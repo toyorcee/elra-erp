@@ -1,0 +1,373 @@
+import express from "express";
+import mongoose from "mongoose";
+import dotenv from "dotenv";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import helmet from "helmet";
+import compression from "compression";
+import rateLimit from "express-rate-limit";
+import mongoSanitize from "express-mongo-sanitize";
+import hpp from "hpp";
+import { fileURLToPath } from "url";
+import { existsSync } from "fs";
+import path from "path";
+import { createServer } from "http";
+import { EventEmitter } from "events";
+import chalk from "chalk";
+import xss from "xss-clean";
+import morgan from "morgan";
+import { Server as SocketIOServer } from "socket.io";
+import Message from "./models/Message.js";
+import User from "./models/User.js";
+import { initializeNotificationService } from "./controllers/notificationController.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Routes
+import authRoutes from "./routes/auth.js";
+import userRoutes from "./routes/users.js";
+import documentRoutes from "./routes/documents.js";
+import dashboardRoutes from "./routes/dashboard.js";
+import messageRoutes from "./routes/messages.js";
+import notificationRoutes from "./routes/notifications.js";
+
+dotenv.config();
+
+const isProduction = process.env.NODE_ENV === "production";
+const isDevelopment = process.env.NODE_ENV === "development";
+
+const app = express();
+const httpServer = createServer(app);
+
+console.log("[server.js] Environment:", process.env.NODE_ENV);
+
+app.use(cookieParser());
+app.use(
+  cors({
+    origin:
+      process.env.NODE_ENV === "production"
+        ? process.env.CLIENT_URL
+        : ["http://localhost:5173"],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    exposedHeaders: ["Content-Range", "X-Content-Range"],
+    maxAge: 86400,
+  })
+);
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    },
+    limit: "50mb",
+  })
+);
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.use(helmet());
+app.use(mongoSanitize());
+app.use(hpp());
+app.use(compression());
+app.use(xss());
+app.use(morgan("combined"));
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; " +
+      "img-src 'self' data: blob: https: http:; " +
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; " +
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+      "font-src 'self' https://fonts.gstatic.com; " +
+      "connect-src 'self' wss: ws:; " +
+      "media-src 'self' blob:;"
+  );
+
+  if (process.env.NODE_ENV === "production") {
+    res.setHeader(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains"
+    );
+  }
+
+  // Other security headers
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+
+  // Allow cross-origin resource sharing
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+
+  // Add CORS headers for preflight requests
+  if (req.method === "OPTIONS") {
+    res.setHeader(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    );
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, X-Requested-With"
+    );
+    res.setHeader("Access-Control-Max-Age", "86400");
+    return res.status(204).end();
+  }
+
+  next();
+});
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Too many requests from this IP, please try again later.",
+});
+
+app.use("/api/", limiter);
+
+EventEmitter.defaultMaxListeners = 15;
+
+// Connect MongoDB
+const connectDB = async () => {
+  try {
+    if (!process.env.MONGODB_URI) {
+      throw new Error("MONGODB_URI is not defined");
+    }
+
+    const conn = await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 30000,
+      maxPoolSize: 10,
+      minPoolSize: 1,
+    });
+
+    console.log(`🟢 MongoDB Connected: ${conn.connection.host}`);
+
+    mongoose.connection.on("error", (error) => {
+      console.error("🔴 MongoDB Error:", error.message);
+    });
+
+    mongoose.connection.on("disconnected", () => {
+      console.log("🔴 MongoDB Disconnected - Retrying...");
+      setTimeout(connectDB, 10000);
+    });
+  } catch (error) {
+    console.error("❌ MongoDB Connection Error:", error.message);
+    console.log("🔄 Reconnecting in 10 seconds...");
+    setTimeout(connectDB, 10000);
+  }
+};
+
+connectDB();
+
+// Serve uploaded files
+app.use(
+  "/uploads",
+  (req, res, next) => {
+    // Add CORS headers for file requests
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    next();
+  },
+  express.static(path.join(__dirname, "uploads"))
+);
+
+// API Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/documents", documentRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/messages", messageRoutes);
+app.use("/api/notifications", notificationRoutes);
+
+app.get("/api", (req, res) => {
+  res.json({
+    message: "Welcome to EDMS API",
+    version: "1.0.0",
+    status: "active",
+    environment: process.env.NODE_ENV || "development",
+  });
+});
+
+// 🔥 Production: Serve Vite frontend
+if (isProduction) {
+  const clientBuildPath = path.join(__dirname, "../client/dist");
+
+  console.log("💡 App running from:", __dirname);
+  console.log("📍 FINAL CLIENT PATH:", clientBuildPath);
+  console.log("📂 Directory exists?", existsSync(clientBuildPath));
+
+  if (!existsSync(clientBuildPath)) {
+    console.error("❌ MISSING CLIENT FILES! Expected at:", clientBuildPath);
+    process.exit(1);
+  }
+
+  app.use(express.static(clientBuildPath));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(clientBuildPath, "index.html"));
+  });
+} else {
+  app.get("/dashboard/*", (req, res) => {
+    res.redirect(`http://localhost:5173${req.url}`);
+  });
+
+  app.get("/", (req, res) => {
+    res.redirect("http://localhost:5173");
+  });
+}
+
+app.use((err, req, res, next) => {
+  console.error(chalk.red(err.stack));
+  res.status(500).json({
+    success: false,
+    error:
+      process.env.NODE_ENV === "development" ? err.message : "Server Error",
+  });
+});
+
+// 404 handler
+app.use("*", (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "Route not found",
+  });
+});
+
+const PORT = process.env.PORT || 5000;
+httpServer.listen(PORT, () => {
+  console.log(
+    chalk.green.bold(
+      `\n${
+        isProduction ? "🚀 Production" : "🔧 Development"
+      } Server running on port ${chalk.cyan(PORT)}\n`
+    )
+  );
+  console.log(chalk.blue(`📡 API URL: http://localhost:${PORT}/api`));
+  console.log(
+    chalk.blue(
+      `🌐 Client URL: ${process.env.CLIENT_URL || "http://localhost:5173"}`
+    )
+  );
+});
+
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin:
+      process.env.NODE_ENV === "production"
+        ? process.env.CLIENT_URL
+        : ["http://localhost:5173"],
+    credentials: true,
+  },
+});
+
+// UserID <-> socketID mapping
+const onlineUsers = new Map();
+
+io.on("connection", async (socket) => {
+  // Authenticate user (assume token is sent as query param or handshake)
+  const userId = socket.handshake.query.userId;
+  if (userId) {
+    onlineUsers.set(userId, socket.id);
+
+    // Update user's online status
+    try {
+      await User.findByIdAndUpdate(userId, {
+        isOnline: true,
+        lastSeen: new Date(),
+      });
+
+      // Emit user online status to all other users
+      socket.broadcast.emit("userOnline", { userId });
+    } catch (error) {
+      console.error("Error updating user online status:", error);
+    }
+
+    // Register for notification service
+    if (typeof global.notificationService !== "undefined") {
+      global.notificationService.registerUser(userId, socket.id);
+    }
+  }
+
+  // Handle chat message
+  socket.on("sendMessage", async (data) => {
+    // data: { sender, recipient, content, document }
+    try {
+      const { sender, recipient, content, document } = data;
+      const message = new Message({ sender, recipient, content, document });
+      await message.save();
+
+      // Emit to recipient if online
+      const recipientSocketId = onlineUsers.get(recipient);
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit("receiveMessage", {
+          _id: message._id,
+          sender,
+          recipient,
+          content,
+          document,
+          createdAt: message.createdAt,
+        });
+      }
+      // Optionally emit to sender for confirmation
+      socket.emit("messageSent", {
+        _id: message._id,
+        sender,
+        recipient,
+        content,
+        document,
+        createdAt: message.createdAt,
+      });
+    } catch (err) {
+      socket.emit("error", { message: "Failed to send message" });
+    }
+  });
+
+  // Mark message as read
+  socket.on("markMessageRead", async ({ messageId, userId }) => {
+    try {
+      const message = await Message.findById(messageId);
+      if (message && message.recipient.toString() === userId) {
+        message.isRead = true;
+        message.readAt = new Date();
+        await message.save();
+      }
+    } catch (err) {
+      // Ignore
+    }
+  });
+
+  socket.on("disconnect", async () => {
+    if (userId) {
+      onlineUsers.delete(userId);
+
+      // Update user's offline status
+      try {
+        await User.findByIdAndUpdate(userId, {
+          isOnline: false,
+          lastSeen: new Date(),
+        });
+
+        // Emit user offline status to all other users
+        socket.broadcast.emit("userOffline", { userId });
+      } catch (error) {
+        console.error("Error updating user offline status:", error);
+      }
+
+      if (typeof global.notificationService !== "undefined") {
+        global.notificationService.removeUser(socket.id);
+      }
+    }
+  });
+});
+
+// Initialize notification service with io
+initializeNotificationService(io);
+
+export { io, onlineUsers };

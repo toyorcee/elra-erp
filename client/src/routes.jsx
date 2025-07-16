@@ -4,12 +4,10 @@ import { Login, Register, Unauthorized } from "./pages/auth";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
 import { Dashboard, Profile, Documents, Upload, Approvals } from "./pages/user";
-import {
-  Dashboard as AdminDashboard,
-  Users,
-  Departments,
-  Settings,
-} from "./pages/admin";
+import Notifications from "./pages/shared/Notifications";
+import UserSettings from "./pages/user/Settings";
+import { Dashboard as AdminDashboard, Users, Departments } from "./pages/admin";
+import AdminSettings from "./pages/admin/settings/Settings";
 import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
 import DashboardLayout from "./layouts/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -42,6 +40,8 @@ const AppRoutes = () => {
         <Route path="upload" element={<Upload />} />
         <Route path="approvals" element={<Approvals />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="notifications" element={<Notifications />} />
+        <Route path="settings" element={<UserSettings />} />
       </Route>
 
       {/* Admin routes - also use DashboardLayout */}
@@ -58,13 +58,14 @@ const AppRoutes = () => {
         <Route index element={<SuperAdminDashboard />} />
         <Route path="users" element={<Users />} />
         <Route path="departments" element={<Departments />} />
-        <Route path="settings" element={<Settings />} />
-        <Route path="system-settings" element={<Settings />} />
-        <Route path="roles" element={<Settings />} />
-        <Route path="analytics" element={<Settings />} />
-        <Route path="approvals" element={<Settings />} />
-        <Route path="documents" element={<Settings />} />
+        <Route path="settings" element={<AdminSettings />} />
+        <Route path="system-settings" element={<AdminSettings />} />
+        <Route path="roles" element={<AdminSettings />} />
+        <Route path="analytics" element={<AdminSettings />} />
+        <Route path="approvals" element={<AdminSettings />} />
+        <Route path="documents" element={<AdminSettings />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="notifications" element={<Notifications />} />
       </Route>
 
       {/* Role-based redirect for authenticated users */}

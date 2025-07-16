@@ -1,13 +1,22 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  MdAccountCircle,
   MdLogout,
   MdSettings,
   MdPerson,
   MdNotifications,
 } from "react-icons/md";
 import { useAuth } from "../context/AuthContext";
+
+const getImageUrl = (avatarPath) => {
+  if (!avatarPath) return null;
+  if (avatarPath.startsWith("http")) return avatarPath;
+
+  const baseUrl = (
+    import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+  ).replace("/api", "");
+  return `${baseUrl}${avatarPath}`;
+};
 
 const ProfileMenu = () => {
   const { user, logout } = useAuth();
@@ -32,14 +41,49 @@ const ProfileMenu = () => {
     return "User";
   };
 
+  const navigateToSettings = () => {
+    setIsOpen(false);
+    if (user?.role?.level >= 100) {
+      navigate("/admin/settings");
+    } else {
+      navigate("/dashboard/settings");
+    }
+  };
+
+  const navigateToNotifications = () => {
+    setIsOpen(false);
+    if (user?.role?.level >= 100) {
+      navigate("/admin/notifications");
+    } else {
+      navigate("/dashboard/notifications");
+    }
+  };
+
   return (
     <div className="relative">
       {/* Desktop Profile Section */}
       <div className="hidden lg:flex items-center space-x-3">
         {/* User Info */}
         <div className="flex items-center space-x-3 bg-gray-50 rounded-xl px-3 py-2 border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer">
-          <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg">
-            {getUserInitial()}
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg bg-gradient-to-r from-blue-600 to-cyan-500 overflow-hidden">
+            {user?.avatar ? (
+              <img
+                src={getImageUrl(user.avatar)}
+                alt="Profile"
+                className="w-full h-full object-cover rounded-full"
+                onError={(e) => {
+                  e.target.style.display = "none";
+                  e.target.nextSibling.style.display = "flex";
+                }}
+              />
+            ) : null}
+            <div
+              className={`w-full h-full flex items-center justify-center ${
+                user?.avatar ? "hidden" : ""
+              }`}
+            >
+              {getUserInitial()}
+            </div>
           </div>
           <div className="text-gray-700">
             <div className="text-sm font-medium">
@@ -93,8 +137,25 @@ const ProfileMenu = () => {
         onClick={() => setIsOpen(!isOpen)}
         className="lg:hidden flex items-center space-x-2 p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-all duration-300 group"
       >
-        <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg">
-          {getUserInitial()}
+        <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg lg:hidden overflow-hidden">
+          {user?.avatar ? (
+            <img
+              src={getImageUrl(user.avatar)}
+              alt="Profile"
+              className="w-full h-full object-cover rounded-full"
+              onError={(e) => {
+                e.target.style.display = "none";
+                e.target.nextSibling.style.display = "flex";
+              }}
+            />
+          ) : null}
+          <div
+            className={`w-full h-full flex items-center justify-center ${
+              user?.avatar ? "hidden" : ""
+            }`}
+          >
+            {getUserInitial()}
+          </div>
         </div>
         <span className="hidden md:block font-medium">
           {user?.firstName ? `${user.firstName} ${user.lastName}` : "User"}
@@ -126,8 +187,25 @@ const ProfileMenu = () => {
           {/* User Info Header */}
           <div className="px-6 py-4 border-b border-gray-100">
             <div className="flex items-center space-x-4">
-              <div className="w-14 h-14 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                {getUserInitial()}
+              <div className="w-14 h-14 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg overflow-hidden">
+                {user?.avatar ? (
+                  <img
+                    src={getImageUrl(user.avatar)}
+                    alt="Profile"
+                    className="w-full h-full object-cover rounded-full"
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                      e.target.nextSibling.style.display = "flex";
+                    }}
+                  />
+                ) : null}
+                <div
+                  className={`w-full h-full flex items-center justify-center ${
+                    user?.avatar ? "hidden" : ""
+                  }`}
+                >
+                  {getUserInitial()}
+                </div>
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-bold text-gray-900 text-lg truncate">
@@ -161,10 +239,7 @@ const ProfileMenu = () => {
             </button>
 
             <button
-              onClick={() => {
-                setIsOpen(false);
-                navigate("/dashboard/notifications");
-              }}
+              onClick={navigateToNotifications}
               className="w-full flex items-center px-6 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group"
             >
               <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3 group-hover:bg-blue-200 transition-colors duration-200">
@@ -174,10 +249,7 @@ const ProfileMenu = () => {
             </button>
 
             <button
-              onClick={() => {
-                setIsOpen(false);
-                navigate("/dashboard/settings");
-              }}
+              onClick={navigateToSettings}
               className="w-full flex items-center px-6 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group"
             >
               <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3 group-hover:bg-blue-200 transition-colors duration-200">

@@ -5,7 +5,7 @@ import {
   useCallback,
   useEffect,
 } from "react";
-import { authAPI, handleApiError } from "../services/api";
+import { authAPI, handleApiError, setHasLoggedIn } from "../services/api";
 
 const initialState = {
   user: null,
@@ -25,6 +25,7 @@ const AUTH_ACTIONS = {
   INIT_START: "INIT_START",
   INIT_SUCCESS: "INIT_SUCCESS",
   INIT_FAILURE: "INIT_FAILURE",
+  UPDATE_PROFILE: "UPDATE_PROFILE",
 };
 
 const authReducer = (state, action) => {
@@ -105,6 +106,12 @@ const authReducer = (state, action) => {
         loading: action.payload,
       };
 
+    case AUTH_ACTIONS.UPDATE_PROFILE:
+      return {
+        ...state,
+        user: action.payload.user,
+      };
+
     default:
       return state;
   }
@@ -115,25 +122,51 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // Initialize authentication on app startup
   const initializeAuth = useCallback(async () => {
     try {
       console.log("🚀 AuthContext: Initializing authentication...");
       dispatch({ type: AUTH_ACTIONS.INIT_START });
 
+      const hasCookies = document.cookie.length > 0;
+      console.log("🔍 AuthContext: Cookie check - has cookies:", hasCookies);
+
+      if (!hasCookies) {
+        console.log(
+          "🔍 AuthContext: No cookies found, skipping authentication check"
+        );
+        dispatch({ type: AUTH_ACTIONS.INIT_FAILURE });
+        return;
+      }
+
+      console.log(
+        "🔍 AuthContext: Cookies found, attempting to get user data..."
+      );
       const response = await authAPI.getMe();
+
+      const userData = response.data.data?.user || response.data.user;
+
       console.log("✅ AuthContext: Initialization successful:", {
-        user: response.data.user,
-        roleName: response.data.user?.role?.name,
-        roleLevel: response.data.user?.role?.level,
+        user: userData,
+        roleName: userData?.role?.name,
+        roleLevel: userData?.role?.level,
+        responseStructure: {
+          hasDataProperty: !!response.data.data,
+          userFromData: !!response.data.data?.user,
+          userFromRoot: !!response.data.user,
+        },
       });
 
       dispatch({
         type: AUTH_ACTIONS.INIT_SUCCESS,
-        payload: { user: response.data.user },
+        payload: { user: userData },
       });
     } catch (error) {
       console.log("❌ AuthContext: Initialization failed:", error.message);
+      console.log(
+        "❌ Error details:",
+        error.response?.status,
+        error.response?.data
+      );
       dispatch({ type: AUTH_ACTIONS.INIT_FAILURE });
     }
   }, []);
@@ -148,9 +181,21 @@ export const AuthProvider = ({ children }) => {
 
     try {
       const response = await authAPI.login(credentials);
+      setHasLoggedIn(true); // Set login flag
+
+      // Handle the correct response structure
+      const userData = response.data.data?.user || response.data.user;
+
+      console.log("🔍 Login response structure:", {
+        hasDataProperty: !!response.data.data,
+        userFromData: !!response.data.data?.user,
+        userFromRoot: !!response.data.user,
+        finalUser: userData,
+      });
+
       dispatch({
         type: AUTH_ACTIONS.LOGIN_SUCCESS,
-        payload: { user: response.data.user },
+        payload: { user: userData },
       });
       return { success: true };
     } catch (error) {
@@ -189,6 +234,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error("Logout API error:", error);
     } finally {
+      setHasLoggedIn(false);
       dispatch({ type: AUTH_ACTIONS.LOGOUT });
     }
   }, []);
@@ -224,6 +270,14 @@ export const AuthProvider = ({ children }) => {
     dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
   }, []);
 
+  const updateProfile = useCallback((updatedUser) => {
+    console.log("🔄 AuthContext: Updating profile in context:", updatedUser);
+    dispatch({
+      type: AUTH_ACTIONS.UPDATE_PROFILE,
+      payload: { user: updatedUser },
+    });
+  }, []);
+
   const value = {
     ...state,
     login,
@@ -232,6 +286,7 @@ export const AuthProvider = ({ children }) => {
     getMe,
     clearError,
     initializeAuth,
+    updateProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

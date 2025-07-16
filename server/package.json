@@ -9,7 +9,8 @@
     "dev": "nodemon server.js",
     "setup": "node scripts/setupSuperAdmin.js",
     "update-password": "node scripts/updatePassword.js",
-    "update-email": "node scripts/updateEmail.js"
+    "update-email": "node scripts/updateEmail.js",
+    "build": "cd ../client && npm install && npm run build"
   },
   "keywords": [
     "edms",

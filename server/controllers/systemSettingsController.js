@@ -42,17 +42,86 @@ export const updateSystemSettings = async (req, res) => {
     }
 
     const updates = req.body;
+    const previousSettings = await SystemSettings.getSettings();
+
+    // Log the changes being made
+    console.log(
+      `🔧 System Settings Update - User: ${req.user.username} (${req.user.email})`
+    );
+    console.log(`📝 Update Type: ${Object.keys(updates).length === 1 ? 'Partial Update' : 'Full Update'}`);
+    console.log(`🔄 Requested Updates:`, JSON.stringify(updates, null, 2));
+
+    // Log specific changes for partial updates
+    Object.keys(updates).forEach(section => {
+      if (updates[section] && typeof updates[section] === 'object') {
+        Object.keys(updates[section]).forEach(field => {
+          const oldValue = previousSettings[section]?.[field];
+          const newValue = updates[section][field];
+          
+          if (oldValue !== newValue) {
+            console.log(`🎯 CHANGE: ${section}.${field}`);
+            console.log(`   From: ${oldValue}`);
+            console.log(`   To: ${newValue}`);
+          }
+        });
+      }
+    });
+
+    // Check for specific important changes
+    if (updates.registration?.requireDepartmentSelection !== undefined) {
+      const oldValue = previousSettings.registration.requireDepartmentSelection;
+      const newValue = updates.registration.requireDepartmentSelection;
+
+      if (oldValue !== newValue) {
+        console.log(`🎯 CRITICAL CHANGE: Department Selection Requirement`);
+        console.log(`   From: ${oldValue ? "REQUIRED" : "OPTIONAL"}`);
+        console.log(`   To: ${newValue ? "REQUIRED" : "OPTIONAL"}`);
+        console.log(
+          `   Impact: Registration form will ${
+            newValue ? "show" : "hide"
+          } department field`
+        );
+      }
+    }
+
+    if (updates.registration?.allowPublicRegistration !== undefined) {
+      const oldValue = previousSettings.registration.allowPublicRegistration;
+      const newValue = updates.registration.allowPublicRegistration;
+
+      if (oldValue !== newValue) {
+        console.log(`🎯 CRITICAL CHANGE: Public Registration`);
+        console.log(`   From: ${oldValue ? "ALLOWED" : "RESTRICTED"}`);
+        console.log(`   To: ${newValue ? "ALLOWED" : "RESTRICTED"}`);
+      }
+    }
+
     const settings = await SystemSettings.updateSettings(updates, req.user.id);
+
+    // Log the final result
+    console.log(`✅ System Settings Updated Successfully`);
+    console.log(`📊 New Settings:`, JSON.stringify(settings, null, 2));
+    console.log(`👤 Updated By: ${req.user.username} (${req.user.email})`);
+    console.log(`⏰ Timestamp: ${new Date().toISOString()}`);
+    console.log(`---`);
 
     res.status(200).json({
       success: true,
       message: "System settings updated successfully",
       data: {
         settings,
+        updatedBy: {
+          id: req.user.id,
+          username: req.user.username,
+          email: req.user.email,
+        },
+        timestamp: new Date().toISOString(),
       },
     });
   } catch (error) {
-    console.error("Update system settings error:", error);
+    console.error("❌ Update system settings error:", error);
+    console.error(`👤 User: ${req.user?.username} (${req.user?.email})`);
+    console.error(`📝 Request Body:`, JSON.stringify(req.body, null, 2));
+
     res.status(500).json({
       success: false,
       message: "Internal server error",

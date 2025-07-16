@@ -1,93 +1,88 @@
 import axios from "axios";
 
+console.log("API Base URL:", import.meta.env.VITE_API_URL);
+
+let hasLoggedIn = false;
+export const setHasLoggedIn = (value) => {
+  hasLoggedIn = value;
+  console.log("🔐 Login state changed:", hasLoggedIn);
+};
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "/api",
-  timeout: 10000,
-  headers: {
-    "Content-Type": "application/json",
-  },
   withCredentials: true,
+  headers: {
+    Accept: "application/json",
+  },
 });
-
-let isRefreshing = false;
-let failedQueue = [];
-
-const processQueue = (error, token = null) => {
-  failedQueue.forEach(({ resolve, reject }) => {
-    if (error) {
-      reject(error);
-    } else {
-      resolve(token);
-    }
-  });
-
-  failedQueue = [];
-};
 
 api.interceptors.request.use(
   (config) => {
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
+
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
 
 api.interceptors.response.use(
   (response) => {
     return response;
   },
   async (error) => {
+    console.error("API Error:", {
+      url: error.config?.url,
+      method: error.config?.method,
+      status: error.response?.status,
+      data: error.response?.data,
+      headers: error.response?.headers,
+      cookies: document.cookie,
+    });
+
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (originalRequest.url === "/auth/refresh") {
+      return Promise.reject(error);
+    }
+
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      hasLoggedIn
+    ) {
       if (isRefreshing) {
-        return new Promise((resolve, reject) => {
+        return new Promise(function (resolve, reject) {
           failedQueue.push({ resolve, reject });
         })
-          .then((token) => {
-            originalRequest.headers["Authorization"] = `Bearer ${token}`;
-            return api(originalRequest);
-          })
-          .catch((err) => {
-            return Promise.reject(err);
-          });
+          .then(() => api(originalRequest))
+          .catch((err) => Promise.reject(err));
       }
 
       originalRequest._retry = true;
       isRefreshing = true;
 
       try {
-        const response = await authAPI.refreshToken();
-        const { accessToken } = response.data;
-
-        processQueue(null, accessToken);
-        isRefreshing = false;
-
-        originalRequest.headers["Authorization"] = `Bearer ${accessToken}`;
+        await api.post("/auth/refresh");
+        processQueue(null);
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        isRefreshing = false;
-
-        // If refresh fails, redirect to login
-        if (window.location.pathname !== "/login") {
-          window.location.href = "/login";
-        }
-
         return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
-    }
-
-    if (error.response?.status === 403) {
-      // Handle forbidden access
-      if (window.location.pathname !== "/unauthorized") {
-        window.location.href = "/unauthorized";
-      }
-    }
-
-    if (error.response?.status === 500) {
-      console.error("Server error occurred");
     }
 
     return Promise.reject(error);
@@ -96,23 +91,32 @@ api.interceptors.response.use(
 
 // Auth API methods
 export const authAPI = {
-  login: (credentials) =>
-    api.post("/auth/login", credentials).then((res) => res.data),
-  register: (userData) =>
-    api.post("/auth/register", userData).then((res) => res.data),
-  logout: () => api.post("/auth/logout").then((res) => res.data),
-  refreshToken: () => api.post("/auth/refresh").then((res) => res.data),
-  getProfile: () => api.get("/auth/me").then((res) => res.data),
-  getMe: () => api.get("/auth/me").then((res) => res.data),
-  forgotPassword: (data) =>
-    api.post("/auth/forgot-password", data).then((res) => res.data),
-  resetPassword: (data) =>
-    api.post("/auth/reset-password", data).then((res) => res.data),
+  login: (credentials) => api.post("/auth/login", credentials),
+  register: (userData) => api.post("/auth/register", userData),
+  logout: () => api.post("/auth/logout"),
+  refreshToken: () => api.post("/auth/refresh"),
+  getProfile: () => api.get("/auth/me"),
+  getMe: () => api.get("/auth/me"),
+  forgotPassword: (data) => api.post("/auth/forgot-password", data),
+  resetPassword: (data) => api.post("/auth/reset-password", data),
   isAuthenticated: () => {
-    return (
-      document.cookie.includes("accessToken=") ||
-      document.cookie.includes("refreshToken=")
-    );
+    // Check for accessToken cookie (not httpOnly, so we can read it)
+    const cookies = document.cookie.split(";").reduce((acc, cookie) => {
+      const [key, value] = cookie.trim().split("=");
+      acc[key] = value;
+      return acc;
+    }, {});
+
+    const hasAccessToken =
+      cookies.accessToken && cookies.accessToken !== "undefined";
+
+    console.log("🔍 Cookie check:", {
+      hasAccessToken,
+      hasLoggedIn,
+      allCookies: document.cookie || "No cookies found",
+    });
+
+    return hasAccessToken || hasLoggedIn;
   },
 };
 

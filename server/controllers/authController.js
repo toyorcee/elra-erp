@@ -21,6 +21,19 @@ const generateRefreshToken = (userId) => {
   });
 };
 
+// Reusable cookie options function
+const getCookieOptions = (maxAge) => {
+  const isProd = process.env.NODE_ENV === "production";
+
+  return {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "None" : "Lax",
+    path: "/",
+    maxAge: maxAge,
+  };
+};
+
 // Set token cookies
 const setTokenCookies = (res, accessToken, refreshToken) => {
   const accessTokenMaxAge = process.env.ACCESS_TOKEN_EXPIRE
@@ -30,20 +43,22 @@ const setTokenCookies = (res, accessToken, refreshToken) => {
   const refreshTokenMaxAge = process.env.REFRESH_TOKEN_EXPIRE
     ? parseTimeToMs(process.env.REFRESH_TOKEN_EXPIRE)
     : 24 * 60 * 60 * 1000;
-  // Access token cookie (httpOnly, secure in production)
-  res.cookie("accessToken", accessToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: accessTokenMaxAge,
-  });
 
-  // Refresh token cookie (httpOnly, secure in production)
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: refreshTokenMaxAge,
+  // Set cookies with consistent options
+  res.cookie("accessToken", accessToken, getCookieOptions(accessTokenMaxAge));
+  res.cookie(
+    "refreshToken",
+    refreshToken,
+    getCookieOptions(refreshTokenMaxAge)
+  );
+
+  console.log("🍪 Setting cookies:", {
+    accessToken: `httpOnly: true, secure: ${
+      process.env.NODE_ENV === "production"
+    }, sameSite: ${process.env.NODE_ENV === "production" ? "None" : "Lax"}`,
+    refreshToken: "httpOnly: true, secure, sameSite",
+    maxAge: accessTokenMaxAge,
+    environment: process.env.NODE_ENV || "development",
   });
 };
 
@@ -62,14 +77,31 @@ const parseTimeToMs = (timeString) => {
     case "d":
       return value * 24 * 60 * 60 * 1000;
     default:
-      return 15 * 60 * 1000; // 15 minutes default
+      return 15 * 60 * 1000;
   }
 };
 
 // Clear token cookies
 const clearTokenCookies = (res) => {
-  res.clearCookie("accessToken");
-  res.clearCookie("refreshToken");
+  const isProd = process.env.NODE_ENV === "production";
+
+  const clearOptions = {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "None" : "Lax",
+    path: "/",
+  };
+
+  console.log("🗑️ Clearing cookies:", {
+    accessToken: `httpOnly: true, secure: ${isProd}, sameSite: ${
+      isProd ? "None" : "Lax"
+    }`,
+    refreshToken: "httpOnly: true, secure, sameSite",
+    environment: process.env.NODE_ENV || "development",
+  });
+
+  res.clearCookie("accessToken", clearOptions);
+  res.clearCookie("refreshToken", clearOptions);
 };
 
 // @desc    Register a new user
@@ -144,6 +176,9 @@ export const register = async (req, res) => {
     await user.save();
     console.log("Register success:", user.email);
 
+    // Populate role after saving
+    await user.populate("role");
+
     // Generate tokens
     const accessToken = generateAccessToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
@@ -170,9 +205,16 @@ export const register = async (req, res) => {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      phone: user.phone,
+      position: user.position,
+      bio: user.bio,
+      address: user.address,
+      employeeId: user.employeeId,
+      department: user.department,
       role: user.role,
       isActive: user.isActive,
       createdAt: user.createdAt,
+      avatar: user.avatar,
     };
 
     res.status(201).json({
@@ -213,9 +255,9 @@ export const login = async (req, res) => {
     const { identifier, password } = req.body;
 
     // Find user by email or username and include password
-    const user = await User.findByEmailOrUsername(identifier).select(
-      "+password"
-    );
+    const user = await User.findByEmailOrUsername(identifier)
+      .select("+password")
+      .populate("role");
     if (!user) {
       console.log("Login failed: user not found");
       return res.status(401).json({
@@ -279,10 +321,17 @@ export const login = async (req, res) => {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      phone: user.phone,
+      position: user.position,
+      bio: user.bio,
+      address: user.address,
+      employeeId: user.employeeId,
+      department: user.department,
       role: user.role,
       isActive: user.isActive,
       lastLogin: user.lastLogin,
       createdAt: user.createdAt,
+      avatar: user.avatar,
     };
 
     res.status(200).json({
@@ -478,11 +527,17 @@ export const getMe = async (req, res) => {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      role: user.role,
+      phone: user.phone,
+      position: user.position,
+      bio: user.bio,
+      address: user.address,
+      employeeId: user.employeeId,
       department: user.department,
+      role: user.role,
       isActive: user.isActive,
       lastLogin: user.lastLogin,
       createdAt: user.createdAt,
+      avatar: user.avatar,
     };
 
     console.log("📤 Sending user response:", {

@@ -4,11 +4,15 @@ import {
   getSystemSettings,
   updateSystemSettings,
 } from "../../../services/admin/systemSettings";
+import { useAuth } from "../../../context/AuthContext";
 
 const SystemSettings = () => {
+  const { user } = useAuth();
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [originalSettings, setOriginalSettings] = useState(null);
+  const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -18,7 +22,10 @@ const SystemSettings = () => {
     try {
       setLoading(true);
       const response = await getSystemSettings();
-      setSettings(response.data.settings);
+      const fetchedSettings = response.data.settings;
+      setSettings(fetchedSettings);
+      setOriginalSettings(JSON.parse(JSON.stringify(fetchedSettings))); // Deep copy
+      setHasChanges(false);
     } catch (error) {
       toast.error("Failed to fetch system settings");
       console.error("Error fetching settings:", error);
@@ -27,21 +34,123 @@ const SystemSettings = () => {
     }
   };
 
+  // Calculate delta between current and original settings
+  const calculateDelta = () => {
+    if (!settings || !originalSettings) return {};
+
+    const delta = {};
+
+    // Compare registration settings
+    if (
+      JSON.stringify(settings.registration) !==
+      JSON.stringify(originalSettings.registration)
+    ) {
+      delta.registration = settings.registration;
+    }
+
+    // Compare department settings
+    if (
+      JSON.stringify(settings.departments) !==
+      JSON.stringify(originalSettings.departments)
+    ) {
+      delta.departments = settings.departments;
+    }
+
+    // Compare system info settings
+    if (
+      JSON.stringify(settings.systemInfo) !==
+      JSON.stringify(originalSettings.systemInfo)
+    ) {
+      delta.systemInfo = settings.systemInfo;
+    }
+
+    return delta;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const delta = calculateDelta();
+
+    if (Object.keys(delta).length === 0) {
+      toast.info("No changes to save");
+      return;
+    }
+
+    console.log("💾 SAVE BUTTON CLICKED!");
+    console.log("📝 Delta to save:", delta);
+    console.log("👤 User:", user?.username, "(", user?.email, ")");
+    console.log("⏰ Timestamp:", new Date().toISOString());
+
     try {
       setSaving(true);
-      await updateSystemSettings(settings);
+      console.log("🚀 Calling updateSystemSettings service with delta...");
+      await updateSystemSettings(delta);
+      console.log("✅ Settings saved successfully!");
+
+      // Update original settings to current state
+      setOriginalSettings(JSON.parse(JSON.stringify(settings)));
+      setHasChanges(false);
+
       toast.success("System settings updated successfully");
     } catch (error) {
+      console.error("❌ Error saving settings:", error);
       toast.error("Failed to update system settings");
-      console.error("Error updating settings:", error);
     } finally {
       setSaving(false);
     }
   };
 
+  const handleToggleUpdate = async (section, field, value) => {
+    console.log(`🎯 TOGGLE UPDATE: ${section}.${field} = ${value}`);
+    console.log("👤 User:", user?.username, "(", user?.email, ")");
+    console.log("⏰ Timestamp:", new Date().toISOString());
+
+    const delta = {
+      [section]: {
+        ...settings[section],
+        [field]: value,
+      },
+    };
+
+    console.log("📝 Delta being sent:", delta);
+
+    try {
+      console.log("🚀 Making immediate API call for toggle update...");
+      await updateSystemSettings(delta);
+      console.log("✅ Toggle update saved successfully!");
+
+      // Update local state after successful API call
+      setSettings((prev) => ({
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [field]: value,
+        },
+      }));
+
+      // Update original settings
+      setOriginalSettings((prev) => ({
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [field]: value,
+        },
+      }));
+      setHasChanges(false);
+
+      toast.success(`${section}.${field} updated successfully`);
+    } catch (error) {
+      console.error("❌ Error updating toggle:", error);
+      toast.error(`Failed to update ${section}.${field}`);
+
+      // Don't update local state on error - keep the original value
+    }
+  };
+
+  // Regular change handler for non-toggle fields
   const handleChange = (section, field, value) => {
+    console.log(`📝 FIELD CHANGE: ${section}.${field} = ${value}`);
+
     setSettings((prev) => ({
       ...prev,
       [section]: {
@@ -49,6 +158,8 @@ const SystemSettings = () => {
         [field]: value,
       },
     }));
+
+    setHasChanges(true);
   };
 
   if (loading) {
@@ -73,6 +184,14 @@ const SystemSettings = () => {
         <p className="text-gray-600">
           Configure system-wide settings and registration behavior
         </p>
+        {hasChanges && (
+          <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+            <p className="text-sm text-yellow-800">
+              ⚠️ You have unsaved changes. Click "Save Settings" to apply all
+              changes at once.
+            </p>
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
@@ -98,7 +217,7 @@ const SystemSettings = () => {
                   settings?.registration?.allowPublicRegistration || false
                 }
                 onChange={(e) =>
-                  handleChange(
+                  handleToggleUpdate(
                     "registration",
                     "allowPublicRegistration",
                     e.target.checked
@@ -123,7 +242,7 @@ const SystemSettings = () => {
                   settings?.registration?.requireDepartmentSelection || false
                 }
                 onChange={(e) =>
-                  handleChange(
+                  handleToggleUpdate(
                     "registration",
                     "requireDepartmentSelection",
                     e.target.checked
@@ -179,7 +298,7 @@ const SystemSettings = () => {
                   settings?.departments?.allowExternalDepartment || false
                 }
                 onChange={(e) =>
-                  handleChange(
+                  handleToggleUpdate(
                     "departments",
                     "allowExternalDepartment",
                     e.target.checked
@@ -202,7 +321,7 @@ const SystemSettings = () => {
                 type="checkbox"
                 checked={settings?.departments?.autoCreateExternal || false}
                 onChange={(e) =>
-                  handleChange(
+                  handleToggleUpdate(
                     "departments",
                     "autoCreateExternal",
                     e.target.checked
@@ -257,10 +376,14 @@ const SystemSettings = () => {
         <div className="flex justify-end">
           <button
             type="submit"
-            disabled={saving}
-            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            disabled={saving || !hasChanges}
+            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {saving ? "Saving..." : "Save Settings"}
+            {saving
+              ? "Saving..."
+              : hasChanges
+              ? "Save All Changes"
+              : "No Changes"}
           </button>
         </div>
       </form>

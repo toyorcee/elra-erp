@@ -11,6 +11,17 @@ import {
 import { getNavigationForRole, getRoleTitle } from "../config/sidebarConfig";
 import { useAuth } from "../context/AuthContext";
 
+// Helper function to get full image URL
+const getImageUrl = (avatarPath) => {
+  if (!avatarPath) return null;
+  if (avatarPath.startsWith("http")) return avatarPath;
+
+  const baseUrl = (
+    import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+  ).replace("/api", "");
+  return `${baseUrl}${avatarPath}`;
+};
+
 function hasAccess(user, required) {
   if (!user) return false;
   if (!required) return true;
@@ -110,7 +121,7 @@ const Sidebar = ({ onExpandedChange, onPinnedChange }) => {
           msOverflowStyle: isExpanded ? "auto" : "none",
         }}
       >
-        <style jsx>{`
+        <style>{`
           .scrollbar-hide::-webkit-scrollbar {
             display: none;
           }
@@ -203,8 +214,25 @@ const Sidebar = ({ onExpandedChange, onPinnedChange }) => {
               className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-white/20 transition-all duration-300 group"
             >
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg">
-                  {getUserInitial()}
+                <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg overflow-hidden">
+                  {user?.avatar ? (
+                    <img
+                      src={getImageUrl(user.avatar)}
+                      alt="Profile"
+                      className="w-full h-full object-cover rounded-full"
+                      onError={(e) => {
+                        e.target.style.display = "none";
+                        e.target.nextSibling.style.display = "flex";
+                      }}
+                    />
+                  ) : null}
+                  <div
+                    className={`w-full h-full flex items-center justify-center ${
+                      user?.avatar ? "hidden" : ""
+                    }`}
+                  >
+                    {getUserInitial()}
+                  </div>
                 </div>
                 <div className="text-left">
                   <div className="font-medium text-white text-sm">
@@ -243,8 +271,25 @@ const Sidebar = ({ onExpandedChange, onPinnedChange }) => {
                 {/* User Info Header */}
                 <div className="px-4 py-3 border-b border-gray-200/50">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg">
-                      {getUserInitial()}
+                    <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg overflow-hidden">
+                      {user?.avatar ? (
+                        <img
+                          src={getImageUrl(user.avatar)}
+                          alt="Profile"
+                          className="w-full h-full object-cover rounded-full"
+                          onError={(e) => {
+                            e.target.style.display = "none";
+                            e.target.nextSibling.style.display = "flex";
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className={`w-full h-full flex items-center justify-center ${
+                          user?.avatar ? "hidden" : ""
+                        }`}
+                      >
+                        {getUserInitial()}
+                      </div>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-bold text-gray-900 text-sm truncate">
@@ -323,8 +368,25 @@ const Sidebar = ({ onExpandedChange, onPinnedChange }) => {
         ) : (
           // Collapsed Profile View (Icon Only) - Improved styling
           <div className="flex justify-center">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer">
-              {getUserInitial()}
+            <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer overflow-hidden">
+              {user?.avatar ? (
+                <img
+                  src={getImageUrl(user.avatar)}
+                  alt="Profile"
+                  className="w-full h-full object-cover rounded-full"
+                  onError={(e) => {
+                    e.target.style.display = "none";
+                    e.target.nextSibling.style.display = "flex";
+                  }}
+                />
+              ) : null}
+              <div
+                className={`w-full h-full flex items-center justify-center ${
+                  user?.avatar ? "hidden" : ""
+                }`}
+              >
+                {getUserInitial()}
+              </div>
             </div>
           </div>
         )}

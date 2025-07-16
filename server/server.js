@@ -34,6 +34,7 @@ import notificationRoutes from "./routes/notifications.js";
 import departmentRoutes from "./routes/departments.js";
 import superAdminRoutes from "./routes/superAdmin.js";
 import systemSettingsRoutes from "./routes/systemSettings.js";
+import profileRoutes from "./routes/profile.js";
 
 dotenv.config();
 
@@ -192,6 +193,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/departments", departmentRoutes);
 app.use("/api/super-admin", superAdminRoutes);
 app.use("/api/system-settings", systemSettingsRoutes);
+app.use("/api/profile", profileRoutes);
 
 app.get("/api", (req, res) => {
   res.json({

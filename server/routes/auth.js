@@ -11,6 +11,7 @@ import {
   resetPassword,
 } from "../controllers/authController.js";
 import { protect } from "../middleware/auth.js";
+import { passwordResetLimiter } from "../middleware/rateLimit.js";
 
 const router = express.Router();
 
@@ -94,7 +95,12 @@ router.put(
   changePasswordValidation,
   changePassword
 );
-router.post("/forgot-password", forgotPasswordValidation, forgotPassword);
+router.post(
+  "/forgot-password",
+  passwordResetLimiter,
+  forgotPasswordValidation,
+  forgotPassword
+);
 router.post("/reset-password", resetPasswordValidation, resetPassword);
 
 export default router;

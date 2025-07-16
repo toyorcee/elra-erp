@@ -1,0 +1,264 @@
+/* EDMS Brand Color System */
+:root {
+  /* Primary Brand Colors - Based on Login/Register gradients */
+  --primary-gradient: linear-gradient(
+    135deg,
+    #1e40af 0%,
+    #0891b2 50%,
+    #7c3aed 100%
+  );
+  --primary-gradient-hover: linear-gradient(
+    135deg,
+    #1d4ed8 0%,
+    #0e7490 50%,
+    #6d28d9 100%
+  );
+
+  /* Secondary Brand Colors - Green to Blue variant */
+  --secondary-gradient: linear-gradient(
+    135deg,
+    #059669 0%,
+    #1e40af 50%,
+    #7c3aed 100%
+  );
+  --secondary-gradient-hover: linear-gradient(
+    135deg,
+    #047857 0%,
+    #1d4ed8 50%,
+    #6d28d9 100%
+  );
+
+  /* Individual Color Stops */
+  --primary-blue: #1e40af;
+  --primary-blue-hover: #1d4ed8;
+  --primary-cyan: #0891b2;
+  --primary-cyan-hover: #0e7490;
+  --primary-purple: #7c3aed;
+  --primary-purple-hover: #6d28d9;
+
+  --secondary-green: #059669;
+  --secondary-green-hover: #047857;
+
+  /* Background Gradients */
+  --bg-primary: linear-gradient(135deg, #1e40af 0%, #0891b2 50%, #7c3aed 100%);
+  --bg-secondary: linear-gradient(
+    135deg,
+    #059669 0%,
+    #1e40af 50%,
+    #7c3aed 100%
+  );
+  --bg-light: linear-gradient(135deg, #dbeafe 0%, #cffafe 50%, #f3e8ff 100%);
+
+  /* Text Colors */
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-light: #f8fafc;
+  --text-muted: #94a3b8;
+
+  /* Status Colors */
+  --success: #059669;
+  --success-light: #d1fae5;
+  --warning: #d97706;
+  --warning-light: #fef3c7;
+  --error: #dc2626;
+  --error-light: #fee2e2;
+  --info: #0891b2;
+  --info-light: #cffafe;
+
+  /* Border Colors */
+  --border-primary: #e2e8f0;
+  --border-focus: #1e40af;
+  --border-error: #fca5a5;
+
+  /* Shadow Colors */
+  --shadow-primary: rgba(30, 64, 175, 0.1);
+  --shadow-secondary: rgba(5, 150, 105, 0.1);
+  --shadow-purple: rgba(124, 58, 237, 0.1);
+
+  /* Component Specific */
+  --sidebar-bg: rgba(255, 255, 255, 0.3);
+  --sidebar-border: rgba(255, 255, 255, 0.4);
+  --card-bg: rgba(255, 255, 255, 0.6);
+  --card-border: rgba(226, 232, 240, 0.8);
+}
+
+/* Utility Classes for Brand Colors */
+.bg-brand-primary {
+  background: var(--primary-gradient);
+}
+
+.bg-brand-secondary {
+  background: var(--secondary-gradient);
+}
+
+.bg-brand-light {
+  background: var(--bg-light);
+}
+
+.text-brand-primary {
+  color: var(--primary-blue);
+}
+
+.text-brand-secondary {
+  color: var(--secondary-green);
+}
+
+.border-brand-primary {
+  border-color: var(--border-focus);
+}
+
+.shadow-brand-primary {
+  box-shadow: 0 4px 6px -1px var(--shadow-primary);
+}
+
+.shadow-brand-secondary {
+  box-shadow: 0 4px 6px -1px var(--shadow-secondary);
+}
+
+/* Gradient Text */
+.text-gradient-primary {
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-secondary {
+  background: var(--secondary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Button Variants */
+.btn-primary {
+  background: var(--primary-gradient);
+  color: var(--text-light);
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  background: var(--primary-gradient-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px var(--shadow-primary);
+}
+
+.btn-secondary {
+  background: var(--secondary-gradient);
+  color: var(--text-light);
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: var(--secondary-gradient-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px var(--shadow-secondary);
+}
+
+/* Focus States */
+.focus-brand-primary:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+}
+
+/* Loading States */
+.loading-primary {
+  background: var(--primary-gradient);
+  background-size: 200% 200%;
+  animation: gradient-shift 2s ease infinite;
+}
+
+.loading-secondary {
+  background: var(--secondary-gradient);
+  background-size: 200% 200%;
+  animation: gradient-shift 2s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Custom animations for stat cards */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.6s ease-out;
+}
+
+.animate-slide-in {
+  animation: slide-in 0.6s ease-out;
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.8s ease-out;
+}
+
+/* Stagger animation for grid items */
+.stat-grid > * {
+  animation: fade-in 0.6s ease-out;
+}
+
+.stat-grid > *:nth-child(1) {
+  animation-delay: 0.1s;
+}
+.stat-grid > *:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.stat-grid > *:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.stat-grid > *:nth-child(4) {
+  animation-delay: 0.4s;
+}
+.stat-grid > *:nth-child(5) {
+  animation-delay: 0.5s;
+}
+.stat-grid > *:nth-child(6) {
+  animation-delay: 0.6s;
+}

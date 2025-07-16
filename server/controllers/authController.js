@@ -2,8 +2,12 @@ import jwt from "jsonwebtoken";
 import { validationResult } from "express-validator";
 import bcrypt from "bcryptjs";
 import User from "../models/User.js";
+import Department from "../models/Department.js";
+import {
+  sendPasswordResetEmail,
+  sendPasswordChangeSuccessEmail,
+} from "../services/emailService.js";
 
-// Generate access token (short-lived - 15 minutes)
 const generateAccessToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
     expiresIn: process.env.ACCESS_TOKEN_EXPIRE || "15m",
@@ -73,6 +77,7 @@ const clearTokenCookies = (res) => {
 // @access  Public
 export const register = async (req, res) => {
   try {
+    console.log("Register attempt:", req.body);
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -83,7 +88,8 @@ export const register = async (req, res) => {
       });
     }
 
-    const { username, email, password, firstName, lastName } = req.body;
+    const { username, email, password, firstName, lastName, department } =
+      req.body;
 
     // Check if user already exists
     const existingUser = await User.findByEmailOrUsername(email);
@@ -94,6 +100,37 @@ export const register = async (req, res) => {
       });
     }
 
+    // Handle department assignment
+    let departmentId;
+    if (department) {
+      // If department name/code provided, find the department
+      const dept = await Department.findOne({
+        $or: [{ name: department }, { code: department.toUpperCase() }],
+        isActive: true,
+      });
+      departmentId = dept?._id;
+    }
+
+    // If no department found or provided, get/create External department
+    if (!departmentId) {
+      let externalDept = await Department.findOne({
+        code: "EXT",
+        isActive: true,
+      });
+
+      if (!externalDept) {
+        externalDept = new Department({
+          name: "External",
+          code: "EXT",
+          description: "External users and contractors",
+          level: 10,
+          createdBy: null,
+        });
+        await externalDept.save();
+      }
+      departmentId = externalDept._id;
+    }
+
     // Create new user
     const user = new User({
       username,
@@ -101,9 +138,11 @@ export const register = async (req, res) => {
       password,
       firstName,
       lastName,
+      department: departmentId,
     });
 
     await user.save();
+    console.log("Register success:", user.email);
 
     // Generate tokens
     const accessToken = generateAccessToken(user._id);
@@ -146,7 +185,7 @@ export const register = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Registration error:", error);
+    console.error("Register error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -160,6 +199,7 @@ export const register = async (req, res) => {
 // @access  Public
 export const login = async (req, res) => {
   try {
+    console.log("Login attempt:", req.body.identifier);
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -177,6 +217,7 @@ export const login = async (req, res) => {
       "+password"
     );
     if (!user) {
+      console.log("Login failed: user not found");
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
@@ -197,6 +238,7 @@ export const login = async (req, res) => {
       user.password
     );
     if (!isPasswordCorrect) {
+      console.log("Login failed: incorrect password");
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
@@ -225,6 +267,7 @@ export const login = async (req, res) => {
     // Update last login
     user.lastLogin = new Date();
     await user.save();
+    console.log("Login success:", user.email);
 
     // Set cookies
     setTokenCookies(res, accessToken, refreshToken);
@@ -406,14 +449,28 @@ export const refreshToken = async (req, res) => {
 // @access  Private
 export const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    console.log("🔍 /me endpoint called for user ID:", req.user.id);
+
+    const user = await User.findById(req.user.id).populate("role department");
 
     if (!user) {
+      console.log("❌ User not found for ID:", req.user.id);
       return res.status(404).json({
         success: false,
         message: "User not found",
       });
     }
+
+    console.log("✅ User found:", {
+      id: user._id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      roleId: user.role?._id,
+      roleName: user.role?.name,
+      roleLevel: user.role?.level,
+      department: user.department?.name,
+    });
 
     const userResponse = {
       id: user._id,
@@ -422,10 +479,17 @@ export const getMe = async (req, res) => {
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role,
+      department: user.department,
       isActive: user.isActive,
       lastLogin: user.lastLogin,
       createdAt: user.createdAt,
     };
+
+    console.log("📤 Sending user response:", {
+      roleName: userResponse.role?.name,
+      roleLevel: userResponse.role?.level,
+      roleId: userResponse.role?._id,
+    });
 
     res.status(200).json({
       success: true,
@@ -434,7 +498,7 @@ export const getMe = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Get me error:", error);
+    console.error("❌ Get me error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -516,6 +580,7 @@ export const forgotPassword = async (req, res) => {
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log("❌ Password reset validation failed:", errors.array());
       return res.status(400).json({
         success: false,
         message: "Validation failed",
@@ -524,11 +589,34 @@ export const forgotPassword = async (req, res) => {
     }
 
     const { email } = req.body;
+    const clientIP = req.ip || req.connection.remoteAddress;
+    const userAgent = req.get("User-Agent");
+
+    console.log(`🔐 Password reset attempt for email: ${email}`);
+    console.log(`📍 IP Address: ${clientIP}`);
+    console.log(`🌐 User Agent: ${userAgent}`);
 
     // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
+      console.log(`❌ Password reset failed: User not found - ${email}`);
+      console.log(
+        `🚨 Potential security threat: Unknown email attempting password reset`
+      );
       // Don't reveal if email exists or not for security
+      return res.status(200).json({
+        success: true,
+        message:
+          "If an account with that email exists, a password reset link has been sent.",
+      });
+    }
+
+    console.log(`✅ User found: ${user.username} (${user.email})`);
+    console.log(`👤 User ID: ${user._id}`);
+
+    // Check if user is active
+    if (!user.isActive) {
+      console.log(`❌ Password reset failed: Account deactivated - ${email}`);
       return res.status(200).json({
         success: true,
         message:
@@ -540,6 +628,8 @@ export const forgotPassword = async (req, res) => {
     const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: process.env.PASSWORD_RESET_EXPIRE || "1h",
     });
+
+    console.log(`🔑 Reset token generated for user: ${user._id}`);
 
     // Save reset token to user (hashed)
     const saltRounds = parseInt(process.env.BCRYPT_ROUNDS) || 12;
@@ -553,20 +643,39 @@ export const forgotPassword = async (req, res) => {
     user.passwordResetExpires = new Date(Date.now() + resetTokenExpiry);
     await user.save();
 
-    // TODO: Send email with reset link
-    // For now, just return the token (in production, send via email)
-    const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
+    console.log(`💾 Reset token saved to database for user: ${user._id}`);
+    console.log(`⏰ Token expires at: ${user.passwordResetExpires}`);
+
+    // Send email with reset link
+    console.log(`📧 Sending password reset email to: ${user.email}`);
+    const emailResult = await sendPasswordResetEmail(
+      user.email,
+      resetToken,
+      user.firstName || user.username
+    );
+
+    if (!emailResult.success) {
+      console.error(
+        "❌ Failed to send password reset email:",
+        emailResult.error
+      );
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send password reset email. Please try again.",
+      });
+    }
+
+    console.log(`✅ Password reset email sent successfully!`);
+    console.log(`📧 Email Message ID: ${emailResult.messageId}`);
+    console.log(`🎯 Reset link sent to: ${user.email}`);
 
     res.status(200).json({
       success: true,
-      message: "Password reset link sent to email",
-      data: {
-        resetUrl, // Remove this in production
-        message: "In production, this would be sent via email",
-      },
+      message:
+        "If an account with that email exists, a password reset link has been sent.",
     });
   } catch (error) {
-    console.error("Forgot password error:", error);
+    console.error("❌ Forgot password error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -580,9 +689,16 @@ export const forgotPassword = async (req, res) => {
 // @access  Public
 export const resetPassword = async (req, res) => {
   try {
+    console.log("🔐 Reset password attempt:", {
+      hasToken: !!req.body.token,
+      hasPassword: !!req.body.newPassword,
+      passwordLength: req.body.newPassword?.length,
+    });
+
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log("❌ Reset password validation failed:", errors.array());
       return res.status(400).json({
         success: false,
         message: "Validation failed",
@@ -591,13 +707,18 @@ export const resetPassword = async (req, res) => {
     }
 
     const { token, newPassword } = req.body;
+    console.log("✅ Validation passed, processing reset...");
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log("🔑 Token verified for user:", decoded.id);
 
     // Find user with reset token
-    const user = await User.findById(decoded.id);
+    const user = await User.findById(decoded.id).select(
+      "+passwordResetToken +passwordResetExpires"
+    );
     if (!user) {
+      console.log("❌ User not found for token:", decoded.id);
       return res.status(400).json({
         success: false,
         message: "Invalid or expired reset token",
@@ -606,6 +727,7 @@ export const resetPassword = async (req, res) => {
 
     // Check if reset token exists and is not expired
     if (!user.passwordResetToken || !user.passwordResetExpires) {
+      console.log("❌ No reset token found for user:", user._id);
       return res.status(400).json({
         success: false,
         message: "Invalid or expired reset token",
@@ -613,6 +735,7 @@ export const resetPassword = async (req, res) => {
     }
 
     if (user.passwordResetExpires < new Date()) {
+      console.log("❌ Reset token expired for user:", user._id);
       return res.status(400).json({
         success: false,
         message: "Reset token has expired",
@@ -622,11 +745,14 @@ export const resetPassword = async (req, res) => {
     // Verify reset token
     const isTokenValid = await bcrypt.compare(token, user.passwordResetToken);
     if (!isTokenValid) {
+      console.log("❌ Invalid reset token for user:", user._id);
       return res.status(400).json({
         success: false,
         message: "Invalid reset token",
       });
     }
+
+    console.log("✅ Token validation successful, updating password...");
 
     // Update password
     user.password = newPassword;
@@ -637,6 +763,21 @@ export const resetPassword = async (req, res) => {
     user.refreshTokens = [];
 
     await user.save();
+    console.log("✅ Password updated successfully for user:", user._id);
+
+    const emailResult = await sendPasswordChangeSuccessEmail(
+      user.email,
+      user.firstName || user.username
+    );
+
+    if (!emailResult.success) {
+      console.error(
+        "❌ Failed to send password change success email:",
+        emailResult.error
+      );
+    } else {
+      console.log("✅ Password change success email sent to:", user.email);
+    }
 
     res.status(200).json({
       success: true,
@@ -644,7 +785,7 @@ export const resetPassword = async (req, res) => {
         "Password reset successfully. Please login with your new password.",
     });
   } catch (error) {
-    console.error("Reset password error:", error);
+    console.error("❌ Reset password error:", error);
 
     if (error.name === "JsonWebTokenError") {
       return res.status(400).json({

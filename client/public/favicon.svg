@@ -1,0 +1,26 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle with gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="16" cy="16" r="16" fill="url(#bgGradient)"/>
+  
+  <!-- Document icon -->
+  <path d="M8 6C8 5.44772 8.44772 5 9 5H17L24 12V26C24 26.5523 23.5523 27 23 27H9C8.44772 27 8 26.5523 8 26V6Z" fill="white" fill-opacity="0.9"/>
+  
+  <!-- Document fold -->
+  <path d="M17 5L24 12H19C17.8954 12 17 11.1046 17 10V5Z" fill="white" fill-opacity="0.7"/>
+  
+  <!-- Document lines -->
+  <rect x="11" y="14" width="8" height="1" rx="0.5" fill="#10b981"/>
+  <rect x="11" y="17" width="6" height="1" rx="0.5" fill="#3b82f6"/>
+  <rect x="11" y="20" width="7" height="1" rx="0.5" fill="#10b981"/>
+  
+  <!-- EDMS text -->
+  <text x="16" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="6" font-weight="bold" fill="white">EDMS</text>
+</svg> 

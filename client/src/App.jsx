@@ -1,14 +1,16 @@
-import "./App.css";
+import React from "react";
+import { BrowserRouter as Router } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import AppRoutes from "./routes";
 
-function App() {
+const App = () => {
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-red-600 mb-4">Hello World</h1>
-        <p className="text-gray-600">Tailwind CSS is working! 🎉</p>
-      </div>
-    </div>
+    <Router>
+      <ToastContainer position="top-right" autoClose={3000} />
+      <AppRoutes />
+    </Router>
   );
-}
+};
 
 export default App;

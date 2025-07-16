@@ -3,10 +3,25 @@ import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema(
   {
-    name: {
+    username: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      minlength: 3,
+      maxlength: 30,
+    },
+    firstName: {
       type: String,
       required: true,
       trim: true,
+      maxlength: 50,
+    },
+    lastName: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 50,
     },
     email: {
       type: String,
@@ -33,18 +48,8 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
     department: {
-      type: String,
-      enum: [
-        "Finance",
-        "HR",
-        "Legal",
-        "IT",
-        "Operations",
-        "Marketing",
-        "Sales",
-        "Executive",
-        "External",
-      ],
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Department",
       required: true,
     },
     position: {
@@ -105,9 +110,23 @@ const userSchema = new mongoose.Schema(
         ],
       },
     ],
+    refreshTokens: [
+      {
+        token: String,
+        expiresAt: Date,
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
     isActive: {
       type: Boolean,
       default: true,
+    },
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
     },
     lastLogin: {
       type: Date,
@@ -167,6 +186,14 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    passwordResetToken: {
+      type: String,
+      select: false,
+    },
+    passwordResetExpires: {
+      type: Date,
+      select: false,
+    },
   },
   {
     timestamps: true,
@@ -191,6 +218,46 @@ userSchema.pre("save", async function (next) {
 // Instance method to compare password
 userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
+};
+
+// Instance method to check if password is correct (alias for comparePassword)
+userSchema.methods.correctPassword = async function (
+  candidatePassword,
+  hashedPassword
+) {
+  return await bcrypt.compare(candidatePassword, hashedPassword);
+};
+
+// Instance method to add refresh token
+userSchema.methods.addRefreshToken = async function (token, expiresAt) {
+  if (!this.refreshTokens) {
+    this.refreshTokens = [];
+  }
+
+  this.refreshTokens.push({
+    token,
+    expiresAt,
+    createdAt: new Date(),
+  });
+
+  await this.save();
+};
+
+// Instance method to remove refresh token
+userSchema.methods.removeRefreshToken = async function (token) {
+  if (this.refreshTokens) {
+    this.refreshTokens = this.refreshTokens.filter((rt) => rt.token !== token);
+    await this.save();
+  }
+};
+
+// Instance method to clean expired refresh tokens
+userSchema.methods.cleanExpiredRefreshTokens = async function () {
+  if (this.refreshTokens) {
+    const now = new Date();
+    this.refreshTokens = this.refreshTokens.filter((rt) => rt.expiresAt > now);
+    await this.save();
+  }
 };
 
 // Instance method to check permission
@@ -258,6 +325,14 @@ userSchema.methods.getManageableUsers = async function () {
   }).populate("role");
 };
 
+// Static method to find by email or username
+userSchema.statics.findByEmailOrUsername = function (identifier) {
+  return this.findOne({
+    $or: [{ email: identifier.toLowerCase() }, { username: identifier }],
+    isActive: true,
+  });
+};
+
 // Static method to find by email
 userSchema.statics.findByEmail = function (email) {
   return this.findOne({ email: email.toLowerCase(), isActive: true });
@@ -280,7 +355,7 @@ userSchema.statics.findByRoleLevel = function (level) {
 
 // Virtual for full name
 userSchema.virtual("fullName").get(function () {
-  return this.name;
+  return `${this.firstName} ${this.lastName}`;
 });
 
 // Virtual for role level

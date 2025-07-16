@@ -129,18 +129,9 @@ export const AuthProvider = ({ children }) => {
 
       const hasCookies = document.cookie.length > 0;
       console.log("🔍 AuthContext: Cookie check - has cookies:", hasCookies);
+      console.log("🔍 AuthContext: All cookies:", document.cookie);
 
-      if (!hasCookies) {
-        console.log(
-          "🔍 AuthContext: No cookies found, skipping authentication check"
-        );
-        dispatch({ type: AUTH_ACTIONS.INIT_FAILURE });
-        return;
-      }
-
-      console.log(
-        "🔍 AuthContext: Cookies found, attempting to get user data..."
-      );
+      console.log("🔍 AuthContext: Attempting to get user data...");
       const response = await authAPI.getMe();
 
       const userData = response.data.data?.user || response.data.user;
@@ -167,6 +158,14 @@ export const AuthProvider = ({ children }) => {
         error.response?.status,
         error.response?.data
       );
+
+      // Don't fail immediately on 401 - might be expired token
+      if (error.response?.status === 401) {
+        console.log(
+          "🔍 AuthContext: 401 error - likely expired token, clearing auth"
+        );
+      }
+
       dispatch({ type: AUTH_ACTIONS.INIT_FAILURE });
     }
   }, []);

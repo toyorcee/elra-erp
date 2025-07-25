@@ -32,6 +32,7 @@ import {
   uploadProfilePicture,
   deleteProfilePicture,
 } from "../../../services/profile";
+import { useProfile } from "../../../hooks/useProfile";
 
 // Helper function to get full image URL
 const getImageUrl = (avatarPath) => {
@@ -46,6 +47,10 @@ const getImageUrl = (avatarPath) => {
 
 const Settings = () => {
   const { user, updateProfile: updateAuthProfile } = useAuth();
+  const {
+    uploadProfilePicture: uploadProfilePictureMutation,
+    isUploadingPicture,
+  } = useProfile();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("system");
@@ -92,9 +97,8 @@ const Settings = () => {
     }
   }, [user]);
 
-  // Profile Picture State
+  // Profile Picture State - now using React Query
   const [profilePicture, setProfilePicture] = useState(user?.avatar || null);
-  const [isUploading, setIsUploading] = useState(false);
 
   // Notification Settings
   const [notificationSettings, setNotificationSettings] = useState({
@@ -345,7 +349,7 @@ const Settings = () => {
     }
   };
 
-  // Profile Picture Upload Handler
+  // Profile Picture Upload Handler - now using React Query
   const handleProfilePictureUpload = async (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -365,8 +369,6 @@ const Settings = () => {
         return;
       }
 
-      setIsUploading(true);
-
       try {
         console.log(
           "📁 Uploading profile picture:",
@@ -375,22 +377,26 @@ const Settings = () => {
           "bytes"
         );
 
-        const response = await uploadProfilePicture(file);
-
+        // Use React Query mutation
+        uploadProfilePictureMutation(file, {
+          onSuccess: (response) => {
         console.log("✅ Profile picture upload response:", response);
-
         setProfilePicture(response.data.user.avatar);
-
-        updateAuthProfile(response.data.user);
-
         toast.success("Profile picture updated successfully!");
+          },
+          onError: (error) => {
+            console.error("❌ Profile picture upload error:", error);
+            toast.error(
+              error.response?.data?.message ||
+                "Failed to upload profile picture"
+            );
+          },
+        });
       } catch (error) {
         console.error("❌ Profile picture upload error:", error);
         toast.error(
           error.response?.data?.message || "Failed to upload profile picture"
         );
-      } finally {
-        setIsUploading(false);
       }
     }
   };
@@ -480,7 +486,9 @@ const Settings = () => {
             >
               <MdEdit className="w-8 h-8 text-gray-400 mx-auto mb-2" />
               <p className="text-sm text-gray-600">
-                {isUploading ? "Uploading..." : "Drag and drop an image here"}
+                {isUploadingPicture
+                  ? "Uploading..."
+                  : "Drag and drop an image here"}
               </p>
             </div>
           </div>

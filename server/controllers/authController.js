@@ -92,6 +92,8 @@ const clearTokenCookies = (res) => {
     secure: isProd,
     sameSite: isProd ? "None" : "Lax",
     path: "/",
+    ...(isProd &&
+      process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN }),
   };
 
   console.log("🗑️ Clearing cookies:", {
@@ -257,9 +259,32 @@ export const login = async (req, res) => {
     const { identifier, password } = req.body;
 
     // Find user by email or username and include password
-    const user = await User.findByEmailOrUsername(identifier)
+    let user = await User.findByEmailOrUsername(identifier)
       .select("+password")
       .populate("role");
+
+    // If not found, try without isActive filter for debugging
+    if (!user) {
+      console.log("User not found with isActive filter, trying without...");
+      user = await User.findOne({
+        $or: [{ email: identifier.toLowerCase() }, { username: identifier }],
+      })
+        .select("+password")
+        .populate("role");
+    }
+
+    console.log("Login attempt for:", identifier);
+    console.log("User found:", user ? "Yes" : "No");
+    if (user) {
+      console.log("User details:", {
+        email: user.email,
+        username: user.username,
+        isActive: user.isActive,
+        role: user.role?.name,
+        hasPassword: !!user.password,
+      });
+    }
+
     if (!user) {
       console.log("Login failed: user not found");
       return res.status(401).json({
@@ -270,6 +295,7 @@ export const login = async (req, res) => {
 
     // Check if user is active
     if (!user.isActive) {
+      console.log("Login failed: user is inactive");
       return res.status(401).json({
         success: false,
         message: "Account is deactivated",
@@ -277,12 +303,17 @@ export const login = async (req, res) => {
     }
 
     // Check password
+    console.log("Attempting password comparison...");
     const isPasswordCorrect = await user.correctPassword(
       password,
       user.password
     );
+    console.log("Password comparison result:", isPasswordCorrect);
+
     if (!isPasswordCorrect) {
       console.log("Login failed: incorrect password");
+      console.log("Provided password:", password);
+      console.log("Stored password hash:", user.password);
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
@@ -657,10 +688,6 @@ export const forgotPassword = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) {
       console.log(`❌ Password reset failed: User not found - ${email}`);
-      console.log(
-        `🚨 Potential security threat: Unknown email attempting password reset`
-      );
-      // Don't reveal if email exists or not for security
       return res.status(200).json({
         success: true,
         message:
@@ -668,10 +695,6 @@ export const forgotPassword = async (req, res) => {
       });
     }
 
-    console.log(`✅ User found: ${user.username} (${user.email})`);
-    console.log(`👤 User ID: ${user._id}`);
-
-    // Check if user is active
     if (!user.isActive) {
       console.log(`❌ Password reset failed: Account deactivated - ${email}`);
       return res.status(200).json({

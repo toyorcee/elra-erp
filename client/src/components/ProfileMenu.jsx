@@ -64,8 +64,8 @@ const ProfileMenu = () => {
       {/* Desktop Profile Section */}
       <div className="hidden lg:flex items-center space-x-3">
         {/* User Info */}
-        <div className="flex items-center space-x-3 bg-gray-50 rounded-xl px-3 py-2 border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg bg-gradient-to-r from-blue-600 to-cyan-500 overflow-hidden">
+        <div className="flex items-center space-x-3 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 rounded-xl px-3 py-2 border border-white/20 hover:from-blue-600 hover:via-purple-600 hover:to-blue-700 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-xl backdrop-blur-sm">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg bg-white/20 backdrop-blur-sm overflow-hidden border border-white/30">
             {user?.avatar ? (
               <img
                 src={getImageUrl(user.avatar)}
@@ -85,18 +85,18 @@ const ProfileMenu = () => {
               {getUserInitial()}
             </div>
           </div>
-          <div className="text-gray-700">
+          <div className="text-white">
             <div className="text-sm font-medium">
               {user?.firstName ? `${user.firstName} ${user.lastName}` : "User"}
             </div>
-            <div className="text-xs text-gray-500">{getUserRole()}</div>
+            <div className="text-xs text-white/80">{getUserRole()}</div>
           </div>
         </div>
 
         {/* Sign Out Button */}
         <button
           onClick={handleLogout}
-          className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-all duration-200 group"
+          className="p-2 rounded-lg bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 text-white hover:from-blue-600 hover:via-purple-600 hover:to-blue-700 transition-all duration-200 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
           title="Sign out"
         >
           <MdLogout
@@ -108,7 +108,7 @@ const ProfileMenu = () => {
         {/* Dropdown Toggle for Additional Options */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-all duration-300 group"
+          className="p-2 rounded-lg bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 text-white hover:from-blue-600 hover:via-purple-600 hover:to-blue-700 transition-all duration-300 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
         >
           <div
             className={`w-4 h-4 transition-transform duration-300 ${
@@ -135,9 +135,9 @@ const ProfileMenu = () => {
       {/* Mobile Profile Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="lg:hidden flex items-center space-x-2 p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-all duration-300 group"
+        className="lg:hidden flex items-center space-x-2 p-2 rounded-lg bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 text-white hover:from-blue-600 hover:via-purple-600 hover:to-blue-700 transition-all duration-300 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
       >
-        <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg lg:hidden overflow-hidden">
+        <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg lg:hidden overflow-hidden border border-white/30">
           {user?.avatar ? (
             <img
               src={getImageUrl(user.avatar)}
@@ -157,7 +157,7 @@ const ProfileMenu = () => {
             {getUserInitial()}
           </div>
         </div>
-        <span className="hidden md:block font-medium">
+        <span className="hidden md:block font-medium text-white">
           {user?.firstName ? `${user.firstName} ${user.lastName}` : "User"}
         </span>
         <div
@@ -187,7 +187,7 @@ const ProfileMenu = () => {
           {/* User Info Header */}
           <div className="px-6 py-4 border-b border-gray-100">
             <div className="flex items-center space-x-4">
-              <div className="w-14 h-14 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg overflow-hidden">
+              <div className="w-14 h-14 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg overflow-hidden border-2 border-white/30">
                 {user?.avatar ? (
                   <img
                     src={getImageUrl(user.avatar)}
@@ -213,7 +213,7 @@ const ProfileMenu = () => {
                     ? `${user.firstName} ${user.lastName}`
                     : "User"}
                 </div>
-                <div className="text-sm font-medium text-blue-600">
+                <div className="text-sm font-medium bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
                   {getUserRole()}
                 </div>
                 <div className="text-xs text-gray-500 truncate">

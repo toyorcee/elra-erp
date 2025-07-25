@@ -30,9 +30,9 @@ const ProtectedRoute = ({ children, required }) => {
       return <Navigate to="/unauthorized" />;
   }
 
-  // Redirect to login if not authenticated
+  // Redirect to landing page if not authenticated
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return children;

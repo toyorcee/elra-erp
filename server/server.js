@@ -20,6 +20,10 @@ import { Server as SocketIOServer } from "socket.io";
 import Message from "./models/Message.js";
 import User from "./models/User.js";
 import { initializeNotificationService } from "./controllers/notificationController.js";
+import platformAdminRoutes from "./routes/platformAdmin.js";
+import industryInstanceRoutes from "./routes/industryInstances.js";
+import approvalLevelRoutes from "./routes/approvalLevels.js";
+import workflowTemplateRoutes from "./routes/workflowTemplates.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,11 +34,15 @@ import userRoutes from "./routes/users.js";
 import documentRoutes from "./routes/documents.js";
 import dashboardRoutes from "./routes/dashboard.js";
 import messageRoutes from "./routes/messages.js";
-import notificationRoutes from "./routes/notifications.js";
+import notificationRoutes, {
+  initializeNotificationRoutes,
+} from "./routes/notifications.js";
 import departmentRoutes from "./routes/departments.js";
 import superAdminRoutes from "./routes/superAdmin.js";
 import systemSettingsRoutes from "./routes/systemSettings.js";
 import profileRoutes from "./routes/profile.js";
+import auditRoutes from "./routes/audit.js";
+import subscriptionRoutes from "./routes/subscriptions.js";
 
 dotenv.config();
 
@@ -142,24 +150,33 @@ const connectDB = async () => {
     }
 
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 30000,
-      socketTimeoutMS: 45000,
-      connectTimeoutMS: 30000,
+      serverSelectionTimeoutMS: 60000,
+      socketTimeoutMS: 60000,
+      connectTimeoutMS: 60000,
       maxPoolSize: 10,
       minPoolSize: 1,
+      retryWrites: true,
+      w: "majority",
     });
 
     console.log(`🟢 MongoDB Connected: ${conn.connection.host}`);
 
     mongoose.connection.on("error", (error) => {
       console.error("🔴 MongoDB Error:", error.message);
+      console.error("Error details:", error);
     });
 
     mongoose.connection.on("disconnected", () => {
-      console.log("🔴 MongoDB Disconnected - Retrying...");
+      console.log("🔴 MongoDB Disconnected - Retrying in 10 seconds...");
       setTimeout(connectDB, 10000);
+    });
+
+    mongoose.connection.on("connected", () => {
+      console.log("🟢 MongoDB Connected successfully");
+    });
+
+    mongoose.connection.on("reconnected", () => {
+      console.log("🔄 MongoDB Reconnected");
     });
   } catch (error) {
     console.error("❌ MongoDB Connection Error:", error.message);
@@ -189,11 +206,51 @@ app.use("/api/users", userRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/messages", messageRoutes);
-app.use("/api/notifications", notificationRoutes);
 app.use("/api/departments", departmentRoutes);
 app.use("/api/super-admin", superAdminRoutes);
 app.use("/api/system-settings", systemSettingsRoutes);
 app.use("/api/profile", profileRoutes);
+app.use("/api/audit", auditRoutes);
+app.use("/api/platform", platformAdminRoutes);
+app.use("/api/industry-instances", industryInstanceRoutes);
+app.use("/api/approval-levels", approvalLevelRoutes);
+app.use("/api/workflow-templates", workflowTemplateRoutes);
+app.use("/api/subscriptions", subscriptionRoutes);
+
+// Create Socket.IO server before starting HTTP server
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin:
+      process.env.NODE_ENV === "production"
+        ? process.env.CLIENT_URL
+        : ["http://localhost:5173"],
+    credentials: true,
+  },
+});
+
+// Initialize notification routes with io instance
+console.log("🔧 Initializing notification routes...");
+initializeNotificationRoutes(io);
+console.log("✅ Notification routes initialized");
+
+// Initialize notification service with io instance
+console.log("🔧 Initializing notification service...");
+initializeNotificationService(io);
+console.log("✅ Notification service initialized");
+
+// Add notification routes after initialization
+console.log("🔧 Adding notification routes to Express app...");
+app.use("/api/notifications", notificationRoutes);
+console.log("✅ Notification routes added to Express app");
+
+// Add a simple test route to verify routing is working
+app.get("/api/test-routing", (req, res) => {
+  res.json({
+    success: true,
+    message: "Basic routing is working",
+    timestamp: new Date().toISOString(),
+  });
+});
 
 app.get("/api", (req, res) => {
   res.json({
@@ -249,6 +306,8 @@ app.use("*", (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
+
+// Start the HTTP server
 httpServer.listen(PORT, () => {
   console.log(
     chalk.green.bold(
@@ -265,26 +324,13 @@ httpServer.listen(PORT, () => {
   );
 });
 
-const io = new SocketIOServer(httpServer, {
-  cors: {
-    origin:
-      process.env.NODE_ENV === "production"
-        ? process.env.CLIENT_URL
-        : ["http://localhost:5173"],
-    credentials: true,
-  },
-});
-
-// UserID <-> socketID mapping
 const onlineUsers = new Map();
 
 io.on("connection", async (socket) => {
-  // Authenticate user (assume token is sent as query param or handshake)
   const userId = socket.handshake.query.userId;
   if (userId) {
     onlineUsers.set(userId, socket.id);
 
-    // Update user's online status
     try {
       await User.findByIdAndUpdate(userId, {
         isOnline: true,
@@ -374,8 +420,5 @@ io.on("connection", async (socket) => {
     }
   });
 });
-
-// Initialize notification service with io
-initializeNotificationService(io);
 
 export { io, onlineUsers };

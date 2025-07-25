@@ -1,5 +1,5 @@
 // Role-based sidebar navigation config for EDMS
-// Role Levels: SUPER_ADMIN(100), ADMIN(90), MANAGER(80), SUPERVISOR(70), SENIOR_STAFF(60), STAFF(50), JUNIOR_STAFF(40), EXTERNAL_USER(30), GUEST(20), READ_ONLY(10)
+// Role Levels: PLATFORM_ADMIN(110), SUPER_ADMIN(100), ADMIN(90), MANAGER(80), SUPERVISOR(70), SENIOR_STAFF(60), STAFF(50), JUNIOR_STAFF(40), EXTERNAL_USER(30), GUEST(20), READ_ONLY(10)
 
 export const sidebarConfig = [
   // ===== COMMON SECTIONS (All Users) =====
@@ -7,7 +7,21 @@ export const sidebarConfig = [
     label: "Dashboard",
     icon: "HiOutlineHome",
     path: "/dashboard",
-    required: { minLevel: 10 },
+    required: { minLevel: 10, maxLevel: 89 },
+    section: "common",
+  },
+  {
+    label: "Admin Dashboard",
+    icon: "HiOutlineHome",
+    path: "/admin/dashboard",
+    required: { minLevel: 90, maxLevel: 109 },
+    section: "common",
+  },
+  {
+    label: "Platform Dashboard",
+    icon: "HiOutlineHome",
+    path: "/platform-admin/dashboard",
+    required: { minLevel: 110 },
     section: "common",
   },
 
@@ -15,28 +29,21 @@ export const sidebarConfig = [
   {
     label: "My Documents",
     icon: "HiOutlineDocumentText",
-    path: "/dashboard/documents",
-    required: { minLevel: 50 },
-    section: "documents",
-  },
-  {
-    label: "Upload Document",
-    icon: "HiOutlineUpload",
-    path: "/dashboard/upload",
+    path: "/admin/documents",
     required: { minLevel: 50 },
     section: "documents",
   },
   {
     label: "Document Approvals",
     icon: "HiOutlineCheckCircle",
-    path: "/dashboard/approvals",
+    path: "/admin/approvals",
     required: { minLevel: 70 },
     section: "documents",
   },
   {
     label: "Document Analytics",
     icon: "HiOutlineChartBar",
-    path: "/dashboard/analytics",
+    path: "/admin/analytics",
     required: { minLevel: 60 },
     section: "documents",
   },
@@ -45,14 +52,14 @@ export const sidebarConfig = [
   {
     label: "Workflows",
     icon: "HiOutlineClipboardDocumentList",
-    path: "/dashboard/workflows",
+    path: "/admin/workflows",
     required: { minLevel: 60 },
     section: "workflow",
   },
   {
     label: "Pending Tasks",
     icon: "HiOutlineClock",
-    path: "/dashboard/tasks",
+    path: "/admin/tasks",
     required: { minLevel: 50 },
     section: "workflow",
   },
@@ -78,6 +85,36 @@ export const sidebarConfig = [
     path: "/admin/roles",
     required: { minLevel: 100 },
     section: "admin",
+  },
+  {
+    label: "Approval Levels",
+    icon: "HiOutlineClipboardCheck",
+    path: "/admin/approval-levels",
+    required: { minLevel: 100 },
+    section: "admin",
+  },
+  {
+    label: "Workflow Templates",
+    icon: "HiOutlineCog",
+    path: "/admin/workflow-templates",
+    required: { minLevel: 100 },
+    section: "admin",
+  },
+
+  // ===== PLATFORM MANAGEMENT (Platform Admin Only) =====
+  {
+    label: "Industry Instances",
+    icon: "HiOutlineBuildingOffice",
+    path: "/platform-admin/instances",
+    required: { minLevel: 110 },
+    section: "platform",
+  },
+  {
+    label: "Create Instance",
+    icon: "HiOutlinePlusCircle",
+    path: "/platform-admin/create-instance",
+    required: { minLevel: 110 },
+    section: "platform",
   },
 
   // ===== SYSTEM MANAGEMENT (Super Admin Only) =====
@@ -107,14 +144,14 @@ export const sidebarConfig = [
   {
     label: "Messages",
     icon: "HiOutlineChatBubbleLeftRight",
-    path: "/dashboard/messages",
+    path: "/admin/messages",
     required: { minLevel: 30 },
     section: "communication",
   },
   {
     label: "Notifications",
     icon: "HiOutlineBell",
-    path: "/dashboard/notifications",
+    path: "/admin/notifications",
     required: { minLevel: 30 },
     section: "communication",
   },
@@ -123,7 +160,7 @@ export const sidebarConfig = [
   {
     label: "My Profile",
     icon: "HiOutlineUser",
-    path: "/dashboard/profile",
+    path: "/admin/profile",
     required: { minLevel: 10 },
     section: "profile",
   },
@@ -131,6 +168,12 @@ export const sidebarConfig = [
 
 // Role-specific navigation sections
 export const roleSections = {
+  // PLATFORM_ADMIN (110) - Platform management
+  110: {
+    sections: ["common", "platform", "communication", "profile"],
+    title: "Platform Administrator",
+  },
+
   // SUPER_ADMIN (100) - Full access
   100: {
     sections: [
@@ -215,6 +258,11 @@ export const getNavigationForRole = (roleLevel) => {
   return sidebarConfig.filter((item) => {
     // Check if user meets minimum level requirement
     if (item.required.minLevel && roleLevel < item.required.minLevel) {
+      return false;
+    }
+
+    // Check if user meets maximum level requirement
+    if (item.required.maxLevel && roleLevel > item.required.maxLevel) {
       return false;
     }
 

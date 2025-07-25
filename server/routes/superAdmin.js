@@ -1,6 +1,7 @@
 import express from "express";
 import {
   getSystemOverview,
+  getSystemStats,
   getAllSystemUsers,
   getSystemRoles,
   updateSystemSettings,
@@ -14,10 +15,11 @@ const router = express.Router();
 
 // All routes require authentication and super admin privileges
 router.use(protect);
-router.use(checkRole(100)); // Super admin only
+router.use(checkRole(100));
 
 // System overview and statistics
 router.get("/overview", getSystemOverview);
+router.get("/stats", getSystemStats);
 
 // User management
 router.get("/users", getAllSystemUsers);

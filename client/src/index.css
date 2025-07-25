@@ -1,9 +1,42 @@
 @import "tailwindcss";
 @import "./styles/brandColors.css";
+
+/* Glassmorphism utility class */
+.glass-card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+}
 /* @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@700;800&display=swap"); */
 
 body {
   height: 100vh;
+}
+
+/* Global select dropdown styling */
+select option {
+  background-color: #1f2937 !important;
+  color: #ffffff !important;
+  padding: 8px 12px;
+}
+
+select option:hover {
+  background-color: #374151 !important;
+}
+
+select option:checked {
+  background-color: #3b82f6 !important; /* bg-blue-500 */
+}
+
+/* Ensure select dropdowns are visible */
+select:focus option:checked {
+  background-color: #3b82f6 !important;
+}
+
+select:focus option:hover {
+  background-color: #374151 !important;
 }
 
 /* :root {

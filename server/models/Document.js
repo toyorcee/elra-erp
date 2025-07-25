@@ -1,4 +1,8 @@
 import mongoose from "mongoose";
+import documentClassifications, {
+  categories,
+  documentTypes,
+} from "../constants/documentClassifications.js";
 
 const documentSchema = new mongoose.Schema(
   {
@@ -33,34 +37,20 @@ const documentSchema = new mongoose.Schema(
     },
     documentType: {
       type: String,
-      enum: [
-        "Invoice",
-        "Contract",
-        "Policy",
-        "Report",
-        "Certificate",
-        "License",
-        "Receipt",
-        "Correspondence",
-        "Legal Document",
-        "Financial Statement",
-        "Other",
-      ],
-      default: "Other",
+      enum: documentTypes,
+      required: true,
+      validate: {
+        validator: function (value) {
+          return documentClassifications[this.category]?.includes(value);
+        },
+        message: function (props) {
+          return `Document type '${props.value}' is not valid for category '${this.category}'.`;
+        },
+      },
     },
     category: {
       type: String,
-      enum: [
-        "Finance",
-        "HR",
-        "Legal",
-        "IT",
-        "Operations",
-        "Marketing",
-        "Sales",
-        "Executive",
-        "General",
-      ],
+      enum: categories,
       required: true,
     },
     priority: {
@@ -104,7 +94,7 @@ const documentSchema = new mongoose.Schema(
         "Executive",
         "External",
       ],
-      required: true,
+      required: false, 
     },
     // Workflow tracking
     currentApprover: {

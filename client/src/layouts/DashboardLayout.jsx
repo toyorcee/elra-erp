@@ -1,9 +1,10 @@
-import React, { useState, createContext, useContext } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
-import { MdNotifications, MdMenu } from "react-icons/md";
+import React, { useState, createContext, useContext, useEffect } from "react";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { MdMenu } from "react-icons/md";
 import Sidebar from "../components/Sidebar";
 import ProfileMenu from "../components/ProfileMenu";
 import EDMSLogo from "../components/EDMSLogo";
+import NotificationBell from "../components/NotificationBell";
 import { useAuth } from "../context/AuthContext";
 
 // Create context for sidebar state
@@ -23,8 +24,30 @@ const DashboardLayout = () => {
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const isSidebarActuallyExpanded = sidebarPinned ? true : sidebarExpanded;
+
+  useEffect(() => {
+    if (user && user.role?.level >= 110) {
+      if (
+        location.pathname.startsWith("/dashboard") ||
+        location.pathname.startsWith("/admin")
+      ) {
+        console.log(
+          "🚨 DashboardLayout: Platform Admin on /dashboard or /admin, redirecting to /platform-admin/dashboard"
+        );
+        navigate("/platform-admin/dashboard");
+      }
+    } else if (user && user.role?.level >= 100) {
+      if (location.pathname.startsWith("/dashboard")) {
+        console.log(
+          "🚨 DashboardLayout: Super Admin on /dashboard, redirecting to /admin/dashboard"
+        );
+        navigate("/admin/dashboard");
+      }
+    }
+  }, [user, location.pathname, navigate]);
 
   return (
     <SidebarContext.Provider
@@ -60,13 +83,8 @@ const DashboardLayout = () => {
 
               {/* Right side */}
               <div className="flex items-center space-x-4">
-                {/* Notifications */}
-                <button className="relative p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors">
-                  <MdNotifications size={22} />
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-                </button>
+                <NotificationBell />
 
-                {/* Profile Menu */}
                 <ProfileMenu />
               </div>
             </div>

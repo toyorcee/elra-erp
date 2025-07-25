@@ -2,7 +2,9 @@ import User from "../models/User.js";
 import Department from "../models/Department.js";
 import Role from "../models/Role.js";
 import Document from "../models/Document.js";
+import AuditLog from "../models/AuditLog.js";
 import { hasPermission } from "../utils/permissionUtils.js";
+import AuditService from "../services/auditService.js";
 
 // @desc    Get system overview statistics
 // @route   GET /api/super-admin/overview
@@ -19,34 +21,58 @@ export const getSystemOverview = async (req, res) => {
       });
     }
 
-    // Get system statistics
-    const totalUsers = await User.countDocuments({ isActive: true });
+    // Get system statistics - FILTER BY COMPANY for data isolation
+    const companyFilter = currentUser.company
+      ? { company: currentUser.company }
+      : {};
+
+    const totalUsers = await User.countDocuments({
+      isActive: true,
+      ...companyFilter,
+    });
     const totalDepartments = await Department.countDocuments({
       isActive: true,
+      ...companyFilter,
     });
-    const totalDocuments = await Document.countDocuments({ isActive: true });
+    const totalDocuments = await Document.countDocuments({
+      isActive: true,
+      ...companyFilter,
+    });
     const totalRoles = await Role.countDocuments({ isActive: true });
 
-    // Get recent activity
-    const recentUsers = await User.find({ isActive: true })
+    // Get recent activity - FILTER BY COMPANY
+    const recentUsers = await User.find({
+      isActive: true,
+      ...companyFilter,
+    })
       .sort({ createdAt: -1 })
       .limit(5)
-      .select("name email createdAt");
+      .select("firstName lastName email createdAt");
 
-    const recentDepartments = await Department.find({ isActive: true })
+    const recentDepartments = await Department.find({
+      isActive: true,
+      ...companyFilter,
+    })
       .sort({ createdAt: -1 })
       .limit(5)
       .select("name code createdAt");
 
-    const recentDocuments = await Document.find({ isActive: true })
+    const recentDocuments = await Document.find({
+      isActive: true,
+      ...companyFilter,
+    })
       .sort({ createdAt: -1 })
       .limit(5)
-      .populate("uploadedBy", "name")
+      .populate("uploadedBy", "firstName lastName")
       .select("title status createdAt");
 
-    // Get users by role
     const usersByRole = await User.aggregate([
-      { $match: { isActive: true } },
+      {
+        $match: {
+          isActive: true,
+          ...companyFilter,
+        },
+      },
       {
         $lookup: {
           from: "roles",
@@ -65,9 +91,14 @@ export const getSystemOverview = async (req, res) => {
       { $sort: { count: -1 } },
     ]);
 
-    // Get documents by status
+    // Get documents by status - FILTER BY COMPANY
     const documentsByStatus = await Document.aggregate([
-      { $match: { isActive: true } },
+      {
+        $match: {
+          isActive: true,
+          ...companyFilter,
+        },
+      },
       {
         $group: {
           _id: "$status",
@@ -107,6 +138,79 @@ export const getSystemOverview = async (req, res) => {
   }
 };
 
+// @desc    Get system statistics for dashboard
+// @route   GET /api/super-admin/stats
+// @access  Private (Super Admin only)
+export const getSystemStats = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    // Check if user is super admin
+    if (currentUser.role.level < 100) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Super admin privileges required.",
+      });
+    }
+
+    // Get basic counts - FILTER BY COMPANY for data isolation
+    const companyFilter = currentUser.company
+      ? { company: currentUser.company }
+      : {};
+
+    const totalUsers = await User.countDocuments({
+      isActive: true,
+      ...companyFilter,
+    });
+    const totalDocuments = await Document.countDocuments({
+      isActive: true,
+      ...companyFilter,
+    });
+    const totalDepartments = await Department.countDocuments({
+      isActive: true,
+      ...companyFilter,
+    });
+    const pendingApprovals = await Document.countDocuments({
+      status: { $in: ["SUBMITTED", "UNDER_REVIEW"] },
+      isActive: true,
+      ...companyFilter,
+    });
+
+    // Get recent activity stats - FILTER BY COMPANY
+    const recentActivity = await AuditService.getRecentActivity(
+      10,
+      companyFilter
+    );
+
+    // Get activity trends (last 7 days) - FILTER BY COMPANY
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentActivityCount = await AuditService.getActivityStats({
+      startDate: sevenDaysAgo,
+      endDate: new Date(),
+      company: currentUser.company,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalUsers,
+        totalDocuments,
+        totalDepartments,
+        pendingApprovals,
+        recentActivity: recentActivity.data || [],
+        activityStats: recentActivityCount.data || {},
+      },
+    });
+  } catch (error) {
+    console.error("System stats error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
 // @desc    Get all system users with advanced filtering
 // @route   GET /api/super-admin/users
 // @access  Private (Super Admin only)
@@ -134,6 +238,11 @@ export const getAllSystemUsers = async (req, res) => {
     } = req.query;
 
     const query = {};
+
+    // FILTER BY COMPANY for data isolation
+    if (currentUser.company) {
+      query.company = currentUser.company;
+    }
 
     // Filter by status
     if (status === "active") {
@@ -213,13 +322,20 @@ export const getSystemRoles = async (req, res) => {
       .sort({ level: -1 })
       .select("name level description permissions departmentAccess");
 
-    // Get user count for each role
+    // Get user count for each role - FILTER BY COMPANY
     const rolesWithUserCount = await Promise.all(
       roles.map(async (role) => {
-        const userCount = await User.countDocuments({
+        const userCountQuery = {
           role: role._id,
           isActive: true,
-        });
+        };
+
+        // Add company filter if user has a company
+        if (currentUser.company) {
+          userCountQuery.company = currentUser.company;
+        }
+
+        const userCount = await User.countDocuments(userCountQuery);
         return {
           ...role.toObject(),
           userCount,
@@ -317,39 +433,47 @@ export const getSystemAudit = async (req, res) => {
       endDate,
     } = req.query;
 
-    // In a real implementation, you'd have an AuditLog model
-    // For now, we'll return a mock response
-    const mockAuditLog = [
-      {
-        id: 1,
-        action: "USER_LOGIN",
-        userId: "user123",
-        userName: "John Doe",
-        timestamp: new Date(),
-        ipAddress: "192.168.1.1",
-        userAgent: "Mozilla/5.0...",
-        details: "User logged in successfully",
-      },
-      {
-        id: 2,
-        action: "DOCUMENT_UPLOAD",
-        userId: "user456",
-        userName: "Jane Smith",
-        timestamp: new Date(Date.now() - 3600000),
-        ipAddress: "192.168.1.2",
-        userAgent: "Mozilla/5.0...",
-        details: "Document 'Q4 Report.pdf' uploaded",
-      },
-    ];
+    // Build query with company filtering for data isolation
+    const query = { isDeleted: false };
+
+    // Add company filter if user has a company
+    if (currentUser.company) {
+      query.company = currentUser.company;
+    }
+
+    // Add filters based on query parameters
+    if (action) query.action = action;
+    if (userId) query.userId = userId;
+
+    if (startDate || endDate) {
+      query.timestamp = {};
+      if (startDate) query.timestamp.$gte = new Date(startDate);
+      if (endDate) query.timestamp.$lte = new Date(endDate);
+    }
+
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Get total count for pagination
+    const total = await AuditLog.countDocuments(query);
+
+    // Get audit logs with pagination and company filtering
+    const logs = await AuditLog.find(query)
+      .sort({ timestamp: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .populate("userId", "firstName lastName email")
+      .populate("resourceId");
 
     res.status(200).json({
       success: true,
       data: {
-        logs: mockAuditLog,
+        logs,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
-          total: mockAuditLog.length,
+          total,
+          pages: Math.ceil(total / parseInt(limit)),
         },
       },
     });
@@ -382,17 +506,22 @@ export const bulkUserOperations = async (req, res) => {
 
     let result;
 
+    // Add company filter for data isolation
+    const companyFilter = currentUser.company
+      ? { company: currentUser.company }
+      : {};
+
     switch (operation) {
       case "activate":
         result = await User.updateMany(
-          { _id: { $in: userIds } },
+          { _id: { $in: userIds }, ...companyFilter },
           { isActive: true }
         );
         break;
 
       case "deactivate":
         result = await User.updateMany(
-          { _id: { $in: userIds } },
+          { _id: { $in: userIds }, ...companyFilter },
           { isActive: false }
         );
         break;
@@ -405,7 +534,7 @@ export const bulkUserOperations = async (req, res) => {
           });
         }
         result = await User.updateMany(
-          { _id: { $in: userIds } },
+          { _id: { $in: userIds }, ...companyFilter },
           { role: data.roleId }
         );
         break;
@@ -418,7 +547,7 @@ export const bulkUserOperations = async (req, res) => {
           });
         }
         result = await User.updateMany(
-          { _id: { $in: userIds } },
+          { _id: { $in: userIds }, ...companyFilter },
           { department: data.departmentId }
         );
         break;

@@ -7,12 +7,16 @@ export const createDocument = (documentData) =>
 export const updateDocument = (id, documentData) =>
   api.put(`/documents/${id}`, documentData);
 export const deleteDocument = (id) => api.delete(`/documents/${id}`);
-export const uploadDocument = (file) => {
-  const formData = new FormData();
-  formData.append("file", file);
+export const uploadDocument = (formData) => {
   return api.post("/documents/upload", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
   });
 };
+
+export const searchDocuments = (params) => api.get("/documents/search", { params });
+export const getPendingApprovals = () => api.get("/documents/pending-approvals");
+export const approveDocument = (id, data) => api.post(`/documents/${id}/approve`, data);
+export const rejectDocument = (id, data) => api.post(`/documents/${id}/reject`, data);
+export const submitForApproval = (id) => api.post(`/documents/${id}/submit`);

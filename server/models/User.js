@@ -50,7 +50,7 @@ const userSchema = new mongoose.Schema(
     department: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Department",
-      required: true,
+      required: false,
     },
     position: {
       type: String,
@@ -194,6 +194,15 @@ const userSchema = new mongoose.Schema(
       type: Date,
       select: false,
     },
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Company",
+      required: false,
+    },
+    isSuperadmin: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
@@ -213,6 +222,24 @@ userSchema.pre("save", async function (next) {
   } catch (error) {
     next(error);
   }
+});
+
+// Add after schema definition
+userSchema.pre("validate", async function (next) {
+  if (!this.department) {
+    let roleDoc = this.role;
+    if (roleDoc && roleDoc.name === undefined) {
+      const Role = mongoose.model("Role");
+      roleDoc = await Role.findById(this.role);
+    }
+    if (
+      !roleDoc ||
+      (roleDoc.name !== "PLATFORM_ADMIN" && roleDoc.name !== "SUPER_ADMIN")
+    ) {
+      this.invalidate("department", "Path `department` is required.");
+    }
+  }
+  next();
 });
 
 // Instance method to compare password

@@ -7,9 +7,15 @@ export const adminSidebarConfig = [
     required: { permission: "system.settings", minLevel: 100 },
   },
   {
-    label: "System Settings",
+    label: "Settings",
     icon: "HiOutlineCog6Tooth",
-    path: "/admin/system-settings",
+    path: "/admin/settings",
+    required: { permission: "system.settings", minLevel: 100 },
+  },
+  {
+    label: "Audit Logs",
+    icon: "HiOutlineClipboardDocument",
+    path: "/admin/audit",
     required: { permission: "system.settings", minLevel: 100 },
   },
   {

@@ -11,7 +11,6 @@ import {
 import { getNavigationForRole, getRoleTitle } from "../config/sidebarConfig";
 import { useAuth } from "../context/AuthContext";
 
-// Helper function to get full image URL
 const getImageUrl = (avatarPath) => {
   if (!avatarPath) return null;
   if (avatarPath.startsWith("http")) return avatarPath;
@@ -152,7 +151,13 @@ const Sidebar = ({ onExpandedChange, onPinnedChange }) => {
           }
         `}</style>
         <nav className="space-y-2">
-          {getNavigationForRole(user?.role?.level || 10).map((item) => {
+          {(() => {
+            const navigationItems = getNavigationForRole(
+              user?.role?.level || 10
+            );
+
+            return navigationItems;
+          })().map((item) => {
             const Icon = HiIcons[item.icon] || HiIcons.HiOutlineDocumentText;
             const isActive = location.pathname === item.path;
 

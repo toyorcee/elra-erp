@@ -347,9 +347,147 @@ export const sendPasswordChangeSuccessEmail = async (email, userName) => {
   }
 };
 
+// Send generic email (for industry instance invitations)
+export const sendEmail = async (email, subject, htmlContent) => {
+  try {
+    const transporter = createTransporter();
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM,
+      to: email,
+      subject: subject,
+      html: htmlContent,
+    };
+
+    const result = await transporter.sendMail(mailOptions);
+    console.log(`✅ Email sent to: ${email}`);
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    console.error(`❌ Error sending email to ${email}:`, error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+// Send industry instance invitation email
+export const sendIndustryInstanceInvitation = async (
+  email,
+  userName,
+  companyName,
+  tempPassword,
+  industryType
+) => {
+  try {
+    const transporter = createTransporter();
+    const loginUrl = `${process.env.CLIENT_URL}/login`;
+    const credentialsUrl = `${process.env.CLIENT_URL}/retrieve-credentials`;
+
+    const htmlContent = createEmailTemplate(
+      `Welcome to ${companyName} - EDMS Platform`,
+      `
+        <p>Hello <strong>${userName}</strong>,</p>
+        <p>Welcome to the <strong>${companyName}</strong> EDMS platform!</p>
+        <p>Your account has been created as a <strong>Super Administrator</strong> for the ${industryType.replace(
+          "_",
+          " "
+        )} system.</p>
+        
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
+          <h3 style="margin: 0 0 15px 0; color: #333;">Your Login Credentials:</h3>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+        </div>
+        
+        <p><strong>Important:</strong> Please change your password after your first login for security.</p>
+        <p>If you lose this email, you can retrieve your credentials at any time using the credentials retrieval page.</p>
+      `,
+      "Login to EDMS",
+      loginUrl,
+      `Welcome to ${companyName} - Your EDMS platform is ready!`
+    );
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM,
+      to: email,
+      subject: `Welcome to ${companyName} - EDMS Platform Access`,
+      html: htmlContent,
+    };
+
+    const result = await transporter.sendMail(mailOptions);
+    console.log(`✅ Industry instance invitation sent to: ${email}`);
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    console.error(
+      `❌ Error sending industry instance invitation to ${email}:`,
+      error.message
+    );
+    return { success: false, error: error.message };
+  }
+};
+
+// Send subscription activation email
+export const sendSubscriptionEmail = async (
+  email,
+  companyName,
+  planName,
+  billingCycle
+) => {
+  try {
+    const transporter = createTransporter();
+    const loginUrl = `${process.env.CLIENT_URL}/login`;
+
+    const htmlContent = createEmailTemplate(
+      "🎉 Your EDMS Subscription is Active!",
+      `
+        <p>Hello <strong>${companyName}</strong> Team,</p>
+        <p>🎊 <strong>Congratulations!</strong> Your EDMS subscription has been successfully activated!</p>
+        
+        <div style="background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); color: white; padding: 25px; border-radius: 15px; margin: 20px 0; text-align: center;">
+          <h2 style="margin: 0 0 15px 0; font-size: 24px;">Subscription Details</h2>
+          <p style="margin: 5px 0; font-size: 18px;"><strong>Plan:</strong> ${planName}</p>
+          <p style="margin: 5px 0; font-size: 18px;"><strong>Billing Cycle:</strong> ${billingCycle}</p>
+          <p style="margin: 15px 0 0 0; font-size: 16px;">Your platform is now ready for use!</p>
+        </div>
+        
+        <p>🚀 <strong>What's Next?</strong></p>
+        <ul style="margin: 20px 0; padding-left: 20px;">
+          <li>Set up your approval workflows</li>
+          <li>Create departments and user roles</li>
+          <li>Upload your first documents</li>
+          <li>Configure your system settings</li>
+        </ul>
+        
+        <p>Need help getting started? Our support team is here to assist you!</p>
+      `,
+      "Access Your EDMS Platform",
+      loginUrl,
+      "Welcome to the EDMS family - Your subscription is active!"
+    );
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM,
+      to: email,
+      subject: "🎉 Your EDMS Subscription is Now Active!",
+      html: htmlContent,
+    };
+
+    const result = await transporter.sendMail(mailOptions);
+    console.log(`✅ Subscription activation email sent to: ${email}`);
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    console.error(
+      `❌ Error sending subscription email to ${email}:`,
+      error.message
+    );
+    return { success: false, error: error.message };
+  }
+};
+
 export default {
   sendPasswordResetEmail,
   sendWelcomeEmail,
   sendAccountActivationEmail,
   sendPasswordChangeSuccessEmail,
+  sendEmail,
+  sendIndustryInstanceInvitation,
+  sendSubscriptionEmail,
 };

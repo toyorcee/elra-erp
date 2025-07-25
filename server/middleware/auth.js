@@ -11,18 +11,26 @@ const setTokenCookies = (res, accessToken, refreshToken) => {
     ? parseTimeToMs(process.env.REFRESH_TOKEN_EXPIRE)
     : 24 * 60 * 60 * 1000;
 
+  const isProd = process.env.NODE_ENV === "production";
+
   res.cookie("accessToken", accessToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: isProd,
+    sameSite: isProd ? "None" : "Lax",
+    path: "/",
     maxAge: accessTokenMaxAge,
+    ...(isProd &&
+      process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN }),
   });
 
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: isProd,
+    sameSite: isProd ? "None" : "Lax",
+    path: "/",
     maxAge: refreshTokenMaxAge,
+    ...(isProd &&
+      process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN }),
   });
 };
 
@@ -81,37 +89,37 @@ export const protect = async (req, res, next) => {
     }
 
     try {
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      // Verify token
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Check if user still exists
+      // Check if user still exists
       const user = await User.findById(decoded.id).populate("role department");
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "User no longer exists",
-      });
-    }
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: "User no longer exists",
+        });
+      }
 
-    // Check if user is active
-    if (!user.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: "Account is deactivated",
-      });
-    }
+      // Check if user is active
+      if (!user.isActive) {
+        return res.status(401).json({
+          success: false,
+          message: "Account is deactivated",
+        });
+      }
 
-    // Check if user changed password after token was issued
-    if (user.changedPasswordAfter(decoded.iat)) {
-      return res.status(401).json({
-        success: false,
-        message: "Password was changed recently. Please login again.",
-      });
-    }
+      // Check if user changed password after token was issued
+      if (user.changedPasswordAfter(decoded.iat)) {
+        return res.status(401).json({
+          success: false,
+          message: "Password was changed recently. Please login again.",
+        });
+      }
 
-    // Grant access to protected route
-    req.user = user;
-    next();
+      // Grant access to protected route
+      req.user = user;
+      next();
     } catch (tokenError) {
       // If token is expired, try to refresh it
       if (tokenError.name === "TokenExpiredError") {
@@ -189,11 +197,11 @@ export const protect = async (req, res, next) => {
         }
       } else {
         // Other token errors
-      return res.status(401).json({
-        success: false,
-        message: "Invalid access token",
-      });
-    }
+        return res.status(401).json({
+          success: false,
+          message: "Invalid access token",
+        });
+      }
     }
   } catch (error) {
     console.error("Auth middleware error:", error);
@@ -214,7 +222,7 @@ export const restrictTo = (...roles) => {
       });
     }
 
-    if (!roles.includes(req.user.role)) {
+    if (!roles.includes(req.user.role.name)) {
       return res.status(403).json({
         success: false,
         message: "You do not have permission to perform this action",
@@ -245,13 +253,13 @@ export const optionalAuth = async (req, res, next) => {
     }
 
     try {
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      // Verify token
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Check if user still exists and is active
+      // Check if user still exists and is active
       const user = await User.findById(decoded.id).populate("role department");
-    if (user && user.isActive && !user.changedPasswordAfter(decoded.iat)) {
-      req.user = user;
+      if (user && user.isActive && !user.changedPasswordAfter(decoded.iat)) {
+        req.user = user;
       }
     } catch (tokenError) {
       // If token is expired, try to refresh it silently
@@ -347,4 +355,9 @@ export const checkRole = (minLevel) => {
       });
     }
   };
+};
+
+// Alias for checkRole - authorize function for backward compatibility
+export const authorize = (minLevel) => {
+  return checkRole(minLevel);
 };

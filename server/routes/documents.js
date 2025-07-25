@@ -9,6 +9,7 @@ import {
   getPendingApprovals,
   deleteDocument,
   searchDocuments,
+  updateDocument,
 } from "../controllers/documentController.js";
 import { protect } from "../middleware/auth.js";
 
@@ -26,7 +27,7 @@ router.get("/:id", getDocumentById);
 router.post("/:id/submit", submitForApproval);
 router.post("/:id/approve", approveDocument);
 router.post("/:id/reject", rejectDocument);
+router.put("/:id", updateDocument);
 router.delete("/:id", deleteDocument);
 
 export default router;
- 

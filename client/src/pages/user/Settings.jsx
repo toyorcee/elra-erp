@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { useProfile } from "../../hooks/useProfile";
 import SkeletonLoader from "../../components/SkeletonLoader";
 import {
   MdPerson,
@@ -18,20 +19,14 @@ import {
   MdStorage,
   MdSpeed,
   MdAccountCircle,
+  MdCameraAlt,
+  MdDelete,
 } from "react-icons/md";
 import { toast } from "react-toastify";
-import {
-  updateProfile,
-  uploadProfilePicture,
-  deleteProfilePicture,
-} from "../../services/profile";
 
-// Helper function to get full image URL
 const getImageUrl = (avatarPath) => {
   if (!avatarPath) return null;
   if (avatarPath.startsWith("http")) return avatarPath;
-
-  // Remove /api from the base URL for static file serving
   const baseUrl = (
     import.meta.env.VITE_API_URL || "http://localhost:5000/api"
   ).replace("/api", "");
@@ -40,13 +35,17 @@ const getImageUrl = (avatarPath) => {
 
 const Settings = () => {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const {
+    updateProfile,
+    uploadProfilePicture,
+    isUpdatingProfile,
+    isUploadingPicture,
+  } = useProfile();
   const [activeTab, setActiveTab] = useState("profile");
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Profile Settings
   const [profileData, setProfileData] = useState({
     firstName: user?.firstName || "",
     lastName: user?.lastName || "",
@@ -61,9 +60,9 @@ const Settings = () => {
       state: user?.address?.state || "",
       postalCode: user?.address?.postalCode || "",
     },
+    employeeId: user?.employeeId || "",
   });
 
-  // Notification Settings
   const [notificationSettings, setNotificationSettings] = useState({
     emailNotifications: true,
     pushNotifications: true,
@@ -73,17 +72,14 @@ const Settings = () => {
     dailyDigest: false,
   });
 
-  // Security Settings
   const [securityData, setSecurityData] = useState({
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
     twoFactorAuth: false,
-    sessionTimeout: 30,
   });
 
-  // Personal Preferences
-  const [personalPreferences, setPersonalPreferences] = useState({
+  const [preferences, setPreferences] = useState({
     theme: "auto",
     language: "en",
     timezone: "UTC",
@@ -91,7 +87,29 @@ const Settings = () => {
     timeFormat: "12h",
     autoSave: true,
     compactMode: false,
+    emailDigest: "weekly",
   });
+
+  useEffect(() => {
+    if (user) {
+      setProfileData({
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        email: user.email || "",
+        phone: user.phone || "",
+        department: user.department?.name || "",
+        position: user.position || "",
+        bio: user.bio || "",
+        address: {
+          street: user.address?.street || "",
+          city: user.address?.city || "",
+          state: user.address?.state || "",
+          postalCode: user.address?.postalCode || "",
+        },
+        employeeId: user.employeeId || "",
+      });
+    }
+  }, [user]);
 
   const tabs = [
     { id: "profile", label: "Profile", icon: MdPerson },
@@ -102,20 +120,48 @@ const Settings = () => {
 
   const handleProfileSave = async () => {
     try {
-      console.log("🔄 Saving profile data:", profileData);
-      setLoading(true);
-
       const { department, ...updateData } = profileData;
-
-      const response = await updateProfile(updateData);
-
-      console.log("✅ Profile update response:", response);
+      await updateProfile(updateData);
       toast.success("Profile updated successfully");
     } catch (error) {
-      console.error("❌ Error updating profile:", error);
       toast.error(error.response?.data?.message || "Failed to update profile");
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const handleProfilePictureUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const validTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!validTypes.includes(file.type)) {
+      toast.error("Please select a valid image file (JPEG, PNG, GIF, or WebP)");
+      return;
+    }
+
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error("Image size must be less than 5MB");
+      return;
+    }
+
+    try {
+      await uploadProfilePicture(file);
+      toast.success("Profile picture updated successfully!");
+    } catch (error) {
+      toast.error(
+        error.response?.data?.message || "Failed to upload profile picture"
+      );
+    }
+  };
+
+  const handleDragOver = (e) => e.preventDefault();
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      const event = { target: { files: [file] } };
+      await handleProfilePictureUpload(event);
     }
   };
 
@@ -125,10 +171,8 @@ const Settings = () => {
       return;
     }
 
-    setLoading(true);
     try {
-      // API call to update security settings
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       toast.success("Security settings updated successfully!");
       setSecurityData({
         ...securityData,
@@ -138,26 +182,91 @@ const Settings = () => {
       });
     } catch (error) {
       toast.error("Failed to update security settings");
-    } finally {
-      setLoading(false);
     }
   };
 
   const handlePreferencesSave = async () => {
-    setLoading(true);
     try {
-      // API call to update preferences
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       toast.success("Preferences updated successfully!");
     } catch (error) {
       toast.error("Failed to update preferences");
-    } finally {
-      setLoading(false);
     }
   };
 
   const renderProfileTab = () => (
     <div className="space-y-6">
+      <div className="bg-white/80 rounded-xl p-6 shadow-sm">
+        <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+          <MdCameraAlt className="mr-2 text-blue-600" />
+          Profile Picture
+        </h3>
+
+        <div className="flex items-center space-x-6">
+          <div className="relative group">
+            <div className="relative w-32 h-32 rounded-full overflow-hidden bg-gradient-to-br from-blue-400 via-cyan-400 to-purple-500 p-1">
+              {user?.avatar ? (
+                <img
+                  src={getImageUrl(user.avatar)}
+                  alt="Profile"
+                  className="w-full h-full rounded-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = "none";
+                    e.target.nextSibling.style.display = "flex";
+                  }}
+                />
+              ) : null}
+              <div
+                className={`w-full h-full rounded-full bg-gray-200 flex items-center justify-center ${
+                  user?.avatar ? "hidden" : ""
+                }`}
+              >
+                <MdPerson className="w-12 h-12 text-gray-400" />
+              </div>
+
+              <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                <MdEdit className="w-6 h-6 text-white" />
+              </div>
+            </div>
+
+            <input
+              type="file"
+              id="profile-picture-upload"
+              accept="image/*"
+              onChange={handleProfilePictureUpload}
+              className="hidden"
+            />
+            <label
+              htmlFor="profile-picture-upload"
+              className="absolute inset-0 cursor-pointer"
+            />
+          </div>
+
+          <div className="flex-1">
+            <h4 className="text-lg font-medium text-gray-900 mb-2">
+              Update Profile Picture
+            </h4>
+            <p className="text-sm text-gray-600 mb-4">
+              Click the image above or drag and drop a new photo. Supported
+              formats: JPEG, PNG, GIF, WebP (max 5MB)
+            </p>
+
+            <div
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors cursor-pointer"
+            >
+              <MdEdit className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-sm text-gray-600">
+                {isUploadingPicture
+                  ? "Uploading..."
+                  : "Drag and drop an image here"}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-white/80 rounded-xl p-6 shadow-sm">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
           <MdPerson className="mr-2 text-blue-600" />
@@ -218,6 +327,22 @@ const Settings = () => {
                 setProfileData({ ...profileData, phone: e.target.value })
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="+1234567890"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Employee ID
+            </label>
+            <input
+              type="text"
+              value={profileData.employeeId}
+              onChange={(e) =>
+                setProfileData({ ...profileData, employeeId: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="EMP001"
             />
           </div>
 
@@ -244,6 +369,82 @@ const Settings = () => {
                 setProfileData({ ...profileData, position: e.target.value })
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Software Engineer"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Street Address
+            </label>
+            <input
+              type="text"
+              value={profileData.address.street}
+              onChange={(e) =>
+                setProfileData({
+                  ...profileData,
+                  address: { ...profileData.address, street: e.target.value },
+                })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="123 Main Street"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              City
+            </label>
+            <input
+              type="text"
+              value={profileData.address.city}
+              onChange={(e) =>
+                setProfileData({
+                  ...profileData,
+                  address: { ...profileData.address, city: e.target.value },
+                })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="City"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              State/Province
+            </label>
+            <input
+              type="text"
+              value={profileData.address.state}
+              onChange={(e) =>
+                setProfileData({
+                  ...profileData,
+                  address: { ...profileData.address, state: e.target.value },
+                })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="State"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Postal Code
+            </label>
+            <input
+              type="text"
+              value={profileData.address.postalCode}
+              onChange={(e) =>
+                setProfileData({
+                  ...profileData,
+                  address: {
+                    ...profileData.address,
+                    postalCode: e.target.value,
+                  },
+                })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="ZIP/Postal Code"
             />
           </div>
         </div>
@@ -266,11 +467,11 @@ const Settings = () => {
         <div className="mt-6">
           <button
             onClick={handleProfileSave}
-            disabled={loading}
+            disabled={isUpdatingProfile}
             className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
             <MdSave className="mr-2" />
-            {loading ? "Saving..." : "Save Changes"}
+            {isUpdatingProfile ? "Saving..." : "Save Changes"}
           </button>
         </div>
       </div>
@@ -470,11 +671,10 @@ const Settings = () => {
         <div className="mt-6">
           <button
             onClick={handleSecuritySave}
-            disabled={loading}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <MdSave className="mr-2" />
-            {loading ? "Saving..." : "Update Security Settings"}
+            Update Security Settings
           </button>
         </div>
       </div>
@@ -495,12 +695,9 @@ const Settings = () => {
               Theme
             </label>
             <select
-              value={personalPreferences.theme}
+              value={preferences.theme}
               onChange={(e) =>
-                setPersonalPreferences({
-                  ...personalPreferences,
-                  theme: e.target.value,
-                })
+                setPreferences({ ...preferences, theme: e.target.value })
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
@@ -515,12 +712,9 @@ const Settings = () => {
               Language
             </label>
             <select
-              value={personalPreferences.language}
+              value={preferences.language}
               onChange={(e) =>
-                setPersonalPreferences({
-                  ...personalPreferences,
-                  language: e.target.value,
-                })
+                setPreferences({ ...preferences, language: e.target.value })
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
@@ -536,12 +730,9 @@ const Settings = () => {
               Timezone
             </label>
             <select
-              value={personalPreferences.timezone}
+              value={preferences.timezone}
               onChange={(e) =>
-                setPersonalPreferences({
-                  ...personalPreferences,
-                  timezone: e.target.value,
-                })
+                setPreferences({ ...preferences, timezone: e.target.value })
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
@@ -557,18 +748,49 @@ const Settings = () => {
               Date Format
             </label>
             <select
-              value={personalPreferences.dateFormat}
+              value={preferences.dateFormat}
               onChange={(e) =>
-                setPersonalPreferences({
-                  ...personalPreferences,
-                  dateFormat: e.target.value,
-                })
+                setPreferences({ ...preferences, dateFormat: e.target.value })
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="MM/DD/YYYY">MM/DD/YYYY</option>
               <option value="DD/MM/YYYY">DD/MM/YYYY</option>
               <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Time Format
+            </label>
+            <select
+              value={preferences.timeFormat}
+              onChange={(e) =>
+                setPreferences({ ...preferences, timeFormat: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="12h">12-hour</option>
+              <option value="24h">24-hour</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Email Digest
+            </label>
+            <select
+              value={preferences.emailDigest}
+              onChange={(e) =>
+                setPreferences({ ...preferences, emailDigest: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="never">Never</option>
             </select>
           </div>
         </div>
@@ -584,12 +806,9 @@ const Settings = () => {
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
-                checked={personalPreferences.autoSave}
+                checked={preferences.autoSave}
                 onChange={(e) =>
-                  setPersonalPreferences({
-                    ...personalPreferences,
-                    autoSave: e.target.checked,
-                  })
+                  setPreferences({ ...preferences, autoSave: e.target.checked })
                 }
                 className="sr-only peer"
               />
@@ -607,10 +826,10 @@ const Settings = () => {
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
-                checked={personalPreferences.compactMode}
+                checked={preferences.compactMode}
                 onChange={(e) =>
-                  setPersonalPreferences({
-                    ...personalPreferences,
+                  setPreferences({
+                    ...preferences,
                     compactMode: e.target.checked,
                   })
                 }
@@ -624,18 +843,17 @@ const Settings = () => {
         <div className="mt-6">
           <button
             onClick={handlePreferencesSave}
-            disabled={loading}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <MdSave className="mr-2" />
-            {loading ? "Saving..." : "Save Preferences"}
+            Save Preferences
           </button>
         </div>
       </div>
     </div>
   );
 
-  if (loading) {
+  if (isUpdatingProfile) {
     return (
       <div className="w-full py-6">
         <SkeletonLoader className="h-96" />
@@ -645,7 +863,6 @@ const Settings = () => {
 
   return (
     <div className="w-full py-6">
-      {/* Tab Navigation */}
       <div className="bg-white/80 rounded-xl p-2 shadow-sm mb-6">
         <div className="flex space-x-1">
           {tabs.map((tab) => {
@@ -668,7 +885,6 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* Tab Content */}
       <div className="min-h-[600px]">
         {activeTab === "profile" && renderProfileTab()}
         {activeTab === "notifications" && renderNotificationsTab()}

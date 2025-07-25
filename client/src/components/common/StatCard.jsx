@@ -1,7 +1,7 @@
 import React from "react";
 import * as HiIcons from "react-icons/hi";
 
-const StatCard = ({
+export default function StatCard({
   title,
   value,
   icon,
@@ -10,7 +10,7 @@ const StatCard = ({
   trendValue,
   loading = false,
   className = "",
-}) => {
+}) {
   const variants = {
     primary: {
       gradient: "from-blue-500 via-cyan-500 to-purple-500",
@@ -106,7 +106,6 @@ const StatCard = ({
         )}
       </div>
 
-      {/* Value with animated counter effect */}
       <div className="mb-2">
         <h3 className="text-3xl font-bold text-gray-900 group-hover:text-gray-800 transition-colors duration-300">
           {typeof value === "number" ? value.toLocaleString() : value}
@@ -129,7 +128,7 @@ const StatCard = ({
       <div className="absolute inset-0 rounded-2xl border-2 border-transparent group-hover:border-current group-hover:border-opacity-20 transition-all duration-300 pointer-events-none"></div>
     </div>
   );
-};
+}
 
 // Enhanced StatCard with more features
 export const AnimatedStatCard = ({
@@ -197,5 +196,3 @@ export const StatCardGrid = ({
     </div>
   );
 };
-
-export default StatCard;

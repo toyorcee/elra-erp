@@ -18,6 +18,7 @@ import {
   MdEmail,
 } from "react-icons/md";
 import { toast } from "react-toastify";
+import notificationService from "../../services/notifications";
 
 const Notifications = () => {
   const { user } = useAuth();
@@ -26,62 +27,6 @@ const Notifications = () => {
   const [filter, setFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Mock notifications data - replace with API call
-  const mockNotifications = [
-    {
-      id: 1,
-      type: "document",
-      title: "Document Approval Required",
-      message: "Please review and approve the Q4 Financial Report",
-      timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-      read: false,
-      priority: "high",
-      sender: "John Doe",
-      documentId: "doc-123",
-    },
-    {
-      id: 2,
-      type: "system",
-      title: "System Maintenance",
-      message: "Scheduled maintenance on Sunday, 2:00 AM - 4:00 AM",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-      read: true,
-      priority: "medium",
-      sender: "System",
-    },
-    {
-      id: 3,
-      type: "approval",
-      title: "Document Uploaded",
-      message: "New document 'Project Proposal 2024' has been uploaded",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4), // 4 hours ago
-      read: false,
-      priority: "low",
-      sender: "Jane Smith",
-      documentId: "doc-124",
-    },
-    {
-      id: 4,
-      type: "warning",
-      title: "Storage Space Warning",
-      message: "You're using 85% of your allocated storage space",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 6), // 6 hours ago
-      read: true,
-      priority: "medium",
-      sender: "System",
-    },
-    {
-      id: 5,
-      type: "info",
-      title: "Welcome to EDMS",
-      message: "Thank you for joining our document management system",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-      read: true,
-      priority: "low",
-      sender: "Admin",
-    },
-  ];
-
   useEffect(() => {
     fetchNotifications();
   }, []);
@@ -89,9 +34,8 @@ const Notifications = () => {
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setNotifications(mockNotifications);
+      const response = await notificationService.getNotifications();
+      setNotifications(response.data || []);
     } catch (error) {
       console.error("Error fetching notifications:", error);
       toast.error("Failed to fetch notifications");
@@ -102,10 +46,10 @@ const Notifications = () => {
 
   const markAsRead = async (notificationId) => {
     try {
-      // API call to mark as read
+      await notificationService.markAsRead(notificationId);
       setNotifications((prev) =>
         prev.map((notif) =>
-          notif.id === notificationId ? { ...notif, read: true } : notif
+          notif._id === notificationId ? { ...notif, read: true } : notif
         )
       );
       toast.success("Marked as read");
@@ -116,7 +60,7 @@ const Notifications = () => {
 
   const markAllAsRead = async () => {
     try {
-      // API call to mark all as read
+      await notificationService.markAllAsRead();
       setNotifications((prev) =>
         prev.map((notif) => ({ ...notif, read: true }))
       );
@@ -128,9 +72,9 @@ const Notifications = () => {
 
   const deleteNotification = async (notificationId) => {
     try {
-      // API call to delete notification
+      await notificationService.deleteNotification(notificationId);
       setNotifications((prev) =>
-        prev.filter((notif) => notif.id !== notificationId)
+        prev.filter((notif) => notif._id !== notificationId)
       );
       toast.success("Notification deleted");
     } catch (error) {

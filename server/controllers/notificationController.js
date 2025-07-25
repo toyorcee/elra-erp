@@ -1,66 +1,51 @@
 import NotificationService from "../services/notificationService.js";
-import Notification from "../models/Notification.js";
+import { asyncHandler } from "../utils/index.js";
 
-let notificationService;
+class NotificationController {
+  constructor(io) {
+    this.notificationService = new NotificationService(io || {});
+    this.io = io;
+  }
 
-export const initializeNotificationService = (io) => {
-  notificationService = new NotificationService(io);
-  global.notificationService = notificationService;
-};
-
-export const getUserNotifications = async (req, res) => {
-  try {
-    const currentUser = req.user;
+  // Get user's notifications
+  getNotifications = asyncHandler(async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
+    const userId = req.user._id;
 
-    const result = await notificationService.getUserNotifications(
-      currentUser.userId,
+    const result = await this.notificationService.getUserNotifications(
+      userId,
       parseInt(page),
       parseInt(limit)
     );
 
-    res.json({
+    res.status(200).json({
       success: true,
       data: result.notifications,
       pagination: result.pagination,
+      message: "Notifications retrieved successfully",
     });
-  } catch (error) {
-    console.error("Get user notifications error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch notifications",
-    });
-  }
-};
+  });
 
-// Get unread count
-export const getUnreadCount = async (req, res) => {
-  try {
-    const currentUser = req.user;
-    const count = await notificationService.getUnreadCount(currentUser.userId);
+  // Get unread notification count
+  getUnreadCount = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+    const count = await this.notificationService.getUnreadCount(userId);
 
-    res.json({
+    res.status(200).json({
       success: true,
       data: { count },
+      message: "Unread count retrieved successfully",
     });
-  } catch (error) {
-    console.error("Get unread count error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch unread count",
-    });
-  }
-};
+  });
 
-// Mark notification as read
-export const markAsRead = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const currentUser = req.user;
+  // Mark notification as read
+  markAsRead = asyncHandler(async (req, res) => {
+    const { notificationId } = req.params;
+    const userId = req.user._id;
 
-    const notification = await notificationService.markAsRead(
-      id,
-      currentUser.userId
+    const notification = await this.notificationService.markAsRead(
+      notificationId,
+      userId
     );
 
     if (!notification) {
@@ -70,52 +55,33 @@ export const markAsRead = async (req, res) => {
       });
     }
 
-    res.json({
+    res.status(200).json({
       success: true,
+      data: notification,
       message: "Notification marked as read",
     });
-  } catch (error) {
-    console.error("Mark as read error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to mark notification as read",
-    });
-  }
-};
+  });
 
-// Mark all notifications as read
-export const markAllAsRead = async (req, res) => {
-  try {
-    const currentUser = req.user;
+  // Mark all notifications as read
+  markAllAsRead = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
 
-    await notificationService.markAllAsRead(currentUser.userId);
+    await this.notificationService.markAllAsRead(userId);
 
-    res.json({
+    res.status(200).json({
       success: true,
       message: "All notifications marked as read",
     });
-  } catch (error) {
-    console.error("Mark all as read error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to mark all notifications as read",
-    });
-  }
-};
+  });
 
-// Delete notification
-export const deleteNotification = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const currentUser = req.user;
+  // Delete notification
+  deleteNotification = asyncHandler(async (req, res) => {
+    const { notificationId } = req.params;
+    const userId = req.user._id;
 
-    const notification = await Notification.findOneAndUpdate(
-      {
-        _id: id,
-        recipient: currentUser.userId,
-      },
-      { isActive: false },
-      { new: true }
+    const notification = await this.notificationService.deleteNotification(
+      notificationId,
+      userId
     );
 
     if (!notification) {
@@ -125,18 +91,67 @@ export const deleteNotification = async (req, res) => {
       });
     }
 
-    res.json({
+    res.status(200).json({
       success: true,
-      message: "Notification deleted",
+      message: "Notification deleted successfully",
     });
-  } catch (error) {
-    console.error("Delete notification error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to delete notification",
-    });
-  }
-};
+  });
 
-// Export notification service for use in other controllers
-export { notificationService };
+  // Get user's notification preferences
+  getPreferences = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+    const preferences = await this.notificationService.getUserPreferences(
+      userId
+    );
+
+    res.status(200).json({
+      success: true,
+      data: preferences,
+      message: "Notification preferences retrieved successfully",
+    });
+  });
+
+  // Update user's notification preferences
+  updatePreferences = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+    const preferences = req.body;
+
+    const updatedPreferences =
+      await this.notificationService.updateUserPreferences(userId, preferences);
+
+    res.status(200).json({
+      success: true,
+      data: updatedPreferences,
+      message: "Notification preferences updated successfully",
+    });
+  });
+
+  // Test notification (for development)
+  testNotification = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+    const { type = "SYSTEM_ALERT", priority = "medium" } = req.body;
+
+    const notification = await this.notificationService.createNotification({
+      recipient: userId,
+      type,
+      title: "Test Notification",
+      message: "This is a test notification to verify your preferences.",
+      data: {
+        priority,
+        test: true,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      data: notification,
+      message: "Test notification sent successfully",
+    });
+  });
+}
+
+export default NotificationController;
+
+export const initializeNotificationService = (io) => {
+  global.notificationService = new NotificationService(io);
+};

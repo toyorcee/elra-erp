@@ -2,7 +2,18 @@ import axios from "axios";
 
 console.log("API Base URL:", import.meta.env.VITE_API_URL);
 
-let hasLoggedIn = false;
+// Check if user has valid cookies on app start
+const checkInitialAuth = () => {
+  const cookies = document.cookie.split(";").reduce((acc, cookie) => {
+    const [key, value] = cookie.trim().split("=");
+    acc[key] = value;
+    return acc;
+  }, {});
+
+  return !!(cookies.accessToken && cookies.accessToken !== "undefined");
+};
+
+let hasLoggedIn = checkInitialAuth();
 export const setHasLoggedIn = (value) => {
   hasLoggedIn = value;
   console.log("🔐 Login state changed:", hasLoggedIn);
@@ -60,7 +71,7 @@ api.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
-      hasLoggedIn
+      (hasLoggedIn || checkInitialAuth())
     ) {
       if (isRefreshing) {
         return new Promise(function (resolve, reject) {

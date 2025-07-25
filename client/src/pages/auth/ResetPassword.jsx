@@ -81,12 +81,12 @@ const ResetPassword = () => {
         newPassword,
       });
 
-      if (response.success) {
+      if (response.data.success) {
         setSuccess(true);
         toast.success("Password updated successfully! Redirecting to login...");
         try {
           await authAPI.sendPasswordChangeNotification({
-            email: response.user?.email,
+            email: response.data.user?.email,
           });
         } catch (emailError) {
           console.log("Email notification failed:", emailError);
@@ -95,8 +95,8 @@ const ResetPassword = () => {
           navigate("/login");
         }, 3000);
       } else {
-        setError(response.message || "Something went wrong");
-        toast.error(response.message || "Something went wrong");
+        setError(response.data.message || "Something went wrong");
+        toast.error(response.data.message || "Something went wrong");
       }
     } catch (error) {
       const errorData = handleApiError(error);

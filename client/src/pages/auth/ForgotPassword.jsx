@@ -35,18 +35,16 @@ const ForgotPassword = () => {
     if (!validateEmail(email)) return;
 
     setLoading(true);
+    console.log("Submitting email:", email);
     try {
       const response = await authAPI.forgotPassword({ email });
 
-      if (response.success) {
-        setSuccess(true);
-        toast.success(
-          "Password reset link sent successfully! Check your email."
-        );
-      } else {
-        setError(response.message || "Something went wrong");
-        toast.error(response.message || "Something went wrong");
-      }
+      // Always show the backend message as a success toast
+      setSuccess(true);
+      toast.success(
+        response.message ||
+          "If an account with that email exists, a password reset link has been sent."
+      );
     } catch (error) {
       const errorData = handleApiError(error);
       setError(errorData.message);
@@ -160,99 +158,67 @@ const ForgotPassword = () => {
       <div className="relative z-10 w-full max-w-md lg:max-w-lg xl:max-w-xl">
         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-cyan-500 p-8 text-center">
-            <div className="mx-auto h-20 w-20 flex items-center justify-center rounded-full bg-white/20 mb-6 shadow-lg">
-              <svg
-                className="h-10 w-10 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-                />
-              </svg>
-            </div>
+          <div className="bg-gradient-to-r from-blue-600 to-cyan-600 p-8 text-center">
             <EDMSLogo variant="light" className="mb-3" />
-            <h2 className="text-3xl font-bold text-white mb-2">
-              Forgot Password?
+            <h2 className="text-2xl font-bold text-white mb-2">
+              Forgot Password
             </h2>
             <p className="text-blue-100 text-base">
-              Enter your email to reset your password
+              Enter your email address to receive a password reset link.
             </p>
           </div>
 
           {/* Form */}
-          <div className="p-8">
-            <form className="space-y-6" onSubmit={handleSubmit}>
-              {error && (
-                <div className="mb-6">
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm text-center">
-                    {error}
-                  </div>
-                </div>
+          <form onSubmit={handleSubmit} className="p-8 space-y-6">
+            <div>
+              <label className="block text-gray-700 font-medium mb-2">
+                Email Address
+              </label>
+              <input
+                type="email"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  emailError ? "border-red-500" : "border-gray-300"
+                }`}
+                placeholder="Enter your email"
+                value={email}
+                onChange={handleEmailChange}
+                disabled={loading}
+                required
+              />
+              {emailError && (
+                <p className="text-red-500 text-sm mt-1">{emailError}</p>
               )}
-
-              {/* Email Field */}
-              <div>
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Email address
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={handleEmailChange}
-                  className={`w-full px-4 py-3 rounded-lg border text-gray-900 placeholder-gray-500 transition-all duration-200 ${
-                    emailError
-                      ? "border-red-300 focus:border-red-500 focus:ring-red-200"
-                      : "border-gray-300 focus:border-blue-500 focus:ring-blue-200"
-                  } focus:outline-none focus:ring-2`}
-                  placeholder="Enter your email address"
-                />
-                {emailError && (
-                  <p className="mt-1 text-sm text-red-600">{emailError}</p>
-                )}
-              </div>
-
-              {/* Submit Button */}
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3 px-6 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold shadow-md hover:from-blue-700 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <div className="flex items-center justify-center space-x-2">
-                      <GradientSpinner size="sm" variant="light" />
-                      <span>Sending reset link...</span>
-                    </div>
-                  ) : (
-                    "Send Reset Link"
-                  )}
-                </button>
-              </div>
-
-              {/* Back to Login */}
-              <div className="text-center">
-                <Link
-                  to="/login"
-                  className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
-                >
-                  ← Back to Login
-                </Link>
-              </div>
-            </form>
-          </div>
+              {/* No error shown for non-existent email, always show generic message */}
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200"
+              disabled={loading}
+            >
+              {loading ? (
+                <span className="flex items-center justify-center">
+                  <GradientSpinner size="sm" className="mr-2" />
+                  Sending...
+                </span>
+              ) : (
+                "Send Reset Link"
+              )}
+            </button>
+            <div className="flex justify-between items-center mt-4">
+              <Link
+                to="/login"
+                className="text-blue-600 hover:underline text-sm"
+              >
+                Back to Login
+              </Link>
+              <Link
+                to="/register"
+                className="text-blue-600 hover:underline text-sm"
+              >
+                Register
+              </Link>
+            </div>
+          </form>
         </div>
       </div>
     </div>

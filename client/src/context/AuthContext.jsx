@@ -131,6 +131,21 @@ export const AuthProvider = ({ children }) => {
       console.log("🔍 AuthContext: Cookie check - has cookies:", hasCookies);
       console.log("🔍 AuthContext: All cookies:", document.cookie);
 
+      // Check if we have refresh token before attempting to get user data
+      const cookies = document.cookie.split(";").reduce((acc, cookie) => {
+        const [key, value] = cookie.trim().split("=");
+        acc[key] = value;
+        return acc;
+      }, {});
+
+      const hasRefreshToken = cookies.refreshToken && cookies.refreshToken !== "undefined";
+      
+      if (!hasRefreshToken) {
+        console.log("🔍 AuthContext: No refresh token found, user not authenticated");
+        dispatch({ type: AUTH_ACTIONS.INIT_FAILURE });
+        return;
+      }
+
       console.log("🔍 AuthContext: Attempting to get user data...");
       const response = await authAPI.getMe();
 
@@ -147,6 +162,7 @@ export const AuthProvider = ({ children }) => {
         },
       });
 
+      setHasLoggedIn(true); // Set login flag after successful auth
       dispatch({
         type: AUTH_ACTIONS.INIT_SUCCESS,
         payload: { user: userData },
@@ -159,11 +175,24 @@ export const AuthProvider = ({ children }) => {
         error.response?.data
       );
 
-      // Don't fail immediately on 401 - might be expired token
+      // If it's a 401, try to refresh the token
       if (error.response?.status === 401) {
-        console.log(
-          "🔍 AuthContext: 401 error - likely expired token, clearing auth"
-        );
+        console.log("🔍 AuthContext: 401 error - attempting token refresh...");
+        try {
+          await authAPI.refreshToken();
+          // If refresh successful, try to get user data again
+          const response = await authAPI.getMe();
+          const userData = response.data.data?.user || response.data.user;
+          
+          setHasLoggedIn(true);
+          dispatch({
+            type: AUTH_ACTIONS.INIT_SUCCESS,
+            payload: { user: userData },
+          });
+          return;
+        } catch (refreshError) {
+          console.log("❌ AuthContext: Token refresh failed:", refreshError.message);
+        }
       }
 
       dispatch({ type: AUTH_ACTIONS.INIT_FAILURE });

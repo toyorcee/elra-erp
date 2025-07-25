@@ -7,6 +7,7 @@ const roleSchema = new mongoose.Schema(
       required: true,
       unique: true,
       enum: [
+        "PLATFORM_ADMIN",
         "SUPER_ADMIN",
         "ADMIN",
         "MANAGER",
@@ -24,7 +25,7 @@ const roleSchema = new mongoose.Schema(
       required: true,
       unique: true,
       min: 10,
-      max: 100,
+      max: 120,
     },
     description: {
       type: String,
@@ -66,6 +67,11 @@ const roleSchema = new mongoose.Schema(
           "system.reports",
           "system.audit",
           "system.backup",
+
+          "company.create",
+          "company.view",
+          "company.edit",
+          "company.delete",
         ],
       },
     ],

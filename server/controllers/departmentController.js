@@ -123,13 +123,7 @@ export const createDepartment = async (req, res) => {
 // @access  Private (Admin+)
 export const getAllDepartments = async (req, res) => {
   try {
-    const {
-      page = 1,
-      limit = 10,
-      search,
-      status = "active",
-      includeInactive = false,
-    } = req.query;
+    const { search, status = "active", includeInactive = false } = req.query;
 
     const query = {};
 
@@ -151,18 +145,11 @@ export const getAllDepartments = async (req, res) => {
       ];
     }
 
-    const options = {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      populate: [
-        { path: "parentDepartment", select: "name code" },
-        { path: "manager", select: "firstName lastName email" },
-        { path: "createdBy", select: "firstName lastName" },
-      ],
-      sort: { name: 1 },
-    };
-
-    const departments = await Department.paginate(query, options);
+    const departments = await Department.find(query)
+      .populate("parentDepartment", "name code")
+      .populate("manager", "firstName lastName email")
+      .populate("createdBy", "firstName lastName")
+      .sort({ name: 1 });
 
     res.status(200).json({
       success: true,

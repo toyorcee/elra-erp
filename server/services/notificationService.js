@@ -1,9 +1,10 @@
 import Notification from "../models/Notification.js";
+import NotificationPreferences from "../models/NotificationPreferences.js";
 import User from "../models/User.js";
 
 class NotificationService {
   constructor(io) {
-    this.io = io;
+    this.io = io || { to: () => ({ emit: () => {} }) };
     this.connectedUsers = new Map();
   }
 
@@ -22,16 +23,51 @@ class NotificationService {
     }
   }
 
-  // Create and send notification
+  // Check if notification should be sent based on user preferences
+  async shouldSendNotification(userId, type, priority = "medium") {
+    try {
+      const preferences = await NotificationPreferences.getOrCreate(userId);
+
+      // Check if quiet hours are active
+      if (preferences.isQuietHoursActive()) {
+        return priority === "urgent";
+      }
+
+      if (!preferences.priorityLevels[priority]) {
+        return false;
+      }
+
+      return preferences.isNotificationEnabled(type, "inApp");
+    } catch (error) {
+      console.error("Error checking notification preferences:", error);
+      return true;
+    }
+  }
+
+  // Create and send notification with preference checking
   async createNotification(notificationData) {
     try {
+      const { recipient, type, priority = "medium" } = notificationData;
+
+      // Check if notification should be sent
+      const shouldSend = await this.shouldSendNotification(
+        recipient,
+        type,
+        priority
+      );
+
+      if (!shouldSend) {
+        console.log(
+          `Notification skipped for user ${recipient} - type: ${type}, priority: ${priority}`
+        );
+        return null;
+      }
+
       const notification = new Notification(notificationData);
       await notification.save();
 
       // Send real-time notification if user is online
-      const socketId = this.connectedUsers.get(
-        notification.recipient.toString()
-      );
+      const socketId = this.connectedUsers.get(recipient.toString());
       if (socketId) {
         this.io.to(socketId).emit("newNotification", {
           id: notification._id,
@@ -48,6 +84,26 @@ class NotificationService {
       console.error("Error creating notification:", error);
       throw error;
     }
+  }
+
+  // Get user's notification preferences
+  async getUserPreferences(userId) {
+    return await NotificationPreferences.getOrCreate(userId);
+  }
+
+  // Update user's notification preferences
+  async updateUserPreferences(userId, preferences) {
+    const userPreferences = await NotificationPreferences.getOrCreate(userId);
+
+    // Update the preferences
+    Object.keys(preferences).forEach((key) => {
+      if (userPreferences[key] !== undefined) {
+        userPreferences[key] = preferences[key];
+      }
+    });
+
+    await userPreferences.save();
+    return userPreferences;
   }
 
   // Send document approval notification

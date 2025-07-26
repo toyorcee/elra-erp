@@ -100,7 +100,7 @@ const Login = () => {
   // Show loading while auth is being initialized
   if (!initialized) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-cyan-800 to-purple-900">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900">
         <GradientSpinner
           size="xl"
           variant="secondary"
@@ -114,7 +114,7 @@ const Login = () => {
   // If already authenticated, show loading while redirecting
   if (isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-cyan-800 to-purple-900">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900">
         <GradientSpinner
           size="xl"
           variant="secondary"
@@ -126,7 +126,7 @@ const Login = () => {
   }
 
   return (
-    <div className="h-screen flex bg-gradient-to-br from-blue-900 via-cyan-800 to-purple-900 overflow-hidden relative">
+    <div className="h-screen flex bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 overflow-hidden relative">
       {/* Sliding Background Images */}
       <div className="absolute inset-0 w-full h-full">
         {backgroundImages.map((image, index) => (
@@ -135,23 +135,26 @@ const Login = () => {
             src={image.src}
             alt={image.alt}
             className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-1000 ${
-              index === currentImageIndex ? "opacity-20" : "opacity-0"
+              index === currentImageIndex ? "opacity-30" : "opacity-0"
             }`}
           />
         ))}
       </div>
 
+      {/* Dark Overlay */}
+      <div className="absolute inset-0 bg-slate-900/70" />
+
       {/* Gradient Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-900/80 via-cyan-800/80 to-purple-900/80" />
+      <div className="absolute inset-0 bg-gradient-to-r from-slate-900/80 via-blue-900/40 to-transparent" />
 
       {/* Main Container - Full Height with Centered Modal */}
       <div className="relative z-10 flex items-center justify-center w-full h-full p-4 sm:p-6 lg:p-8">
         <div className="w-full max-w-md sm:max-w-lg lg:max-w-xl xl:max-w-2xl h-full max-h-[90vh] flex flex-col">
           {/* Modal Card with Fixed Height */}
-          <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 flex flex-col h-full overflow-hidden">
+          <div className="bg-white/5 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/10 flex flex-col h-full overflow-hidden">
             {/* Fixed Header */}
-            <div className="bg-gradient-to-r from-blue-600 via-cyan-500 to-purple-600 p-6 sm:p-8 text-center flex-shrink-0">
-              <div className="mx-auto h-16 w-16 sm:h-20 sm:w-20 flex items-center justify-center rounded-full bg-white/20 mb-4 sm:mb-6 shadow-lg backdrop-blur-sm">
+            <div className="bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-purple-600/20 backdrop-blur-xl border-b border-white/10 p-6 sm:p-8 text-center flex-shrink-0">
+              <div className="mx-auto h-16 w-16 sm:h-20 sm:w-20 flex items-center justify-center rounded-full bg-white/10 mb-4 sm:mb-6 shadow-lg backdrop-blur-sm border border-white/20">
                 <svg
                   className="h-8 w-8 sm:h-10 sm:w-10 text-white"
                   fill="none"
@@ -170,7 +173,7 @@ const Login = () => {
               <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">
                 Welcome Back
               </h2>
-              <p className="text-blue-100 text-sm sm:text-base">
+              <p className="text-white/70 text-sm sm:text-base">
                 Sign in to your account to continue
               </p>
             </div>
@@ -182,7 +185,7 @@ const Login = () => {
                   {/* Error Display */}
                   {error && (
                     <div className="mb-6">
-                      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm text-center">
+                      <div className="bg-red-500/10 border border-red-400/30 text-red-400 px-4 py-3 rounded-xl text-sm text-center backdrop-blur-sm">
                         {error}
                       </div>
                     </div>
@@ -192,7 +195,7 @@ const Login = () => {
                   <div>
                     <label
                       htmlFor="email"
-                      className="block text-sm font-medium text-gray-700 mb-2"
+                      className="block text-sm font-medium text-white/90 mb-2"
                     >
                       Email Address
                     </label>
@@ -204,15 +207,15 @@ const Login = () => {
                       required
                       value={formData.email}
                       onChange={handleChange}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 ${
+                      className={`w-full px-4 py-3 rounded-xl border transition-all duration-200 ${
                         errors.email
-                          ? "border-red-400 bg-red-50"
-                          : "border-gray-300 bg-white focus:border-blue-400"
-                      } text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400/50`}
+                          ? "border-red-400 bg-red-500/10"
+                          : "border-white/20 bg-white/5 focus:border-blue-400"
+                      } text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-400/50 backdrop-blur-sm`}
                       placeholder="Enter your email"
                     />
                     {errors.email && (
-                      <p className="mt-1 text-sm text-red-600">
+                      <p className="mt-1 text-sm text-red-400">
                         {errors.email}
                       </p>
                     )}
@@ -222,7 +225,7 @@ const Login = () => {
                   <div>
                     <label
                       htmlFor="password"
-                      className="block text-sm font-medium text-gray-700 mb-2"
+                      className="block text-sm font-medium text-white/90 mb-2"
                     >
                       Password
                     </label>
@@ -235,17 +238,17 @@ const Login = () => {
                         required
                         value={formData.password}
                         onChange={handleChange}
-                        className={`w-full px-4 py-3 pr-12 rounded-xl border-2 transition-all duration-200 ${
+                        className={`w-full px-4 py-3 pr-12 rounded-xl border transition-all duration-200 ${
                           errors.password
-                            ? "border-red-400 bg-red-50"
-                            : "border-gray-300 bg-white focus:border-blue-400"
-                        } text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400/50`}
+                            ? "border-red-400 bg-red-500/10"
+                            : "border-white/20 bg-white/5 focus:border-blue-400"
+                        } text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-blue-400/50 backdrop-blur-sm`}
                         placeholder="Enter your password"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-white/40 hover:text-white/60 transition-colors"
                       >
                         {showPassword ? (
                           <HiOutlineEyeOff className="h-5 w-5" />
@@ -255,7 +258,7 @@ const Login = () => {
                       </button>
                     </div>
                     {errors.password && (
-                      <p className="mt-1 text-sm text-red-600">
+                      <p className="mt-1 text-sm text-red-400">
                         {errors.password}
                       </p>
                     )}
@@ -282,15 +285,15 @@ const Login = () => {
                 <div className="mt-6 text-center space-y-3">
                   <Link
                     to="/forgot-password"
-                    className="text-blue-600 hover:text-blue-700 text-sm transition-colors hover:underline"
+                    className="text-blue-400 hover:text-blue-300 text-sm transition-colors hover:underline"
                   >
                     Forgot your password?
                   </Link>
-                  <div className="text-gray-600 text-sm">
+                  <div className="text-white/60 text-sm">
                     Don't have an account?{" "}
                     <Link
                       to="/register"
-                      className="text-blue-600 hover:text-blue-700 font-medium transition-colors hover:underline"
+                      className="text-blue-400 hover:text-blue-300 font-medium transition-colors hover:underline"
                     >
                       Sign up
                     </Link>
@@ -300,8 +303,8 @@ const Login = () => {
             </div>
 
             {/* Fixed Footer */}
-            <div className="flex-shrink-0 p-4 bg-gray-50/80 backdrop-blur-sm border-t border-gray-200/50">
-              <p className="text-center text-xs text-gray-500">
+            <div className="flex-shrink-0 p-4 bg-white/5 backdrop-blur-sm border-t border-white/10">
+              <p className="text-center text-xs text-white/50">
                 © {new Date().getFullYear()} EDMS. Secure Document Management.
               </p>
             </div>

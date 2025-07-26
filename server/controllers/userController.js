@@ -6,6 +6,7 @@ import {
   generatePermissionAudit,
 } from "../utils/permissionUtils.js";
 import { validateRegistration } from "../utils/validationUtils.js";
+import { checkPlanLimits } from "../middleware/planLimits.js";
 
 // Get all users (with role-based filtering)
 export const getAllUsers = async (req, res) => {

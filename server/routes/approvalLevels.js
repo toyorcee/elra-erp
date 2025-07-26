@@ -7,6 +7,7 @@ import {
   deleteApprovalLevel,
 } from "../controllers/approvalLevelController.js";
 import { protect, authorize } from "../middleware/auth.js";
+import { checkPlanLimits } from "../middleware/planLimits.js";
 
 const router = express.Router();
 
@@ -15,7 +16,7 @@ router.use(protect);
 router.use(authorize(100));
 
 // CRUD operations for approval levels
-router.route("/").get(getApprovalLevels).post(createApprovalLevel);
+router.route("/").get(getApprovalLevels).post(checkPlanLimits("createApprovalLevel"), createApprovalLevel);
 
 router
   .route("/:id")

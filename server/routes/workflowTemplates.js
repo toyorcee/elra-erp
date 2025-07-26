@@ -7,6 +7,7 @@ import {
   deleteWorkflowTemplate,
 } from "../controllers/workflowTemplateController.js";
 import { protect, authorize } from "../middleware/auth.js";
+import { checkPlanLimits } from "../middleware/planLimits.js";
 
 const router = express.Router();
 
@@ -15,7 +16,7 @@ router.use(protect);
 router.use(authorize(100));
 
 // CRUD operations for workflow templates
-router.route("/").get(getWorkflowTemplates).post(createWorkflowTemplate);
+router.route("/").get(getWorkflowTemplates).post(checkPlanLimits("createWorkflow"), createWorkflowTemplate);
 
 router
   .route("/:id")

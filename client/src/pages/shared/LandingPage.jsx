@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   HiDocumentText,
@@ -11,19 +11,20 @@ import {
   HiLightningBolt,
   HiCheckCircle,
   HiArrowRight,
-  HiPlay,
   HiMenu,
   HiX,
   HiBell,
   HiChat,
   HiStar,
   HiSparkles,
+  HiInformationCircle,
 } from "react-icons/hi";
 import EDMSLogo from "../../components/EDMSLogo";
 import { getSubscriptionPlans } from "../../services/subscriptions.js";
 import SubscriptionForm from "./SubscriptionForm.jsx";
 
 const LandingPage = () => {
+  const navigate = useNavigate();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -33,6 +34,7 @@ const LandingPage = () => {
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [showSubscriptionForm, setShowSubscriptionForm] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
+  const [showPricingTooltip, setShowPricingTooltip] = useState(false);
   const [animatedStats, setAnimatedStats] = useState({
     documents: 0,
     users: 0,
@@ -325,8 +327,8 @@ const LandingPage = () => {
   ];
 
   const handlePlanSelection = (plan) => {
-    setSelectedPlan(plan);
-    setShowSubscriptionForm(true);
+    // Navigate to welcome screen for subscription
+    navigate("/welcome?flow=company");
   };
 
   return (
@@ -459,18 +461,35 @@ const LandingPage = () => {
                     animate={{ x: 0, opacity: 1 }}
                     transition={{ delay: 0.4 }}
                   >
-                    <Link
-                      to="/register"
-                      onClick={() => setMobileMenuOpen(false)}
+                    <button
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        navigate("/welcome?flow=individual");
+                      }}
                       className="block w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-center py-3 px-6 rounded-full font-semibold transition-all duration-300 transform hover:scale-105"
                     >
-                      Get Started Free
-                    </Link>
+                      Sign Up Free
+                    </button>
                   </motion.div>
                   <motion.div
                     initial={{ x: -20, opacity: 0 }}
                     animate={{ x: 0, opacity: 1 }}
                     transition={{ delay: 0.5 }}
+                  >
+                    <button
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        navigate("/welcome?flow=company");
+                      }}
+                      className="block w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-center py-3 px-6 rounded-full font-semibold transition-all duration-300 transform hover:scale-105"
+                    >
+                      Subscribe for Company
+                    </button>
+                  </motion.div>
+                  <motion.div
+                    initial={{ x: -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: 0.6 }}
                   >
                     <Link
                       to="/login"
@@ -544,16 +563,19 @@ const LandingPage = () => {
                 {heroContent[currentWordIndex]?.description}
               </motion.p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                <Link
-                  to="/register"
+                <button
+                  onClick={() => navigate("/welcome?flow=individual")}
                   className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-full font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-500/25 flex items-center justify-center"
                 >
-                  <span>Get Started Free</span>
+                  <span>Sign Up Free</span>
                   <HiArrowRight className="ml-2" />
-                </Link>
-                <button className="bg-transparent border-2 border-white/20 hover:border-white/40 hover:bg-white/10 text-white px-8 py-4 rounded-full font-semibold transition-all duration-300 flex items-center justify-center">
-                  <HiPlay className="mr-2" />
-                  Watch Demo
+                </button>
+                <button
+                  onClick={() => navigate("/welcome?flow=company")}
+                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-4 rounded-full font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl hover:shadow-green-500/25 flex items-center justify-center"
+                >
+                  <HiStar className="mr-2" />
+                  Subscribe for Company
                 </button>
               </div>
             </motion.div>
@@ -565,6 +587,7 @@ const LandingPage = () => {
               className="relative h-96 lg:h-[500px] hidden lg:block"
             >
               <div className="relative w-full h-full">
+                {/* Top Row */}
                 <motion.div
                   animate={{ y: [0, -20, 0] }}
                   transition={{
@@ -572,13 +595,14 @@ const LandingPage = () => {
                     repeat: Infinity,
                     ease: "easeInOut",
                   }}
-                  className="absolute top-10 left-10 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 flex flex-col items-center space-y-3"
+                  className="absolute top-8 left-8 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 flex flex-col items-center space-y-3"
                 >
                   <HiDocumentText className="text-3xl text-blue-400" />
-                  <span className="text-white font-semibold">
+                  <span className="text-white font-semibold text-center">
                     Smart Organization
                   </span>
                 </motion.div>
+
                 <motion.div
                   animate={{ y: [0, -15, 0] }}
                   transition={{
@@ -587,13 +611,15 @@ const LandingPage = () => {
                     ease: "easeInOut",
                     delay: 2,
                   }}
-                  className="absolute top-40 right-20 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 flex flex-col items-center space-y-3"
+                  className="absolute top-8 right-8 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 flex flex-col items-center space-y-3"
                 >
                   <HiShieldCheck className="text-3xl text-green-400" />
-                  <span className="text-white font-semibold">
+                  <span className="text-white font-semibold text-center">
                     Secure Access
                   </span>
                 </motion.div>
+
+                {/* Bottom Row */}
                 <motion.div
                   animate={{ y: [0, -25, 0] }}
                   transition={{
@@ -602,11 +628,30 @@ const LandingPage = () => {
                     ease: "easeInOut",
                     delay: 4,
                   }}
-                  className="absolute bottom-20 left-30 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 flex flex-col items-center space-y-3"
+                  className="absolute bottom-8 left-8 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 flex flex-col items-center space-y-3"
                 >
                   <HiUsers className="text-3xl text-purple-400" />
-                  <span className="text-white font-semibold">
+                  <span className="text-white font-semibold text-center">
                     Team Collaboration
+                  </span>
+                </motion.div>
+
+                <motion.div
+                  animate={{ y: [0, -30, 0] }}
+                  transition={{
+                    duration: 6,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    delay: 6,
+                  }}
+                  className="absolute bottom-8 right-8 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 flex flex-col items-center space-y-3"
+                >
+                  <HiShieldCheck className="text-3xl text-green-400" />
+                  <span className="text-white font-semibold text-center">
+                    Secure Payments
+                  </span>
+                  <span className="text-green-400 text-xs text-center">
+                    PCI DSS Compliant
                   </span>
                 </motion.div>
               </div>
@@ -783,7 +828,8 @@ const LandingPage = () => {
                     billingCycle === "monthly" ? "yearly" : "monthly"
                   )
                 }
-                className="relative w-16 h-8 bg-white/10 backdrop-blur-sm rounded-full p-1 transition-all duration-300 hover:bg-white/20"
+                className="relative w-16 h-8 bg-white/10 backdrop-blur-sm rounded-full p-1 transi
+                tion-all duration-300 hover:bg-white/20"
               >
                 <motion.div
                   className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full shadow-lg"
@@ -791,16 +837,68 @@ const LandingPage = () => {
                   transition={{ duration: 0.3, ease: "easeInOut" }}
                 />
               </button>
-              <span
-                className={`text-sm font-medium transition-colors duration-300 ${
-                  billingCycle === "yearly" ? "text-white" : "text-white/60"
-                }`}
-              >
-                Yearly
-                <span className="ml-2 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full">
-                  Save 17%
+              <div className="relative">
+                <span
+                  className={`text-sm font-medium transition-colors duration-300 ${
+                    billingCycle === "yearly" ? "text-white" : "text-white/60"
+                  }`}
+                >
+                  Yearly
+                  <span className="ml-2 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full">
+                    Save 17%
+                  </span>
                 </span>
-              </span>
+
+                {/* Info Icon */}
+                <button
+                  onMouseEnter={() => setShowPricingTooltip(true)}
+                  onMouseLeave={() => setShowPricingTooltip(false)}
+                  className="ml-2 inline-flex items-center justify-center w-4 h-4 text-white/60 hover:text-white/80 transition-colors"
+                >
+                  <HiInformationCircle className="w-4 h-4" />
+                </button>
+
+                {/* Tooltip */}
+                <AnimatePresence>
+                  {showPricingTooltip && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                      className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-80 bg-slate-800/95 backdrop-blur-xl border border-white/20 rounded-xl p-4 shadow-2xl z-50"
+                    >
+                      <div className="text-sm text-white/90 space-y-2">
+                        <div className="font-semibold text-white mb-2">
+                          💡 How the Savings Work:
+                        </div>
+                        <div className="space-y-1 text-xs">
+                          <div>
+                            • <strong>Monthly:</strong> Pay every month (more
+                            flexible)
+                          </div>
+                          <div>
+                            • <strong>Yearly:</strong> Pay once per year (better
+                            value)
+                          </div>
+                        </div>
+                        <div className="text-xs text-green-400 mt-2">
+                          <strong>Example:</strong> Professional Plan
+                        </div>
+                        <div className="text-xs space-y-1">
+                          <div>Monthly: $99.99 × 12 = $1,199.88/year</div>
+                          <div>Yearly: $999.99/year</div>
+                          <div className="text-green-400 font-semibold">
+                            You save $199.89! (2 months free)
+                          </div>
+                        </div>
+                      </div>
+                      {/* Arrow */}
+                      <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-slate-800/95"></div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </motion.div>
 
@@ -1307,21 +1405,7 @@ const LandingPage = () => {
         </div>
       </footer>
 
-      {/* Subscription Form Modal */}
-      {showSubscriptionForm && selectedPlan && (
-        <SubscriptionForm
-          selectedPlan={selectedPlan}
-          billingCycle={billingCycle}
-          onClose={() => {
-            setShowSubscriptionForm(false);
-            setSelectedPlan(null);
-          }}
-          onSuccess={() => {
-            setShowSubscriptionForm(false);
-            setSelectedPlan(null);
-          }}
-        />
-      )}
+      {/* Subscription Form Modal - Now handled in welcome screen */}
     </div>
   );
 };

@@ -133,7 +133,7 @@ const ResetPassword = () => {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-cyan-800 to-purple-900 p-6">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 p-6">
         {/* Fixed Background Image */}
         <img
           src={loginBg}
@@ -141,12 +141,18 @@ const ResetPassword = () => {
           className="fixed inset-0 w-full h-full object-cover object-center opacity-20"
         />
 
+        {/* Dark Overlay */}
+        <div className="fixed inset-0 bg-slate-900/70" />
+
+        {/* Gradient Overlay */}
+        <div className="fixed inset-0 bg-gradient-to-r from-slate-900/80 via-blue-900/40 to-transparent" />
+
         {/* Main Container */}
         <div className="relative z-10 w-full max-w-md lg:max-w-lg xl:max-w-xl">
-          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+          <div className="bg-white/5 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/10 overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-r from-green-600 to-blue-600 p-8 text-center">
-              <div className="mx-auto h-20 w-20 flex items-center justify-center rounded-full bg-white/20 mb-6 shadow-lg">
+            <div className="bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-purple-600/20 backdrop-blur-xl border-b border-white/10 p-8 text-center">
+              <div className="mx-auto h-20 w-20 flex items-center justify-center rounded-full bg-white/10 mb-6 shadow-lg border border-white/20">
                 <svg
                   className="h-10 w-10 text-white"
                   fill="none"
@@ -165,7 +171,7 @@ const ResetPassword = () => {
               <h2 className="text-3xl font-bold text-white mb-2">
                 Password Reset Success!
               </h2>
-              <p className="text-green-100 text-base">
+              <p className="text-white/70 text-base">
                 Your password has been updated successfully
               </p>
             </div>
@@ -173,13 +179,13 @@ const ResetPassword = () => {
             {/* Content */}
             <div className="p-8 text-center">
               <div className="mb-6">
-                <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm">
+                <div className="bg-green-500/10 border border-green-400/30 text-green-400 px-4 py-3 rounded-xl text-sm backdrop-blur-sm">
                   <p className="font-medium mb-2">✅ Password Updated</p>
                   <p>You can now log in with your new password.</p>
                 </div>
               </div>
 
-              <div className="text-gray-600 text-sm mb-6">
+              <div className="text-white/70 text-sm mb-6">
                 <p className="mb-2">
                   Redirecting you to the login page in a few seconds...
                 </p>
@@ -188,7 +194,7 @@ const ResetPassword = () => {
               <div className="space-y-4">
                 <Link
                   to="/login"
-                  className="w-full py-3 px-6 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold shadow-md hover:from-blue-700 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all duration-200 inline-block text-center"
+                  className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-600 to-purple-600 text-white font-semibold shadow-lg hover:from-blue-700 hover:via-cyan-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition-all duration-200 inline-block text-center transform hover:scale-105"
                 >
                   Go to Login Now
                 </Link>
@@ -202,7 +208,7 @@ const ResetPassword = () => {
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-cyan-800 to-purple-900 p-6">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 p-6">
         {/* Fixed Background Image */}
         <img
           src={loginBg}
@@ -210,12 +216,18 @@ const ResetPassword = () => {
           className="fixed inset-0 w-full h-full object-cover object-center opacity-20"
         />
 
+        {/* Dark Overlay */}
+        <div className="fixed inset-0 bg-slate-900/70" />
+
+        {/* Gradient Overlay */}
+        <div className="fixed inset-0 bg-gradient-to-r from-slate-900/80 via-blue-900/40 to-transparent" />
+
         {/* Main Container */}
         <div className="relative z-10 w-full max-w-md lg:max-w-lg xl:max-w-xl">
-          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+          <div className="bg-white/5 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/10 overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-r from-red-600 to-orange-500 p-8 text-center">
-              <div className="mx-auto h-20 w-20 flex items-center justify-center rounded-full bg-white/20 mb-6 shadow-lg">
+            <div className="bg-gradient-to-r from-red-600/20 to-orange-500/20 backdrop-blur-xl border-b border-white/10 p-8 text-center">
+              <div className="mx-auto h-20 w-20 flex items-center justify-center rounded-full bg-white/10 mb-6 shadow-lg border border-white/20">
                 <svg
                   className="h-10 w-10 text-white"
                   fill="none"
@@ -234,7 +246,7 @@ const ResetPassword = () => {
               <h2 className="text-3xl font-bold text-white mb-2">
                 Invalid Reset Link
               </h2>
-              <p className="text-red-100 text-base">
+              <p className="text-white/70 text-base">
                 This reset link is invalid or has expired
               </p>
             </div>
@@ -242,7 +254,7 @@ const ResetPassword = () => {
             {/* Content */}
             <div className="p-8 text-center">
               <div className="mb-6">
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+                <div className="bg-red-500/10 border border-red-400/30 text-red-400 px-4 py-3 rounded-xl text-sm backdrop-blur-sm">
                   <p className="font-medium mb-2">❌ Invalid or Expired Link</p>
                   <p>Please request a new password reset link.</p>
                 </div>
@@ -251,14 +263,14 @@ const ResetPassword = () => {
               <div className="space-y-4">
                 <Link
                   to="/forgot-password"
-                  className="w-full py-3 px-6 rounded-lg bg-gradient-to-r from-red-600 to-orange-500 text-white font-semibold shadow-md hover:from-red-700 hover:to-orange-600 focus:outline-none focus:ring-2 focus:ring-red-200 transition-all duration-200 inline-block text-center"
+                  className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-red-600 to-orange-500 text-white font-semibold shadow-lg hover:from-red-700 hover:to-orange-600 focus:outline-none focus:ring-2 focus:ring-red-400/50 transition-all duration-200 inline-block text-center transform hover:scale-105"
                 >
                   Request New Reset Link
                 </Link>
 
                 <Link
                   to="/login"
-                  className="w-full py-3 px-6 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all duration-200 inline-block text-center"
+                  className="w-full py-3 px-6 rounded-xl border border-white/20 bg-white/5 text-white font-semibold hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20 transition-all duration-200 backdrop-blur-sm inline-block text-center"
                 >
                   Back to Login
                 </Link>
@@ -271,7 +283,7 @@ const ResetPassword = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-cyan-800 to-purple-900 p-6">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 p-6">
       {/* Fixed Background Image */}
       <img
         src={loginBg}
@@ -279,12 +291,18 @@ const ResetPassword = () => {
         className="fixed inset-0 w-full h-full object-cover object-center opacity-20"
       />
 
+      {/* Dark Overlay */}
+      <div className="fixed inset-0 bg-slate-900/70" />
+
+      {/* Gradient Overlay */}
+      <div className="fixed inset-0 bg-gradient-to-r from-slate-900/80 via-blue-900/40 to-transparent" />
+
       {/* Main Container */}
       <div className="relative z-10 w-full max-w-md lg:max-w-lg xl:max-w-xl">
-        <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+        <div className="bg-white/5 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/10 overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-cyan-500 p-8 text-center">
-            <div className="mx-auto h-20 w-20 flex items-center justify-center rounded-full bg-white/20 mb-6 shadow-lg">
+          <div className="bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-purple-600/20 backdrop-blur-xl border-b border-white/10 p-8 text-center">
+            <div className="mx-auto h-20 w-20 flex items-center justify-center rounded-full bg-white/10 mb-6 shadow-lg border border-white/20">
               <svg
                 className="h-10 w-10 text-white"
                 fill="none"
@@ -303,7 +321,7 @@ const ResetPassword = () => {
             <h2 className="text-3xl font-bold text-white mb-2">
               Reset Password
             </h2>
-            <p className="text-blue-100 text-base">
+            <p className="text-white/70 text-base">
               Enter your new password below
             </p>
           </div>
@@ -313,7 +331,7 @@ const ResetPassword = () => {
             <form className="space-y-6" onSubmit={handleSubmit}>
               {error && (
                 <div className="mb-6">
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm text-center">
+                  <div className="bg-red-500/10 border border-red-400/30 text-red-400 px-4 py-3 rounded-xl text-sm text-center backdrop-blur-sm">
                     {error}
                   </div>
                 </div>
@@ -323,7 +341,7 @@ const ResetPassword = () => {
               <div>
                 <label
                   htmlFor="newPassword"
-                  className="block text-sm font-medium text-gray-700 mb-2"
+                  className="block text-sm font-medium text-white/90 mb-2"
                 >
                   New Password
                 </label>
@@ -336,10 +354,10 @@ const ResetPassword = () => {
                     required
                     value={newPassword}
                     onChange={handlePasswordChange}
-                    className={`w-full px-4 py-3 rounded-lg border text-gray-900 placeholder-gray-500 transition-all duration-200 pr-10 ${
+                    className={`w-full px-4 py-3 rounded-xl border text-white placeholder-white/40 transition-all duration-200 pr-10 backdrop-blur-sm ${
                       passwordError
-                        ? "border-red-300 focus:border-red-500 focus:ring-red-200"
-                        : "border-gray-300 focus:border-blue-500 focus:ring-blue-200"
+                        ? "border-red-400 bg-red-500/10 focus:border-red-400 focus:ring-red-400/50"
+                        : "border-white/20 bg-white/5 focus:border-blue-400 focus:ring-blue-400/50"
                     } focus:outline-none focus:ring-2`}
                     placeholder="Enter your new password"
                   />
@@ -348,14 +366,14 @@ const ResetPassword = () => {
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? (
-                      <HiOutlineEyeOff className="h-5 w-5 text-gray-500" />
+                      <HiOutlineEyeOff className="h-5 w-5 text-white/40" />
                     ) : (
-                      <HiOutlineEye className="h-5 w-5 text-gray-500" />
+                      <HiOutlineEye className="h-5 w-5 text-white/40" />
                     )}
                   </span>
                 </div>
                 {passwordError && (
-                  <p className="mt-1 text-sm text-red-600">{passwordError}</p>
+                  <p className="mt-1 text-sm text-red-400">{passwordError}</p>
                 )}
               </div>
 
@@ -363,7 +381,7 @@ const ResetPassword = () => {
               <div>
                 <label
                   htmlFor="confirmPassword"
-                  className="block text-sm font-medium text-gray-700 mb-2"
+                  className="block text-sm font-medium text-white/90 mb-2"
                 >
                   Confirm New Password
                 </label>
@@ -376,10 +394,10 @@ const ResetPassword = () => {
                     required
                     value={confirmPassword}
                     onChange={handleConfirmPasswordChange}
-                    className={`w-full px-4 py-3 rounded-lg border text-gray-900 placeholder-gray-500 transition-all duration-200 pr-10 ${
+                    className={`w-full px-4 py-3 rounded-xl border text-white placeholder-white/40 transition-all duration-200 pr-10 backdrop-blur-sm ${
                       confirmPasswordError
-                        ? "border-red-300 focus:border-red-500 focus:ring-red-200"
-                        : "border-gray-300 focus:border-blue-500 focus:ring-blue-200"
+                        ? "border-red-400 bg-red-500/10 focus:border-red-400 focus:ring-red-400/50"
+                        : "border-white/20 bg-white/5 focus:border-blue-400 focus:ring-blue-400/50"
                     } focus:outline-none focus:ring-2`}
                     placeholder="Confirm your new password"
                   />
@@ -388,14 +406,14 @@ const ResetPassword = () => {
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   >
                     {showConfirmPassword ? (
-                      <HiOutlineEyeOff className="h-5 w-5 text-gray-500" />
+                      <HiOutlineEyeOff className="h-5 w-5 text-white/40" />
                     ) : (
-                      <HiOutlineEye className="h-5 w-5 text-gray-500" />
+                      <HiOutlineEye className="h-5 w-5 text-white/40" />
                     )}
                   </span>
                 </div>
                 {confirmPasswordError && (
-                  <p className="mt-1 text-sm text-red-600">
+                  <p className="mt-1 text-sm text-red-400">
                     {confirmPasswordError}
                   </p>
                 )}
@@ -406,11 +424,11 @@ const ResetPassword = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 px-6 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold shadow-md hover:from-blue-700 hover:to-cyan-600 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-600 to-purple-600 text-white font-semibold shadow-lg hover:from-blue-700 hover:via-cyan-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none transform hover:scale-105"
                 >
                   {loading ? (
                     <div className="flex items-center justify-center space-x-2">
-                      <GradientSpinner size="sm" variant="light" />
+                      <GradientSpinner size="sm" variant="white" />
                       <span>Updating password...</span>
                     </div>
                   ) : (
@@ -423,7 +441,7 @@ const ResetPassword = () => {
               <div className="text-center">
                 <Link
                   to="/login"
-                  className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
+                  className="text-blue-400 hover:text-blue-300 font-medium text-sm transition-colors"
                 >
                   ← Back to Login
                 </Link>

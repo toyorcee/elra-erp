@@ -21,6 +21,7 @@ import { PlatformAdminDashboard } from "./pages/platform-admin";
 import CreateIndustryInstance from "./pages/platform-admin/CreateIndustryInstance";
 import IndustryInstances from "./pages/platform-admin/IndustryInstances";
 import LandingPage from "./pages/shared/LandingPage";
+import WelcomeOnboarding from "./pages/shared/WelcomeOnboarding";
 import PaymentCallback from "./pages/shared/PaymentCallback";
 import DashboardLayout from "./layouts/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -49,6 +50,7 @@ const AppRoutes = () => {
     <Routes>
       {/* Public routes */}
       <Route path="/" element={<LandingPage />} />
+      <Route path="/welcome" element={<WelcomeOnboarding />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />

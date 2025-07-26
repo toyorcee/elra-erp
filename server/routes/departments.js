@@ -15,6 +15,7 @@ import {
 } from "../controllers/departmentController.js";
 import { protect } from "../middleware/auth.js";
 import { checkRole } from "../middleware/auth.js";
+import { checkPlanLimits } from "../middleware/planLimits.js";
 
 const router = express.Router();
 
@@ -65,7 +66,13 @@ router.get("/:id", checkRole(80), getDepartmentById);
 router.get("/", checkRole(80), getAllDepartments);
 
 // Super Admin only routes
-router.post("/", checkRole(100), validateDepartment, createDepartment);
+router.post(
+  "/",
+  checkRole(100),
+  checkPlanLimits("createDepartment"),
+  validateDepartment,
+  createDepartment
+);
 router.put("/:id", checkRole(100), validateDepartment, updateDepartment);
 router.delete("/:id", checkRole(100), deleteDepartment);
 router.delete("/bulk-delete", checkRole(100), bulkDeleteDepartments);

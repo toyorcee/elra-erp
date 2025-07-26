@@ -2,7 +2,6 @@ import jwt from "jsonwebtoken";
 import { validationResult } from "express-validator";
 import bcrypt from "bcryptjs";
 import User from "../models/User.js";
-import Department from "../models/Department.js";
 import {
   sendPasswordResetEmail,
   sendPasswordChangeSuccessEmail,
@@ -124,8 +123,7 @@ export const register = async (req, res) => {
       });
     }
 
-    const { username, email, password, firstName, lastName, department } =
-      req.body;
+    const { username, email, password, firstName, lastName } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findByEmailOrUsername(email);
@@ -136,37 +134,6 @@ export const register = async (req, res) => {
       });
     }
 
-    // Handle department assignment
-    let departmentId;
-    if (department) {
-      // If department name/code provided, find the department
-      const dept = await Department.findOne({
-        $or: [{ name: department }, { code: department.toUpperCase() }],
-        isActive: true,
-      });
-      departmentId = dept?._id;
-    }
-
-    // If no department found or provided, get/create External department
-    if (!departmentId) {
-      let externalDept = await Department.findOne({
-        code: "EXT",
-        isActive: true,
-      });
-
-      if (!externalDept) {
-        externalDept = new Department({
-          name: "External",
-          code: "EXT",
-          description: "External users and contractors",
-          level: 10,
-          createdBy: null,
-        });
-        await externalDept.save();
-      }
-      departmentId = externalDept._id;
-    }
-
     // Create new user
     const user = new User({
       username,
@@ -174,7 +141,6 @@ export const register = async (req, res) => {
       password,
       firstName,
       lastName,
-      department: departmentId,
     });
 
     await user.save();

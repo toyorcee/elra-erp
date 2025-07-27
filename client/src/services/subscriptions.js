@@ -93,3 +93,28 @@ export const createTrialSubscription = async (trialData) => {
     throw error;
   }
 };
+
+// Update subscription plan pricing (Platform Admin only)
+export const updateSubscriptionPlan = async (planName, planData) => {
+  try {
+    const response = await api.put(
+      `/system-settings/subscription-plans/${planName}`,
+      planData
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error updating subscription plan:", error);
+    throw error;
+  }
+};
+
+// Get subscription plan by name (Platform Admin only)
+export const getSubscriptionPlan = async (planName) => {
+  try {
+    const response = await api.get(`/subscriptions/plans/${planName}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching subscription plan:", error);
+    throw error;
+  }
+};

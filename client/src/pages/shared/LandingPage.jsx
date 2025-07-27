@@ -21,19 +21,20 @@ import {
 } from "react-icons/hi";
 import EDMSLogo from "../../components/EDMSLogo";
 import { getSubscriptionPlans } from "../../services/subscriptions.js";
-import SubscriptionForm from "./SubscriptionForm.jsx";
+import { useAuth } from "../../context/AuthContext";
+import { getPlanPrice } from "../../utils/priceUtils";
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const { setSubscriptionPlans: setGlobalPlans } = useAuth();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [billingCycle, setBillingCycle] = useState("monthly");
+  const [selectedCurrency, setSelectedCurrency] = useState("USD");
   const [subscriptionPlans, setSubscriptionPlans] = useState({});
   const [loadingPlans, setLoadingPlans] = useState(true);
-  const [showSubscriptionForm, setShowSubscriptionForm] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState(null);
   const [showPricingTooltip, setShowPricingTooltip] = useState(false);
   const [animatedStats, setAnimatedStats] = useState({
     documents: 0,
@@ -41,6 +42,7 @@ const LandingPage = () => {
     companies: 0,
     uptime: 0,
   });
+  const [calculatedPrices, setCalculatedPrices] = useState({}); // Store calculated prices
 
   // Sliding words and contextual content for hero section
   const heroContent = [
@@ -99,6 +101,36 @@ const LandingPage = () => {
         const data = await getSubscriptionPlans();
         if (data.success) {
           setSubscriptionPlans(data.data);
+          setGlobalPlans(data.data);
+          console.log(
+            "✅ LandingPage: Stored subscription plans in auth context:",
+            data.data
+          );
+
+          // Calculate prices for all plans and currencies
+          const newPrices = {};
+          const currencies = ["USD", "NGN"];
+          const cycles = ["monthly", "yearly"];
+
+          for (const plan of data.data) {
+            for (const currency of currencies) {
+              for (const cycle of cycles) {
+                const cacheKey = `${plan.name}-${currency}-${cycle}`;
+                try {
+                  const price = await getPlanPrice(plan, currency, cycle);
+                  newPrices[cacheKey] = price;
+                } catch (error) {
+                  console.error(
+                    `Error calculating price for ${cacheKey}:`,
+                    error
+                  );
+                  newPrices[cacheKey] = currency === "NGN" ? "₦99" : "$99";
+                }
+              }
+            }
+          }
+
+          setCalculatedPrices(newPrices);
         }
       } catch (error) {
         console.error("Error fetching subscription plans:", error);
@@ -108,7 +140,7 @@ const LandingPage = () => {
     };
 
     fetchPlans();
-  }, []);
+  }, [setGlobalPlans]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -327,8 +359,20 @@ const LandingPage = () => {
   ];
 
   const handlePlanSelection = (plan) => {
-    // Navigate to welcome screen for subscription
-    navigate("/welcome?flow=company");
+    // Navigate to welcome screen for subscription with plan details
+    const planParams = new URLSearchParams({
+      flow: "company",
+      planName: plan.name,
+      planDisplayName: plan.displayName,
+      planPrice:
+        plan.price?.[selectedCurrency]?.[billingCycle] ||
+        plan.price?.USD?.[billingCycle] ||
+        plan.price?.[billingCycle],
+      planBillingCycle: billingCycle,
+      planFeatures: JSON.stringify(plan.features),
+      planDescription: plan.description,
+    });
+    navigate(`/welcome?${planParams.toString()}`);
   };
 
   return (
@@ -886,10 +930,28 @@ const LandingPage = () => {
                           <strong>Example:</strong> Professional Plan
                         </div>
                         <div className="text-xs space-y-1">
-                          <div>Monthly: $99.99 × 12 = $1,199.88/year</div>
-                          <div>Yearly: $999.99/year</div>
+                          <div>
+                            Monthly: {selectedCurrency === "NGN" ? "₦" : "$"}
+                            {selectedCurrency === "NGN" ? "149,985" : "99.99"} ×
+                            12 = {selectedCurrency === "NGN" ? "₦" : "$"}
+                            {selectedCurrency === "NGN"
+                              ? (149985 * 12).toLocaleString()
+                              : (99.99 * 12).toLocaleString()}
+                            /year
+                          </div>
+                          <div>
+                            Yearly: {selectedCurrency === "NGN" ? "₦" : "$"}
+                            {selectedCurrency === "NGN"
+                              ? "1,499,850"
+                              : "999.99"}
+                            /year
+                          </div>
                           <div className="text-green-400 font-semibold">
-                            You save $199.89! (2 months free)
+                            You save {selectedCurrency === "NGN" ? "₦" : "$"}
+                            {selectedCurrency === "NGN"
+                              ? (149985 * 12 - 1499850).toLocaleString()
+                              : (99.99 * 12 - 999.99).toFixed(2)}
+                            ! (2 months free)
                           </div>
                         </div>
                       </div>
@@ -898,6 +960,35 @@ const LandingPage = () => {
                     </motion.div>
                   )}
                 </AnimatePresence>
+              </div>
+            </div>
+
+            {/* Currency Selector */}
+            <div className="flex items-center justify-center space-x-4 mb-8">
+              <span className="text-sm font-medium text-white/60">
+                Currency:
+              </span>
+              <div className="flex items-center space-x-3 bg-white/10 backdrop-blur-sm rounded-full p-1">
+                <button
+                  onClick={() => setSelectedCurrency("USD")}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                    selectedCurrency === "USD"
+                      ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg"
+                      : "text-white/60 hover:text-white/80"
+                  }`}
+                >
+                  USD ($)
+                </button>
+                <button
+                  onClick={() => setSelectedCurrency("NGN")}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                    selectedCurrency === "NGN"
+                      ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg"
+                      : "text-white/60 hover:text-white/80"
+                  }`}
+                >
+                  NGN (₦)
+                </button>
               </div>
             </div>
           </motion.div>
@@ -979,10 +1070,21 @@ const LandingPage = () => {
                       <div className="text-center mb-8">
                         <div className="flex items-center justify-center space-x-2 mb-2">
                           <span className="text-4xl font-bold">
-                            $
-                            {billingCycle === "yearly"
-                              ? plan.price.yearly
-                              : plan.price.monthly}
+                            {calculatedPrices[
+                              `${plan.name}-${selectedCurrency}-${billingCycle}`
+                            ] ||
+                              plan.formattedPrices?.[selectedCurrency]?.[
+                                billingCycle
+                              ]?.formatted ||
+                              `${selectedCurrency === "NGN" ? "₦" : "$"}${
+                                billingCycle === "yearly"
+                                  ? plan.price?.[selectedCurrency]?.yearly ||
+                                    plan.price?.USD?.yearly ||
+                                    plan.price?.yearly
+                                  : plan.price?.[selectedCurrency]?.monthly ||
+                                    plan.price?.USD?.monthly ||
+                                    plan.price?.monthly
+                              }`}
                           </span>
                           <span className="text-white/60">
                             /{billingCycle === "yearly" ? "year" : "month"}
@@ -990,11 +1092,16 @@ const LandingPage = () => {
                         </div>
                         {billingCycle === "yearly" && (
                           <p className="text-green-400 text-sm font-medium">
-                            Save $
+                            Save {selectedCurrency === "NGN" ? "₦" : "$"}
                             {(
-                              plan.price.monthly * 12 -
-                              plan.price.yearly
-                            ).toFixed(2)}{" "}
+                              (plan.price?.[selectedCurrency]?.monthly ||
+                                plan.price?.USD?.monthly ||
+                                plan.price?.monthly) *
+                                12 -
+                              (plan.price?.[selectedCurrency]?.yearly ||
+                                plan.price?.USD?.yearly ||
+                                plan.price?.yearly)
+                            ).toLocaleString()}{" "}
                             annually
                           </p>
                         )}
@@ -1072,7 +1179,7 @@ const LandingPage = () => {
                         className={`block w-full py-3 px-6 rounded-xl font-semibold text-center transition-all duration-300 transform hover:scale-105 ${
                           planKey === "professional"
                             ? "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/25"
-                            : "bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/40"
+                            : "bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/40 cursor-pointer"
                         }`}
                       >
                         Get Started

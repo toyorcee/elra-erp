@@ -10,6 +10,8 @@ import {
   getSubscriptionStatistics,
   handlePaymentWebhook,
   createTrialSubscription,
+  updateSubscriptionPlan,
+  getSubscriptionPlan,
 } from "../controllers/subscriptionController.js";
 import { protect, restrictTo } from "../middleware/auth.js";
 
@@ -29,6 +31,10 @@ router.get("/", getAllSubscriptions);
 router.put("/:id/cancel", cancelSubscription);
 router.get("/statistics", getSubscriptionStatistics);
 router.post("/trial", createTrialSubscription);
+
+// Plan Management Routes (Platform Admin only)
+router.get("/plans/:planName", getSubscriptionPlan);
+router.put("/plans/:planName", updateSubscriptionPlan);
 
 // System routes (for internal usage tracking)
 router.put("/:id/usage", updateSubscriptionUsage);

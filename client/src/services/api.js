@@ -108,6 +108,8 @@ export const authAPI = {
   refreshToken: () => api.post("/auth/refresh"),
   getProfile: () => api.get("/auth/me"),
   getMe: () => api.get("/auth/me"),
+  changePassword: (passwordData) =>
+    api.put("/auth/change-password", passwordData),
   forgotPassword: (data) => api.post("/auth/forgot-password", data),
   resetPassword: (data) => api.post("/auth/reset-password", data),
   isAuthenticated: () => {

@@ -12,6 +12,7 @@ import {
 } from "../controllers/authController.js";
 import { protect } from "../middleware/auth.js";
 import { passwordResetLimiter } from "../middleware/rateLimit.js";
+import { allowPasswordChangeRoutes } from "../middleware/passwordSecurity.js";
 
 const router = express.Router();
 
@@ -54,6 +55,7 @@ const loginValidation = [
 
 const changePasswordValidation = [
   body("currentPassword")
+    .optional()
     .notEmpty()
     .withMessage("Current password is required"),
   body("newPassword")
@@ -92,6 +94,7 @@ router.get("/me", protect, getMe);
 router.put(
   "/change-password",
   protect,
+  allowPasswordChangeRoutes,
   changePasswordValidation,
   changePassword
 );

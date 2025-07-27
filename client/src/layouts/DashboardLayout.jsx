@@ -5,6 +5,7 @@ import Sidebar from "../components/Sidebar";
 import ProfileMenu from "../components/ProfileMenu";
 import EDMSLogo from "../components/EDMSLogo";
 import NotificationBell from "../components/NotificationBell";
+import PasswordChangeModal from "../components/common/PasswordChangeModal";
 import { useAuth } from "../context/AuthContext";
 
 // Create context for sidebar state
@@ -22,6 +23,7 @@ const DashboardLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [sidebarPinned, setSidebarPinned] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -48,6 +50,16 @@ const DashboardLayout = () => {
       }
     }
   }, [user, location.pathname, navigate]);
+
+  // Check for temporary password and show modal
+  useEffect(() => {
+    if (user && (user.passwordChangeRequired || user.isTemporaryPassword)) {
+      console.log(
+        "🔐 User has temporary password, showing password change modal"
+      );
+      setShowPasswordModal(true);
+    }
+  }, [user]);
 
   return (
     <SidebarContext.Provider
@@ -130,6 +142,23 @@ const DashboardLayout = () => {
           )}
         </div>
       </div>
+
+      {/* Password Change Modal */}
+      <PasswordChangeModal
+        isOpen={showPasswordModal}
+        onClose={() => {
+          // Don't allow closing if password change is required
+          if (user?.passwordChangeRequired || user?.isTemporaryPassword) {
+            return;
+          }
+          setShowPasswordModal(false);
+        }}
+        onSuccess={() => {
+          console.log("✅ Password changed successfully");
+          setShowPasswordModal(false);
+        }}
+        userData={user}
+      />
     </SidebarContext.Provider>
   );
 };

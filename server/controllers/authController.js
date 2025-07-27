@@ -6,6 +6,7 @@ import {
   sendPasswordResetEmail,
   sendPasswordChangeSuccessEmail,
 } from "../services/emailService.js";
+import WelcomeNotificationService from "../services/welcomeNotificationService.js";
 
 const generateAccessToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
@@ -167,6 +168,16 @@ export const register = async (req, res) => {
 
     // Set cookies
     setTokenCookies(res, accessToken, refreshToken);
+
+    // Send welcome notification and email (async - don't wait for it)
+    try {
+      const welcomeService = new WelcomeNotificationService(global.io);
+      welcomeService.sendWelcomeNotification(user).catch((error) => {
+        console.error("❌ Error sending welcome notification:", error);
+      });
+    } catch (error) {
+      console.error("❌ Error initializing welcome service:", error);
+    }
 
     // Return user data (without password)
     const userResponse = {
@@ -331,6 +342,10 @@ export const login = async (req, res) => {
       lastLogin: user.lastLogin,
       createdAt: user.createdAt,
       avatar: user.avatar,
+      // Add temporary password info
+      isTemporaryPassword: user.isTemporaryPassword,
+      passwordChangeRequired: user.passwordChangeRequired,
+      temporaryPasswordExpiry: user.temporaryPasswordExpiry,
     };
 
     res.status(200).json({
@@ -588,34 +603,77 @@ export const changePassword = async (req, res) => {
       });
     }
 
-    // Check current password
-    const isCurrentPasswordCorrect = await user.correctPassword(
-      currentPassword,
-      user.password
-    );
+    if (!user.isTemporaryPassword) {
+      const isCurrentPasswordCorrect = await user.correctPassword(
+        currentPassword,
+        user.password
+      );
 
-    if (!isCurrentPasswordCorrect) {
-      return res.status(400).json({
-        success: false,
-        message: "Current password is incorrect",
-      });
+      if (!isCurrentPasswordCorrect) {
+        return res.status(400).json({
+          success: false,
+          message: "Current password is incorrect",
+        });
+      }
     }
 
     // Update password
     user.password = newPassword;
+
+    if (user.isTemporaryPassword) {
+      user.isTemporaryPassword = false;
+      user.temporaryPasswordExpiry = null;
+      user.passwordChangeRequired = false;
+      user.lastPasswordChange = new Date();
+      user.passwordChangedAt = new Date();
+
+      console.log(
+        `✅ User ${user.email} changed temporary password successfully`
+      );
+    }
+
     await user.save();
 
-    // Clear all refresh tokens (force re-login)
-    user.refreshTokens = [];
-    await user.save();
+    if (user.isTemporaryPassword) {
+      const accessToken = generateAccessToken(user._id);
+      const refreshToken = generateRefreshToken(user._id);
 
-    // Clear cookies
-    clearTokenCookies(res);
+      await user.addRefreshToken(
+        refreshToken,
+        new Date(Date.now() + 24 * 60 * 60 * 1000)
+      );
 
-    res.status(200).json({
-      success: true,
-      message: "Password changed successfully. Please login again.",
-    });
+      setTokenCookies(res, accessToken, refreshToken);
+
+      res.status(200).json({
+        success: true,
+        message: "Password changed successfully! Welcome to your dashboard.",
+        data: {
+          user: {
+            id: user._id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role,
+            isTemporaryPassword: false,
+            passwordChangeRequired: false,
+          },
+          accessToken,
+        },
+      });
+    } else {
+      // For regular password changes, clear tokens and force re-login
+      user.refreshTokens = [];
+      await user.save();
+
+      // Clear cookies
+      clearTokenCookies(res);
+
+      res.status(200).json({
+        success: true,
+        message: "Password changed successfully. Please login again.",
+      });
+    }
   } catch (error) {
     console.error("Change password error:", error);
     res.status(500).json({

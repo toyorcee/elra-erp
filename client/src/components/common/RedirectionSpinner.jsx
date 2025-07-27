@@ -4,35 +4,72 @@ import { HiArrowRight, HiShieldCheck, HiCreditCard } from "react-icons/hi";
 
 const RedirectionSpinner = ({
   isVisible,
-  paymentProvider = "Paystack",
+  paymentProvider = "paystack",
   amount,
+  currency = "USD",
   planName,
   onComplete,
 }) => {
+  // Payment provider configurations
+  const paymentProviders = {
+    paystack: {
+      name: "Paystack",
+      icon: "₦",
+      colors: "from-green-500 to-green-600",
+      borderColor: "border-green-500/30",
+      bgColor: "bg-green-500/10",
+      textColor: "text-green-400",
+      description: "Secure payment for Nigerian customers",
+    },
+    stripe: {
+      name: "Stripe",
+      icon: "💳",
+      colors: "from-purple-500 to-purple-600",
+      borderColor: "border-purple-500/30",
+      bgColor: "bg-purple-500/10",
+      textColor: "text-purple-400",
+      description: "Secure payment with credit/debit cards",
+    },
+    paypal: {
+      name: "PayPal",
+      icon: "🔵",
+      colors: "from-blue-500 to-blue-600",
+      borderColor: "border-blue-500/30",
+      bgColor: "bg-blue-500/10",
+      textColor: "text-blue-400",
+      description: "Pay with your PayPal account",
+    },
+  };
+
+  const currentProvider =
+    paymentProviders[paymentProvider] || paymentProviders.paystack;
   const [currentStep, setCurrentStep] = useState(0);
   const [dots, setDots] = useState("");
 
-  const steps = [
-    {
-      title: "Preparing Your Payment",
-      description: "Setting up secure payment gateway...",
-      icon: HiShieldCheck,
-      color: "text-blue-400",
-    },
-    {
-      title: "Redirecting to Payment",
-      description: `Redirecting to ${paymentProvider} secure payment page...`,
-      icon: HiCreditCard,
-      color: "text-green-400",
-    },
-    {
-      title: "Almost There",
-      description:
-        "Please complete your payment to activate your subscription...",
-      icon: HiArrowRight,
-      color: "text-purple-400",
-    },
-  ];
+  const steps = React.useMemo(
+    () => [
+      {
+        title: "Preparing Your Payment",
+        description: "Setting up secure payment gateway...",
+        icon: HiShieldCheck,
+        color: "text-blue-400",
+      },
+      {
+        title: "Redirecting to Payment",
+        description: `Redirecting to ${currentProvider.name} secure payment page...`,
+        icon: HiCreditCard,
+        color: currentProvider.textColor,
+      },
+      {
+        title: "Almost There",
+        description:
+          "Please complete your payment to activate your subscription...",
+        icon: HiArrowRight,
+        color: "text-purple-400",
+      },
+    ],
+    [currentProvider.name, currentProvider.textColor]
+  );
 
   useEffect(() => {
     if (!isVisible) return;
@@ -86,7 +123,7 @@ const RedirectionSpinner = ({
 
           {/* Floating particles */}
           <div className="absolute inset-0 overflow-hidden">
-            {[...Array(6)].map((_, i) => (
+            {Array.from({ length: 6 }, (_, i) => (
               <motion.div
                 key={i}
                 className="absolute w-2 h-2 bg-white/20 rounded-full"
@@ -108,6 +145,13 @@ const RedirectionSpinner = ({
           </div>
 
           <div className="relative z-10">
+            {/* Payment Provider Badge */}
+            <div
+              className={`px-4 py-2 rounded-full bg-gradient-to-r ${currentProvider.colors} text-white text-sm font-semibold mb-6 inline-block`}
+            >
+              {currentProvider.name}
+            </div>
+
             {/* Main spinner with enhanced animations */}
             <div className="relative mb-8">
               <div className="w-32 h-32 mx-auto relative">
@@ -191,21 +235,33 @@ const RedirectionSpinner = ({
               </div>
               <div className="flex items-center justify-between text-sm mt-2">
                 <span className="text-white/60">Amount:</span>
-                <span className="text-white font-medium">${amount}</span>
+                <span className="text-white font-medium">
+                  {typeof amount === "number"
+                    ? amount.toLocaleString(
+                        currency === "NGN" ? "en-NG" : "en-US",
+                        {
+                          style: "currency",
+                          currency: currency,
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0,
+                        }
+                      )
+                    : amount}
+                </span>
               </div>
               <div className="flex items-center justify-between text-sm mt-2">
                 <span className="text-white/60">Provider:</span>
                 <span className="text-white font-medium">
-                  {paymentProvider}
+                  {currentProvider.name}
                 </span>
               </div>
             </motion.div>
 
             {/* Progress indicator */}
             <div className="flex items-center justify-center space-x-2 mb-6">
-              {steps.map((_, index) => (
+              {steps.map((step, index) => (
                 <motion.div
-                  key={index}
+                  key={`step-${index}-${step.title}`}
                   className={`w-3 h-3 rounded-full ${
                     index <= currentStep ? "bg-blue-500" : "bg-white/20"
                   }`}

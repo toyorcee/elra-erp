@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import SystemSettings from "./SystemSettings.js";
 
 const subscriptionSchema = new mongoose.Schema(
   {
@@ -6,7 +7,7 @@ const subscriptionSchema = new mongoose.Schema(
     company: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Company",
-      required: true,
+      required: false,
     },
 
     // Subscription plan details
@@ -21,13 +22,33 @@ const subscriptionSchema = new mongoose.Schema(
         required: true,
       },
       price: {
+        USD: {
+          monthly: {
+            type: Number,
+            required: true,
+          },
+          yearly: {
+            type: Number,
+            required: true,
+          },
+        },
+        NGN: {
+          monthly: {
+            type: Number,
+            required: true,
+          },
+          yearly: {
+            type: Number,
+            required: true,
+          },
+        },
         monthly: {
           type: Number,
-          required: true,
+          required: false,
         },
         yearly: {
           type: Number,
-          required: true,
+          required: false,
         },
       },
       features: {
@@ -168,7 +189,7 @@ const subscriptionSchema = new mongoose.Schema(
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false,
     },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -228,92 +249,141 @@ subscriptionSchema.methods.isWithinLimits = function () {
   );
 };
 
-// Static method to get subscription plans
-subscriptionSchema.statics.getPlans = function () {
-  return {
-    starter: {
-      name: "starter",
-      displayName: "Starter Plan",
-      price: {
-        monthly: 19.99,
-        yearly: 199.99, // 17% discount
+// Static method to get subscription plans from system settings
+subscriptionSchema.statics.getPlans = async function () {
+  try {
+    const settings = await SystemSettings.getSettings();
+    const plans = settings.subscriptionPlans || {};
+
+    // Transform the plans to match the expected format
+    const transformedPlans = {};
+
+    Object.keys(plans).forEach((planKey) => {
+      const plan = plans[planKey];
+      if (plan && plan.isActive) {
+        transformedPlans[planKey] = {
+          name: planKey,
+          displayName: plan.displayName,
+          description: plan.description,
+          price: {
+            USD: {
+              monthly: plan.price.USD.monthly,
+              yearly: plan.price.USD.yearly,
+            },
+            NGN: {
+              monthly: plan.price.NGN.monthly,
+              yearly: plan.price.NGN.yearly,
+            },
+            // Keep legacy format for backward compatibility
+            monthly: plan.price.USD.monthly,
+            yearly: plan.price.USD.yearly,
+          },
+          features: plan.features,
+        };
+      }
+    });
+
+    return transformedPlans;
+  } catch (error) {
+    console.error(
+      "Error fetching subscription plans from system settings:",
+      error
+    );
+
+    return {
+      starter: {
+        name: "starter",
+        displayName: "Starter Plan",
+        price: {
+          USD: { monthly: 19.99, yearly: 199.99 },
+          NGN: { monthly: 29985, yearly: 299985 }, // 19.99 * 1500, 199.99 * 1500
+          monthly: 19.99,
+          yearly: 199.99,
+        },
+        features: {
+          maxUsers: 10,
+          maxStorage: 10,
+          maxDepartments: 5,
+          customWorkflows: false,
+          advancedAnalytics: false,
+          prioritySupport: false,
+          customBranding: false,
+          apiAccess: false,
+          sso: false,
+        },
+        description:
+          "Perfect for small teams and startups getting started with document management",
       },
-      features: {
-        maxUsers: 10,
-        maxStorage: 10,
-        maxDepartments: 5,
-        customWorkflows: false,
-        advancedAnalytics: false,
-        prioritySupport: false,
-        customBranding: false,
-        apiAccess: false,
-        sso: false,
+      business: {
+        name: "business",
+        displayName: "Business Plan",
+        price: {
+          USD: { monthly: 49.99, yearly: 499.99 },
+          NGN: { monthly: 74985, yearly: 749985 }, // 49.99 * 1500, 499.99 * 1500
+          monthly: 49.99,
+          yearly: 499.99,
+        },
+        features: {
+          maxUsers: 50,
+          maxStorage: 50,
+          maxDepartments: 15,
+          customWorkflows: true,
+          advancedAnalytics: false,
+          prioritySupport: false,
+          customBranding: false,
+          apiAccess: true,
+          sso: false,
+        },
+        description: "Ideal for growing businesses and medium organizations",
       },
-      description:
-        "Perfect for small teams and startups getting started with document management",
-    },
-    business: {
-      name: "business",
-      displayName: "Business Plan",
-      price: {
-        monthly: 49.99,
-        yearly: 499.99, // 17% discount
+      professional: {
+        name: "professional",
+        displayName: "Professional Plan",
+        price: {
+          USD: { monthly: 99.99, yearly: 999.99 },
+          NGN: { monthly: 149985, yearly: 1499850 },
+          monthly: 99.99,
+          yearly: 999.99,
+        },
+        features: {
+          maxUsers: 150,
+          maxStorage: 200,
+          maxDepartments: 30,
+          customWorkflows: true,
+          advancedAnalytics: true,
+          prioritySupport: true,
+          customBranding: true,
+          apiAccess: true,
+          sso: false,
+        },
+        description:
+          "For established organizations with advanced workflow needs",
       },
-      features: {
-        maxUsers: 50,
-        maxStorage: 50,
-        maxDepartments: 15,
-        customWorkflows: true,
-        advancedAnalytics: false,
-        prioritySupport: false,
-        customBranding: false,
-        apiAccess: true,
-        sso: false,
+      enterprise: {
+        name: "enterprise",
+        displayName: "Enterprise Plan",
+        price: {
+          USD: { monthly: 199.99, yearly: 1999.99 },
+          NGN: { monthly: 299985, yearly: 2999985 }, // 199.99 * 1500, 1999.99 * 1500
+          monthly: 199.99,
+          yearly: 1999.99,
+        },
+        features: {
+          maxUsers: -1,
+          maxStorage: 1000,
+          maxDepartments: -1,
+          customWorkflows: true,
+          advancedAnalytics: true,
+          prioritySupport: true,
+          customBranding: true,
+          apiAccess: true,
+          sso: true,
+        },
+        description:
+          "Complete solution for large enterprises with unlimited scalability and dedicated support",
       },
-      description: "Ideal for growing businesses and medium organizations",
-    },
-    professional: {
-      name: "professional",
-      displayName: "Professional Plan",
-      price: {
-        monthly: 99.99,
-        yearly: 999.99, // 17% discount
-      },
-      features: {
-        maxUsers: 150,
-        maxStorage: 200,
-        maxDepartments: 30,
-        customWorkflows: true,
-        advancedAnalytics: true,
-        prioritySupport: true,
-        customBranding: true,
-        apiAccess: true,
-        sso: false,
-      },
-      description: "For established organizations with advanced workflow needs",
-    },
-    enterprise: {
-      name: "enterprise",
-      displayName: "Enterprise Plan",
-      price: {
-        monthly: 199.99,
-        yearly: 1999.99, // 17% discount
-      },
-      features: {
-        maxUsers: -1, // unlimited
-        maxStorage: 1000,
-        maxDepartments: -1, // unlimited
-        customWorkflows: true,
-        advancedAnalytics: true,
-        prioritySupport: true,
-        customBranding: true,
-        apiAccess: true,
-        sso: true,
-      },
-      description:
-        "Complete solution for large enterprises with unlimited scalability and dedicated support",
-    },
-  };
+    };
+  }
 };
 
 const Subscription = mongoose.model("Subscription", subscriptionSchema);

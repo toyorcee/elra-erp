@@ -22,6 +22,9 @@ const notificationPreferencesSchema = new mongoose.Schema(
         DOCUMENT_SHARED: { type: Boolean, default: true },
         SYSTEM_ALERT: { type: Boolean, default: true },
         WORKFLOW_UPDATE: { type: Boolean, default: true },
+        WELCOME: { type: Boolean, default: true },
+        ACCOUNT_ACTIVATED: { type: Boolean, default: true },
+        SUBSCRIPTION_ACTIVE: { type: Boolean, default: true },
       },
     },
     // In-app notification preferences
@@ -38,6 +41,9 @@ const notificationPreferencesSchema = new mongoose.Schema(
         DOCUMENT_SHARED: { type: Boolean, default: true },
         SYSTEM_ALERT: { type: Boolean, default: true },
         WORKFLOW_UPDATE: { type: Boolean, default: true },
+        WELCOME: { type: Boolean, default: true },
+        ACCOUNT_ACTIVATED: { type: Boolean, default: true },
+        SUBSCRIPTION_ACTIVE: { type: Boolean, default: true },
       },
     },
     // Push notification preferences (for future mobile app)
@@ -54,6 +60,9 @@ const notificationPreferencesSchema = new mongoose.Schema(
         DOCUMENT_SHARED: { type: Boolean, default: true },
         SYSTEM_ALERT: { type: Boolean, default: true },
         WORKFLOW_UPDATE: { type: Boolean, default: true },
+        WELCOME: { type: Boolean, default: true },
+        ACCOUNT_ACTIVATED: { type: Boolean, default: true },
+        SUBSCRIPTION_ACTIVE: { type: Boolean, default: true },
       },
     },
     // General preferences
@@ -64,11 +73,11 @@ const notificationPreferencesSchema = new mongoose.Schema(
       },
       startTime: {
         type: String,
-        default: "22:00", 
+        default: "22:00",
       },
       endTime: {
         type: String,
-        default: "08:00", 
+        default: "08:00",
       },
       timezone: {
         type: String,
@@ -88,8 +97,7 @@ const notificationPreferencesSchema = new mongoose.Schema(
   }
 );
 
-// Index for better performance
-notificationPreferencesSchema.index({ user: 1 });
+// Note: user field already has unique: true which creates an index automatically
 
 // Static method to get or create preferences for a user
 notificationPreferencesSchema.statics.getOrCreate = async function (userId) {

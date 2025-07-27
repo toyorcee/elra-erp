@@ -94,7 +94,7 @@ const documentSchema = new mongoose.Schema(
         "Executive",
         "External",
       ],
-      required: false, 
+      required: false,
     },
     // Workflow tracking
     currentApprover: {
@@ -355,7 +355,6 @@ documentSchema.statics.findPendingApproval = function () {
 documentSchema.index({ title: "text", description: "text", tags: "text" });
 documentSchema.index({ status: 1, category: 1 });
 documentSchema.index({ uploadedBy: 1, createdAt: -1 });
-documentSchema.index({ reference: 1 });
 
 const Document = mongoose.model("Document", documentSchema);
 

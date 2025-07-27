@@ -5,19 +5,25 @@ const departmentSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
-      unique: true,
+      unique: false, 
       trim: true,
       maxlength: 100,
     },
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Company",
+      required: false, 
+    },
     code: {
       type: String,
-      required: true,
-      unique: true,
+      required: false, 
+      unique: false, 
       trim: true,
       uppercase: true,
       maxlength: 10,
       validate: {
         validator: function (v) {
+          if (!v) return true; // Allow empty/null values
           return /^[A-Z0-9]+$/.test(v);
         },
         message:
@@ -52,7 +58,7 @@ const departmentSchema = new mongoose.Schema(
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false, // Made optional for self-service creation
     },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -112,8 +118,7 @@ departmentSchema.pre("save", function (next) {
 });
 
 // Index for better query performance
-departmentSchema.index({ name: 1, isActive: 1 });
-departmentSchema.index({ code: 1, isActive: 1 });
+departmentSchema.index({ isActive: 1 });
 
 // Static method to get all active departments
 departmentSchema.statics.getActiveDepartments = function () {

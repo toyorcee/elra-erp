@@ -116,6 +116,20 @@ export const sidebarConfig = [
     required: { minLevel: 110 },
     section: "platform",
   },
+  {
+    label: "Pricing Management",
+    icon: "HiOutlineCurrencyDollar",
+    path: "/platform-admin/pricing",
+    required: { minLevel: 110 },
+    section: "platform",
+  },
+  {
+    label: "Subscription Management",
+    icon: "HiOutlineCreditCard",
+    path: "/platform-admin/subscriptions",
+    required: { minLevel: 110 },
+    section: "platform",
+  },
 
   // ===== SYSTEM MANAGEMENT (Super Admin Only) =====
   {

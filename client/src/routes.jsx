@@ -17,9 +17,13 @@ import {
 import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
 import ApprovalLevels from "./pages/admin/ApprovalLevels";
 import WorkflowTemplates from "./pages/admin/WorkflowTemplates";
-import { PlatformAdminDashboard } from "./pages/platform-admin";
-import CreateIndustryInstance from "./pages/platform-admin/CreateIndustryInstance";
-import IndustryInstances from "./pages/platform-admin/IndustryInstances";
+import {
+  PlatformAdminDashboard,
+  CreateIndustryInstance,
+  IndustryInstances,
+  PricingManagement,
+  SubscriptionManagement,
+} from "./pages/platform-admin";
 import LandingPage from "./pages/shared/LandingPage";
 import WelcomeOnboarding from "./pages/shared/WelcomeOnboarding";
 import PaymentCallback from "./pages/shared/PaymentCallback";
@@ -133,6 +137,8 @@ const AppRoutes = () => {
 
         <Route path="instances" element={<IndustryInstances />} />
         <Route path="create-instance" element={<CreateIndustryInstance />} />
+        <Route path="pricing" element={<PricingManagement />} />
+        <Route path="subscriptions" element={<SubscriptionManagement />} />
       </Route>
 
       {/* Fallback redirects */}

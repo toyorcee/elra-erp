@@ -13,6 +13,7 @@ const initialState = {
   loading: true,
   error: null,
   initialized: false,
+  subscriptionPlans: [],
 };
 
 const AUTH_ACTIONS = {
@@ -26,6 +27,7 @@ const AUTH_ACTIONS = {
   INIT_SUCCESS: "INIT_SUCCESS",
   INIT_FAILURE: "INIT_FAILURE",
   UPDATE_PROFILE: "UPDATE_PROFILE",
+  SET_SUBSCRIPTION_PLANS: "SET_SUBSCRIPTION_PLANS",
 };
 
 const authReducer = (state, action) => {
@@ -112,6 +114,12 @@ const authReducer = (state, action) => {
         user: action.payload.user,
       };
 
+    case AUTH_ACTIONS.SET_SUBSCRIPTION_PLANS:
+      return {
+        ...state,
+        subscriptionPlans: Array.isArray(action.payload) ? action.payload : [],
+      };
+
     default:
       return state;
   }
@@ -138,10 +146,13 @@ export const AuthProvider = ({ children }) => {
         return acc;
       }, {});
 
-      const hasRefreshToken = cookies.refreshToken && cookies.refreshToken !== "undefined";
-      
+      const hasRefreshToken =
+        cookies.refreshToken && cookies.refreshToken !== "undefined";
+
       if (!hasRefreshToken) {
-        console.log("🔍 AuthContext: No refresh token found, user not authenticated");
+        console.log(
+          "🔍 AuthContext: No refresh token found, user not authenticated"
+        );
         dispatch({ type: AUTH_ACTIONS.INIT_FAILURE });
         return;
       }
@@ -183,7 +194,7 @@ export const AuthProvider = ({ children }) => {
           // If refresh successful, try to get user data again
           const response = await authAPI.getMe();
           const userData = response.data.data?.user || response.data.user;
-          
+
           setHasLoggedIn(true);
           dispatch({
             type: AUTH_ACTIONS.INIT_SUCCESS,
@@ -191,7 +202,10 @@ export const AuthProvider = ({ children }) => {
           });
           return;
         } catch (refreshError) {
-          console.log("❌ AuthContext: Token refresh failed:", refreshError.message);
+          console.log(
+            "❌ AuthContext: Token refresh failed:",
+            refreshError.message
+          );
         }
       }
 
@@ -306,6 +320,15 @@ export const AuthProvider = ({ children }) => {
     });
   }, []);
 
+  const setSubscriptionPlans = useCallback((plans) => {
+    console.log("🔄 AuthContext: Setting subscription plans:", plans);
+    const validPlans = Array.isArray(plans) ? plans : [];
+    dispatch({
+      type: AUTH_ACTIONS.SET_SUBSCRIPTION_PLANS,
+      payload: validPlans,
+    });
+  }, []);
+
   const value = {
     ...state,
     login,
@@ -315,6 +338,7 @@ export const AuthProvider = ({ children }) => {
     clearError,
     initializeAuth,
     updateProfile,
+    setSubscriptionPlans,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

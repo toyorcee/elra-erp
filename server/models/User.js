@@ -194,6 +194,23 @@ const userSchema = new mongoose.Schema(
       type: Date,
       select: false,
     },
+    // Password security fields
+    isTemporaryPassword: {
+      type: Boolean,
+      default: false,
+    },
+    temporaryPasswordExpiry: {
+      type: Date,
+      default: null,
+    },
+    passwordChangeRequired: {
+      type: Boolean,
+      default: false,
+    },
+    lastPasswordChange: {
+      type: Date,
+      default: null,
+    },
     company: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Company",

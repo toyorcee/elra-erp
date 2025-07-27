@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MdNotifications, MdNotificationsActive } from "react-icons/md";
 import { toast } from "react-toastify";
 import notificationService from "../services/notifications";
+import { useSocket } from "../context/SocketContext";
 
 const NotificationBell = ({ className = "" }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -10,6 +11,7 @@ const NotificationBell = ({ className = "" }) => {
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef(null);
   const queryClient = useQueryClient();
+  const { socket, isConnected } = useSocket();
 
   // Fetch unread count
   const {
@@ -53,28 +55,33 @@ const NotificationBell = ({ className = "" }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Handle real-time notifications (WebSocket)
+  // Handle real-time notifications (Socket.IO)
   useEffect(() => {
-    // This would be connected to your WebSocket service
-    // For now, we'll simulate real-time updates
+    if (!socket || !isConnected) return;
+
     const handleNewNotification = (notification) => {
+      console.log("🔔 Real-time notification received:", notification);
       setNotifications((prev) => [notification, ...prev]);
       refetchUnread();
+
+      // Show toast notification
       toast.info(notification.message, {
         position: "top-right",
         autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
       });
     };
 
-    // Simulate WebSocket connection
-    // In real implementation, this would be:
-    // socket.on('newNotification', handleNewNotification);
+    // Listen for real-time notifications
+    socket.on("newNotification", handleNewNotification);
 
     return () => {
-      // Cleanup WebSocket listener
-      // socket.off('newNotification', handleNewNotification);
+      socket.off("newNotification", handleNewNotification);
     };
-  }, [refetchUnread]);
+  }, [socket, isConnected, refetchUnread]);
 
   const handleMarkAsRead = async (notificationId) => {
     try {

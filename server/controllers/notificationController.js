@@ -1,5 +1,6 @@
 import NotificationService from "../services/notificationService.js";
 import { asyncHandler } from "../utils/index.js";
+import WelcomeNotificationService from "../services/welcomeNotificationService.js";
 
 class NotificationController {
   constructor(io) {
@@ -126,27 +127,57 @@ class NotificationController {
     });
   });
 
-  // Test notification (for development)
+  // Test notification (development)
   testNotification = asyncHandler(async (req, res) => {
+    const { type = "WELCOME", priority = "medium" } = req.body;
     const userId = req.user._id;
-    const { type = "SYSTEM_ALERT", priority = "medium" } = req.body;
 
-    const notification = await this.notificationService.createNotification({
-      recipient: userId,
-      type,
-      title: "Test Notification",
-      message: "This is a test notification to verify your preferences.",
-      data: {
-        priority,
-        test: true,
-      },
-    });
+    try {
+      const notification = await this.notificationService.createNotification({
+        recipient: userId,
+        type,
+        title: `Test ${type} Notification`,
+        message: `This is a test ${type.toLowerCase()} notification for development purposes.`,
+        data: {
+          priority,
+          actionUrl: "/dashboard",
+        },
+      });
 
-    res.status(200).json({
-      success: true,
-      data: notification,
-      message: "Test notification sent successfully",
-    });
+      res.status(200).json({
+        success: true,
+        message: "Test notification sent successfully",
+        data: notification,
+      });
+    } catch (error) {
+      console.error("Test notification error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to send test notification",
+      });
+    }
+  });
+
+  // Test welcome notification specifically
+  testWelcomeNotification = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+
+    try {
+      const welcomeService = new WelcomeNotificationService(global.io);
+      const result = await welcomeService.sendWelcomeNotification(req.user);
+
+      res.status(200).json({
+        success: true,
+        message: "Welcome notification test sent successfully",
+        data: result,
+      });
+    } catch (error) {
+      console.error("Welcome notification test error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to send welcome notification test",
+      });
+    }
   });
 }
 

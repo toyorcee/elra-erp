@@ -48,16 +48,20 @@ export const updateSystemSettings = async (req, res) => {
     console.log(
       `🔧 System Settings Update - User: ${req.user.username} (${req.user.email})`
     );
-    console.log(`📝 Update Type: ${Object.keys(updates).length === 1 ? 'Partial Update' : 'Full Update'}`);
+    console.log(
+      `📝 Update Type: ${
+        Object.keys(updates).length === 1 ? "Partial Update" : "Full Update"
+      }`
+    );
     console.log(`🔄 Requested Updates:`, JSON.stringify(updates, null, 2));
 
     // Log specific changes for partial updates
-    Object.keys(updates).forEach(section => {
-      if (updates[section] && typeof updates[section] === 'object') {
-        Object.keys(updates[section]).forEach(field => {
+    Object.keys(updates).forEach((section) => {
+      if (updates[section] && typeof updates[section] === "object") {
+        Object.keys(updates[section]).forEach((field) => {
           const oldValue = previousSettings[section]?.[field];
           const newValue = updates[section][field];
-          
+
           if (oldValue !== newValue) {
             console.log(`🎯 CHANGE: ${section}.${field}`);
             console.log(`   From: ${oldValue}`);
@@ -218,6 +222,68 @@ export const resetSystemSettings = async (req, res) => {
     });
   } catch (error) {
     console.error("Reset system settings error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
+// @desc    Update individual subscription plan
+// @route   PUT /api/system-settings/subscription-plans/:planName
+// @access  Private (Platform Admin only)
+export const updateSubscriptionPlan = async (req, res) => {
+  try {
+    const { planName } = req.params;
+    const planUpdates = req.body;
+
+    // Validate plan name
+    const validPlanNames = [
+      "starter",
+      "business",
+      "professional",
+      "enterprise",
+    ];
+    if (!validPlanNames.includes(planName)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid plan name. Must be one of: starter, business, professional, enterprise",
+      });
+    }
+
+    // Get current settings
+    const settings = await SystemSettings.getSettings();
+
+    // Update the specific plan
+    if (!settings.subscriptionPlans) {
+      settings.subscriptionPlans = {};
+    }
+
+    settings.subscriptionPlans[planName] = {
+      ...settings.subscriptionPlans[planName],
+      ...planUpdates,
+    };
+
+    // Save the updated settings
+    await settings.save();
+
+    console.log(
+      `🔧 Subscription Plan Update - User: ${req.user.username} (${req.user.email})`
+    );
+    console.log(`📦 Plan: ${planName}`);
+    console.log(`🔄 Updates:`, JSON.stringify(planUpdates, null, 2));
+
+    res.status(200).json({
+      success: true,
+      message: `${planName} plan updated successfully`,
+      data: {
+        plan: settings.subscriptionPlans[planName],
+      },
+    });
+  } catch (error) {
+    console.error("Update subscription plan error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",

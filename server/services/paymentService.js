@@ -15,13 +15,25 @@ class PaymentService {
 
   async initializePaystackPayment(data) {
     try {
+      // Get secret key dynamically to ensure it's loaded
+      const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY;
+
+      // Debug: Check Paystack secret key
+      console.log("🔍 [PAYSTACK] Secret key check:", {
+        hasSecretKey: !!paystackSecretKey,
+        secretKeyLength: paystackSecretKey?.length || 0,
+        secretKeyPrefix: paystackSecretKey?.substring(0, 10) || "NOT_SET",
+        fromEnv: !!process.env.PAYSTACK_SECRET_KEY,
+        envLength: process.env.PAYSTACK_SECRET_KEY?.length || 0,
+      });
+
       const { email, amount, reference, callback_url, metadata } = data;
 
       const response = await axios.post(
         "https://api.paystack.co/transaction/initialize",
         {
           email,
-          amount: amount * 100, // Paystack expects amount in kobo (smallest currency unit)
+          amount: amount,
           reference,
           callback_url,
           metadata,
@@ -29,7 +41,7 @@ class PaymentService {
         },
         {
           headers: {
-            Authorization: `Bearer ${this.paystackSecretKey}`,
+            Authorization: `Bearer ${paystackSecretKey}`,
             "Content-Type": "application/json",
           },
         }
@@ -54,11 +66,22 @@ class PaymentService {
 
   async verifyPaystackPayment(reference) {
     try {
+      // Get secret key dynamically to ensure it's loaded
+      const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY;
+
+      console.log("🔍 [PAYSTACK VERIFY] Secret key check:", {
+        hasSecretKey: !!paystackSecretKey,
+        secretKeyLength: paystackSecretKey?.length || 0,
+        secretKeyPrefix: paystackSecretKey?.substring(0, 10) || "NOT_SET",
+        fromEnv: !!process.env.PAYSTACK_SECRET_KEY,
+        envLength: process.env.PAYSTACK_SECRET_KEY?.length || 0,
+      });
+
       const response = await axios.get(
         `https://api.paystack.co/transaction/verify/${reference}`,
         {
           headers: {
-            Authorization: `Bearer ${this.paystackSecretKey}`,
+            Authorization: `Bearer ${paystackSecretKey}`,
           },
         }
       );
@@ -356,14 +379,69 @@ class PaymentService {
     return plans[plan]?.[billingCycle] || 0;
   }
 
-  getCurrencyForProvider(provider) {
-    const currencies = {
+  getCurrencyForProvider(provider, preferredCurrency = null) {
+    // If preferred currency is specified, use it if supported by the provider
+    if (preferredCurrency) {
+      const supportedCurrencies = {
+        paystack: ["NGN", "USD"],
+        stripe: ["USD", "EUR", "GBP"],
+        paypal: ["USD", "EUR", "GBP"],
+      };
+
+      if (supportedCurrencies[provider]?.includes(preferredCurrency)) {
+        return preferredCurrency;
+      }
+    }
+
+    // Default currencies per provider
+    const defaultCurrencies = {
       paystack: "NGN",
       stripe: "USD",
       paypal: "USD",
     };
 
-    return currencies[provider] || "USD";
+    return defaultCurrencies[provider] || "USD";
+  }
+
+  // Get supported currencies for a provider
+  getSupportedCurrencies(provider) {
+    const supportedCurrencies = {
+      paystack: ["NGN", "USD"],
+      stripe: ["USD", "EUR", "GBP"],
+      paypal: ["USD", "EUR", "GBP"],
+    };
+
+    return supportedCurrencies[provider] || ["USD"];
+  }
+
+  // Format currency amount for display
+  formatCurrency(amount, currency = "USD") {
+    const formatter = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency,
+      minimumFractionDigits: 2,
+    });
+
+    return formatter.format(amount);
+  }
+
+  // Convert currency if needed (basic conversion rates - in production, use real-time rates)
+  convertCurrency(amount, fromCurrency, toCurrency) {
+    // Basic conversion rates (should be replaced with real-time API in production)
+    const rates = {
+      USD: 1,
+      NGN: 1500, // 1 USD = 1500 NGN (approximate)
+      EUR: 0.85, // 1 USD = 0.85 EUR (approximate)
+      GBP: 0.75, // 1 USD = 0.75 GBP (approximate)
+    };
+
+    if (fromCurrency === toCurrency) {
+      return amount;
+    }
+
+    // Convert to USD first, then to target currency
+    const usdAmount = amount / (rates[fromCurrency] || 1);
+    return usdAmount * (rates[toCurrency] || 1);
   }
 }
 

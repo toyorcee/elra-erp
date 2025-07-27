@@ -43,6 +43,17 @@ import systemSettingsRoutes from "./routes/systemSettings.js";
 import profileRoutes from "./routes/profile.js";
 import auditRoutes from "./routes/audit.js";
 import subscriptionRoutes from "./routes/subscriptions.js";
+import transactionRoutes from "./routes/transactions.js";
+
+// Helper function to validate MongoDB ObjectId
+const isValidObjectId = (id) => {
+  return (
+    id &&
+    id !== "undefined" &&
+    id !== "null" &&
+    mongoose.Types.ObjectId.isValid(id)
+  );
+};
 
 dotenv.config();
 
@@ -216,6 +227,7 @@ app.use("/api/industry-instances", industryInstanceRoutes);
 app.use("/api/approval-levels", approvalLevelRoutes);
 app.use("/api/workflow-templates", workflowTemplateRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/transactions", transactionRoutes);
 
 // Create Socket.IO server before starting HTTP server
 const io = new SocketIOServer(httpServer, {
@@ -232,6 +244,9 @@ const io = new SocketIOServer(httpServer, {
 console.log("🔧 Initializing notification routes...");
 initializeNotificationRoutes(io);
 console.log("✅ Notification routes initialized");
+
+// Make io instance globally available
+global.io = io;
 
 // Initialize notification service with io instance
 console.log("🔧 Initializing notification service...");
@@ -328,7 +343,9 @@ const onlineUsers = new Map();
 
 io.on("connection", async (socket) => {
   const userId = socket.handshake.query.userId;
-  if (userId) {
+
+  // Validate userId before using it
+  if (isValidObjectId(userId)) {
     onlineUsers.set(userId, socket.id);
 
     try {
@@ -398,7 +415,7 @@ io.on("connection", async (socket) => {
   });
 
   socket.on("disconnect", async () => {
-    if (userId) {
+    if (isValidObjectId(userId)) {
       onlineUsers.delete(userId);
 
       // Update user's offline status

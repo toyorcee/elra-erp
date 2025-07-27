@@ -20,7 +20,7 @@ import {
 import EDMSLogo from "../../components/EDMSLogo";
 import SubscriptionForm from "./SubscriptionForm";
 import ComingSoon from "./ComingSoon";
-import { getSubscriptionPlans } from "../../services/subscriptions.js";
+import { useAuth } from "../../context/AuthContext";
 
 const WelcomeOnboarding = () => {
   const [searchParams] = useSearchParams();
@@ -31,24 +31,67 @@ const WelcomeOnboarding = () => {
   const [showJoinCompanyModal, setShowJoinCompanyModal] = useState(false);
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [comingSoonData, setComingSoonData] = useState({});
+  const { subscriptionPlans } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState(null);
-  const [subscriptionPlans, setSubscriptionPlans] = useState({});
   const navigate = useNavigate();
 
-  // Fetch subscription plans
-  useEffect(() => {
-    const fetchPlans = async () => {
-      try {
-        const data = await getSubscriptionPlans();
-        setSubscriptionPlans(data);
-      } catch (error) {
-        console.error("Error fetching subscription plans:", error);
-      }
-    };
-    fetchPlans();
-  }, []);
+  const planName = searchParams.get("planName");
+  const planDisplayName = searchParams.get("planDisplayName");
+  const planPrice = searchParams.get("planPrice");
+  const planBillingCycle = searchParams.get("planBillingCycle");
+  const planFeatures = searchParams.get("planFeatures");
+  const planDescription = searchParams.get("planDescription");
 
-  // 4D Animation Cards Data - Different cards based on flow
+  useEffect(() => {
+    // Only set selectedPlan if we have URL parameters, otherwise wait for card click
+    if (planName && planDisplayName && planPrice) {
+      const price = parseFloat(planPrice) || 99.99;
+
+      // Determine if the price is USD or NGN based on the value
+      // If price > 1000, it's likely NGN, otherwise USD
+      const isNGN = price > 1000;
+      const usdPrice = isNGN ? price / 1500 : price;
+      const ngnPrice = isNGN ? price : price * 1500;
+
+      const planFromURL = {
+        name: planName,
+        displayName: planDisplayName,
+        description:
+          planDescription || "Professional plan with advanced features",
+        price: {
+          USD: {
+            monthly: usdPrice,
+            yearly: usdPrice * 12,
+          },
+          NGN: {
+            monthly: ngnPrice,
+            yearly: ngnPrice * 12,
+          },
+        },
+        billingCycle: planBillingCycle || "monthly",
+        selectedCurrency: "USD",
+        features: planFeatures
+          ? JSON.parse(decodeURIComponent(planFeatures))
+          : {
+              maxUsers: 50,
+              maxStorage: 100,
+              maxDepartments: 10,
+              customWorkflows: true,
+              advancedAnalytics: true,
+              prioritySupport: true,
+            },
+      };
+      setSelectedPlan(planFromURL);
+    }
+  }, [
+    planName,
+    planDisplayName,
+    planPrice,
+    planBillingCycle,
+    planFeatures,
+    planDescription,
+  ]);
+
   const getCards = () => {
     if (flow === "individual") {
       return [
@@ -451,33 +494,71 @@ const WelcomeOnboarding = () => {
 
     setTimeout(() => {
       setIsAnimating(false);
-      // Handle navigation based on card
       const card = cards[cardIndex];
+
       if (card.route === "/subscription") {
-        // Show subscription form modal with professional plan
-        setShowSubscriptionForm(true);
-        setSelectedPlan(
-          subscriptionPlans.professional || {
-            name: "professional",
-            displayName: "Professional Plan",
-            price: { monthly: 99, yearly: 990 },
+        // Use URL parameters directly if available, otherwise use selectedPlan
+        let planToUse = selectedPlan;
+
+        if (planName && planDisplayName && planPrice) {
+          // Create plan from URL parameters
+          const price = parseFloat(planPrice) || 99.99;
+
+          // Determine if the price is USD or NGN based on the value
+          // If price > 1000, it's likely NGN, otherwise USD
+          const isNGN = price > 1000;
+          const usdPrice = isNGN ? price / 1500 : price;
+          const ngnPrice = isNGN ? price : price * 1500;
+
+          planToUse = {
+            name: planName,
+            displayName: planDisplayName,
             description:
-              "Perfect for growing businesses with advanced document management needs.",
-            features: {
-              maxUsers: 50,
-              maxStorage: 500,
-              maxDepartments: 10,
+              planDescription || "Professional plan with advanced features",
+            price: {
+              USD: {
+                monthly: usdPrice,
+                yearly: usdPrice * 12,
+              },
+              NGN: {
+                monthly: ngnPrice,
+                yearly: ngnPrice * 12,
+              },
             },
+            billingCycle: planBillingCycle || "monthly",
+            selectedCurrency: "USD",
+            features: planFeatures
+              ? JSON.parse(decodeURIComponent(planFeatures))
+              : {
+                  maxUsers: 50,
+                  maxStorage: 100,
+                  maxDepartments: 10,
+                  customWorkflows: true,
+                  advancedAnalytics: true,
+                  prioritySupport: true,
+                },
+          };
+        } else if (!selectedPlan && subscriptionPlans.length > 0) {
+          // Fallback to professional plan from context
+          const professionalPlan = subscriptionPlans.find(
+            (plan) => plan.name === "professional"
+          );
+          if (professionalPlan) {
+            planToUse = {
+              ...professionalPlan,
+              billingCycle: "monthly",
+              selectedCurrency: "USD",
+            };
           }
-        );
+        }
+
+        setSelectedPlan(planToUse);
+        setShowSubscriptionForm(true);
       } else if (card.route === "/register") {
-        // Navigate to registration page
         navigate("/register");
       } else if (card.route === "/join-company") {
-        // Show join company modal
         setShowJoinCompanyModal(true);
       } else if (card.route === "/demo") {
-        // Show coming soon for demo
         setComingSoonData({
           feature: "Demo Mode",
           description:
@@ -486,10 +567,8 @@ const WelcomeOnboarding = () => {
         });
         setShowComingSoon(true);
       } else if (card.route === "/") {
-        // Navigate back to landing page
         navigate("/");
       } else if (card.route === "/features") {
-        // Navigate to features page
         navigate("/");
       }
     }, 500);

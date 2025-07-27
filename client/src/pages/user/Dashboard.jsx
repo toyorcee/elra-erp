@@ -5,6 +5,7 @@ import SkeletonLoader from "../../components/SkeletonLoader";
 import EmptyState from "../../components/EmptyState";
 import { StatCard, StatCardGrid } from "../../components/common";
 import { getDashboard } from "../../services/dashboard";
+import NotificationTester from "../../components/NotificationTester";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -29,6 +30,9 @@ const Dashboard = () => {
       <h1 className="text-3xl font-bold mb-6 text-text-primary font-[Poppins]">
         Dashboard
       </h1>
+
+      {/* Notification Tester - Remove this after testing */}
+      <NotificationTester />
 
       {/* Stats Grid */}
       <StatCardGrid cols={3} gap={6} className="mb-8 stat-grid">

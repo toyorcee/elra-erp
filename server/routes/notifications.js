@@ -121,4 +121,15 @@ router.post("/test", (req, res) => {
   notificationController.testNotification(req, res);
 });
 
+// Test welcome notification (development only)
+router.post("/test-welcome", (req, res) => {
+  if (!notificationController) {
+    return res.status(500).json({
+      success: false,
+      message: "Notification service not initialized",
+    });
+  }
+  notificationController.testWelcomeNotification(req, res);
+});
+
 export default router;

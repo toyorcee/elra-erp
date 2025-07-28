@@ -44,8 +44,10 @@ import profileRoutes from "./routes/profile.js";
 import auditRoutes from "./routes/audit.js";
 import subscriptionRoutes from "./routes/subscriptions.js";
 import transactionRoutes from "./routes/transactions.js";
+import invitationRoutes from "./routes/invitations.js";
+import systemSetupRoutes from "./routes/systemSetup.js";
+import scanningRoutes from "./routes/scanning.js";
 
-// Helper function to validate MongoDB ObjectId
 const isValidObjectId = (id) => {
   return (
     id &&
@@ -228,6 +230,9 @@ app.use("/api/approval-levels", approvalLevelRoutes);
 app.use("/api/workflow-templates", workflowTemplateRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/transactions", transactionRoutes);
+app.use("/api/invitations", invitationRoutes);
+app.use("/api/system-setup", systemSetupRoutes);
+app.use("/api/scanning", scanningRoutes);
 
 // Create Socket.IO server before starting HTTP server
 const io = new SocketIOServer(httpServer, {

@@ -23,6 +23,16 @@ const ProfileMenu = () => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
 
+  // Debug logging
+  console.log("🔍 ProfileMenu: User data:", {
+    user,
+    roleName: user?.role?.name,
+    roleLevel: user?.role?.level,
+    roleId: user?.role?._id,
+    firstName: user?.firstName,
+    lastName: user?.lastName,
+  });
+
   const handleLogout = async () => {
     setIsOpen(false);
     await logout();
@@ -36,6 +46,7 @@ const ProfileMenu = () => {
   };
 
   const getUserRole = () => {
+    if (user?.role?.level >= 110) return "Platform Administrator";
     if (user?.role?.level >= 100) return "Super Administrator";
     if (user?.role?.level >= 90) return "Administrator";
     return "User";

@@ -4,6 +4,8 @@ import { Login, Register, Unauthorized } from "./pages/auth";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
 import RetrieveCredentials from "./pages/auth/RetrieveCredentials";
+import EmailVerification from "./pages/auth/EmailVerification";
+import EmailVerificationSuccess from "./pages/auth/EmailVerificationSuccess";
 import { Dashboard, Profile, Documents, Upload, Approvals } from "./pages/user";
 import Notifications from "./pages/shared/Notifications";
 import UserSettings from "./pages/user/Settings";
@@ -19,18 +21,22 @@ import ApprovalLevels from "./pages/admin/ApprovalLevels";
 import WorkflowTemplates from "./pages/admin/WorkflowTemplates";
 import {
   PlatformAdminDashboard,
-  CreateIndustryInstance,
   IndustryInstances,
-  PricingManagement,
+  CreateIndustryInstance,
+  CompanyList,
+  CreateCompany,
   SubscriptionManagement,
+  PricingManagement,
 } from "./pages/platform-admin";
 import LandingPage from "./pages/shared/LandingPage";
 import WelcomeOnboarding from "./pages/shared/WelcomeOnboarding";
-import PaymentCallback from "./pages/shared/PaymentCallback";
+import SystemSetupOnboarding from "./pages/shared/SystemSetupOnboarding";
 import DashboardLayout from "./layouts/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import RoleRedirect from "./components/common/RoleRedirect";
 import { SidebarProvider } from "./context/SidebarContext";
+import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
+import TermsConditions from "./pages/legal/TermsConditions";
 
 // Placeholder components for missing admin pages
 const RolesManagement = () => (
@@ -55,13 +61,22 @@ const AppRoutes = () => {
       {/* Public routes */}
       <Route path="/" element={<LandingPage />} />
       <Route path="/welcome" element={<WelcomeOnboarding />} />
+      <Route path="/system-setup" element={<SystemSetupOnboarding />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/retrieve-credentials" element={<RetrieveCredentials />} />
       <Route path="/unauthorized" element={<Unauthorized />} />
-      <Route path="/subscription/callback" element={<PaymentCallback />} />
+      <Route path="/verify-email" element={<EmailVerification />} />
+      <Route
+        path="/verify-email-success"
+        element={<EmailVerificationSuccess />}
+      />
+
+      {/* Legal pages */}
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsConditions />} />
 
       {/* Authenticated routes - role redirect for authenticated users */}
       <Route
@@ -121,11 +136,11 @@ const AppRoutes = () => {
         <Route path="notifications" element={<Notifications />} />
       </Route>
 
-      {/* Platform Admin routes - use DashboardLayout with role protection */}
+      {/* Platform Admin routes - also use DashboardLayout */}
       <Route
         path="/platform-admin"
         element={
-          <ProtectedRoute required={{ minLevel: 110 }}>
+          <ProtectedRoute>
             <SidebarProvider>
               <DashboardLayout />
             </SidebarProvider>
@@ -134,11 +149,14 @@ const AppRoutes = () => {
       >
         <Route index element={<PlatformAdminDashboard />} />
         <Route path="dashboard" element={<PlatformAdminDashboard />} />
-
         <Route path="instances" element={<IndustryInstances />} />
         <Route path="create-instance" element={<CreateIndustryInstance />} />
-        <Route path="pricing" element={<PricingManagement />} />
+        <Route path="companies" element={<CompanyList />} />
+        <Route path="create-company" element={<CreateCompany />} />
         <Route path="subscriptions" element={<SubscriptionManagement />} />
+        <Route path="pricing" element={<PricingManagement />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="notifications" element={<Notifications />} />
       </Route>
 
       {/* Fallback redirects */}

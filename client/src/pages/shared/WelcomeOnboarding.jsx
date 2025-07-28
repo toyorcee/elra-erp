@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   motion,
   AnimatePresence,
@@ -6,284 +6,103 @@ import {
   useTransform,
   useSpring,
 } from "framer-motion";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   HiOfficeBuilding,
   HiUserGroup,
-  HiPlay,
-  HiInformationCircle,
   HiArrowRight,
   HiSparkles,
   HiUser,
   HiHome,
+  HiPlay,
+  HiUserAdd,
 } from "react-icons/hi";
 import EDMSLogo from "../../components/EDMSLogo";
-import SubscriptionForm from "./SubscriptionForm";
+import JoinCompanyModal from "./JoinCompanyModal";
 import ComingSoon from "./ComingSoon";
-import { useAuth } from "../../context/AuthContext";
 
 const WelcomeOnboarding = () => {
-  const [searchParams] = useSearchParams();
-  const flow = searchParams.get("flow") || "default";
+  const flow = "default";
   const [currentCard, setCurrentCard] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [showSubscriptionForm, setShowSubscriptionForm] = useState(false);
   const [showJoinCompanyModal, setShowJoinCompanyModal] = useState(false);
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [comingSoonData, setComingSoonData] = useState({});
-  const { subscriptionPlans } = useAuth();
-  const [selectedPlan, setSelectedPlan] = useState(null);
   const navigate = useNavigate();
 
-  const planName = searchParams.get("planName");
-  const planDisplayName = searchParams.get("planDisplayName");
-  const planPrice = searchParams.get("planPrice");
-  const planBillingCycle = searchParams.get("planBillingCycle");
-  const planFeatures = searchParams.get("planFeatures");
-  const planDescription = searchParams.get("planDescription");
-
+  // Scroll to top on component mount
   useEffect(() => {
-    // Only set selectedPlan if we have URL parameters, otherwise wait for card click
-    if (planName && planDisplayName && planPrice) {
-      const price = parseFloat(planPrice) || 99.99;
-
-      // Determine if the price is USD or NGN based on the value
-      // If price > 1000, it's likely NGN, otherwise USD
-      const isNGN = price > 1000;
-      const usdPrice = isNGN ? price / 1500 : price;
-      const ngnPrice = isNGN ? price : price * 1500;
-
-      const planFromURL = {
-        name: planName,
-        displayName: planDisplayName,
-        description:
-          planDescription || "Professional plan with advanced features",
-        price: {
-          USD: {
-            monthly: usdPrice,
-            yearly: usdPrice * 12,
-          },
-          NGN: {
-            monthly: ngnPrice,
-            yearly: ngnPrice * 12,
-          },
-        },
-        billingCycle: planBillingCycle || "monthly",
-        selectedCurrency: "USD",
-        features: planFeatures
-          ? JSON.parse(decodeURIComponent(planFeatures))
-          : {
-              maxUsers: 50,
-              maxStorage: 100,
-              maxDepartments: 10,
-              customWorkflows: true,
-              advancedAnalytics: true,
-              prioritySupport: true,
-            },
-      };
-      setSelectedPlan(planFromURL);
-    }
-  }, [
-    planName,
-    planDisplayName,
-    planPrice,
-    planBillingCycle,
-    planFeatures,
-    planDescription,
-  ]);
+    window.scrollTo(0, 0);
+  }, []);
 
   const getCards = () => {
-    if (flow === "individual") {
-      return [
-        {
-          id: 0,
-          title: "Individual Account",
-          subtitle: "Personal document management",
-          description:
-            "Create your personal account to manage documents, collaborate with teams, and access shared resources.",
-          icon: HiUser,
-          gradient: "from-blue-500 via-cyan-500 to-purple-500",
-          action: "Create Account",
-          route: "/register",
-          features: [
-            "Personal Dashboard",
-            "Document Access",
-            "Team Collaboration",
-          ],
-          particles: 12,
-          tiltIntensity: 15,
-        },
-        {
-          id: 1,
-          title: "Join Existing Company",
-          subtitle: "Connect to your team",
-          description:
-            "Enter your invitation code to join an existing organization and collaborate with your team.",
-          icon: HiUserGroup,
-          gradient: "from-green-500 via-emerald-500 to-teal-500",
-          action: "Enter Code",
-          route: "/join-company",
-          features: ["Team Access", "Shared Documents", "Collaboration"],
-          particles: 8,
-          tiltIntensity: 12,
-        },
-        {
-          id: 2,
-          title: "Explore Demo",
-          subtitle: "Try before you commit",
-          description:
-            "Experience the full power of EDMS with limited features. Perfect for testing and evaluation.",
-          icon: HiPlay,
-          gradient: "from-orange-500 via-red-500 to-pink-500",
-          action: "Start Demo",
-          route: "/demo",
-          features: ["Limited Features", "Sample Data", "No Commitment"],
-          particles: 6,
-          tiltIntensity: 10,
-        },
-        {
-          id: 3,
-          title: "Back to Home",
-          subtitle: "Return to main page",
-          description:
-            "Go back to the main landing page to explore more options and learn about our platform.",
-          icon: HiHome,
-          gradient: "from-purple-500 via-pink-500 to-indigo-500",
-          action: "Go Back",
-          route: "/",
-          features: ["Feature Overview", "Pricing Details", "Use Cases"],
-          particles: 10,
-          tiltIntensity: 18,
-        },
-      ];
-    } else if (flow === "company") {
-      return [
-        {
-          id: 0,
-          title: "Start My Company",
-          subtitle: "Create your organization's workspace",
-          description:
-            "Set up your own document management system with custom workflows, departments, and team collaboration.",
-          icon: HiOfficeBuilding,
-          gradient: "from-blue-500 via-cyan-500 to-purple-500",
-          action: "Subscribe Now",
-          route: "/subscription",
-          features: [
-            "Custom Workflows",
-            "Department Management",
-            "Team Collaboration",
-          ],
-          particles: 12,
-          tiltIntensity: 15,
-        },
-        {
-          id: 1,
-          title: "Join Existing Company",
-          subtitle: "Connect to your team",
-          description:
-            "Enter your invitation code to join an existing organization and collaborate with your team.",
-          icon: HiUserGroup,
-          gradient: "from-green-500 via-emerald-500 to-teal-500",
-          action: "Enter Code",
-          route: "/join-company",
-          features: ["Team Access", "Shared Documents", "Collaboration"],
-          particles: 8,
-          tiltIntensity: 12,
-        },
-        {
-          id: 2,
-          title: "Explore Demo",
-          subtitle: "Try before you commit",
-          description:
-            "Experience the full power of EDMS with limited features. Perfect for testing and evaluation.",
-          icon: HiPlay,
-          gradient: "from-orange-500 via-red-500 to-pink-500",
-          action: "Start Demo",
-          route: "/demo",
-          features: ["Limited Features", "Sample Data", "No Commitment"],
-          particles: 6,
-          tiltIntensity: 10,
-        },
-        {
-          id: 3,
-          title: "Back to Home",
-          subtitle: "Return to main page",
-          description:
-            "Go back to the main landing page to explore more options and learn about our platform.",
-          icon: HiHome,
-          gradient: "from-purple-500 via-pink-500 to-indigo-500",
-          action: "Go Back",
-          route: "/",
-          features: ["Feature Overview", "Pricing Details", "Use Cases"],
-          particles: 10,
-          tiltIntensity: 18,
-        },
-      ];
-    } else {
-      // Default cards (fallback)
-      return [
-        {
-          id: 0,
-          title: "Start My Company",
-          subtitle: "Create your organization's workspace",
-          description:
-            "Set up your own document management system with custom workflows, departments, and team collaboration.",
-          icon: HiOfficeBuilding,
-          gradient: "from-blue-500 via-cyan-500 to-purple-500",
-          action: "Subscribe Now",
-          route: "/subscription",
-          features: [
-            "Custom Workflows",
-            "Department Management",
-            "Team Collaboration",
-          ],
-          particles: 12,
-          tiltIntensity: 15,
-        },
-        {
-          id: 1,
-          title: "Join Existing Company",
-          subtitle: "Connect to your team",
-          description:
-            "Enter your invitation code to join an existing organization and collaborate with your team.",
-          icon: HiUserGroup,
-          gradient: "from-green-500 via-emerald-500 to-teal-500",
-          action: "Enter Code",
-          route: "/join-company",
-          features: ["Team Access", "Shared Documents", "Collaboration"],
-          particles: 8,
-          tiltIntensity: 12,
-        },
-        {
-          id: 2,
-          title: "Explore Demo",
-          subtitle: "Try before you commit",
-          description:
-            "Experience the full power of EDMS with limited features. Perfect for testing and evaluation.",
-          icon: HiPlay,
-          gradient: "from-orange-500 via-red-500 to-pink-500",
-          action: "Start Demo",
-          route: "/demo",
-          features: ["Limited Features", "Sample Data", "No Commitment"],
-          particles: 6,
-          tiltIntensity: 10,
-        },
-        {
-          id: 3,
-          title: "Learn More",
-          subtitle: "Discover our features",
-          description:
-            "Explore detailed information about our platform, pricing, and how EDMS can transform your workflow.",
-          icon: HiInformationCircle,
-          gradient: "from-purple-500 via-pink-500 to-indigo-500",
-          action: "Explore",
-          route: "/features",
-          features: ["Feature Overview", "Pricing Details", "Use Cases"],
-          particles: 10,
-          tiltIntensity: 18,
-        },
-      ];
-    }
+    // For client-specific branch - internal company system
+    return [
+      {
+        id: 0,
+        title: "Watch Demo",
+        subtitle: "See how it works",
+        description:
+          "Watch a quick demonstration of how EDMS transforms document management with intelligent workflows and seamless collaboration.",
+        icon: HiPlay,
+        gradient: "from-red-500 via-pink-500 to-purple-500",
+        action: "Watch Demo",
+        route: "demo",
+        features: ["System Overview", "Workflow Demo", "User Experience"],
+        particles: 15,
+        tiltIntensity: 20,
+      },
+      {
+        id: 1,
+        title: "Join Company",
+        subtitle: "Enter invitation code",
+        description:
+          "You've been invited to join your organization's document management system. Enter the invitation code provided by your administrator to get started.",
+        icon: HiUserGroup,
+        gradient: "from-blue-500 via-cyan-500 to-purple-500",
+        action: "Enter Code",
+        route: "/join-company",
+        features: [
+          "Secure Access",
+          "Team Collaboration",
+          "Document Management",
+        ],
+        particles: 12,
+        tiltIntensity: 15,
+      },
+      {
+        id: 2,
+        title: "Register",
+        subtitle: "Create your account",
+        description:
+          "New to the organization? Register as the first superadmin to set up your company's document management system and invite your team.",
+        icon: HiUserAdd,
+        gradient: "from-green-500 via-emerald-500 to-teal-500",
+        action: "Create Account",
+        route: "/register",
+        features: [
+          "Superadmin Setup",
+          "Company Configuration",
+          "Team Invitation",
+        ],
+        particles: 8,
+        tiltIntensity: 12,
+      },
+      {
+        id: 3,
+        title: "Sign In",
+        subtitle: "Access your workspace",
+        description:
+          "Already have an account? Sign in to access your documents, approvals, and team collaboration tools.",
+        icon: HiHome,
+        gradient: "from-purple-500 via-pink-500 to-indigo-500",
+        action: "Sign In",
+        route: "/login",
+        features: ["Document Access", "Approval Workflows", "Team Messaging"],
+        particles: 10,
+        tiltIntensity: 18,
+      },
+    ];
   };
 
   const cards = getCards();
@@ -496,82 +315,20 @@ const WelcomeOnboarding = () => {
       setIsAnimating(false);
       const card = cards[cardIndex];
 
-      if (card.route === "/subscription") {
-        // Use URL parameters directly if available, otherwise use selectedPlan
-        let planToUse = selectedPlan;
-
-        if (planName && planDisplayName && planPrice) {
-          // Create plan from URL parameters
-          const price = parseFloat(planPrice) || 99.99;
-
-          // Determine if the price is USD or NGN based on the value
-          // If price > 1000, it's likely NGN, otherwise USD
-          const isNGN = price > 1000;
-          const usdPrice = isNGN ? price / 1500 : price;
-          const ngnPrice = isNGN ? price : price * 1500;
-
-          planToUse = {
-            name: planName,
-            displayName: planDisplayName,
-            description:
-              planDescription || "Professional plan with advanced features",
-            price: {
-              USD: {
-                monthly: usdPrice,
-                yearly: usdPrice * 12,
-              },
-              NGN: {
-                monthly: ngnPrice,
-                yearly: ngnPrice * 12,
-              },
-            },
-            billingCycle: planBillingCycle || "monthly",
-            selectedCurrency: "USD",
-            features: planFeatures
-              ? JSON.parse(decodeURIComponent(planFeatures))
-              : {
-                  maxUsers: 50,
-                  maxStorage: 100,
-                  maxDepartments: 10,
-                  customWorkflows: true,
-                  advancedAnalytics: true,
-                  prioritySupport: true,
-                },
-          };
-        } else if (!selectedPlan && subscriptionPlans.length > 0) {
-          // Fallback to professional plan from context
-          const professionalPlan = subscriptionPlans.find(
-            (plan) => plan.name === "professional"
-          );
-          if (professionalPlan) {
-            planToUse = {
-              ...professionalPlan,
-              billingCycle: "monthly",
-              selectedCurrency: "USD",
-            };
-          }
-        }
-
-        setSelectedPlan(planToUse);
-        setShowSubscriptionForm(true);
-      } else if (card.route === "/register") {
-        navigate("/register");
-      } else if (card.route === "/join-company") {
+      if (card.route === "/join-company") {
         setShowJoinCompanyModal(true);
-      } else if (card.route === "/demo") {
+      } else if (card.route === "demo") {
         setComingSoonData({
-          feature: "Demo Mode",
+          feature: "Interactive Demo",
           description:
-            "Experience the full power of EDMS with limited features. Perfect for testing and evaluation before committing to a subscription.",
+            "Our comprehensive demo system is currently in development. It will showcase all EDMS features including document workflows, approval systems, team collaboration, and smart automation.",
           icon: HiPlay,
         });
         setShowComingSoon(true);
-      } else if (card.route === "/") {
-        navigate("/");
-      } else if (card.route === "/features") {
-        navigate("/");
+      } else {
+        navigate(card.route);
       }
-    }, 500);
+    }, 300);
   };
 
   const handleSwipe = (direction) => {
@@ -587,7 +344,7 @@ const WelcomeOnboarding = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 overflow-hidden relative">
       {/* Animated Background */}
-      <div className="absolute inset-0">
+      <div className="fixed inset-0">
         <motion.div
           className="absolute inset-0 opacity-20"
           animate={{
@@ -607,7 +364,7 @@ const WelcomeOnboarding = () => {
       </div>
 
       {/* Floating Elements */}
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="fixed inset-0 overflow-hidden">
         {Array.from({ length: 20 }, (_, i) => (
           <motion.div
             key={i}
@@ -667,11 +424,7 @@ const WelcomeOnboarding = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.4 }}
             >
-              {flow === "individual"
-                ? "Choose how you'd like to get started with EDMS"
-                : flow === "company"
-                ? "Choose your path to revolutionize document management"
-                : "Choose your path to revolutionize document management"}
+              Access your organization's document management system
             </motion.p>
           </motion.div>
 
@@ -799,29 +552,15 @@ const WelcomeOnboarding = () => {
         </div>
       </div>
 
-      {/* Subscription Form Modal */}
-      {showSubscriptionForm && (
-        <SubscriptionForm
-          isOpen={showSubscriptionForm}
-          selectedPlan={selectedPlan}
-          onClose={() => {
-            setShowSubscriptionForm(false);
-            setSelectedPlan(null);
-          }}
-        />
-      )}
-
-      {/* Join Company Modal - Coming Soon */}
-      <AnimatePresence>
-        {showJoinCompanyModal && (
-          <ComingSoon
-            feature="Join Company"
-            description="Enter your invitation code to join an existing organization and collaborate with your team. This feature is coming soon!"
-            icon={HiUserGroup}
-            onClose={() => setShowJoinCompanyModal(false)}
-          />
-        )}
-      </AnimatePresence>
+      {/* Join Company Modal */}
+      <JoinCompanyModal
+        isOpen={showJoinCompanyModal}
+        onClose={() => setShowJoinCompanyModal(false)}
+        onSuccess={(data) => {
+          setShowJoinCompanyModal(false);
+          navigate("/dashboard");
+        }}
+      />
 
       {/* Coming Soon Modal */}
       <AnimatePresence>

@@ -209,6 +209,66 @@ const documentSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+
+    ocrData: {
+      extractedText: {
+        type: String,
+        default: "",
+      },
+      confidence: {
+        type: Number,
+        min: 0,
+        max: 100,
+        default: 0,
+      },
+      documentType: {
+        type: String,
+        default: "",
+      },
+      keywords: [
+        {
+          type: String,
+          trim: true,
+        },
+      ],
+      dateReferences: [
+        {
+          type: String,
+          trim: true,
+        },
+      ],
+      organizationReferences: [
+        {
+          type: String,
+          trim: true,
+        },
+      ],
+      monetaryValues: [
+        {
+          type: String,
+          trim: true,
+        },
+      ],
+      ocrLanguage: {
+        type: String,
+        default: "eng",
+      },
+    },
+
+    // Scanning and archiving metadata
+    scanMetadata: {
+      scannerId: String,
+      resolution: Number,
+      format: String,
+      scanDate: Date,
+      originalDocumentDate: Date,
+      archiveLocation: String,
+      boxNumber: Number,
+      folderNumber: Number,
+      archiveReference: String,
+      physicalLocation: String,
+      notes: String,
+    },
   },
   {
     timestamps: true,

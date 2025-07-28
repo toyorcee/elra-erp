@@ -67,6 +67,12 @@ const authReducer = (state, action) => {
       };
 
     case AUTH_ACTIONS.LOGIN_SUCCESS:
+      console.log("🔍 AuthContext: LOGIN_SUCCESS reducer - setting user:", {
+        user: action.payload.user,
+        roleName: action.payload.user?.role?.name,
+        roleLevel: action.payload.user?.role?.level,
+        roleId: action.payload.user?.role?._id,
+      });
       return {
         ...state,
         user: action.payload.user,
@@ -215,6 +221,8 @@ export const AuthProvider = ({ children }) => {
 
   // Initialize auth on mount
   useEffect(() => {
+    // Clear any existing authentication state first
+    dispatch({ type: AUTH_ACTIONS.LOGOUT });
     initializeAuth();
   }, [initializeAuth]);
 
@@ -235,6 +243,14 @@ export const AuthProvider = ({ children }) => {
         finalUser: userData,
       });
 
+      console.log("🔍 AuthContext: Setting user data in state:", {
+        userData,
+        roleName: userData?.role?.name,
+        roleLevel: userData?.role?.level,
+        roleId: userData?.role?._id,
+        hasRole: !!userData?.role,
+      });
+
       dispatch({
         type: AUTH_ACTIONS.LOGIN_SUCCESS,
         payload: { user: userData },
@@ -251,21 +267,17 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const register = useCallback(async (userData) => {
-    dispatch({ type: AUTH_ACTIONS.LOGIN_START });
+    dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: true });
 
     try {
       const response = await authAPI.register(userData);
-      dispatch({
-        type: AUTH_ACTIONS.LOGIN_SUCCESS,
-        payload: { user: response.data.user },
-      });
+
+      dispatch({ type: AUTH_ACTIONS.LOGOUT });
+      dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
       return { success: true };
     } catch (error) {
       const errorData = handleApiError(error);
-      dispatch({
-        type: AUTH_ACTIONS.LOGIN_FAILURE,
-        payload: errorData.message,
-      });
+      dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: false });
       return { success: false, error: errorData.message };
     }
   }, []);

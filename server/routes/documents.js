@@ -10,9 +10,16 @@ import {
   deleteDocument,
   searchDocuments,
   updateDocument,
+  fullTextSearch,
+  metadataSearch,
+  findSimilarDocuments,
+  getSearchSuggestions,
 } from "../controllers/documentController.js";
 import { protect } from "../middleware/auth.js";
-import { checkPlanLimits, checkStorageLimit } from "../middleware/planLimits.js";
+import {
+  checkPlanLimits,
+  checkStorageLimit,
+} from "../middleware/planLimits.js";
 
 const router = express.Router();
 
@@ -20,9 +27,18 @@ const router = express.Router();
 router.use(protect);
 
 // Document routes
-router.post("/upload", checkPlanLimits("uploadDocument"), checkStorageLimit, uploadDocument);
+router.post(
+  "/upload",
+  checkPlanLimits("uploadDocument"),
+  checkStorageLimit,
+  uploadDocument
+);
 router.get("/", getAllDocuments);
 router.get("/search", searchDocuments);
+router.get("/search/fulltext", fullTextSearch);
+router.get("/search/metadata", metadataSearch);
+router.get("/search/suggestions", getSearchSuggestions);
+router.get("/:id/similar", findSimilarDocuments);
 router.get("/pending-approvals", getPendingApprovals);
 router.get("/:id", getDocumentById);
 router.post("/:id/submit", submitForApproval);

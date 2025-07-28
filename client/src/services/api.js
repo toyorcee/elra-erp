@@ -100,50 +100,40 @@ api.interceptors.response.use(
   }
 );
 
-// Auth API methods
+// Auth API
 export const authAPI = {
-  login: (credentials) => api.post("/auth/login", credentials),
   register: (userData) => api.post("/auth/register", userData),
+  login: (credentials) => api.post("/auth/login", credentials),
   logout: () => api.post("/auth/logout"),
   refreshToken: () => api.post("/auth/refresh"),
-  getProfile: () => api.get("/auth/me"),
   getMe: () => api.get("/auth/me"),
   changePassword: (passwordData) =>
     api.put("/auth/change-password", passwordData),
-  forgotPassword: (data) => api.post("/auth/forgot-password", data),
-  resetPassword: (data) => api.post("/auth/reset-password", data),
-  isAuthenticated: () => {
-    // Check for accessToken cookie (not httpOnly, so we can read it)
-    const cookies = document.cookie.split(";").reduce((acc, cookie) => {
-      const [key, value] = cookie.trim().split("=");
-      acc[key] = value;
-      return acc;
-    }, {});
+  forgotPassword: (email) => api.post("/auth/forgot-password", { email }),
+  resetPassword: (resetData) => api.post("/auth/reset-password", resetData),
+  joinCompany: (joinData) => api.post("/auth/join-company", joinData),
+  verifyEmail: (token) => api.post("/auth/verify-email", { token }),
+  resendVerification: (email) => api.post("/auth/resend-verification", email),
+};
 
-    const hasAccessToken =
-      cookies.accessToken && cookies.accessToken !== "undefined";
-
-    console.log("🔍 Cookie check:", {
-      hasAccessToken,
-      hasLoggedIn,
-      allCookies: document.cookie || "No cookies found",
-    });
-
-    return hasAccessToken || hasLoggedIn;
-  },
+// System Setup API
+export const systemSetupAPI = {
+  getIndustryTemplates: () => api.get("/system-setup/templates"),
+  getSystemSetupStatus: (companyId) =>
+    api.get(`/system-setup/status/${companyId}`),
+  saveSystemSetup: (companyId, config) =>
+    api.post(`/system-setup/${companyId}`, config),
 };
 
 // Utility function to handle API errors
 export const handleApiError = (error) => {
   if (error.response) {
-    // Server responded with error status
     return {
       message: error.response.data?.message || "An error occurred",
       status: error.response.status,
       data: error.response.data,
     };
   } else if (error.request) {
-    // Request was made but no response received
     return {
       message: "No response from server",
       status: null,

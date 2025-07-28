@@ -194,6 +194,15 @@ const userSchema = new mongoose.Schema(
       type: Date,
       select: false,
     },
+    // Email verification fields
+    emailVerificationToken: {
+      type: String,
+      select: false,
+    },
+    emailVerificationExpires: {
+      type: Date,
+      select: false,
+    },
     // Password security fields
     isTemporaryPassword: {
       type: Boolean,

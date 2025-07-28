@@ -2,11 +2,15 @@ import jwt from "jsonwebtoken";
 import { validationResult } from "express-validator";
 import bcrypt from "bcryptjs";
 import User from "../models/User.js";
+import Role from "../models/Role.js";
+import Company from "../models/Company.js";
+import Department from "../models/Department.js";
 import {
   sendPasswordResetEmail,
   sendPasswordChangeSuccessEmail,
 } from "../services/emailService.js";
 import WelcomeNotificationService from "../services/welcomeNotificationService.js";
+import Invitation from "../models/Invitation.js";
 
 const generateAccessToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
@@ -113,7 +117,6 @@ const clearTokenCookies = (res) => {
 // @access  Public
 export const register = async (req, res) => {
   try {
-    console.log("Register attempt:", req.body);
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -135,51 +138,122 @@ export const register = async (req, res) => {
       });
     }
 
-    // Create new user
+    // For client-specific branch: Everyone who registers becomes a superadmin
+
+    let userRole;
+    let company;
+    let defaultDepartment;
+
+    // Create or find SUPER_ADMIN role
+    userRole = await Role.findOne({ name: "SUPER_ADMIN" });
+    if (!userRole) {
+      console.error("❌ SUPER_ADMIN role not found");
+      return res.status(500).json({
+        success: false,
+        message: "System configuration error. Please contact support.",
+      });
+    }
+
+    // Check if this is the first user (first superadmin)
+    const existingCompany = await Company.findOne();
+    if (!existingCompany) {
+      company = await Company.create({
+        name: `${firstName} ${lastName}'s Company`,
+        description: "Default company created for superadmin",
+        industry: "Technology",
+        size: "Small",
+        address: "To be updated",
+        phone: "To be updated",
+        email: email,
+        website: "To be updated",
+        isActive: true,
+        createdBy: null, // Will be set after user creation
+      });
+
+      // Create default department
+      defaultDepartment = await Department.create({
+        name: "General",
+        description: "Default department for all users",
+        company: company._id,
+        manager: null, // Will be set after user creation
+        isActive: true,
+        createdBy: null, // Will be set after user creation
+      });
+
+      console.log("✅ Created default company and department for superadmin");
+    } else {
+      // Use existing company and department
+      company = existingCompany;
+      defaultDepartment = await Department.findOne({ company: company._id });
+      if (!defaultDepartment) {
+        defaultDepartment = await Department.create({
+          name: "General",
+          description: "Default department for all users",
+          company: company._id,
+          manager: null,
+          isActive: true,
+          createdBy: null,
+        });
+      }
+    }
+
+    // Generate activation token
+    const activationToken = jwt.sign(
+      { email, type: "activation" },
+      process.env.JWT_SECRET,
+      { expiresIn: "24h" }
+    );
+
     const user = new User({
       username,
       email,
       password,
       firstName,
       lastName,
+      role: userRole._id,
+      company: company?._id,
+      department: defaultDepartment?._id,
+      isSuperadmin: true, // Everyone becomes superadmin in client-specific branch
+      isEmailVerified: false, // Email not verified yet
+      isActive: false, // Account not active until email verified
+      emailVerificationToken: activationToken,
+      emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
     });
 
     await user.save();
-    console.log("Register success:", user.email);
 
-    // Populate role after saving
-    await user.populate("role");
-
-    // Generate tokens
-    const accessToken = generateAccessToken(user._id);
-    const refreshToken = generateRefreshToken(user._id);
-
-    // Calculate refresh token expiration
-    const refreshTokenExpiresAt = new Date();
-    const refreshTokenExpiryMs = process.env.REFRESH_TOKEN_EXPIRE
-      ? parseTimeToMs(process.env.REFRESH_TOKEN_EXPIRE)
-      : 24 * 60 * 60 * 1000; // 1 day default
-    refreshTokenExpiresAt.setTime(
-      refreshTokenExpiresAt.getTime() + refreshTokenExpiryMs
-    );
-
-    // Save refresh token to user
-    await user.addRefreshToken(refreshToken, refreshTokenExpiresAt);
-
-    // Set cookies
-    setTokenCookies(res, accessToken, refreshToken);
-
-    // Send welcome notification and email (async - don't wait for it)
-    try {
-      const welcomeService = new WelcomeNotificationService(global.io);
-      welcomeService.sendWelcomeNotification(user).catch((error) => {
-        console.error("❌ Error sending welcome notification:", error);
+    // Update company and department with the created user as creator/manager
+    if (company && defaultDepartment) {
+      await Company.findByIdAndUpdate(company._id, {
+        createdBy: user._id,
+        updatedBy: user._id,
       });
-    } catch (error) {
-      console.error("❌ Error initializing welcome service:", error);
+
+      await Department.findByIdAndUpdate(defaultDepartment._id, {
+        manager: user._id,
+        createdBy: user._id,
+        updatedBy: user._id,
+      });
     }
 
-    // Return user data (without password)
+    // Populate role, company, and department after saving
+    await user.populate(["role", "company", "department"]);
+
+    // Send activation email (async - don't wait for it)
+    try {
+      const { sendAccountActivationEmail } = await import(
+        "../services/emailService.js"
+      );
+      await sendAccountActivationEmail(
+        user.email,
+        user.firstName || user.username,
+        activationToken
+      );
+    } catch (error) {
+      console.error("Error sending activation email:", error);
+    }
+
+    // Return user data (without password) - NO TOKENS GENERATED
     const userResponse = {
       id: user._id,
       username: user.username,
@@ -192,23 +266,31 @@ export const register = async (req, res) => {
       address: user.address,
       employeeId: user.employeeId,
       department: user.department,
+      company: user.company,
       role: user.role,
+      isSuperadmin: user.isSuperadmin,
       isActive: user.isActive,
+      isEmailVerified: user.isEmailVerified,
       createdAt: user.createdAt,
       avatar: user.avatar,
+      needsSetup: true,
     };
 
     res.status(201).json({
       success: true,
-      message: "User registered successfully",
+      message:
+        "Account created successfully! Please check your email to activate your account before logging in.",
       data: {
         user: userResponse,
-        accessToken,
-        refreshToken,
+        requiresEmailVerification: true,
       },
     });
   } catch (error) {
-    console.error("Register error:", error);
+    console.error("❌ REGISTRATION FAILED");
+    console.error("🔍 Error details:", error);
+    console.error("📝 Request body was:", req.body);
+    console.error("⏰ Error occurred at:", new Date().toISOString());
+    console.error("=".repeat(80));
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -276,6 +358,17 @@ export const login = async (req, res) => {
       return res.status(401).json({
         success: false,
         message: "Account is deactivated",
+      });
+    }
+
+    // Check if email is verified
+    if (!user.isEmailVerified) {
+      console.log("Login failed: email not verified");
+      return res.status(401).json({
+        success: false,
+        message:
+          "Please verify your email address before logging in. Check your inbox for the verification link.",
+        requiresEmailVerification: true,
       });
     }
 
@@ -909,6 +1002,271 @@ export const resetPassword = async (req, res) => {
       success: false,
       message: "Internal server error",
       error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
+// @desc    Join company with invitation code
+// @route   POST /api/auth/join-company
+// @access  Public
+export const joinCompany = async (req, res) => {
+  try {
+    const { invitationCode, userData } = req.body;
+
+    if (!invitationCode || !userData) {
+      return res.status(400).json({
+        success: false,
+        message: "Invitation code and user data are required",
+      });
+    }
+
+    // Find invitation by code
+    const invitation = await Invitation.findOne({
+      code: invitationCode,
+      status: "active",
+      expiresAt: { $gt: new Date() },
+    }).populate("company department role");
+
+    if (!invitation) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired invitation code",
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findByEmailOrUsername(userData.email);
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: "User with this email already exists",
+      });
+    }
+
+    // Create new user with invitation data
+    const user = new User({
+      ...userData,
+      company: invitation.company._id,
+      department: invitation.department._id,
+      role: invitation.role._id,
+      isActive: true,
+      isEmailVerified: true,
+    });
+
+    await user.save();
+
+    // Mark invitation as used
+    invitation.status = "used";
+    invitation.usedBy = user._id;
+    invitation.usedAt = new Date();
+    await invitation.save();
+
+    // Populate role after saving
+    await user.populate("role");
+
+    // Generate tokens
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    // Calculate refresh token expiration
+    const refreshTokenExpiresAt = new Date();
+    const refreshTokenExpiryMs = process.env.REFRESH_TOKEN_EXPIRE
+      ? parseTimeToMs(process.env.REFRESH_TOKEN_EXPIRE)
+      : 24 * 60 * 60 * 1000; // 1 day default
+    refreshTokenExpiresAt.setTime(
+      refreshTokenExpiresAt.getTime() + refreshTokenExpiryMs
+    );
+
+    // Save refresh token to user
+    await user.addRefreshToken(refreshToken, refreshTokenExpiresAt);
+
+    // Set cookies
+    setTokenCookies(res, accessToken, refreshToken);
+
+    console.log("Join company success:", user.email);
+
+    res.status(201).json({
+      success: true,
+      message: "Successfully joined company",
+      data: {
+        user: {
+          id: user._id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          company: invitation.company,
+          department: invitation.department,
+        },
+        accessToken,
+      },
+    });
+  } catch (error) {
+    console.error("Join company error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to join company",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Verify email address
+// @route   POST /api/auth/verify-email
+// @access  Public
+export const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "Verification token is required",
+      });
+    }
+
+    // Verify the token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    if (decoded.type !== "activation") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid verification token",
+      });
+    }
+
+    // Find user by email
+    const user = await User.findOne({
+      email: decoded.email,
+      emailVerificationToken: token,
+      emailVerificationExpires: { $gt: new Date() },
+    }).select("+emailVerificationToken +emailVerificationExpires");
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired verification token",
+      });
+    }
+
+    // Activate the user
+    user.isEmailVerified = true;
+    user.isActive = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
+
+    // Send welcome notification and email after verification
+    try {
+      const welcomeService = new WelcomeNotificationService(global.io);
+      welcomeService.sendWelcomeNotification(user).catch((error) => {
+        console.error("❌ Error sending welcome notification:", error);
+      });
+    } catch (error) {
+      console.error("❌ Error initializing welcome service:", error);
+    }
+
+    res.json({
+      success: true,
+      message:
+        "Email verified successfully! You can now log in to your account.",
+    });
+  } catch (error) {
+    console.error("❌ Email verification failed:", error);
+
+    if (error.name === "JsonWebTokenError") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid verification token",
+      });
+    }
+
+    if (error.name === "TokenExpiredError") {
+      return res.status(400).json({
+        success: false,
+        message: "Verification token has expired",
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+// @desc    Resend verification email
+// @route   POST /api/auth/resend-verification
+// @access  Public
+export const resendVerificationEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message:
+          "If an account with that email exists, a verification email has been sent.",
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is already verified",
+      });
+    }
+
+    // Generate new activation token
+    const activationToken = jwt.sign(
+      { email, type: "activation" },
+      process.env.JWT_SECRET,
+      { expiresIn: "24h" }
+    );
+
+    // Update user with new token
+    user.emailVerificationToken = activationToken;
+    user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await user.save();
+
+    // Send activation email
+    try {
+      const { sendAccountActivationEmail } = await import(
+        "../services/emailService.js"
+      );
+      await sendAccountActivationEmail(
+        user.email,
+        user.firstName || user.username,
+        activationToken
+      );
+      console.log("✅ Verification email resent to:", user.email);
+    } catch (error) {
+      console.error("❌ Error sending verification email:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send verification email",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Verification email sent successfully",
+    });
+  } catch (error) {
+    console.error("❌ Resend verification failed:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
     });
   }
 };

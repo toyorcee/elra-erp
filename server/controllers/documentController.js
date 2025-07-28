@@ -13,6 +13,8 @@ import {
 import { hasPermission } from "../utils/permissionUtils.js";
 import AuditService from "../services/auditService.js";
 import NotificationService from "../services/notificationService.js";
+import OCRService from "../services/ocrService.js";
+import SearchService from "../services/searchService.js";
 
 // Upload document
 export const uploadDocument = async (req, res) => {
@@ -59,13 +61,45 @@ export const uploadDocument = async (req, res) => {
         department
       );
 
+      // Process document with OCR for enhanced metadata
+      let ocrMetadata = {};
+      let extractedText = "";
+
+      try {
+        const ocrResult = await OCRService.processDocument(
+          req.file.path,
+          req.file.mimetype,
+          { language: "eng" }
+        );
+
+        if (ocrResult.success) {
+          ocrMetadata = ocrResult.metadata;
+          extractedText = ocrResult.extractedText;
+
+          // Auto-classify document type if not provided
+          if (!documentType && ocrMetadata.documentType) {
+            documentType = ocrMetadata.documentType;
+          }
+
+          // Auto-extract tags from keywords
+          if (!tags && ocrMetadata.keywords) {
+            tags = ocrMetadata.keywords.slice(0, 5).join(",");
+          }
+        }
+      } catch (ocrError) {
+        console.warn(
+          "OCR processing failed, continuing with basic upload:",
+          ocrError.message
+        );
+      }
+
       const metadata = createDocumentMetadata(
         req.file,
         currentUser._id,
         category
       );
 
-      // Create document
+      // Create document with enhanced metadata
       const docData = {
         title,
         description,
@@ -81,6 +115,16 @@ export const uploadDocument = async (req, res) => {
         uploadedBy: currentUser._id,
         reference: generateDocRef(),
         status: "DRAFT",
+        // Enhanced metadata from OCR
+        ocrData: {
+          extractedText,
+          confidence: ocrMetadata.confidence || 0,
+          documentType: ocrMetadata.documentType,
+          keywords: ocrMetadata.keywords || [],
+          dateReferences: ocrMetadata.dateReferences || [],
+          organizationReferences: ocrMetadata.organizationReferences || [],
+          monetaryValues: ocrMetadata.monetaryValues || [],
+        },
       };
       if (department) {
         docData.department = department;
@@ -724,11 +768,11 @@ export const deleteDocument = async (req, res) => {
   }
 };
 
-// Search documents
+// Enhanced search documents with OCR capabilities
 export const searchDocuments = async (req, res) => {
   try {
     const currentUser = req.user;
-    const { q, category, status, dateFrom, dateTo } = req.query;
+    const searchParams = req.query;
 
     // Check if user has permission to view documents
     if (!hasPermission(currentUser, "document.view")) {
@@ -738,43 +782,184 @@ export const searchDocuments = async (req, res) => {
       });
     }
 
-    let query = { isActive: true };
+    const result = await SearchService.advancedSearch(
+      searchParams,
+      currentUser
+    );
 
-    // Text search
-    if (q) {
-      query.$text = { $search: q };
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        message: result.error,
+      });
     }
 
-    // Filters
-    if (category) query.category = category;
-    if (status) query.status = status;
-    if (dateFrom || dateTo) {
-      query.createdAt = {};
-      if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
-      if (dateTo) query.createdAt.$lte = new Date(dateTo);
-    }
-
-    // Department filter for non-admin users
-    if (currentUser.role.level < 80) {
-      query.department = currentUser.department;
-    }
-
-    const documents = await Document.find(query)
-      .populate("uploadedBy", "name email")
-      .populate("currentApprover", "name email")
-      .sort({ createdAt: -1 })
-      .limit(50);
-
-    res.json({
-      success: true,
-      data: documents,
-      count: documents.length,
-    });
+    res.json(result);
   } catch (error) {
     console.error("Search documents error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to search documents",
+    });
+  }
+};
+
+// Full-text search within OCR extracted text
+export const fullTextSearch = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const { query, page = 1, limit = 20, minConfidence = 50 } = req.query;
+
+    // Check if user has permission to view documents
+    if (!hasPermission(currentUser, "document.view")) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to search documents",
+      });
+    }
+
+    if (!query) {
+      return res.status(400).json({
+        success: false,
+        message: "Search query is required",
+      });
+    }
+
+    const result = await SearchService.fullTextSearch(query, currentUser, {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      minConfidence: parseInt(minConfidence),
+    });
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        message: result.error,
+      });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Full-text search error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to perform full-text search",
+    });
+  }
+};
+
+// Search by metadata (dates, organizations, monetary values)
+export const metadataSearch = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const searchParams = req.query;
+
+    // Check if user has permission to view documents
+    if (!hasPermission(currentUser, "document.view")) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to search documents",
+      });
+    }
+
+    const result = await SearchService.metadataSearch(
+      searchParams,
+      currentUser
+    );
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        message: result.error,
+      });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Metadata search error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to perform metadata search",
+    });
+  }
+};
+
+// Find similar documents
+export const findSimilarDocuments = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const { documentId } = req.params;
+    const { limit = 10 } = req.query;
+
+    // Check if user has permission to view documents
+    if (!hasPermission(currentUser, "document.view")) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to search documents",
+      });
+    }
+
+    const result = await SearchService.findSimilarDocuments(
+      documentId,
+      currentUser,
+      {
+        limit: parseInt(limit),
+      }
+    );
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        message: result.error,
+      });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Similar documents search error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to find similar documents",
+    });
+  }
+};
+
+// Get search suggestions
+export const getSearchSuggestions = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const { query } = req.query;
+
+    // Check if user has permission to view documents
+    if (!hasPermission(currentUser, "document.view")) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to search documents",
+      });
+    }
+
+    if (!query) {
+      return res.status(400).json({
+        success: false,
+        message: "Search query is required",
+      });
+    }
+
+    const result = await SearchService.getSearchSuggestions(query, currentUser);
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        message: result.error,
+      });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Search suggestions error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get search suggestions",
     });
   }
 };

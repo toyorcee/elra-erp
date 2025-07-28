@@ -15,6 +15,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import EDMSLogo from "../../components/EDMSLogo";
 import "../../styles/Register.css";
+import { toast } from "react-toastify";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -35,6 +36,15 @@ const Register = () => {
   const { register, isAuthenticated, error, clearError, initialized } =
     useAuth();
   const navigate = useNavigate();
+
+  // Safety check - wait for auth to be initialized
+  if (!initialized) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   // Background images for the animated background
   const backgroundImages = [
@@ -163,43 +173,52 @@ const Register = () => {
     setSubmitting(true);
 
     try {
-    const userData = {
-      username: formData.username,
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      email: formData.email,
-      password: formData.password,
-    };
+      const userData = {
+        username: formData.username,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        password: formData.password,
+      };
 
-    const response = await register(userData);
-    setSubmitting(false);
+      const response = await register(userData);
+      setSubmitting(false);
 
-    if (response.success) {
-        navigate("/dashboard");
+      if (response.success) {
+        toast.success(
+          "Account created successfully! Please check your email to verify your account."
+        );
+        navigate("/verify-email", {
+          state: {
+            email: formData.email,
+            message:
+              "Please check your email and click the verification link to activate your account.",
+          },
+        });
+      } else {
+        toast.error(response.error || "Registration failed. Please try again.");
       }
     } catch (error) {
       setSubmitting(false);
       console.error("Registration error:", error);
+      toast.error("Registration failed. Please try again.");
     }
   };
 
-  if (!initialized) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/dashboard");
+    }
+  }, [isAuthenticated, navigate]);
 
   if (isAuthenticated) {
-    navigate("/dashboard");
     return null;
   }
 
-    return (
+  return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 overflow-hidden relative">
       {/* Animated Background */}
-      <div className="absolute inset-0">
+      <div className="fixed inset-0">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentImageIndex}
@@ -237,7 +256,7 @@ const Register = () => {
       </div>
 
       {/* Floating Elements */}
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="fixed inset-0 overflow-hidden">
         {Array.from({ length: 15 }, (_, i) => (
           <motion.div
             key={i}
@@ -260,75 +279,81 @@ const Register = () => {
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
+      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 pt-20">
+        {/* Centered Header - OUTSIDE flex containers */}
         <motion.div
-          className="w-full max-w-4xl flex"
+          className="text-center mb-8 sm:mb-12 w-full"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <motion.div
+            className="flex justify-center mb-6 sm:mb-8"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <EDMSLogo variant="light" className="h-12 sm:h-14" />
+          </motion.div>
+
+          <motion.h1
+            className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-3 sm:mb-4"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            Create Your Account
+          </motion.h1>
+
+          <motion.p
+            className="text-white/70 text-sm sm:text-base"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            Join EDMS and revolutionize your document management
+          </motion.p>
+        </motion.div>
+
+        {/* Form and Features Container */}
+        <motion.div
+          className="w-full max-w-6xl flex flex-col lg:flex-row gap-8 lg:gap-12"
           variants={containerVariants}
           initial="hidden"
           animate="visible"
         >
           {/* Left Side - Form */}
           <motion.div
-            className="flex-1 flex items-center justify-center"
+            className="flex-1 flex items-center justify-center order-2 lg:order-1"
             variants={slideVariants}
             initial="hidden"
             animate="visible"
           >
             <motion.div
-              className="w-full max-w-md"
+              className="w-full max-w-md mx-auto"
               variants={cardVariants}
               initial="hidden"
               animate="visible"
             >
-              {/* Header */}
-              <div className="text-center mb-8">
-                <motion.div
-                  className="flex justify-center mb-6"
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  <EDMSLogo variant="light" className="h-12" />
-                </motion.div>
-
-                <motion.h1
-                  className="text-3xl font-bold text-white mb-2"
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  Create Your Account
-                </motion.h1>
-
-                <motion.p
-                  className="text-white/70"
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                >
-                  Join EDMS and revolutionize your document management
-                </motion.p>
-            </div>
-
               {/* Form */}
               <motion.form
                 onSubmit={handleSubmit}
-                className="space-y-6"
+                className="space-y-4 sm:space-y-6"
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
               >
-                    {/* Username */}
+                {/* Username */}
                 <motion.div variants={inputVariants}>
                   <label className="block text-sm font-medium text-white/90 mb-2">
-                        Username
-                      </label>
+                    Username
+                  </label>
                   <div className="relative">
-                      <input
+                    <input
                       type="text"
-                        name="username"
-                        value={formData.username}
-                        onChange={handleChange}
+                      name="username"
+                      value={formData.username}
+                      onChange={handleChange}
                       className={`w-full px-4 py-3 pl-12 rounded-xl border bg-white/5 backdrop-blur-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-400/50 focus:outline-none text-white transition-all duration-200 ${
                         errors.username ? "border-red-400" : "border-white/20"
                       }`}
@@ -336,69 +361,69 @@ const Register = () => {
                     />
                     <HiUser className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/40" />
                   </div>
-                      {errors.username && (
+                  {errors.username && (
                     <p className="text-red-400 text-sm mt-1">
-                          {errors.username}
-                        </p>
-                      )}
+                      {errors.username}
+                    </p>
+                  )}
                 </motion.div>
 
-                    {/* Name Fields */}
-                <div className="grid grid-cols-2 gap-4">
+                {/* Name Fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <motion.div variants={inputVariants}>
                     <label className="block text-sm font-medium text-white/90 mb-2">
-                          First Name
-                        </label>
-                        <input
+                      First Name
+                    </label>
+                    <input
                       type="text"
-                          name="firstName"
-                          value={formData.firstName}
-                          onChange={handleChange}
+                      name="firstName"
+                      value={formData.firstName}
+                      onChange={handleChange}
                       className={`w-full px-4 py-3 rounded-xl border bg-white/5 backdrop-blur-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-400/50 focus:outline-none text-white transition-all duration-200 ${
                         errors.firstName ? "border-red-400" : "border-white/20"
                       }`}
                       placeholder="First name"
-                        />
-                        {errors.firstName && (
+                    />
+                    {errors.firstName && (
                       <p className="text-red-400 text-sm mt-1">
-                            {errors.firstName}
-                          </p>
-                        )}
+                        {errors.firstName}
+                      </p>
+                    )}
                   </motion.div>
 
                   <motion.div variants={inputVariants}>
                     <label className="block text-sm font-medium text-white/90 mb-2">
-                          Last Name
-                        </label>
-                        <input
+                      Last Name
+                    </label>
+                    <input
                       type="text"
-                          name="lastName"
-                          value={formData.lastName}
-                          onChange={handleChange}
+                      name="lastName"
+                      value={formData.lastName}
+                      onChange={handleChange}
                       className={`w-full px-4 py-3 rounded-xl border bg-white/5 backdrop-blur-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-400/50 focus:outline-none text-white transition-all duration-200 ${
                         errors.lastName ? "border-red-400" : "border-white/20"
                       }`}
                       placeholder="Last name"
-                        />
-                        {errors.lastName && (
+                    />
+                    {errors.lastName && (
                       <p className="text-red-400 text-sm mt-1">
-                            {errors.lastName}
-                          </p>
-                        )}
+                        {errors.lastName}
+                      </p>
+                    )}
                   </motion.div>
-                    </div>
+                </div>
 
-                    {/* Email */}
+                {/* Email */}
                 <motion.div variants={inputVariants}>
                   <label className="block text-sm font-medium text-white/90 mb-2">
                     Email Address
-                      </label>
+                  </label>
                   <div className="relative">
-                      <input
+                    <input
                       type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleChange}
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
                       className={`w-full px-4 py-3 pl-12 rounded-xl border bg-white/5 backdrop-blur-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-400/50 focus:outline-none text-white transition-all duration-200 ${
                         errors.email ? "border-red-400" : "border-white/20"
                       }`}
@@ -406,99 +431,99 @@ const Register = () => {
                     />
                     <HiMail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/40" />
                   </div>
-                      {errors.email && (
+                  {errors.email && (
                     <p className="text-red-400 text-sm mt-1">{errors.email}</p>
-                      )}
+                  )}
                 </motion.div>
 
-                    {/* Password */}
+                {/* Password */}
                 <motion.div variants={inputVariants}>
                   <label className="block text-sm font-medium text-white/90 mb-2">
-                        Password
-                      </label>
-                      <div className="relative">
-                        <input
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
                       type={showPassword ? "text" : "password"}
-                          name="password"
-                          value={formData.password}
-                          onChange={handleChange}
+                      name="password"
+                      value={formData.password}
+                      onChange={handleChange}
                       className={`w-full px-4 py-3 pl-12 pr-12 rounded-xl border bg-white/5 backdrop-blur-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-400/50 focus:outline-none text-white transition-all duration-200 ${
                         errors.password ? "border-red-400" : "border-white/20"
                       }`}
                       placeholder="Enter password"
                     />
                     <HiLockClosed className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/40" />
-                        <button
-                          type="button"
+                    <button
+                      type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white/40 hover:text-white/60 transition-colors"
-                        >
-                          {showPassword ? (
+                    >
+                      {showPassword ? (
                         <HiEyeOff className="w-5 h-5" />
-                          ) : (
+                      ) : (
                         <HiEye className="w-5 h-5" />
-                          )}
-                        </button>
-                      </div>
-                      {errors.password && (
-                    <p className="text-red-400 text-sm mt-1">
-                          {errors.password}
-                        </p>
                       )}
+                    </button>
+                  </div>
+                  {errors.password && (
+                    <p className="text-red-400 text-sm mt-1">
+                      {errors.password}
+                    </p>
+                  )}
                 </motion.div>
 
-                    {/* Confirm Password */}
+                {/* Confirm Password */}
                 <motion.div variants={inputVariants}>
                   <label className="block text-sm font-medium text-white/90 mb-2">
-                        Confirm Password
-                      </label>
-                      <div className="relative">
-                        <input
+                    Confirm Password
+                  </label>
+                  <div className="relative">
+                    <input
                       type={showConfirmPassword ? "text" : "password"}
-                          name="confirmPassword"
-                          value={formData.confirmPassword}
-                          onChange={handleChange}
+                      name="confirmPassword"
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
                       className={`w-full px-4 py-3 pl-12 pr-12 rounded-xl border bg-white/5 backdrop-blur-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-400/50 focus:outline-none text-white transition-all duration-200 ${
-                            errors.confirmPassword
+                        errors.confirmPassword
                           ? "border-red-400"
                           : "border-white/20"
                       }`}
                       placeholder="Confirm password"
                     />
                     <HiLockClosed className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-white/40" />
-                        <button
-                          type="button"
+                    <button
+                      type="button"
                       onClick={() =>
                         setShowConfirmPassword(!showConfirmPassword)
                       }
                       className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white/40 hover:text-white/60 transition-colors"
-                        >
-                          {showConfirmPassword ? (
+                    >
+                      {showConfirmPassword ? (
                         <HiEyeOff className="w-5 h-5" />
-                          ) : (
+                      ) : (
                         <HiEye className="w-5 h-5" />
-                          )}
-                        </button>
-                      </div>
-                      {errors.confirmPassword && (
-                    <p className="text-red-400 text-sm mt-1">
-                          {errors.confirmPassword}
-                        </p>
                       )}
+                    </button>
+                  </div>
+                  {errors.confirmPassword && (
+                    <p className="text-red-400 text-sm mt-1">
+                      {errors.confirmPassword}
+                    </p>
+                  )}
                 </motion.div>
 
                 {/* Security Notice */}
                 <motion.div
-                  className="bg-green-500/10 backdrop-blur-xl border border-green-500/20 rounded-xl p-4"
+                  className="bg-green-500/10 backdrop-blur-xl border border-green-500/20 rounded-xl p-3 sm:p-4"
                   variants={inputVariants}
                 >
                   <div className="flex items-start space-x-3">
-                    <HiShieldCheck className="w-5 h-5 text-green-400 mt-0.5 flex-shrink-0" />
+                    <HiShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-green-400 mt-0.5 flex-shrink-0" />
                     <div>
-                      <h4 className="text-green-400 font-semibold mb-1">
+                      <h4 className="text-green-400 font-semibold mb-1 text-sm sm:text-base">
                         Secure Registration
                       </h4>
-                      <p className="text-white/70 text-sm">
+                      <p className="text-white/70 text-xs sm:text-sm">
                         Your data is encrypted and secure. We use
                         industry-standard security measures to protect your
                         information.
@@ -518,16 +543,16 @@ const Register = () => {
                   </motion.div>
                 )}
 
-                  {/* Submit Button */}
+                {/* Submit Button */}
                 <motion.button
-                      type="submit"
-                      disabled={submitting}
+                  type="submit"
+                  disabled={submitting}
                   className="w-full py-4 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-xl hover:shadow-blue-500/25 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   variants={inputVariants}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                    >
-                      {submitting ? (
+                >
+                  {submitting ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                       <span>Creating Account...</span>
@@ -541,17 +566,17 @@ const Register = () => {
                   )}
                 </motion.button>
 
-                  {/* Sign In Link */}
+                {/* Sign In Link */}
                 <motion.div className="text-center" variants={inputVariants}>
                   <p className="text-white/70">
-                      Already have an account?{" "}
-                      <Link
-                        to="/login"
+                    Already have an account?{" "}
+                    <Link
+                      to="/login"
                       className="text-blue-400 hover:text-blue-300 font-semibold transition-colors"
-                      >
+                    >
                       Sign In
-                      </Link>
-                    </p>
+                    </Link>
+                  </p>
                 </motion.div>
               </motion.form>
             </motion.div>
@@ -559,27 +584,27 @@ const Register = () => {
 
           {/* Right Side - Features */}
           <motion.div
-            className="hidden lg:flex flex-1 items-center justify-center"
+            className="flex-1 flex items-center justify-center order-1 lg:order-2"
             variants={slideVariants}
             initial="hidden"
             animate="visible"
             transition={{ delay: 0.3 }}
           >
             <motion.div
-              className="w-full max-w-md space-y-6"
+              className="w-full max-w-md space-y-4 sm:space-y-6"
               variants={containerVariants}
               initial="hidden"
               animate="visible"
             >
               <motion.div
-                className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-6"
+                className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-4 sm:p-6"
                 variants={cardVariants}
               >
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                    <HiOfficeBuilding className="w-6 h-6 text-blue-400" />
+                <div className="flex items-center space-x-3 mb-3 sm:mb-4">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                    <HiOfficeBuilding className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
                   </div>
-                  <h3 className="text-xl font-semibold text-white">
+                  <h3 className="text-lg sm:text-xl font-semibold text-white">
                     Professional Workspace
                   </h3>
                 </div>
@@ -590,17 +615,17 @@ const Register = () => {
               </motion.div>
 
               <motion.div
-                className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-6"
+                className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-4 sm:p-6"
                 variants={cardVariants}
               >
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-10 h-10 bg-green-500/20 rounded-xl flex items-center justify-center">
-                    <HiShieldCheck className="w-6 h-6 text-green-400" />
-              </div>
-                  <h3 className="text-xl font-semibold text-white">
+                <div className="flex items-center space-x-3 mb-3 sm:mb-4">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-500/20 rounded-xl flex items-center justify-center">
+                    <HiShieldCheck className="w-5 h-5 sm:w-6 sm:h-6 text-green-400" />
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-semibold text-white">
                     Enterprise Security
                   </h3>
-            </div>
+                </div>
                 <p className="text-white/70 text-sm">
                   Bank-level encryption and security protocols ensure your
                   documents are always protected.
@@ -608,17 +633,17 @@ const Register = () => {
               </motion.div>
 
               <motion.div
-                className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-6"
+                className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-4 sm:p-6"
                 variants={cardVariants}
               >
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center">
-                    <HiSparkles className="w-6 h-6 text-purple-400" />
-            </div>
-                  <h3 className="text-xl font-semibold text-white">
+                <div className="flex items-center space-x-3 mb-3 sm:mb-4">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-500/20 rounded-xl flex items-center justify-center">
+                    <HiSparkles className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400" />
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-semibold text-white">
                     Smart Features
                   </h3>
-          </div>
+                </div>
                 <p className="text-white/70 text-sm">
                   AI-powered document organization, automated workflows, and
                   intelligent search capabilities.

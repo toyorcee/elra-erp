@@ -9,6 +9,9 @@ import {
   changePassword,
   forgotPassword,
   resetPassword,
+  joinCompany,
+  verifyEmail,
+  resendVerificationEmail,
 } from "../controllers/authController.js";
 import { protect } from "../middleware/auth.js";
 import { passwordResetLimiter } from "../middleware/rateLimit.js";
@@ -85,9 +88,21 @@ const resetPasswordValidation = [
     ),
 ];
 
+const verifyEmailValidation = [
+  body("token").notEmpty().withMessage("Verification token is required"),
+];
+
+const resendVerificationValidation = [
+  body("email")
+    .isEmail()
+    .normalizeEmail()
+    .withMessage("Please provide a valid email address"),
+];
+
 // Routes
 router.post("/register", registerValidation, register);
 router.post("/login", loginValidation, login);
+router.post("/join-company", joinCompany);
 router.post("/logout", protect, logout);
 router.post("/refresh", refreshToken);
 router.get("/me", protect, getMe);
@@ -105,5 +120,11 @@ router.post(
   forgotPassword
 );
 router.post("/reset-password", resetPasswordValidation, resetPassword);
+router.post("/verify-email", verifyEmailValidation, verifyEmail);
+router.post(
+  "/resend-verification",
+  resendVerificationValidation,
+  resendVerificationEmail
+);
 
 export default router;

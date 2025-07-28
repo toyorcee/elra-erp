@@ -26,13 +26,13 @@ const ComingSoon = ({ feature, description, icon: Icon, onClose }) => {
   }, []);
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6">
       <motion.div
         initial={{ opacity: 0, scale: 0.8, y: 50 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.8, y: 50 }}
         transition={{ duration: 0.5, ease: "easeOut" }}
-        className="relative bg-gradient-to-br from-slate-900/95 via-blue-900/95 to-purple-900/95 backdrop-blur-xl border border-white/20 rounded-3xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto"
+        className="relative bg-gradient-to-br from-slate-900/95 via-blue-900/95 to-purple-900/95 backdrop-blur-xl border border-white/20 rounded-3xl p-6 sm:p-8 max-w-md sm:max-w-lg w-full max-h-[85vh] overflow-hidden"
       >
         {/* Animated Background */}
         <div className="absolute inset-0 overflow-hidden">
@@ -91,7 +91,7 @@ const ComingSoon = ({ feature, description, icon: Icon, onClose }) => {
         </div>
 
         {/* Content */}
-        <div className="relative z-10 text-center">
+        <div className="relative z-10 text-center h-full flex flex-col justify-center overflow-y-auto">
           {/* Icon */}
           <motion.div
             initial={{ scale: 0, rotate: -180 }}
@@ -135,7 +135,7 @@ const ComingSoon = ({ feature, description, icon: Icon, onClose }) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.8 }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6"
+            className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4"
           >
             {[
               { icon: HiSparkles, text: "Innovative Features" },
@@ -175,9 +175,9 @@ const ComingSoon = ({ feature, description, icon: Icon, onClose }) => {
               <input
                 type="email"
                 placeholder="Enter your business email"
-                className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-blue-400 transition-colors"
+                className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:border-blue-400 transition-colors text-sm"
               />
-              <button className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105">
+              <button className="px-4 sm:px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 text-sm whitespace-nowrap">
                 Get Early Access
               </button>
             </div>
@@ -188,19 +188,19 @@ const ComingSoon = ({ feature, description, icon: Icon, onClose }) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 1.4 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center"
+            className="flex flex-col sm:flex-row gap-3 justify-center"
           >
             <button
               onClick={onClose}
-              className="px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105"
+              className="px-4 sm:px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 text-sm"
             >
               Continue Exploring
             </button>
             <Link
               to="/"
-              className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 flex items-center justify-center"
+              className="px-4 sm:px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 flex items-center justify-center text-sm"
             >
-              <HiArrowRight className="w-5 h-5 mr-2" />
+              <HiArrowRight className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
               Start Your Journey
             </Link>
           </motion.div>

@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   HiDocumentText,
   HiUsers,
+  HiUser,
+  HiUserGroup,
   HiShieldCheck,
   HiCog,
   HiTrendingUp,
@@ -20,31 +22,28 @@ import {
   HiInformationCircle,
 } from "react-icons/hi";
 import EDMSLogo from "../../components/EDMSLogo";
-import { getSubscriptionPlans } from "../../services/subscriptions.js";
 import { useAuth } from "../../context/AuthContext";
-import { getPlanPrice } from "../../utils/priceUtils";
 
 const LandingPage = () => {
   const navigate = useNavigate();
-  const { setSubscriptionPlans: setGlobalPlans } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [billingCycle, setBillingCycle] = useState("monthly");
-  const [selectedCurrency, setSelectedCurrency] = useState("USD");
-  const [subscriptionPlans, setSubscriptionPlans] = useState({});
-  const [loadingPlans, setLoadingPlans] = useState(true);
-  const [showPricingTooltip, setShowPricingTooltip] = useState(false);
+
+  // Scroll to top on component mount
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const [animatedStats, setAnimatedStats] = useState({
     documents: 0,
     users: 0,
     companies: 0,
     uptime: 0,
   });
-  const [calculatedPrices, setCalculatedPrices] = useState({}); // Store calculated prices
 
-  // Sliding words and contextual content for hero section
   const heroContent = [
     {
       word: "Document Workflows",
@@ -93,54 +92,6 @@ const LandingPage = () => {
   // Animated statistics with intersection observer
   const [statsVisible, setStatsVisible] = useState(false);
   const statsRef = useRef(null);
-
-  // Fetch subscription plans
-  useEffect(() => {
-    const fetchPlans = async () => {
-      try {
-        const data = await getSubscriptionPlans();
-        if (data.success) {
-          setSubscriptionPlans(data.data);
-          setGlobalPlans(data.data);
-          console.log(
-            "✅ LandingPage: Stored subscription plans in auth context:",
-            data.data
-          );
-
-          // Calculate prices for all plans and currencies
-          const newPrices = {};
-          const currencies = ["USD", "NGN"];
-          const cycles = ["monthly", "yearly"];
-
-          for (const plan of data.data) {
-            for (const currency of currencies) {
-              for (const cycle of cycles) {
-                const cacheKey = `${plan.name}-${currency}-${cycle}`;
-                try {
-                  const price = await getPlanPrice(plan, currency, cycle);
-                  newPrices[cacheKey] = price;
-                } catch (error) {
-                  console.error(
-                    `Error calculating price for ${cacheKey}:`,
-                    error
-                  );
-                  newPrices[cacheKey] = currency === "NGN" ? "₦99" : "$99";
-                }
-              }
-            }
-          }
-
-          setCalculatedPrices(newPrices);
-        }
-      } catch (error) {
-        console.error("Error fetching subscription plans:", error);
-      } finally {
-        setLoadingPlans(false);
-      }
-    };
-
-    fetchPlans();
-  }, [setGlobalPlans]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -210,7 +161,6 @@ const LandingPage = () => {
     return () => clearInterval(timer);
   }, [statsVisible]);
 
-  // Auto-slide for testimonials
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % testimonials.length);
@@ -218,7 +168,6 @@ const LandingPage = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Auto-slide for hero content
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentWordIndex((prev) => (prev + 1) % heroContent.length);
@@ -358,23 +307,6 @@ const LandingPage = () => {
     "Zero bottlenecks with conditional workflow logic",
   ];
 
-  const handlePlanSelection = (plan) => {
-    // Navigate to welcome screen for subscription with plan details
-    const planParams = new URLSearchParams({
-      flow: "company",
-      planName: plan.name,
-      planDisplayName: plan.displayName,
-      planPrice:
-        plan.price?.[selectedCurrency]?.[billingCycle] ||
-        plan.price?.USD?.[billingCycle] ||
-        plan.price?.[billingCycle],
-      planBillingCycle: billingCycle,
-      planFeatures: JSON.stringify(plan.features),
-      planDescription: plan.description,
-    });
-    navigate(`/welcome?${planParams.toString()}`);
-  };
-
   return (
     <div className="min-h-screen bg-slate-900 text-white overflow-x-hidden">
       {/* Navigation */}
@@ -394,13 +326,7 @@ const LandingPage = () => {
                 Features
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
               </a>
-              <a
-                href="#pricing"
-                className="text-white/80 hover:text-white transition-colors duration-300 font-medium relative group"
-              >
-                Pricing
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
-              </a>
+
               <a
                 href="#benefits"
                 className="text-white/80 hover:text-white transition-colors duration-300 font-medium relative group"
@@ -467,16 +393,7 @@ const LandingPage = () => {
                 >
                   Features
                 </motion.a>
-                <motion.a
-                  href="#pricing"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block text-white/80 hover:text-white font-medium py-3 px-4 rounded-lg hover:bg-white/5 transition-all duration-300"
-                  initial={{ x: -20, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  Pricing
-                </motion.a>
+
                 <motion.a
                   href="#benefits"
                   onClick={() => setMobileMenuOpen(false)}
@@ -508,11 +425,11 @@ const LandingPage = () => {
                     <button
                       onClick={() => {
                         setMobileMenuOpen(false);
-                        navigate("/welcome?flow=individual");
+                        navigate("/welcome");
                       }}
                       className="block w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-center py-3 px-6 rounded-full font-semibold transition-all duration-300 transform hover:scale-105"
                     >
-                      Sign Up Free
+                      Get Started
                     </button>
                   </motion.div>
                   <motion.div
@@ -523,11 +440,11 @@ const LandingPage = () => {
                     <button
                       onClick={() => {
                         setMobileMenuOpen(false);
-                        navigate("/welcome?flow=company");
+                        navigate("/login");
                       }}
                       className="block w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-center py-3 px-6 rounded-full font-semibold transition-all duration-300 transform hover:scale-105"
                     >
-                      Subscribe for Company
+                      Sign In
                     </button>
                   </motion.div>
                   <motion.div
@@ -553,7 +470,7 @@ const LandingPage = () => {
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center overflow-hidden">
         {/* Background Image Slider */}
-        <div className="absolute inset-0">
+        <div className="fixed inset-0">
           {heroContent.map((content, index) => (
             <div
               key={index}
@@ -608,18 +525,18 @@ const LandingPage = () => {
               </motion.p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                 <button
-                  onClick={() => navigate("/welcome?flow=individual")}
+                  onClick={() => navigate("/welcome")}
                   className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-full font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-500/25 flex items-center justify-center"
                 >
-                  <span>Sign Up Free</span>
+                  <span>Get Started</span>
                   <HiArrowRight className="ml-2" />
                 </button>
                 <button
-                  onClick={() => navigate("/welcome?flow=company")}
+                  onClick={() => navigate("/login")}
                   className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-4 rounded-full font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl hover:shadow-green-500/25 flex items-center justify-center"
                 >
                   <HiStar className="mr-2" />
-                  Subscribe for Company
+                  Sign In
                 </button>
               </div>
             </motion.div>
@@ -784,8 +701,110 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* How It Works Section */}
+      <section
+        id="how-it-works"
+        className="py-24 bg-gradient-to-b from-slate-800/30 to-slate-900/50 relative"
+      >
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-50">
+          <div
+            className="w-full h-full"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+              backgroundSize: "60px 60px",
+            }}
+          ></div>
+        </div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div
+            className="text-center mb-20"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+          >
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-500/20 rounded-2xl mb-6">
+              <HiSparkles className="w-8 h-8 text-blue-400" />
+            </div>
+            <h2 className="text-4xl sm:text-5xl font-bold text-white mb-6">
+              How It Works
+            </h2>
+            <p className="text-xl text-white/70 max-w-3xl mx-auto leading-relaxed">
+              Get started in minutes with our intelligent setup process designed
+              for modern organizations
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
+            <motion.div
+              className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-8 text-center"
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              viewport={{ once: true }}
+            >
+              <div className="w-16 h-16 bg-blue-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <HiUser className="w-8 h-8 text-blue-400" />
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-4">
+                1. Register & Setup
+              </h3>
+              <p className="text-white/70">
+                Register as the first superadmin and choose your industry
+                template or create custom workflows
+              </p>
+            </motion.div>
+
+            <motion.div
+              className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-8 text-center"
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              viewport={{ once: true }}
+            >
+              <div className="w-16 h-16 bg-green-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <HiUserGroup className="w-8 h-8 text-green-400" />
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-4">
+                2. Invite Team
+              </h3>
+              <p className="text-white/70">
+                Send invitation codes to your team members who can join with
+                secure access
+              </p>
+            </motion.div>
+
+            <motion.div
+              className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-8 text-center"
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              viewport={{ once: true }}
+            >
+              <div className="w-16 h-16 bg-purple-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <HiDocumentText className="w-8 h-8 text-purple-400" />
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-4">
+                3. Start Working
+              </h3>
+              <p className="text-white/70">
+                Upload documents, create approval workflows, and collaborate
+                seamlessly
+              </p>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
       {/* Features Section */}
-      <section id="features" className="py-24">
+      <section
+        id="features"
+        className="py-24 bg-gradient-to-b from-slate-900/50 to-slate-900 relative"
+      >
+        {/* Section Divider */}
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             className="text-center mb-16"
@@ -836,360 +855,6 @@ const LandingPage = () => {
               </motion.div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section id="pricing" className="py-24 bg-white/2">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div
-            className="text-center mb-16"
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-          >
-            <h2 className="text-3xl lg:text-4xl font-bold mb-4">
-              Choose Your Perfect Plan
-            </h2>
-            <p className="text-lg lg:text-xl text-white/70 max-w-3xl mx-auto leading-relaxed mb-8">
-              Scale with confidence. Start small and grow with flexible plans
-              designed for every stage of your business.
-            </p>
-
-            {/* Billing Toggle */}
-            <div className="flex items-center justify-center space-x-4 mb-12">
-              <span
-                className={`text-sm font-medium transition-colors duration-300 ${
-                  billingCycle === "monthly" ? "text-white" : "text-white/60"
-                }`}
-              >
-                Monthly
-              </span>
-              <button
-                onClick={() =>
-                  setBillingCycle(
-                    billingCycle === "monthly" ? "yearly" : "monthly"
-                  )
-                }
-                className="relative w-16 h-8 bg-white/10 backdrop-blur-sm rounded-full p-1 transi
-                tion-all duration-300 hover:bg-white/20"
-              >
-                <motion.div
-                  className="w-6 h-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full shadow-lg"
-                  animate={{ x: billingCycle === "yearly" ? 32 : 0 }}
-                  transition={{ duration: 0.3, ease: "easeInOut" }}
-                />
-              </button>
-              <div className="relative">
-                <span
-                  className={`text-sm font-medium transition-colors duration-300 ${
-                    billingCycle === "yearly" ? "text-white" : "text-white/60"
-                  }`}
-                >
-                  Yearly
-                  <span className="ml-2 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full">
-                    Save 17%
-                  </span>
-                </span>
-
-                {/* Info Icon */}
-                <button
-                  onMouseEnter={() => setShowPricingTooltip(true)}
-                  onMouseLeave={() => setShowPricingTooltip(false)}
-                  className="ml-2 inline-flex items-center justify-center w-4 h-4 text-white/60 hover:text-white/80 transition-colors"
-                >
-                  <HiInformationCircle className="w-4 h-4" />
-                </button>
-
-                {/* Tooltip */}
-                <AnimatePresence>
-                  {showPricingTooltip && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      transition={{ duration: 0.2 }}
-                      className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-80 bg-slate-800/95 backdrop-blur-xl border border-white/20 rounded-xl p-4 shadow-2xl z-50"
-                    >
-                      <div className="text-sm text-white/90 space-y-2">
-                        <div className="font-semibold text-white mb-2">
-                          💡 How the Savings Work:
-                        </div>
-                        <div className="space-y-1 text-xs">
-                          <div>
-                            • <strong>Monthly:</strong> Pay every month (more
-                            flexible)
-                          </div>
-                          <div>
-                            • <strong>Yearly:</strong> Pay once per year (better
-                            value)
-                          </div>
-                        </div>
-                        <div className="text-xs text-green-400 mt-2">
-                          <strong>Example:</strong> Professional Plan
-                        </div>
-                        <div className="text-xs space-y-1">
-                          <div>
-                            Monthly: {selectedCurrency === "NGN" ? "₦" : "$"}
-                            {selectedCurrency === "NGN" ? "149,985" : "99.99"} ×
-                            12 = {selectedCurrency === "NGN" ? "₦" : "$"}
-                            {selectedCurrency === "NGN"
-                              ? (149985 * 12).toLocaleString()
-                              : (99.99 * 12).toLocaleString()}
-                            /year
-                          </div>
-                          <div>
-                            Yearly: {selectedCurrency === "NGN" ? "₦" : "$"}
-                            {selectedCurrency === "NGN"
-                              ? "1,499,850"
-                              : "999.99"}
-                            /year
-                          </div>
-                          <div className="text-green-400 font-semibold">
-                            You save {selectedCurrency === "NGN" ? "₦" : "$"}
-                            {selectedCurrency === "NGN"
-                              ? (149985 * 12 - 1499850).toLocaleString()
-                              : (99.99 * 12 - 999.99).toFixed(2)}
-                            ! (2 months free)
-                          </div>
-                        </div>
-                      </div>
-                      {/* Arrow */}
-                      <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-slate-800/95"></div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
-
-            {/* Currency Selector */}
-            <div className="flex items-center justify-center space-x-4 mb-8">
-              <span className="text-sm font-medium text-white/60">
-                Currency:
-              </span>
-              <div className="flex items-center space-x-3 bg-white/10 backdrop-blur-sm rounded-full p-1">
-                <button
-                  onClick={() => setSelectedCurrency("USD")}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
-                    selectedCurrency === "USD"
-                      ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg"
-                      : "text-white/60 hover:text-white/80"
-                  }`}
-                >
-                  USD ($)
-                </button>
-                <button
-                  onClick={() => setSelectedCurrency("NGN")}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
-                    selectedCurrency === "NGN"
-                      ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg"
-                      : "text-white/60 hover:text-white/80"
-                  }`}
-                >
-                  NGN (₦)
-                </button>
-              </div>
-            </div>
-          </motion.div>
-
-          {loadingPlans ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-              {[1, 2, 3, 4].map((index) => (
-                <motion.div
-                  key={index}
-                  className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 animate-pulse"
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: index * 0.1 }}
-                  viewport={{ once: true }}
-                >
-                  <div className="h-8 bg-white/10 rounded mb-4"></div>
-                  <div className="h-12 bg-white/10 rounded mb-6"></div>
-                  <div className="space-y-3">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className="h-4 bg-white/10 rounded"></div>
-                    ))}
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 auto-rows-fr">
-              {Object.entries(subscriptionPlans).map(
-                ([planKey, plan], index) => (
-                  <motion.div
-                    key={planKey}
-                    className={`relative bg-white/5 backdrop-blur-sm border rounded-2xl p-8 transition-all duration-300 hover:shadow-2xl hover:shadow-black/20 group overflow-hidden flex flex-col ${
-                      planKey === "professional"
-                        ? "border-purple-500/50 bg-gradient-to-b from-purple-500/10 to-transparent scale-105"
-                        : "border-white/10 hover:border-white/20"
-                    }`}
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: index * 0.1 }}
-                    viewport={{ once: true }}
-                    whileHover={{ y: -5 }}
-                  >
-                    {/* Header Section - Fixed Height */}
-                    <div className="flex-shrink-0">
-                      {/* Popular Badge */}
-                      {planKey === "professional" && (
-                        <div className="text-center mb-4">
-                          <div className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center justify-center space-x-2 inline-block">
-                            <HiStar className="w-4 h-4" />
-                            <span>Most Popular</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Plan Icon */}
-                      <div className="text-center mb-6">
-                        {planKey === "starter" && (
-                          <HiArrowRight className="w-12 h-12 text-blue-400 mx-auto mb-4" />
-                        )}
-                        {planKey === "business" && (
-                          <HiSparkles className="w-12 h-12 text-green-400 mx-auto mb-4" />
-                        )}
-                        {planKey === "professional" && (
-                          <HiStar className="w-12 h-12 text-purple-400 mx-auto mb-4" />
-                        )}
-                        {planKey === "enterprise" && (
-                          <HiStar className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
-                        )}
-
-                        <h3 className="text-2xl font-bold mb-2">
-                          {plan.displayName}
-                        </h3>
-                        <p className="text-white/60 text-sm">
-                          {plan.description}
-                        </p>
-                      </div>
-
-                      {/* Price */}
-                      <div className="text-center mb-8">
-                        <div className="flex items-center justify-center space-x-2 mb-2">
-                          <span className="text-4xl font-bold">
-                            {calculatedPrices[
-                              `${plan.name}-${selectedCurrency}-${billingCycle}`
-                            ] ||
-                              plan.formattedPrices?.[selectedCurrency]?.[
-                                billingCycle
-                              ]?.formatted ||
-                              `${selectedCurrency === "NGN" ? "₦" : "$"}${
-                                billingCycle === "yearly"
-                                  ? plan.price?.[selectedCurrency]?.yearly ||
-                                    plan.price?.USD?.yearly ||
-                                    plan.price?.yearly
-                                  : plan.price?.[selectedCurrency]?.monthly ||
-                                    plan.price?.USD?.monthly ||
-                                    plan.price?.monthly
-                              }`}
-                          </span>
-                          <span className="text-white/60">
-                            /{billingCycle === "yearly" ? "year" : "month"}
-                          </span>
-                        </div>
-                        {billingCycle === "yearly" && (
-                          <p className="text-green-400 text-sm font-medium">
-                            Save {selectedCurrency === "NGN" ? "₦" : "$"}
-                            {(
-                              (plan.price?.[selectedCurrency]?.monthly ||
-                                plan.price?.USD?.monthly ||
-                                plan.price?.monthly) *
-                                12 -
-                              (plan.price?.[selectedCurrency]?.yearly ||
-                                plan.price?.USD?.yearly ||
-                                plan.price?.yearly)
-                            ).toLocaleString()}{" "}
-                            annually
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Features Section - Flexible Height */}
-                    <div className="flex-grow space-y-4 mb-8">
-                      <div className="flex items-center space-x-3">
-                        <HiCheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                        <span className="text-sm">
-                          {plan.features.maxUsers === -1
-                            ? "Unlimited"
-                            : plan.features.maxUsers}{" "}
-                          Users
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <HiCheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                        <span className="text-sm">
-                          {plan.features.maxStorage}GB Storage
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <HiCheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                        <span className="text-sm">
-                          {plan.features.maxDepartments === -1
-                            ? "Unlimited"
-                            : plan.features.maxDepartments}{" "}
-                          Departments
-                        </span>
-                      </div>
-                      {plan.features.customWorkflows && (
-                        <div className="flex items-center space-x-3">
-                          <HiCheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                          <span className="text-sm">Custom Workflows</span>
-                        </div>
-                      )}
-                      {plan.features.advancedAnalytics && (
-                        <div className="flex items-center space-x-3">
-                          <HiCheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                          <span className="text-sm">Advanced Analytics</span>
-                        </div>
-                      )}
-                      {plan.features.prioritySupport && (
-                        <div className="flex items-center space-x-3">
-                          <HiCheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                          <span className="text-sm">Priority Support</span>
-                        </div>
-                      )}
-                      {plan.features.customBranding && (
-                        <div className="flex items-center space-x-3">
-                          <HiCheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                          <span className="text-sm">Custom Branding</span>
-                        </div>
-                      )}
-                      {plan.features.apiAccess && (
-                        <div className="flex items-center space-x-3">
-                          <HiCheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                          <span className="text-sm">API Access</span>
-                        </div>
-                      )}
-                      {plan.features.sso && (
-                        <div className="flex items-center space-x-3">
-                          <HiCheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                          <span className="text-sm">SSO Integration</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* CTA Button - Fixed at Bottom */}
-                    <div className="flex-shrink-0">
-                      <button
-                        onClick={() => handlePlanSelection(plan)}
-                        className={`block w-full py-3 px-6 rounded-xl font-semibold text-center transition-all duration-300 transform hover:scale-105 ${
-                          planKey === "professional"
-                            ? "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/25"
-                            : "bg-white/10 hover:bg-white/20 text-white border border-white/20 hover:border-white/40 cursor-pointer"
-                        }`}
-                      >
-                        Get Started
-                      </button>
-                    </div>
-                  </motion.div>
-                )
-              )}
-            </div>
-          )}
         </div>
       </section>
 
@@ -1423,17 +1088,17 @@ const LandingPage = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-black/50 py-16">
+      <footer className="relative z-10 bg-black/50 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-8">
-            <div className="lg:col-span-1">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
+            <div className="lg:col-span-1 flex flex-col items-center justify-center text-center">
               <EDMSLogo />
               <p className="text-white/70 mt-4 leading-relaxed">
                 Transforming document management for modern enterprises
               </p>
             </div>
-            <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div>
+            <div className="lg:col-span-4 grid grid-cols-1 md:grid-cols-4 gap-8">
+              <div className="flex flex-col items-center justify-center text-center">
                 <h4 className="font-bold text-white mb-4">Product</h4>
                 <div className="space-y-2">
                   <a
@@ -1456,7 +1121,7 @@ const LandingPage = () => {
                   </a>
                 </div>
               </div>
-              <div>
+              <div className="flex flex-col items-center justify-center text-center">
                 <h4 className="font-bold text-white mb-4">Company</h4>
                 <div className="space-y-2">
                   <a
@@ -1479,7 +1144,7 @@ const LandingPage = () => {
                   </a>
                 </div>
               </div>
-              <div>
+              <div className="flex flex-col items-center justify-center text-center">
                 <h4 className="font-bold text-white mb-4">Support</h4>
                 <div className="space-y-2">
                   <a
@@ -1502,6 +1167,23 @@ const LandingPage = () => {
                   </a>
                 </div>
               </div>
+              <div className="flex flex-col items-center justify-center text-center">
+                <h4 className="font-bold text-white mb-4">Legal</h4>
+                <div className="space-y-2">
+                  <Link
+                    to="/privacy"
+                    className="block text-white/70 hover:text-white transition-colors duration-300"
+                  >
+                    Privacy Policy
+                  </Link>
+                  <Link
+                    to="/terms"
+                    className="block text-white/70 hover:text-white transition-colors duration-300"
+                  >
+                    Terms & Conditions
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
           <div className="border-t border-white/10 pt-8 text-center">
@@ -1511,8 +1193,6 @@ const LandingPage = () => {
           </div>
         </div>
       </footer>
-
-      {/* Subscription Form Modal - Now handled in welcome screen */}
     </div>
   );
 };

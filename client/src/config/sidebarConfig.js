@@ -33,36 +33,8 @@ export const sidebarConfig = [
     required: { minLevel: 50 },
     section: "documents",
   },
-  {
-    label: "Document Approvals",
-    icon: "HiOutlineCheckCircle",
-    path: "/admin/approvals",
-    required: { minLevel: 70 },
-    section: "documents",
-  },
-  {
-    label: "Document Analytics",
-    icon: "HiOutlineChartBar",
-    path: "/admin/analytics",
-    required: { minLevel: 60 },
-    section: "documents",
-  },
 
   // ===== WORKFLOW MANAGEMENT =====
-  {
-    label: "Workflows",
-    icon: "HiOutlineClipboardDocumentList",
-    path: "/admin/workflows",
-    required: { minLevel: 60 },
-    section: "workflow",
-  },
-  {
-    label: "Pending Tasks",
-    icon: "HiOutlineClock",
-    path: "/admin/tasks",
-    required: { minLevel: 50 },
-    section: "workflow",
-  },
 
   // ===== USER MANAGEMENT (Admin Only) =====
   {
@@ -140,13 +112,6 @@ export const sidebarConfig = [
     section: "system",
   },
   {
-    label: "System Reports",
-    icon: "HiOutlineDocumentChartBar",
-    path: "/admin/reports",
-    required: { minLevel: 100 },
-    section: "system",
-  },
-  {
     label: "Audit Logs",
     icon: "HiOutlineClipboardDocument",
     path: "/admin/audit",
@@ -169,22 +134,13 @@ export const sidebarConfig = [
     required: { minLevel: 30 },
     section: "communication",
   },
-
-  // ===== USER PROFILE =====
-  {
-    label: "My Profile",
-    icon: "HiOutlineUser",
-    path: "/admin/profile",
-    required: { minLevel: 10 },
-    section: "profile",
-  },
 ];
 
 // Role-specific navigation sections
 export const roleSections = {
   // PLATFORM_ADMIN (110) - Platform management
   110: {
-    sections: ["common", "platform", "communication", "profile"],
+    sections: ["common", "platform", "communication"],
     title: "Platform Administrator",
   },
 
@@ -197,69 +153,61 @@ export const roleSections = {
       "admin",
       "system",
       "communication",
-      "profile",
     ],
     title: "Super Administrator",
   },
 
   // ADMIN (90) - Administrative access
   90: {
-    sections: [
-      "common",
-      "documents",
-      "workflow",
-      "admin",
-      "communication",
-      "profile",
-    ],
+    sections: ["common", "documents", "workflow", "admin", "communication"],
     title: "Administrator",
   },
 
   // MANAGER (80) - Department management
   80: {
-    sections: ["common", "documents", "workflow", "communication", "profile"],
+    sections: ["common", "documents", "workflow", "communication"],
     title: "Manager",
   },
 
   // SUPERVISOR (70) - Document approval
   70: {
-    sections: ["common", "documents", "workflow", "communication", "profile"],
+    sections: ["common", "documents", "workflow", "communication"],
     title: "Supervisor",
   },
 
   // SENIOR_STAFF (60) - Senior staff
   60: {
-    sections: ["common", "documents", "workflow", "communication", "profile"],
+    sections: ["common", "documents", "workflow", "communication"],
     title: "Senior Staff",
   },
 
   // STAFF (50) - Regular staff
   50: {
-    sections: ["common", "documents", "workflow", "communication", "profile"],
+    sections: ["common", "documents", "workflow", "communication"],
     title: "Staff",
   },
 
   // JUNIOR_STAFF (40) - Junior staff
   40: {
-    sections: ["common", "documents", "communication", "profile"],
+    sections: ["common", "documents", "communication"],
     title: "Junior Staff",
   },
 
   // EXTERNAL_USER (30) - External user
   30: {
-    sections: ["common", "documents", "communication", "profile"],
+    sections: ["common", "documents", "communication"],
     title: "External User",
   },
 
   // GUEST (20) - Guest user
   20: {
-    sections: ["common", "documents", "communication", "profile"],
+    sections: ["common", "documents", "communication"],
     title: "Guest",
   },
 
   // READ_ONLY (10) - Read-only access
   10: {
-    sections: ["common", "documents", "communication", "profile"],
+    sections: ["common", "documents", "communication"],
     title: "Read Only",
   },
 };

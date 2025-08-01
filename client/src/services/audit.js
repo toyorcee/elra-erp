@@ -1,64 +1,47 @@
-import api from "./api.js";
+import api from "./api";
 
-export const auditService = {
-  // Get recent activity for dashboard
-  getRecentActivity: async (limit = 10) => {
-    const response = await api.get(`/audit/recent?limit=${limit}`);
-    return response.data;
-  },
+// Get recent activities for dashboard
+export const getRecentActivities = async (params = {}) => {
+  const response = await api.get("/audit/recent", { params });
+  return response.data;
+};
 
-  // Get audit dashboard data
-  getAuditDashboard: async (days = 7) => {
-    const response = await api.get(`/audit/dashboard?days=${days}`);
-    return response.data;
-  },
+// Get user activity summary
+export const getUserActivitySummary = async (userId, days = 30) => {
+  const response = await api.get(`/audit/users/${userId}`, {
+    params: { days },
+  });
+  return response.data;
+};
 
-  // Get activity statistics
-  getActivityStats: async (filters = {}) => {
-    const params = new URLSearchParams(filters);
-    const response = await api.get(`/audit/stats?${params}`);
-    return response.data;
-  },
+// Get activity statistics for admin dashboard
+export const getActivityStats = async (days = 30) => {
+  const response = await api.get("/audit/stats", {
+    params: { days },
+  });
+  return response.data;
+};
 
-  // Get audit logs with filtering
-  getAuditLogs: async (filters = {}) => {
-    const params = new URLSearchParams(filters);
-    const response = await api.get(`/audit/logs?${params}`);
-    return response.data;
-  },
+// Get audit dashboard data
+export const getAuditDashboard = async (days = 30) => {
+  const response = await api.get("/audit/dashboard", {
+    params: { days },
+  });
+  return response.data;
+};
 
-  // Get specific audit log
-  getAuditLogById: async (id) => {
-    const response = await api.get(`/audit/logs/${id}`);
-    return response.data;
-  },
+// Get document audit trail
+export const getDocumentAuditTrail = async (documentId) => {
+  const response = await api.get(`/audit/documents/${documentId}`);
+  return response.data;
+};
 
-  // Get document audit trail
-  getDocumentAuditTrail: async (documentId) => {
-    const response = await api.get(`/audit/documents/${documentId}`);
-    return response.data;
-  },
-
-  // Get user activity summary
-  getUserActivitySummary: async (userId, days = 30) => {
-    const response = await api.get(`/audit/users/${userId}?days=${days}`);
-    return response.data;
-  },
-
-  // Export audit logs
-  exportAuditLogs: async (filters = {}) => {
-    const params = new URLSearchParams(filters);
-    const response = await api.get(`/audit/export?${params}`, {
-      responseType: "blob",
-    });
-    return response.data;
-  },
-
-  // Clean old audit logs (super admin only)
-  cleanOldLogs: async (daysToKeep = 90) => {
-    const response = await api.delete(`/audit/clean?daysToKeep=${daysToKeep}`);
-    return response.data;
-  },
+const auditService = {
+  getRecentActivities,
+  getUserActivitySummary,
+  getActivityStats,
+  getAuditDashboard,
+  getDocumentAuditTrail,
 };
 
 export default auditService;

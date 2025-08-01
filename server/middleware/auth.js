@@ -3,34 +3,24 @@ import User from "../models/User.js";
 
 // Helper function to set token cookies
 const setTokenCookies = (res, accessToken, refreshToken) => {
-  const accessTokenMaxAge = process.env.ACCESS_TOKEN_EXPIRE
-    ? parseTimeToMs(process.env.ACCESS_TOKEN_EXPIRE)
-    : 15 * 60 * 1000;
-
-  const refreshTokenMaxAge = process.env.REFRESH_TOKEN_EXPIRE
-    ? parseTimeToMs(process.env.REFRESH_TOKEN_EXPIRE)
-    : 24 * 60 * 60 * 1000;
-
   const isProd = process.env.NODE_ENV === "production";
 
-  res.cookie("accessToken", accessToken, {
-    httpOnly: true,
+  // Access token cookie (non-httpOnly for client access)
+  res.cookie("token", accessToken, {
+    httpOnly: false,
     secure: isProd,
-    sameSite: isProd ? "None" : "Lax",
+    sameSite: "lax",
     path: "/",
-    maxAge: accessTokenMaxAge,
-    ...(isProd &&
-      process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN }),
+    maxAge: 15 * 60 * 1000, // 15 minutes
   });
 
+  // Refresh token cookie (httpOnly for security)
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
     secure: isProd,
     sameSite: isProd ? "None" : "Lax",
     path: "/",
-    maxAge: refreshTokenMaxAge,
-    ...(isProd &&
-      process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN }),
+    maxAge: parseInt(process.env.COOKIE_EXPIRE) * 24 * 60 * 60 * 1000,
   });
 };
 
@@ -49,7 +39,7 @@ const parseTimeToMs = (timeString) => {
     case "d":
       return value * 24 * 60 * 60 * 1000;
     default:
-      return 15 * 60 * 1000; // 15 minutes default
+      return 15 * 60 * 1000;
   }
 };
 
@@ -70,23 +60,36 @@ const generateRefreshToken = (userId) => {
 // Protect routes - verify access token with automatic refresh
 export const protect = async (req, res, next) => {
   try {
+    console.log("🔒 Auth middleware - checking request:", {
+      url: req.url,
+      method: req.method,
+      hasCookies: !!req.cookies,
+      cookies: req.cookies,
+      hasAuthHeader: !!req.headers.authorization,
+    });
+
     let token;
 
-    if (req.cookies.accessToken) {
-      token = req.cookies.accessToken;
+    if (req.cookies.token) {
+      token = req.cookies.token;
+      console.log("🔒 Using access token from cookies");
     } else if (
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer")
     ) {
       token = req.headers.authorization.split(" ")[1];
+      console.log("🔒 Using access token from Authorization header");
     }
 
     if (!token) {
+      console.log("❌ No access token found");
       return res.status(401).json({
         success: false,
         message: "Access token is required",
       });
     }
+
+    console.log("🔒 Access token found:", token.substring(0, 20) + "...");
 
     try {
       // Verify token
@@ -239,8 +242,8 @@ export const optionalAuth = async (req, res, next) => {
     let token;
 
     // Check for token in cookies first, then Authorization header
-    if (req.cookies.accessToken) {
-      token = req.cookies.accessToken;
+    if (req.cookies.token) {
+      token = req.cookies.token;
     } else if (
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer")

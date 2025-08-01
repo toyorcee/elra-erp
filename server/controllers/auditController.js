@@ -1,6 +1,10 @@
 import AuditService from "../services/auditService.js";
 import { asyncHandler } from "../utils/index.js";
 import AuditLog from "../models/AuditLog.js";
+import Document from "../models/Document.js";
+import User from "../models/User.js";
+import WorkflowTemplate from "../models/WorkflowTemplate.js";
+import ApprovalLevel from "../models/ApprovalLevel.js";
 
 /**
  * Get recent activity for dashboard

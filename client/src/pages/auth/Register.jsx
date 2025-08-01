@@ -578,6 +578,31 @@ const Register = () => {
                     </Link>
                   </p>
                 </motion.div>
+
+                {/* Divider */}
+                <motion.div className="relative my-6" variants={inputVariants}>
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-white/20"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 text-white/50">
+                      OR
+                    </span>
+                  </div>
+                </motion.div>
+
+                {/* CTA Button for Invitation */}
+                <motion.div className="text-center" variants={inputVariants}>
+                  <p className="text-white/70 mb-3">Have an invitation code?</p>
+                  <Link
+                    to="/welcome"
+                    className="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  >
+                    <HiSparkles className="w-4 h-4 mr-2" />
+                    Join with Invitation Code
+                    <HiArrowRight className="w-4 h-4 ml-2" />
+                  </Link>
+                </motion.div>
               </motion.form>
             </motion.div>
           </motion.div>

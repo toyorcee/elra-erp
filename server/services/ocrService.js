@@ -1,10 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { spawn } from "child_process";
-import { promisify } from "util";
-import { exec } from "child_process";
-
-const execAsync = promisify(exec);
+import Tesseract from "tesseract.js";
 
 class OCRService {
   constructor() {
@@ -19,62 +15,46 @@ class OCRService {
   }
 
   /**
-   * Check if Tesseract OCR is installed
+   * Check if Tesseract.js is available
    */
   async checkTesseractInstallation() {
     try {
-      await execAsync("tesseract --version");
-      return true;
+      return typeof Tesseract !== "undefined";
     } catch (error) {
-      console.error("Tesseract OCR not found:", error.message);
+      console.error("Tesseract.js not available:", error.message);
       return false;
     }
   }
 
   /**
-   * Extract text from image using Tesseract OCR
+   * Extract text from image using Tesseract.js
    */
   async extractTextFromImage(imagePath, options = {}) {
     try {
       const isInstalled = await this.checkTesseractInstallation();
       if (!isInstalled) {
-        throw new Error("Tesseract OCR is not installed on the system");
+        throw new Error("Tesseract.js is not available");
       }
 
-      const {
-        language = "eng",
-        config = "--psm 6", // Assume uniform block of text
-        outputFormat = "txt",
-      } = options;
+      const { language = "eng", logger = (m) => console.log(m) } = options;
 
-      const outputPath = imagePath.replace(/\.[^/.]+$/, "");
-      const command = `tesseract "${imagePath}" "${outputPath}" -l ${language} ${config}`;
+      console.log("🔍 [OCRService] Starting Tesseract.js OCR processing...");
 
-      const { stdout, stderr } = await execAsync(command);
+      const result = await Tesseract.recognize(imagePath, language, {
+        logger: logger,
+        errorHandler: (err) => console.error("OCR Error:", err),
+      });
 
-      if (stderr && !stderr.includes("Warning")) {
-        throw new Error(`OCR processing error: ${stderr}`);
-      }
-
-      // Read the extracted text
-      const textFilePath = `${outputPath}.${outputFormat}`;
-      const extractedText = fs.readFileSync(textFilePath, "utf8");
-
-      // Clean up temporary files
-      try {
-        fs.unlinkSync(textFilePath);
-      } catch (cleanupError) {
-        console.warn("Failed to cleanup OCR temp file:", cleanupError.message);
-      }
+      console.log("✅ [OCRService] OCR processing completed successfully");
 
       return {
         success: true,
-        text: extractedText.trim(),
-        confidence: this.calculateConfidence(extractedText),
+        text: result.data.text.trim(),
+        confidence: result.data.confidence / 100,
         language: language,
       };
     } catch (error) {
-      console.error("OCR extraction failed:", error);
+      console.error("❌ [OCRService] OCR extraction failed:", error);
       return {
         success: false,
         error: error.message,
@@ -88,22 +68,14 @@ class OCRService {
    */
   async extractTextFromPDF(pdfPath, options = {}) {
     try {
-      // For PDFs, we'll use a different approach
-      // This is a simplified version - in production, you'd use pdf2image + tesseract
-      const { stdout, stderr } = await execAsync(`pdftotext "${pdfPath}" -`);
-
-      if (stderr) {
-        throw new Error(`PDF text extraction error: ${stderr}`);
-      }
-
+      console.log("📄 [OCRService] PDF processing not implemented yet");
       return {
-        success: true,
-        text: stdout.trim(),
-        confidence: this.calculateConfidence(stdout),
-        language: "eng",
+        success: false,
+        error: "PDF OCR processing not implemented yet",
+        text: "",
       };
     } catch (error) {
-      console.error("PDF text extraction failed:", error);
+      console.error("❌ [OCRService] PDF text extraction failed:", error);
       return {
         success: false,
         error: error.message,
@@ -116,16 +88,136 @@ class OCRService {
    * Extract metadata from document content
    */
   extractMetadata(text, filename) {
+    const classification = this.classifyDocumentType(text, filename);
     const metadata = {
-      documentType: this.classifyDocumentType(text, filename),
+      documentType: classification.type,
+      confidence: classification.confidence,
       keywords: this.extractKeywords(text),
       dateReferences: this.extractDates(text),
       organizationReferences: this.extractOrganizations(text),
       monetaryValues: this.extractMonetaryValues(text),
-      confidence: this.calculateConfidence(text),
+      suggestedCategory: this.suggestCategory(classification.type),
+      suggestedTags: this.extractKeywords(text).slice(0, 5),
     };
 
     return metadata;
+  }
+
+  /**
+   * Suggest category based on document type
+   */
+  suggestCategory(documentType) {
+    const categoryMap = {
+      // Invoice types
+      Invoice: "Invoice",
+      "Sales Invoice": "Invoice",
+      "Purchase Invoice": "Invoice",
+      "Service Invoice": "Invoice",
+      "Tax Invoice": "Invoice",
+      "Credit Note": "Invoice",
+      "Debit Note": "Invoice",
+
+      // Financial types
+      Receipt: "Financial",
+      Budget: "Financial",
+      "Financial Document": "Financial",
+      "Bank Statement": "Financial",
+      "Tax Return": "Financial",
+      "Budget Document": "Financial",
+      "Expense Report": "Financial",
+      "Payment Voucher": "Financial",
+      "Financial Statement": "Financial",
+
+      // Contract types
+      Contract: "Contract",
+      Agreement: "Contract",
+      "Employment Contract": "Contract",
+      "Vendor Contract": "Contract",
+      "Client Contract": "Contract",
+      "Service Agreement": "Contract",
+      "Lease Agreement": "Contract",
+      "Partnership Agreement": "Contract",
+      NDA: "Contract",
+
+      // Report types
+      Report: "Report",
+      "Financial Report": "Report",
+      "Annual Report": "Report",
+      "Incident Report": "Report",
+      "Monthly Report": "Report",
+      "Quarterly Report": "Report",
+      "Performance Report": "Report",
+      "Audit Report": "Report",
+      "Research Report": "Report",
+
+      // Policy types
+      Policy: "Policy",
+      "HR Policy": "Policy",
+      "IT Policy": "Policy",
+      "Finance Policy": "Policy",
+      "Security Policy": "Policy",
+      "Environmental Policy": "Policy",
+      "Quality Policy": "Policy",
+
+      // Legal types
+      "Legal Document": "Legal",
+      License: "Legal",
+      Permit: "Legal",
+      Certificate: "Legal",
+      "Court Filing": "Legal",
+      "Legal Opinion": "Legal",
+      "Compliance Document": "Legal",
+      "Regulatory Filing": "Legal",
+
+      // HR types
+      "HR Document": "HR",
+      Application: "HR",
+      "Employee Record": "HR",
+      "Performance Review": "HR",
+      "Training Certificate": "HR",
+      "Job Description": "HR",
+      Resume: "HR",
+      "Application Form": "HR",
+
+      // Operations types
+      "Operations Document": "Operations",
+      Manual: "Operations",
+      "SOP Document": "Operations",
+      "Process Manual": "Operations",
+      "Work Instruction": "Operations",
+      "Quality Control": "Operations",
+      "Maintenance Record": "Operations",
+      "Inventory Report": "Operations",
+
+      // Marketing types
+      "Marketing Document": "Marketing",
+      "Marketing Plan": "Marketing",
+      "Campaign Brief": "Marketing",
+      "Brand Guidelines": "Marketing",
+      "Press Release": "Marketing",
+      Advertisement: "Marketing",
+      "Market Research": "Marketing",
+
+      // Technical types
+      "Technical Specification": "Technical",
+      "Design Document": "Technical",
+      "User Manual": "Technical",
+      "API Documentation": "Technical",
+      "System Architecture": "Technical",
+      "Code Documentation": "Technical",
+
+      // General types
+      Form: "General",
+      Letter: "General",
+      Memo: "General",
+      Proposal: "General",
+      Other: "General",
+      Miscellaneous: "General",
+      Notes: "General",
+      Drafts: "General",
+    };
+
+    return categoryMap[documentType] || "General";
   }
 
   /**
@@ -135,66 +227,491 @@ class OCRService {
     const lowerText = text.toLowerCase();
     const lowerFilename = filename.toLowerCase();
 
-    // Invoice detection
-    if (
-      lowerText.includes("invoice") ||
-      lowerText.includes("bill") ||
-      lowerFilename.includes("invoice") ||
-      lowerFilename.includes("bill")
-    ) {
-      return "Invoice";
+    const classifications = [
+      {
+        type: "Sales Invoice",
+        patterns: [
+          "sales invoice",
+          "invoice",
+          "bill",
+          "payment due",
+          "amount due",
+        ],
+        confidence: 0.9,
+      },
+      {
+        type: "Purchase Invoice",
+        patterns: ["purchase invoice", "vendor invoice", "supplier invoice"],
+        confidence: 0.9,
+      },
+      {
+        type: "Service Invoice",
+        patterns: ["service invoice", "service bill"],
+        confidence: 0.9,
+      },
+      {
+        type: "Tax Invoice",
+        patterns: ["tax invoice", "vat invoice", "gst invoice"],
+        confidence: 0.9,
+      },
+      {
+        type: "Credit Note",
+        patterns: ["credit note", "credit memo", "credit"],
+        confidence: 0.9,
+      },
+      {
+        type: "Debit Note",
+        patterns: ["debit note", "debit memo", "debit"],
+        confidence: 0.9,
+      },
+
+      // Financial types
+      {
+        type: "Bank Statement",
+        patterns: ["bank statement", "account statement", "banking"],
+        confidence: 0.9,
+      },
+      {
+        type: "Tax Return",
+        patterns: ["tax return", "income tax", "tax filing"],
+        confidence: 0.9,
+      },
+      {
+        type: "Budget Document",
+        patterns: ["budget", "financial plan", "expenses", "revenue"],
+        confidence: 0.8,
+      },
+      {
+        type: "Expense Report",
+        patterns: ["expense report", "expenses", "reimbursement"],
+        confidence: 0.8,
+      },
+      {
+        type: "Receipt",
+        patterns: [
+          "receipt",
+          "paid",
+          "payment received",
+          "thank you for your payment",
+        ],
+        confidence: 0.9,
+      },
+      {
+        type: "Payment Voucher",
+        patterns: ["payment voucher", "voucher", "payment"],
+        confidence: 0.8,
+      },
+      {
+        type: "Financial Statement",
+        patterns: [
+          "financial statement",
+          "balance sheet",
+          "income statement",
+          "profit loss",
+        ],
+        confidence: 0.8,
+      },
+
+      // Contract types
+      {
+        type: "Employment Contract",
+        patterns: ["employment contract", "employee contract", "job contract"],
+        confidence: 0.9,
+      },
+      {
+        type: "Vendor Contract",
+        patterns: ["vendor contract", "supplier contract", "vendor agreement"],
+        confidence: 0.9,
+      },
+      {
+        type: "Client Contract",
+        patterns: ["client contract", "customer contract", "client agreement"],
+        confidence: 0.9,
+      },
+      {
+        type: "Service Agreement",
+        patterns: ["service agreement", "service contract"],
+        confidence: 0.8,
+      },
+      {
+        type: "Lease Agreement",
+        patterns: ["lease agreement", "lease contract", "rental agreement"],
+        confidence: 0.8,
+      },
+      {
+        type: "Partnership Agreement",
+        patterns: ["partnership agreement", "partnership contract"],
+        confidence: 0.8,
+      },
+      {
+        type: "NDA",
+        patterns: ["nda", "non disclosure", "confidentiality"],
+        confidence: 0.9,
+      },
+      {
+        type: "Contract",
+        patterns: [
+          "contract",
+          "agreement",
+          "terms and conditions",
+          "party of the first part",
+        ],
+        confidence: 0.8,
+      },
+
+      // Report types
+      {
+        type: "Financial Report",
+        patterns: ["financial report", "finance report"],
+        confidence: 0.9,
+      },
+      {
+        type: "Annual Report",
+        patterns: ["annual report", "yearly report"],
+        confidence: 0.9,
+      },
+      {
+        type: "Incident Report",
+        patterns: ["incident report", "accident report", "incident"],
+        confidence: 0.9,
+      },
+      {
+        type: "Monthly Report",
+        patterns: ["monthly report", "month end report"],
+        confidence: 0.8,
+      },
+      {
+        type: "Quarterly Report",
+        patterns: ["quarterly report", "quarter report"],
+        confidence: 0.8,
+      },
+      {
+        type: "Performance Report",
+        patterns: ["performance report", "performance review"],
+        confidence: 0.8,
+      },
+      {
+        type: "Audit Report",
+        patterns: ["audit report", "audit", "auditor"],
+        confidence: 0.9,
+      },
+      {
+        type: "Research Report",
+        patterns: ["research report", "research", "study"],
+        confidence: 0.8,
+      },
+      {
+        type: "Report",
+        patterns: ["report", "analysis", "summary", "findings", "conclusion"],
+        confidence: 0.8,
+      },
+
+      // Policy types
+      {
+        type: "HR Policy",
+        patterns: ["hr policy", "human resource policy", "personnel policy"],
+        confidence: 0.9,
+      },
+      {
+        type: "IT Policy",
+        patterns: ["it policy", "technology policy", "computer policy"],
+        confidence: 0.9,
+      },
+      {
+        type: "Finance Policy",
+        patterns: ["finance policy", "financial policy"],
+        confidence: 0.9,
+      },
+      {
+        type: "Security Policy",
+        patterns: ["security policy", "safety policy"],
+        confidence: 0.9,
+      },
+      {
+        type: "Environmental Policy",
+        patterns: ["environmental policy", "environment policy"],
+        confidence: 0.9,
+      },
+      {
+        type: "Quality Policy",
+        patterns: ["quality policy", "quality assurance policy"],
+        confidence: 0.9,
+      },
+      {
+        type: "Policy",
+        patterns: ["policy", "procedure", "guidelines", "rules", "regulations"],
+        confidence: 0.8,
+      },
+
+      // Legal types
+      {
+        type: "Court Filing",
+        patterns: ["court filing", "legal filing", "court document"],
+        confidence: 0.9,
+      },
+      {
+        type: "Legal Opinion",
+        patterns: ["legal opinion", "legal advice", "attorney opinion"],
+        confidence: 0.9,
+      },
+      {
+        type: "Compliance Document",
+        patterns: ["compliance", "regulatory compliance"],
+        confidence: 0.8,
+      },
+      {
+        type: "Regulatory Filing",
+        patterns: ["regulatory filing", "regulatory document"],
+        confidence: 0.8,
+      },
+      {
+        type: "License",
+        patterns: ["license", "permit", "authorization", "registration"],
+        confidence: 0.8,
+      },
+      {
+        type: "Permit",
+        patterns: ["permit", "permission", "authorization"],
+        confidence: 0.8,
+      },
+      {
+        type: "Certificate",
+        patterns: ["certificate", "certification", "award", "achievement"],
+        confidence: 0.9,
+      },
+      {
+        type: "Legal Document",
+        patterns: ["legal", "attorney", "lawyer", "court", "judgment"],
+        confidence: 0.8,
+      },
+
+      // HR types
+      {
+        type: "Employee Record",
+        patterns: ["employee record", "personnel record", "staff record"],
+        confidence: 0.9,
+      },
+      {
+        type: "Performance Review",
+        patterns: ["performance review", "performance evaluation", "appraisal"],
+        confidence: 0.9,
+      },
+      {
+        type: "Training Certificate",
+        patterns: [
+          "training certificate",
+          "training completion",
+          "course certificate",
+        ],
+        confidence: 0.9,
+      },
+      {
+        type: "Job Description",
+        patterns: [
+          "job description",
+          "position description",
+          "role description",
+        ],
+        confidence: 0.9,
+      },
+      {
+        type: "Resume",
+        patterns: ["resume", "cv", "curriculum vitae"],
+        confidence: 0.9,
+      },
+      {
+        type: "Application Form",
+        patterns: [
+          "application form",
+          "job application",
+          "employment application",
+        ],
+        confidence: 0.9,
+      },
+      {
+        type: "Application",
+        patterns: ["application", "apply", "request", "submission"],
+        confidence: 0.8,
+      },
+      {
+        type: "HR Document",
+        patterns: ["hr", "human resource", "employee", "personnel", "staff"],
+        confidence: 0.7,
+      },
+
+      // Operations types
+      {
+        type: "SOP Document",
+        patterns: ["sop", "standard operating procedure", "procedure"],
+        confidence: 0.9,
+      },
+      {
+        type: "Process Manual",
+        patterns: ["process manual", "workflow manual"],
+        confidence: 0.8,
+      },
+      {
+        type: "Work Instruction",
+        patterns: ["work instruction", "job instruction"],
+        confidence: 0.8,
+      },
+      {
+        type: "Quality Control",
+        patterns: ["quality control", "qc", "quality assurance"],
+        confidence: 0.8,
+      },
+      {
+        type: "Maintenance Record",
+        patterns: ["maintenance record", "maintenance log"],
+        confidence: 0.8,
+      },
+      {
+        type: "Inventory Report",
+        patterns: ["inventory report", "stock report", "inventory"],
+        confidence: 0.8,
+      },
+      {
+        type: "Manual",
+        patterns: ["manual", "guide", "instructions", "how to", "user guide"],
+        confidence: 0.8,
+      },
+      {
+        type: "Operations Document",
+        patterns: ["operations", "process", "workflow", "procedure"],
+        confidence: 0.7,
+      },
+
+      // Marketing types
+      {
+        type: "Marketing Plan",
+        patterns: ["marketing plan", "marketing strategy"],
+        confidence: 0.9,
+      },
+      {
+        type: "Campaign Brief",
+        patterns: ["campaign brief", "marketing campaign"],
+        confidence: 0.8,
+      },
+      {
+        type: "Brand Guidelines",
+        patterns: ["brand guidelines", "brand standards"],
+        confidence: 0.8,
+      },
+      {
+        type: "Press Release",
+        patterns: ["press release", "media release"],
+        confidence: 0.9,
+      },
+      {
+        type: "Advertisement",
+        patterns: ["advertisement", "ad", "promotional"],
+        confidence: 0.8,
+      },
+      {
+        type: "Market Research",
+        patterns: ["market research", "market analysis"],
+        confidence: 0.8,
+      },
+      {
+        type: "Marketing Document",
+        patterns: ["marketing", "advertisement", "campaign", "promotion"],
+        confidence: 0.7,
+      },
+
+      // Technical types
+      {
+        type: "Technical Specification",
+        patterns: ["technical specification", "tech spec", "specification"],
+        confidence: 0.9,
+      },
+      {
+        type: "Design Document",
+        patterns: ["design document", "design spec", "design"],
+        confidence: 0.8,
+      },
+      {
+        type: "User Manual",
+        patterns: ["user manual", "user guide", "instruction manual"],
+        confidence: 0.8,
+      },
+      {
+        type: "API Documentation",
+        patterns: ["api documentation", "api doc", "api"],
+        confidence: 0.9,
+      },
+      {
+        type: "System Architecture",
+        patterns: ["system architecture", "architecture", "system design"],
+        confidence: 0.8,
+      },
+      {
+        type: "Code Documentation",
+        patterns: ["code documentation", "code doc", "programming"],
+        confidence: 0.8,
+      },
+      {
+        type: "Technical Specification",
+        patterns: ["it", "technology", "software", "system", "technical"],
+        confidence: 0.7,
+      },
+
+      // General types
+      {
+        type: "Application Form",
+        patterns: ["form", "questionnaire", "survey", "checklist"],
+        confidence: 0.7,
+      },
+      {
+        type: "Other",
+        patterns: ["letter", "correspondence", "dear", "sincerely"],
+        confidence: 0.7,
+      },
+      {
+        type: "Other",
+        patterns: ["memo", "memorandum", "internal", "to:"],
+        confidence: 0.8,
+      },
+      {
+        type: "Other",
+        patterns: ["proposal", "offer", "quote", "estimate"],
+        confidence: 0.8,
+      },
+      {
+        type: "Other",
+        patterns: ["other", "miscellaneous", "notes", "drafts"],
+        confidence: 0.5,
+      },
+    ];
+
+    let bestMatch = { type: "Other", confidence: 0.1 };
+    let maxScore = 0;
+
+    for (const classification of classifications) {
+      let score = 0;
+      let matches = 0;
+
+      for (const pattern of classification.patterns) {
+        if (lowerText.includes(pattern) || lowerFilename.includes(pattern)) {
+          matches++;
+          score += classification.confidence;
+        }
+      }
+
+      // Bonus for multiple matches
+      if (matches > 1) {
+        score *= 1.2;
+      }
+
+      if (score > maxScore) {
+        maxScore = score;
+        bestMatch = {
+          type: classification.type,
+          confidence: Math.min(score, 1.0),
+        };
+      }
     }
 
-    // Contract detection
-    if (
-      lowerText.includes("contract") ||
-      lowerText.includes("agreement") ||
-      lowerText.includes("terms and conditions") ||
-      lowerFilename.includes("contract")
-    ) {
-      return "Contract";
-    }
-
-    // Receipt detection
-    if (
-      lowerText.includes("receipt") ||
-      lowerText.includes("payment") ||
-      lowerText.includes("total amount") ||
-      lowerFilename.includes("receipt")
-    ) {
-      return "Receipt";
-    }
-
-    // Report detection
-    if (
-      lowerText.includes("report") ||
-      lowerText.includes("summary") ||
-      lowerText.includes("analysis") ||
-      lowerFilename.includes("report")
-    ) {
-      return "Report";
-    }
-
-    // Certificate detection
-    if (
-      lowerText.includes("certificate") ||
-      lowerText.includes("certified") ||
-      lowerFilename.includes("certificate")
-    ) {
-      return "Certificate";
-    }
-
-    // Letter detection
-    if (
-      lowerText.includes("dear") ||
-      lowerText.includes("sincerely") ||
-      lowerText.includes("yours truly") ||
-      lowerFilename.includes("letter")
-    ) {
-      return "Letter";
-    }
-
-    return "General Document";
+    return bestMatch;
   }
 
   /**

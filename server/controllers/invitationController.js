@@ -2,22 +2,37 @@ import Invitation from "../models/Invitation.js";
 import User from "../models/User.js";
 import Role from "../models/Role.js";
 import Department from "../models/Department.js";
+import Company from "../models/Company.js";
 import { sendInvitationEmail } from "../services/emailService.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import AuditService from "../services/auditService.js";
 
-// @desc    Create invitation (Super Admin only)
+// @desc    Create invitation (Super Admin or users with permissions)
 // @route   POST /api/invitations
-// @access  Private (Super Admin)
+// @access  Private
 export const createInvitation = asyncHandler(async (req, res) => {
   const currentUser = req.user;
-  const { email, firstName, lastName, position, departmentId, roleId, notes } =
-    req.body;
+  const {
+    email,
+    firstName,
+    lastName,
+    position,
+    departmentId,
+    roleId,
+    notes,
+    isPendingUser = false,
+    userId = null,
+  } = req.body;
 
-  // Check if user is super admin
-  if (currentUser.role.level < 100) {
+  // Check permissions - Super Admin or users with canManageUsers permission
+  const canInviteUsers =
+    currentUser.role.level >= 100 ||
+    currentUser.role.permissions?.includes("user.manage");
+
+  if (!canInviteUsers) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Super admin privileges required.",
+      message: "Access denied. User management privileges required.",
     });
   }
 
@@ -30,13 +45,29 @@ export const createInvitation = asyncHandler(async (req, res) => {
     });
   }
 
-  // Check if user already exists
-  const existingUser = await User.findByEmailOrUsername(email);
-  if (existingUser) {
-    return res.status(400).json({
-      success: false,
-      message: "User with this email already exists",
-    });
+  if (isPendingUser && userId) {
+    const pendingUser = await User.findById(userId);
+    if (!pendingUser) {
+      return res.status(404).json({
+        success: false,
+        message: "Pending user not found",
+      });
+    }
+
+    if (pendingUser.status !== "PENDING_REGISTRATION") {
+      return res.status(400).json({
+        success: false,
+        message: "User is not in pending registration status",
+      });
+    }
+  } else {
+    const existingUser = await User.findByEmailOrUsername(email);
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: "User with this email already exists",
+      });
+    }
   }
 
   // Check if invitation already exists for this email
@@ -85,14 +116,27 @@ export const createInvitation = asyncHandler(async (req, res) => {
     company: currentUser.company,
     createdBy: currentUser._id,
     notes,
+    isPendingUser,
+    userId: isPendingUser ? userId : null,
   });
+
+  // If this is for a pending user, update their status
+  if (isPendingUser && userId) {
+    await User.findByIdAndUpdate(userId, {
+      status: "INVITED",
+      invitedAt: new Date(),
+    });
+  }
+
+  const company = await Company.findById(currentUser.company);
+  const companyName = company ? company.name : "NAIC";
 
   // Send invitation email
   const emailResult = await sendInvitationEmail(
     invitation.email,
     `${invitation.firstName} ${invitation.lastName}`,
     invitation.code,
-    currentUser.company.name
+    companyName
   );
 
   if (!emailResult.success) {
@@ -233,29 +277,68 @@ export const resendInvitation = asyncHandler(async (req, res) => {
     });
   }
 
-  // Extend expiration date
-  invitation.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+  // Generate new invitation code for security
+  const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+  await Invitation.updateMany(
+    {
+      email: invitation.email,
+      status: "active",
+      _id: { $ne: invitation._id },
+    },
+    {
+      status: "cancelled",
+      updatedAt: new Date(),
+    }
+  );
+
+  // Update invitation with new code and extend expiration
+  invitation.code = newCode;
+  invitation.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  invitation.updatedAt = new Date();
   await invitation.save();
 
-  // Send invitation email
+  // Get company name for email
+  const company = await Company.findById(currentUser.company);
+  const companyName = company ? company.name : "NAIC";
+
+  // Send invitation email with new code
   const emailResult = await sendInvitationEmail(
     invitation.email,
     `${invitation.firstName} ${invitation.lastName}`,
-    invitation.code,
-    currentUser.company.name
+    newCode, // Use the new code
+    companyName
   );
 
   if (!emailResult.success) {
     console.error("Failed to resend invitation email:", emailResult.error);
   }
 
+  // Log the resend action for audit
+  try {
+    await AuditService.logUserAction(
+      currentUser._id,
+      "INVITATION_RESENT",
+      invitation._id,
+      {
+        company: currentUser.company,
+        description: `Invitation resent to ${invitation.firstName} ${invitation.lastName} (${invitation.email}) with new code`,
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      }
+    );
+  } catch (auditError) {
+    console.error("Audit logging error:", auditError);
+    // Don't fail the main operation if audit logging fails
+  }
+
   res.json({
     success: true,
-    message: "Invitation resent successfully",
+    message: "Invitation resent successfully with new code",
     data: {
       invitation: {
         id: invitation._id,
-        code: invitation.code,
+        code: newCode, // Return the new code
         email: invitation.email,
         expiresAt: invitation.expiresAt,
       },

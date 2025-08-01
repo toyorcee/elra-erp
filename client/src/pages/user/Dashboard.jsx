@@ -6,6 +6,7 @@ import EmptyState from "../../components/EmptyState";
 import { StatCard, StatCardGrid } from "../../components/common";
 import { getDashboard } from "../../services/dashboard";
 import NotificationTester from "../../components/NotificationTester";
+import RecentActivities from "../../components/RecentActivities";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -141,6 +142,18 @@ const Dashboard = () => {
               message="No document category data found."
             />
           )}
+        </div>
+      </div>
+
+      {/* Recent Activities */}
+      <div className="mt-8">
+        <div className="bg-white/80 rounded-xl shadow p-6">
+          <RecentActivities
+            userRole="user"
+            maxItems={8}
+            showFilters={false}
+            compact={true}
+          />
         </div>
       </div>
     </div>

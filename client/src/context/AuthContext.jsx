@@ -7,14 +7,36 @@ import {
 } from "react";
 import { authAPI, handleApiError, setHasLoggedIn } from "../services/api";
 
-const initialState = {
-  user: null,
-  isAuthenticated: false,
-  loading: true,
-  error: null,
-  initialized: false,
-  subscriptionPlans: [],
+// Get initial state from localStorage if available
+const getInitialState = () => {
+  try {
+    const savedAuth = localStorage.getItem("authState");
+    if (savedAuth) {
+      const parsed = JSON.parse(savedAuth);
+      return {
+        user: parsed.user,
+        isAuthenticated: !!parsed.user,
+        loading: false,
+        error: null,
+        initialized: true,
+        subscriptionPlans: [],
+      };
+    }
+  } catch (error) {
+    console.log("Failed to parse saved auth state:", error);
+  }
+
+  return {
+    user: null,
+    isAuthenticated: false,
+    loading: true,
+    error: null,
+    initialized: false,
+    subscriptionPlans: [],
+  };
 };
+
+const initialState = getInitialState();
 
 const AUTH_ACTIONS = {
   LOGIN_START: "LOGIN_START",
@@ -141,24 +163,21 @@ export const AuthProvider = ({ children }) => {
       console.log("🚀 AuthContext: Initializing authentication...");
       dispatch({ type: AUTH_ACTIONS.INIT_START });
 
-      const hasCookies = document.cookie.length > 0;
-      console.log("🔍 AuthContext: Cookie check - has cookies:", hasCookies);
+      // Debug: Let's see what cookies we actually have
       console.log("🔍 AuthContext: All cookies:", document.cookie);
+      console.log("🔍 AuthContext: Cookie length:", document.cookie.length);
+      console.log(
+        "🔍 AuthContext: Includes token:",
+        document.cookie.includes("token")
+      );
+      console.log(
+        "🔍 AuthContext: Includes refreshToken:",
+        document.cookie.includes("refreshToken")
+      );
 
-      // Check if we have refresh token before attempting to get user data
-      const cookies = document.cookie.split(";").reduce((acc, cookie) => {
-        const [key, value] = cookie.trim().split("=");
-        acc[key] = value;
-        return acc;
-      }, {});
-
-      const hasRefreshToken =
-        cookies.refreshToken && cookies.refreshToken !== "undefined";
-
-      if (!hasRefreshToken) {
-        console.log(
-          "🔍 AuthContext: No refresh token found, user not authenticated"
-        );
+      // Simple check - if we have any cookies, try to get user data
+      if (!document.cookie.includes("token")) {
+        console.log("🔍 AuthContext: No access token found");
         dispatch({ type: AUTH_ACTIONS.INIT_FAILURE });
         return;
       }
@@ -221,10 +240,35 @@ export const AuthProvider = ({ children }) => {
 
   // Initialize auth on mount
   useEffect(() => {
-    // Clear any existing authentication state first
-    dispatch({ type: AUTH_ACTIONS.LOGOUT });
-    initializeAuth();
+    console.log("🔄 AuthContext: Component mounted - starting initialization");
+    console.log("🔄 AuthContext: Current state before init:", {
+      isAuthenticated: state.isAuthenticated,
+      user: state.user,
+      loading: state.loading,
+      initialized: state.initialized,
+    });
+
+    setTimeout(() => {
+      initializeAuth();
+    }, 100);
   }, [initializeAuth]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        console.log("👁️ Page became visible - checking auth state");
+        console.log("👁️ Current auth state:", {
+          isAuthenticated: state.isAuthenticated,
+          user: state.user,
+          cookies: document.cookie,
+        });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [state.isAuthenticated, state.user]);
 
   const login = useCallback(async (credentials) => {
     dispatch({ type: AUTH_ACTIONS.LOGIN_START });
@@ -243,12 +287,12 @@ export const AuthProvider = ({ children }) => {
         finalUser: userData,
       });
 
-      console.log("🔍 AuthContext: Setting user data in state:", {
-        userData,
-        roleName: userData?.role?.name,
+      console.log("🔍 AuthContext: User logged in successfully:", {
+        id: userData?.id,
+        email: userData?.email,
+        role: userData?.role?.name,
         roleLevel: userData?.role?.level,
-        roleId: userData?.role?._id,
-        hasRole: !!userData?.role,
+        permissions: userData?.role?.permissions?.length || 0,
       });
 
       dispatch({
@@ -340,6 +384,54 @@ export const AuthProvider = ({ children }) => {
       payload: validPlans,
     });
   }, []);
+
+  // Monitor token expiry
+  useEffect(() => {
+    if (!state.isAuthenticated) return;
+
+    const checkTokenExpiry = () => {
+      const cookies = document.cookie.split(";").reduce((acc, cookie) => {
+        const [key, value] = cookie.trim().split("=");
+        if (key && value) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {});
+
+      if (cookies.token) {
+        try {
+          const payload = JSON.parse(atob(cookies.token.split(".")[1]));
+          const expiryTime = payload.exp * 1000;
+          const currentTime = Date.now();
+          const timeUntilExpiry = expiryTime - currentTime;
+
+          console.log("⏰ Token expiry check:", {
+            currentTime: new Date(currentTime).toISOString(),
+            expiryTime: new Date(expiryTime).toISOString(),
+            timeUntilExpiry: Math.round(timeUntilExpiry / 1000) + " seconds",
+            willExpireSoon: timeUntilExpiry < 60000,
+          });
+
+          if (timeUntilExpiry < 60000) {
+            console.log("⚠️ Token expiring soon - attempting refresh");
+            authAPI.refreshToken().catch((error) => {
+              console.log("❌ Failed to refresh token:", error);
+            });
+          }
+        } catch (error) {
+          console.log("❌ Error checking token expiry:", error);
+        }
+      }
+    };
+
+    // Check immediately
+    checkTokenExpiry();
+
+    // Check every 30 seconds
+    const interval = setInterval(checkTokenExpiry, 30000);
+
+    return () => clearInterval(interval);
+  }, [state.isAuthenticated]);
 
   const value = {
     ...state,

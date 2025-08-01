@@ -23,7 +23,10 @@ import {
   MdArchive,
   MdPictureAsPdf,
   MdTableChart,
+  MdScanner,
 } from "react-icons/md";
+import DocumentScanning from "../../components/DocumentScanning";
+import EditDocumentModal from "../../components/EditDocumentModal";
 import { Link, useLocation } from "react-router-dom";
 import SkeletonLoader from "../../components/SkeletonLoader";
 import EmptyState from "../../components/EmptyState";
@@ -62,6 +65,11 @@ const Documents = () => {
     delete: {},
   });
   const [viewMode, setViewMode] = useState("table"); // "table" or "card"
+  const [showScanning, setShowScanning] = useState(false);
+  const [editModal, setEditModal] = useState({
+    isOpen: false,
+    document: null,
+  });
 
   const handleSelectDoc = (id) => {
     setSelectedDocs((prev) =>
@@ -104,11 +112,14 @@ const Documents = () => {
 
       return searchDocuments(params).then((res) => res.data);
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 
-  const documents = documentsData?.data || [];
-  const totalDocuments = documentsData?.total || 0;
+  const documents = Array.isArray(documentsData?.data?.documents)
+    ? documentsData.data.documents
+    : [];
+  const totalDocuments =
+    documentsData?.data?.pagination?.total || documentsData?.total || 0;
   const totalPages = Math.ceil(totalDocuments / itemsPerPage);
 
   const handleSelectAll = () => {
@@ -302,6 +313,20 @@ const Documents = () => {
     }
   };
 
+  const handleEditDocument = (document) => {
+    setEditModal({
+      isOpen: true,
+      document: document,
+    });
+  };
+
+  const handleCloseEditModal = () => {
+    setEditModal({
+      isOpen: false,
+      document: null,
+    });
+  };
+
   const formatFileSize = (bytes) => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
@@ -383,56 +408,67 @@ const Documents = () => {
   }
 
   return (
-    <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-4 sm:py-6">
+    <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-4 sm:py-6 bg-gradient-to-br from-blue-50 via-white to-purple-50 min-h-screen">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white mb-1 sm:mb-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">
             Documents
           </h1>
-          <p className="text-sm sm:text-base text-gray-200">
+          <p className="text-sm sm:text-base text-gray-600">
             Manage and organize your documents efficiently
           </p>
         </div>
-        <Link
-          to={
-            location.pathname.includes("/admin")
-              ? "/admin/upload"
-              : "/dashboard/upload"
-          }
-          className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-brand-primary to-brand-secondary text-white rounded-lg hover:from-brand-secondary hover:to-brand-primary transition-all duration-200 transform hover:-translate-y-1 shadow-lg hover:shadow-xl mt-4 sm:mt-0 cursor-pointer text-sm sm:text-base font-medium"
-        >
-          <MdAdd className="mr-1 sm:mr-2 text-sm sm:text-base" />
-          <span className="hidden sm:inline">Upload Document</span>
-          <span className="sm:hidden">Upload</span>
-        </Link>
+        <div className="flex gap-2 mt-4 sm:mt-0">
+          <Link
+            to={
+              location.pathname.includes("/admin")
+                ? "/admin/upload"
+                : "/dashboard/upload"
+            }
+            className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 transform hover:-translate-y-1 shadow-lg hover:shadow-xl cursor-pointer text-sm sm:text-base font-medium"
+          >
+            <MdAdd className="mr-1 sm:mr-2 text-sm sm:text-base" />
+            <span className="hidden sm:inline">Upload Document</span>
+            <span className="sm:hidden">Upload</span>
+          </Link>
+
+          <button
+            onClick={() => setShowScanning(true)}
+            className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 transform hover:-translate-y-1 shadow-lg hover:shadow-xl cursor-pointer text-sm sm:text-base font-medium"
+          >
+            <MdScanner className="mr-1 sm:mr-2 text-sm sm:text-base" />
+            <span className="hidden sm:inline">Scan Document</span>
+            <span className="sm:hidden">Scan</span>
+          </button>
+        </div>
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6 border border-white/20">
+      <div className="backdrop-blur-xl bg-white/80 rounded-2xl shadow-xl border border-white/30 p-4 sm:p-6 mb-4 sm:mb-6 hover:shadow-2xl hover:bg-white/90 transition-all duration-300">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4">
           {/* Search */}
           <div className="relative flex-1 max-w-md">
-            <MdSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-300" />
+            <MdSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               placeholder="Search documents..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white/20 border border-white/30 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent text-white placeholder-gray-300 backdrop-blur-sm text-sm sm:text-base"
+              className="w-full pl-10 pr-4 py-2 bg-gray-50/50 border border-gray-200/50 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent text-gray-900 placeholder-gray-500 backdrop-blur-sm text-sm sm:text-base"
             />
           </div>
 
           {/* Filter Toggle */}
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {/* View Mode Toggle */}
-            <div className="flex items-center border border-white/30 rounded-lg bg-white/10 overflow-hidden">
+            <div className="flex items-center border border-gray-200/50 rounded-lg bg-gray-50/50 overflow-hidden">
               <button
                 onClick={() => setViewMode("table")}
                 className={`px-3 py-2 text-sm transition-all duration-200 ${
                   viewMode === "table"
                     ? "bg-blue-600 text-white"
-                    : "text-gray-300 hover:text-white hover:bg-white/10"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100/50"
                 }`}
                 title="Table view"
               >
@@ -443,7 +479,7 @@ const Documents = () => {
                 className={`px-3 py-2 text-sm transition-all duration-200 ${
                   viewMode === "card"
                     ? "bg-blue-600 text-white"
-                    : "text-gray-300 hover:text-white hover:bg-white/10"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100/50"
                 }`}
                 title="Card view"
               >
@@ -486,8 +522,8 @@ const Documents = () => {
               onClick={() => setShowFilters(!showFilters)}
               className={`inline-flex items-center px-3 py-2 border rounded-lg transition-all duration-200 ${
                 showFilters
-                  ? "border-blue-400 text-blue-200 bg-blue-900/30"
-                  : "border-white/30 text-gray-300 hover:border-white/50 hover:text-white bg-white/10"
+                  ? "border-blue-400 text-blue-600 bg-blue-100"
+                  : "border-gray-200 text-black hover:border-gray-300 hover:bg-gray-50 bg-white/80"
               }`}
             >
               <MdFilterList className="mr-2" />
@@ -495,7 +531,7 @@ const Documents = () => {
             </button>
             <button
               onClick={() => refetch()}
-              className="inline-flex items-center px-3 py-2 border border-white/30 rounded-lg text-gray-300 hover:border-white/50 hover:text-white transition-all duration-200 bg-white/10"
+              className="inline-flex items-center px-3 py-2 border border-gray-200 rounded-lg text-black hover:border-gray-300 hover:bg-gray-50 transition-all duration-200 bg-white/80"
             >
               <MdRefresh className="mr-2" />
               Refresh
@@ -589,7 +625,7 @@ const Documents = () => {
 
       {/* Results Summary */}
       <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-gray-200">
+        <p className="text-sm text-gray-600">
           {isLoading
             ? "Loading..."
             : `${totalDocuments} document${
@@ -597,7 +633,7 @@ const Documents = () => {
               } found`}
         </p>
         {hasActiveFilters && (
-          <div className="flex items-center gap-2 text-sm text-blue-300">
+          <div className="flex items-center gap-2 text-sm text-blue-600">
             <MdFilterList />
             Filters applied
           </div>
@@ -606,15 +642,30 @@ const Documents = () => {
 
       {/* Documents Display */}
       {isLoading ? (
-        <SkeletonLoader className="h-96" />
+        <div className="backdrop-blur-xl bg-white/80 rounded-2xl shadow-xl border border-white/30 p-6 hover:shadow-2xl hover:bg-white/90 transition-all duration-300">
+          <div className="animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center space-x-4">
+                  <div className="h-12 bg-gray-200 rounded w-12"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       ) : documents.length > 0 ? (
         <>
           {/* Table View */}
           {viewMode === "table" && (
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg overflow-hidden border border-white/20">
+            <div className="backdrop-blur-xl bg-white/80 rounded-2xl shadow-xl border border-white/30 overflow-hidden hover:shadow-2xl hover:bg-white/90 transition-all duration-300">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-white/20">
-                  <thead className="bg-white/10">
+                  <thead className="bg-gray-50/50">
                     <tr>
                       <th className="px-2 sm:px-3 py-2 sm:py-3">
                         <input
@@ -627,30 +678,30 @@ const Documents = () => {
                           className="w-3 h-3 sm:w-4 sm:h-4"
                         />
                       </th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                         Document
                       </th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider hidden sm:table-cell">
+                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider hidden sm:table-cell">
                         Category
                       </th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                         Status
                       </th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider hidden md:table-cell">
+                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider hidden md:table-cell">
                         Priority
                       </th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider hidden lg:table-cell">
+                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider hidden lg:table-cell">
                         Size
                       </th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider hidden lg:table-cell">
+                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider hidden lg:table-cell">
                         Uploaded
                       </th>
-                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      <th className="px-3 sm:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white/5 divide-y divide-white/10">
+                  <tbody className="bg-white/30 divide-y divide-gray-200/50">
                     {documents.map((document) => {
                       const statusInfo = getStatusInfo(document.status);
                       const StatusIcon = statusInfo.icon;
@@ -804,13 +855,13 @@ const Documents = () => {
                               {/* Edit */}
                               {document.status !== "approved" &&
                                 document.status !== "finalized" && (
-                                  <Link
-                                    to={`/dashboard/documents/edit/${document._id}`}
+                                  <button
+                                    onClick={() => handleEditDocument(document)}
                                     className="text-yellow-300 hover:text-yellow-200 transition-colors cursor-pointer"
                                     title="Edit document"
                                   >
                                     <MdEdit size={18} />
-                                  </Link>
+                                  </button>
                                 )}
 
                               {/* Delete */}
@@ -849,10 +900,10 @@ const Documents = () => {
                 return (
                   <div
                     key={document._id}
-                    className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 hover:bg-white/15 transition-all duration-200 group"
+                    className="backdrop-blur-xl bg-white/80 rounded-2xl shadow-xl border border-white/30 hover:shadow-2xl hover:bg-white/90 transition-all duration-300 group"
                   >
                     {/* Card Header */}
-                    <div className="p-4 border-b border-white/10">
+                    <div className="p-4 border-b border-gray-200/50">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center flex-1 min-w-0">
                           <input
@@ -867,7 +918,7 @@ const Documents = () => {
                             className="mr-3 flex-shrink-0"
                           />
                           <div className="min-w-0 flex-1">
-                            <h3 className="text-sm font-medium text-white truncate flex items-center">
+                            <h3 className="text-sm font-medium text-gray-900 truncate flex items-center">
                               {document.title}
                               {document.isConfidential && (
                                 <MdLock
@@ -876,7 +927,7 @@ const Documents = () => {
                                 />
                               )}
                             </h3>
-                            <p className="text-xs text-gray-300 truncate">
+                            <p className="text-xs text-gray-600 truncate">
                               {document.documentType} •{" "}
                               {document.uploadedBy?.name}
                             </p>
@@ -905,25 +956,25 @@ const Documents = () => {
 
                     {/* Card Body */}
                     <div className="p-4 space-y-2">
-                      <div className="text-xs text-gray-300">
+                      <div className="text-xs text-gray-600">
                         <span className="font-medium">Priority:</span>{" "}
                         <span className={getPriorityColor(document.priority)}>
                           {document.priority.charAt(0).toUpperCase() +
                             document.priority.slice(1)}
                         </span>
                       </div>
-                      <div className="text-xs text-gray-300">
+                      <div className="text-xs text-gray-600">
                         <span className="font-medium">Size:</span>{" "}
                         {formatFileSize(document.fileSize)}
                       </div>
-                      <div className="text-xs text-gray-300">
+                      <div className="text-xs text-gray-600">
                         <span className="font-medium">Uploaded:</span>{" "}
                         {formatDate(document.uploadedAt)}
                       </div>
                     </div>
 
                     {/* Card Actions */}
-                    <div className="p-4 border-t border-white/10">
+                    <div className="p-4 border-t border-gray-200/50">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-1">
                           {/* View Original */}
@@ -1027,25 +1078,28 @@ const Documents = () => {
           )}
         </>
       ) : (
-        <EmptyState
-          title="No documents found"
-          message={
-            hasActiveFilters
+        <div className="backdrop-blur-xl bg-white/80 rounded-2xl shadow-xl border border-white/30 p-8 text-center hover:shadow-2xl hover:bg-white/90 transition-all duration-300">
+          <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
+            <DocumentIcon size="lg" variant="light" />
+          </div>
+          <h3 className="text-xl font-bold text-black mb-2">
+            No documents found
+          </h3>
+          <p className="text-black mb-6">
+            {hasActiveFilters
               ? "No documents match your current filters. Try adjusting your search criteria."
-              : "You haven't uploaded any documents yet. Start by uploading your first document."
-          }
-          action={
-            !hasActiveFilters && (
-              <Link
-                to="/dashboard/upload"
-                className="inline-flex items-center px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-secondary transition-all duration-200 transform hover:-translate-y-1 shadow-lg hover:shadow-xl"
-              >
-                <MdAdd className="mr-2" />
-                Upload Document
-              </Link>
-            )
-          }
-        />
+              : "You haven't uploaded any documents yet. Start by uploading your first document."}
+          </p>
+          {!hasActiveFilters && (
+            <Link
+              to="/dashboard/upload"
+              className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 transform hover:-translate-y-1 shadow-lg hover:shadow-xl font-medium"
+            >
+              <MdAdd className="mr-2" />
+              Upload Document
+            </Link>
+          )}
+        </div>
       )}
 
       {/* Pagination */}
@@ -1092,6 +1146,46 @@ const Documents = () => {
           </div>
         </div>
       )}
+
+      {/* Document Scanning Modal */}
+      {showScanning && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto border border-white/20">
+            <div className="p-6 border-b border-white/20 bg-white/5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">
+                  Document Scanning & OCR
+                </h2>
+                <button
+                  onClick={() => setShowScanning(false)}
+                  className="text-gray-400 hover:text-white transition-colors bg-white/10 hover:bg-white/20 rounded-full p-2"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div className="p-6">
+              <DocumentScanning
+                context={
+                  location.pathname.includes("/admin") ? "admin" : "user"
+                }
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Document Modal */}
+      <EditDocumentModal
+        document={editModal.document}
+        isOpen={editModal.isOpen}
+        onClose={handleCloseEditModal}
+        onSuccess={() => {
+          refetch();
+        }}
+        userPermissions={[]} // This should come from user context
+        userRole="user" // This should come from user context
+      />
     </div>
   );
 };

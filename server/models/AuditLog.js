@@ -27,7 +27,6 @@ const auditLogSchema = new mongoose.Schema(
     // Action details
     action: {
       type: String,
-      required: true,
       enum: [
         // Document actions
         "DOCUMENT_CREATED",
@@ -48,19 +47,27 @@ const auditLogSchema = new mongoose.Schema(
         "USER_UPDATED",
         "USER_DELETED",
         "USER_ROLE_CHANGED",
+        "USER_DEPARTMENT_CHANGED",
         "USER_PASSWORD_CHANGED",
+        "INVITATION_CREATED",
+        "INVITATION_RESENT",
+        "INVITATION_USED",
+        "INVITATION_CANCELLED",
+        "DOCUMENT_UPLOADED",
 
         // System actions
         "SETTINGS_UPDATED",
         "DEPARTMENT_CREATED",
         "DEPARTMENT_UPDATED",
         "DEPARTMENT_DELETED",
+        "SYSTEM_MAINTENANCE",
 
         // Security actions
         "LOGIN_ATTEMPT",
         "PERMISSION_DENIED",
         "SUSPICIOUS_ACTIVITY",
       ],
+      required: true,
     },
 
     // Resource being acted upon

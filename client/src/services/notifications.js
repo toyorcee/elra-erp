@@ -3,7 +3,9 @@ import api from "./api";
 class NotificationService {
   // Get user's notifications
   async getNotifications(page = 1, limit = 20) {
-    const response = await api.get(`/notifications?page=${page}&limit=${limit}`);
+    const response = await api.get(
+      `/notifications?page=${page}&limit=${limit}`
+    );
     return response.data;
   }
 
@@ -48,6 +50,19 @@ class NotificationService {
     const response = await api.post("/notifications/test", { type, priority });
     return response.data;
   }
+
+  // Document upload notification helpers
+  async getDocumentUploadNotifications() {
+    const response = await api.get(
+      "/notifications?type=DOCUMENT_UPLOAD_SUCCESS,DOCUMENT_OCR_PROCESSING"
+    );
+    return response.data;
+  }
+
+  async markDocumentNotificationAsRead(notificationId) {
+    const response = await api.patch(`/notifications/${notificationId}/read`);
+    return response.data;
+  }
 }
 
-export default new NotificationService(); 
+export default new NotificationService();

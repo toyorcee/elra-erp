@@ -33,11 +33,12 @@ const approvalLevelSchema = new mongoose.Schema({
     {
       type: String,
       enum: [
-        "case_filing",
-        "legal_document",
-        "administrative",
-        "evidence",
-        "settlement",
+        "insurance_policy",
+        "claims_document",
+        "financial_report",
+        "client_correspondence",
+        "regulatory_compliance",
+        "underwriting_document",
         "general",
       ],
     },

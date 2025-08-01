@@ -15,19 +15,85 @@ import AuditService from "../services/auditService.js";
 import NotificationService from "../services/notificationService.js";
 import OCRService from "../services/ocrService.js";
 import SearchService from "../services/searchService.js";
+import ApprovalLevel from "../models/ApprovalLevel.js";
+
+// Smart function to determine document status
+const determineDocumentStatus = async (currentUser, category, department) => {
+  try {
+    // Check if any approval workflows are configured for this company
+    const approvalWorkflows = await ApprovalLevel.find({
+      company: currentUser.company?._id || currentUser.company,
+      isActive: true,
+    });
+
+    // If no approval workflows exist, auto-approve the document
+    if (!approvalWorkflows || approvalWorkflows.length === 0) {
+      console.log(
+        "✅ [documentController] No approval workflows found - auto-approving document"
+      );
+      return "APPROVED";
+    }
+
+    // Check if there's a specific workflow for this category/department
+    const relevantWorkflow = approvalWorkflows.find(
+      (workflow) =>
+        (workflow.category === category || workflow.category === "ALL") &&
+        (workflow.department === department || workflow.department === "ALL")
+    );
+
+    // If no specific workflow found, check for default workflow
+    const defaultWorkflow = approvalWorkflows.find(
+      (workflow) => workflow.category === "ALL" && workflow.department === "ALL"
+    );
+
+    const workflowToUse = relevantWorkflow || defaultWorkflow;
+
+    if (workflowToUse) {
+      console.log(
+        `📋 [documentController] Found approval workflow: ${workflowToUse.name} - setting status to PENDING_APPROVAL`
+      );
+      return "PENDING_APPROVAL";
+    } else {
+      console.log(
+        "✅ [documentController] No matching approval workflow found - auto-approving document"
+      );
+      return "APPROVED";
+    }
+  } catch (error) {
+    console.error(
+      "❌ [documentController] Error determining document status:",
+      error
+    );
+    // Default to APPROVED if there's an error (safer than losing documents)
+    return "APPROVED";
+  }
+};
 
 // Upload document
 export const uploadDocument = async (req, res) => {
+  console.log("🚀 [documentController] Starting document upload process");
+  console.log("👤 [documentController] User:", {
+    id: req.user._id,
+    username: req.user.username,
+    role: req.user.role?.name,
+    permissions: req.user.role?.permissions,
+  });
+
   try {
     const currentUser = req.user;
 
     // Check if user has permission to upload documents
     if (!hasPermission(currentUser, "document.upload")) {
+      console.log(
+        "❌ [documentController] Permission denied for document upload"
+      );
       return res.status(403).json({
         success: false,
         message: "You do not have permission to upload documents",
       });
     }
+
+    console.log("✅ [documentController] User has upload permission");
 
     // Use multer upload middleware
     upload.single("document")(req, res, async (err) => {
@@ -61,16 +127,32 @@ export const uploadDocument = async (req, res) => {
         department
       );
 
+      console.log("📄 [documentController] File received:", {
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        mimeType: req.file.mimetype,
+        path: req.file.path,
+      });
+
       // Process document with OCR for enhanced metadata
       let ocrMetadata = {};
       let extractedText = "";
 
+      console.log("🔍 [documentController] Starting OCR processing...");
       try {
         const ocrResult = await OCRService.processDocument(
           req.file.path,
           req.file.mimetype,
           { language: "eng" }
         );
+
+        console.log("📊 [documentController] OCR result:", {
+          success: ocrResult.success,
+          confidence: ocrResult.metadata?.confidence,
+          documentType: ocrResult.metadata?.documentType,
+          keywordsCount: ocrResult.metadata?.keywords?.length || 0,
+        });
 
         if (ocrResult.success) {
           ocrMetadata = ocrResult.metadata;
@@ -79,19 +161,32 @@ export const uploadDocument = async (req, res) => {
           // Auto-classify document type if not provided
           if (!documentType && ocrMetadata.documentType) {
             documentType = ocrMetadata.documentType;
+            console.log(
+              "🏷️ [documentController] Auto-classified document type:",
+              documentType
+            );
           }
 
           // Auto-extract tags from keywords
           if (!tags && ocrMetadata.keywords) {
             tags = ocrMetadata.keywords.slice(0, 5).join(",");
+            console.log("🏷️ [documentController] Auto-extracted tags:", tags);
           }
         }
       } catch (ocrError) {
         console.warn(
-          "OCR processing failed, continuing with basic upload:",
+          "❌ [documentController] OCR processing failed, continuing with basic upload:",
           ocrError.message
         );
       }
+
+      // Generate company-specific reference number
+      const companyCode = currentUser.company?.code || "COMP";
+      const reference = await generateDocRef(companyCode, currentUser._id);
+
+      console.log(
+        `[documentController] Generated reference: ${reference} for company: ${companyCode}`
+      );
 
       const metadata = createDocumentMetadata(
         req.file,
@@ -113,8 +208,14 @@ export const uploadDocument = async (req, res) => {
         priority: priority || "Medium",
         tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
         uploadedBy: currentUser._id,
-        reference: generateDocRef(),
-        status: "DRAFT",
+        company: currentUser.company?._id || currentUser.company,
+        reference: reference,
+        // Smart status determination based on approval workflow
+        status: await determineDocumentStatus(
+          currentUser,
+          category,
+          department
+        ),
         // Enhanced metadata from OCR
         ocrData: {
           extractedText,
@@ -124,9 +225,18 @@ export const uploadDocument = async (req, res) => {
           dateReferences: ocrMetadata.dateReferences || [],
           organizationReferences: ocrMetadata.organizationReferences || [],
           monetaryValues: ocrMetadata.monetaryValues || [],
+          processingDate: new Date(),
+          language: ocrMetadata.language || "eng",
+        },
+        // Document classification based on OCR
+        classification: {
+          autoClassified: !!ocrMetadata.documentType,
+          confidence: ocrMetadata.confidence || 0,
+          suggestedCategory: ocrMetadata.suggestedCategory,
+          suggestedTags: ocrMetadata.keywords || [],
         },
       };
-      if (department) {
+      if (department && department.trim() !== "") {
         docData.department = department;
       }
       const document = new Document(docData);
@@ -139,10 +249,26 @@ export const uploadDocument = async (req, res) => {
         req.ip
       );
 
+      console.log("💾 [documentController] Saving document to database:", {
+        title: document.title,
+        reference: document.reference,
+        category: document.category,
+        documentType: document.documentType,
+        priority: document.priority,
+        status: document.status,
+        fileSize: document.fileSize,
+      });
+
       await document.save();
+
+      console.log("✅ [documentController] Document saved successfully:", {
+        documentId: document._id,
+        reference: document.reference,
+      });
 
       // Log document creation
       if (currentUser && currentUser._id) {
+        console.log("📝 [documentController] Creating audit log entry");
         await AuditService.logDocumentAction(
           currentUser._id,
           "DOCUMENT_CREATED",
@@ -159,11 +285,100 @@ export const uploadDocument = async (req, res) => {
             userAgent: req.get("User-Agent"),
           }
         );
+        console.log("✅ [documentController] Audit log created successfully");
       } else {
-        console.error("[documentController] No valid userId for audit log");
+        console.error("❌ [documentController] No valid userId for audit log");
       }
 
       try {
+        console.log(
+          "📧 [documentController] Sending notification to document creator"
+        );
+        await NotificationService.sendDocumentUploadSuccessNotification(
+          document._id,
+          currentUser._id,
+          document.title,
+          document.documentType,
+          document.category
+        );
+        console.log(
+          "✅ [documentController] Creator notification sent successfully"
+        );
+
+        // Send appropriate notification based on document status
+        if (document.status === "APPROVED") {
+          console.log(
+            "📧 [documentController] Sending auto-approval notification"
+          );
+          await NotificationService.sendDocumentAutoApprovalNotification(
+            document._id,
+            currentUser._id,
+            document.title,
+            document.documentType,
+            document.category
+          );
+          console.log(
+            "✅ [documentController] Auto-approval notification sent successfully"
+          );
+        } else if (document.status === "PENDING_APPROVAL") {
+          console.log(
+            "📧 [documentController] Sending approval request notification"
+          );
+          await NotificationService.sendDocumentApprovalRequestNotification(
+            document._id,
+            currentUser._id,
+            document.title,
+            document.documentType,
+            document.category
+          );
+          console.log(
+            "✅ [documentController] Approval request notification sent successfully"
+          );
+        }
+
+        // Send OCR processing notification if OCR was successful
+        if (ocrMetadata && ocrMetadata.confidence) {
+          console.log(
+            "📧 [documentController] Sending OCR processing notification"
+          );
+          await NotificationService.sendDocumentOCRProcessingNotification(
+            document._id,
+            currentUser._id,
+            document.title,
+            ocrMetadata.confidence,
+            ocrMetadata.keywords || []
+          );
+          console.log(
+            "✅ [documentController] OCR notification sent successfully"
+          );
+        }
+
+        // Notify department members (if department is specified)
+        if (document.department) {
+          console.log(
+            "📧 [documentController] Sending department notifications"
+          );
+          try {
+            await NotificationService.sendDocumentUploadDepartmentNotification(
+              document._id,
+              document.department,
+              document.title,
+              document.documentType,
+              document.category,
+              currentUser.name || currentUser.username
+            );
+            console.log(
+              "✅ [documentController] Department notifications sent successfully"
+            );
+          } catch (deptError) {
+            console.warn(
+              "⚠️ [documentController] Department notification failed:",
+              deptError.message
+            );
+          }
+        }
+
+        // Notify admins and super admins (existing logic with updated service)
         let adminsToNotify = [];
         if (document.department) {
           adminsToNotify = await User.find({
@@ -177,27 +392,32 @@ export const uploadDocument = async (req, res) => {
             _id: { $ne: currentUser._id },
           });
         }
+
         if (adminsToNotify && adminsToNotify.length > 0) {
+          console.log("📧 [documentController] Sending admin notifications");
           for (const admin of adminsToNotify) {
-            if (global.notificationService && admin._id) {
-              const departmentInfo = document.department
-                ? `in ${admin.department} department`
-                : "across all departments";
-              await global.notificationService.createNotification({
-                recipient: admin._id,
-                type: "DOCUMENT_SUBMITTED",
-                title: "New Document Uploaded",
-                message: `${currentUser.name} has uploaded "${document.title}" ${departmentInfo}.`,
-                data: {
-                  documentId: document._id,
-                  actionUrl: `/documents/${document._id}`,
-                  priority: document.priority.toLowerCase(),
-                  senderId: currentUser._id,
-                  department: document.department || "General",
-                },
-              });
-            }
+            const departmentInfo = document.department
+              ? `in ${admin.department} department`
+              : "across all departments";
+            await NotificationService.createNotification({
+              recipient: admin._id,
+              type: "DOCUMENT_SUBMITTED",
+              title: "New Document Uploaded",
+              message: `${
+                currentUser.name || currentUser.username
+              } has uploaded "${document.title}" ${departmentInfo}.`,
+              data: {
+                documentId: document._id,
+                actionUrl: `/documents/${document._id}`,
+                priority: document.priority.toLowerCase(),
+                senderId: currentUser._id,
+                department: document.department || "General",
+              },
+            });
           }
+          console.log(
+            "✅ [documentController] Admin notifications sent successfully"
+          );
         } else {
           console.warn(
             "[documentController] No admins to notify for this document upload."
@@ -206,43 +426,38 @@ export const uploadDocument = async (req, res) => {
 
         // If document is confidential, notify super admins
         if (document.isConfidential) {
+          console.log(
+            "📧 [documentController] Sending confidential document notifications"
+          );
           const superAdmins = await User.find({
             "role.level": { $gte: 100 },
             _id: { $ne: currentUser._id },
           });
 
           for (const superAdmin of superAdmins) {
-            if (global.notificationService) {
-              await global.notificationService.createNotification({
-                recipient: superAdmin._id,
-                type: "SYSTEM_ALERT",
-                title: "Confidential Document Uploaded",
-                message: `A confidential document "${document.title}" has been uploaded by ${currentUser.name}.`,
-                data: {
-                  documentId: document._id,
-                  actionUrl: `/documents/${document._id}`,
-                  priority: "high",
-                  senderId: currentUser._id,
-                },
-              });
-            }
+            await NotificationService.createNotification({
+              recipient: superAdmin._id,
+              type: "SYSTEM_ALERT",
+              title: "Confidential Document Uploaded",
+              message: `A confidential document "${
+                document.title
+              }" has been uploaded by ${
+                currentUser.name || currentUser.username
+              }.`,
+              data: {
+                documentId: document._id,
+                actionUrl: `/documents/${document._id}`,
+                priority: "high",
+                senderId: currentUser._id,
+              },
+            });
           }
+          console.log(
+            "✅ [documentController] Confidential document notifications sent successfully"
+          );
         }
 
-        // Notify the uploader about successful upload
-        if (global.notificationService) {
-          await global.notificationService.createNotification({
-            recipient: currentUser._id,
-            type: "DOCUMENT_SUBMITTED",
-            title: "Document Uploaded Successfully",
-            message: `Your document "${document.title}" has been uploaded successfully.`,
-            data: {
-              documentId: document._id,
-              actionUrl: `/documents/${document._id}`,
-              priority: "medium",
-            },
-          });
-        }
+        // Note: Creator notification is already sent above via NotificationService.sendDocumentUploadSuccessNotification
       } catch (notificationError) {
         console.error("Error sending notifications:", notificationError);
         // Don't fail the upload if notifications fail
@@ -1049,6 +1264,180 @@ export const updateDocument = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to update document",
+    });
+  }
+};
+
+// Process OCR for a document
+export const processOCR = async (req, res) => {
+  console.log("🔍 [documentController] Starting OCR processing");
+
+  try {
+    const currentUser = req.user;
+
+    if (!hasPermission(currentUser, "document.upload")) {
+      console.log(
+        "❌ [documentController] Permission denied for OCR processing"
+      );
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to process documents",
+      });
+    }
+
+    // Use multer upload middleware for OCR
+    upload.single("document")(req, res, async (err) => {
+      if (err) {
+        return res.status(400).json({
+          success: false,
+          message: err.message,
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "No file uploaded for OCR processing",
+        });
+      }
+
+      console.log("📄 [documentController] File received for OCR:", {
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        mimeType: req.file.mimetype,
+      });
+
+      try {
+        const ocrResult = await OCRService.processDocument(
+          req.file.path,
+          req.file.mimetype,
+          { language: "eng" }
+        );
+
+        console.log("📊 [documentController] OCR result:", {
+          success: ocrResult.success,
+          confidence: ocrResult.metadata?.confidence,
+          documentType: ocrResult.metadata?.documentType,
+          keywordsCount: ocrResult.metadata?.keywords?.length || 0,
+        });
+
+        if (ocrResult.success) {
+          res.json({
+            success: true,
+            data: {
+              extractedText: ocrResult.extractedText,
+              confidence: ocrResult.metadata?.confidence || 0,
+              documentType: ocrResult.metadata?.documentType || "Other",
+              suggestedCategory:
+                ocrResult.metadata?.suggestedCategory || "General",
+              keywords: ocrResult.metadata?.keywords || [],
+              dateReferences: ocrResult.metadata?.dateReferences || [],
+              organizationReferences:
+                ocrResult.metadata?.organizationReferences || [],
+              monetaryValues: ocrResult.metadata?.monetaryValues || [],
+              processingTime: ocrResult.metadata?.processingTime || "Unknown",
+            },
+          });
+        } else {
+          res.status(400).json({
+            success: false,
+            message: "OCR processing failed",
+            error: ocrResult.error,
+          });
+        }
+      } catch (ocrError) {
+        console.error(
+          "❌ [documentController] OCR processing error:",
+          ocrError
+        );
+        res.status(500).json({
+          success: false,
+          message: "OCR processing failed",
+          error: ocrError.message,
+        });
+      }
+    });
+  } catch (error) {
+    console.error("❌ [documentController] OCR controller error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to process OCR",
+      error: error.message,
+    });
+  }
+};
+
+// Get document metadata (classifications, categories, etc.)
+export const getDocumentMetadata = async (req, res) => {
+  try {
+    console.log("📋 [documentController] Getting document metadata");
+
+    // Import the classifications here to avoid circular dependencies
+    const {
+      default: documentClassifications,
+      categories,
+      documentTypes,
+      documentSections,
+      priorityLevels,
+      documentStatuses,
+    } = await import("../constants/documentClassifications.js");
+
+    // Get department options from the Document model
+    const departmentOptions = [
+      "Finance",
+      "HR",
+      "Legal",
+      "IT",
+      "Operations",
+      "Marketing",
+      "Sales",
+      "Executive",
+      "External",
+    ];
+
+    const metadata = {
+      success: true,
+      data: {
+        classifications: documentClassifications,
+        categories,
+        documentTypes,
+        documentSections,
+        priorityLevels,
+        documentStatuses,
+        departmentOptions,
+        supportedFileTypes: [
+          "application/pdf",
+          "image/jpeg",
+          "image/jpg",
+          "image/png",
+          "image/tiff",
+          "image/bmp",
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/vnd.ms-excel",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "text/plain",
+          "text/csv",
+        ],
+        maxFileSize: 50 * 1024 * 1024, // 50MB
+        maxFileSizeMB: 50,
+      },
+    };
+
+    console.log(
+      "✅ [documentController] Document metadata retrieved successfully"
+    );
+    res.json(metadata);
+  } catch (error) {
+    console.error(
+      "❌ [documentController] Error getting document metadata:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Failed to get document metadata",
+      error: error.message,
     });
   }
 };

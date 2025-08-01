@@ -16,7 +16,18 @@ export const useSocket = () => {
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
-  const { user, isAuthenticated } = useAuth();
+
+  let authContext = null;
+  try {
+    authContext = useAuth();
+  } catch (error) {
+    console.log("🔍 SocketProvider: Auth context not ready yet");
+  }
+
+  const { user, isAuthenticated } = authContext || {
+    user: null,
+    isAuthenticated: false,
+  };
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -36,6 +47,11 @@ export const SocketProvider = ({ children }) => {
     const newSocket = io(socketUrl, {
       query: { userId: user._id },
       withCredentials: true,
+      transports: ["websocket", "polling"],
+      timeout: 20000,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
 
     // Connection events

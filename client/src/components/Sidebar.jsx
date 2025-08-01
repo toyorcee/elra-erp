@@ -317,19 +317,6 @@ const Sidebar = ({ onExpandedChange, onPinnedChange }) => {
                   <button
                     onClick={() => {
                       setIsProfileOpen(false);
-                      navigate("/dashboard/profile");
-                    }}
-                    className="w-full flex items-center px-4 py-2 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group"
-                  >
-                    <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center mr-3 group-hover:bg-blue-200 transition-colors duration-200">
-                      <MdPerson className="w-3 h-3 text-blue-600" />
-                    </div>
-                    <span>My Profile</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setIsProfileOpen(false);
                       navigate("/dashboard/notifications");
                     }}
                     className="w-full flex items-center px-4 py-2 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group"

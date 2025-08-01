@@ -5,19 +5,19 @@ const departmentSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
-      unique: false, 
+      unique: false,
       trim: true,
       maxlength: 100,
     },
     company: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Company",
-      required: false, 
+      required: false,
     },
     code: {
       type: String,
-      required: false, 
-      unique: false, 
+      required: false,
+      unique: false,
       trim: true,
       uppercase: true,
       maxlength: 10,
@@ -64,16 +64,7 @@ const departmentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
-    color: {
-      type: String,
-      default: "#3B82F6", // Default blue color
-      validate: {
-        validator: function (v) {
-          return /^#[0-9A-F]{6}$/i.test(v);
-        },
-        message: "Color must be a valid hex color code",
-      },
-    },
+
     settings: {
       allowDocumentUpload: {
         type: Boolean,
@@ -85,7 +76,7 @@ const departmentSchema = new mongoose.Schema(
       },
       maxFileSize: {
         type: Number,
-        default: 10, // MB
+        default: 10, 
       },
       allowedFileTypes: [
         {

@@ -15,7 +15,7 @@ import { createServer } from "http";
 import { EventEmitter } from "events";
 import chalk from "chalk";
 import xss from "xss-clean";
-import morgan from "morgan";
+
 import { Server as SocketIOServer } from "socket.io";
 import Message from "./models/Message.js";
 import User from "./models/User.js";
@@ -38,7 +38,7 @@ import notificationRoutes, {
   initializeNotificationRoutes,
 } from "./routes/notifications.js";
 import departmentRoutes from "./routes/departments.js";
-import superAdminRoutes from "./routes/superAdmin.js";
+import roleRoutes from "./routes/roles.js";
 import systemSettingsRoutes from "./routes/systemSettings.js";
 import profileRoutes from "./routes/profile.js";
 import auditRoutes from "./routes/audit.js";
@@ -95,10 +95,10 @@ app.use(mongoSanitize());
 app.use(hpp());
 app.use(compression());
 app.use(xss());
-app.use(morgan("combined"));
 
 // Security headers
 app.use((req, res, next) => {
+  // Content Security Policy - Updated for local file storage with Multer
   res.setHeader(
     "Content-Security-Policy",
     "default-src 'self'; " +
@@ -110,6 +110,7 @@ app.use((req, res, next) => {
       "media-src 'self' blob:;"
   );
 
+  // Force HTTPS in production
   if (process.env.NODE_ENV === "production") {
     res.setHeader(
       "Strict-Transport-Security",
@@ -123,7 +124,6 @@ app.use((req, res, next) => {
   res.setHeader("X-XSS-Protection", "1; mode=block");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
 
-  // Allow cross-origin resource sharing
   res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
 
   // Add CORS headers for preflight requests
@@ -148,7 +148,6 @@ const limiter = rateLimit({
   max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
-  message: "Too many requests from this IP, please try again later.",
 });
 
 app.use("/api/", limiter);
@@ -163,33 +162,22 @@ const connectDB = async () => {
     }
 
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 60000,
-      socketTimeoutMS: 60000,
-      connectTimeoutMS: 60000,
-      maxPoolSize: 10,
-      minPoolSize: 1,
-      retryWrites: true,
-      w: "majority",
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 30000,
     });
 
     console.log(`🟢 MongoDB Connected: ${conn.connection.host}`);
 
     mongoose.connection.on("error", (error) => {
       console.error("🔴 MongoDB Error:", error.message);
-      console.error("Error details:", error);
     });
 
     mongoose.connection.on("disconnected", () => {
-      console.log("🔴 MongoDB Disconnected - Retrying in 10 seconds...");
+      console.log("🔴 MongoDB Disconnected - Retrying...");
       setTimeout(connectDB, 10000);
-    });
-
-    mongoose.connection.on("connected", () => {
-      console.log("🟢 MongoDB Connected successfully");
-    });
-
-    mongoose.connection.on("reconnected", () => {
-      console.log("🔄 MongoDB Reconnected");
     });
   } catch (error) {
     console.error("❌ MongoDB Connection Error:", error.message);
@@ -200,11 +188,9 @@ const connectDB = async () => {
 
 connectDB();
 
-// Serve uploaded files
 app.use(
   "/uploads",
   (req, res, next) => {
-    // Add CORS headers for file requests
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -220,7 +206,7 @@ app.use("/api/documents", documentRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/departments", departmentRoutes);
-app.use("/api/super-admin", superAdminRoutes);
+app.use("/api/roles", roleRoutes);
 app.use("/api/system-settings", systemSettingsRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/audit", auditRoutes);
@@ -268,6 +254,27 @@ app.get("/api/test-routing", (req, res) => {
   res.json({
     success: true,
     message: "Basic routing is working",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Test cookie endpoint
+app.get("/api/test-cookies", (req, res) => {
+  console.log("🍪 Test cookies endpoint - received cookies:", req.cookies);
+
+  // Set a test cookie
+  res.cookie("testCookie", "testValue", {
+    httpOnly: true,
+    secure: false,
+    sameSite: "Lax",
+    path: "/",
+    maxAge: 60000,
+  });
+
+  res.json({
+    success: true,
+    message: "Test cookie set",
+    receivedCookies: req.cookies,
     timestamp: new Date().toISOString(),
   });
 });

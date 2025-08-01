@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   HiX,
@@ -11,14 +11,25 @@ import {
 import { authAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 
-const JoinCompanyModal = ({ isOpen, onClose, onSuccess }) => {
+const JoinCompanyModal = ({ isOpen, onClose, onSuccess, initialCode = "" }) => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   // Step 1: Invitation Code
-  const [invitationCode, setInvitationCode] = useState("");
+  const [invitationCode, setInvitationCode] = useState(initialCode);
+
+  // Update invitation code when initialCode prop changes
+  useEffect(() => {
+    if (initialCode && initialCode !== invitationCode) {
+      setInvitationCode(initialCode);
+      // Auto-verify the code if it's provided
+      if (isOpen && initialCode) {
+        handleInvitationCodeSubmit({ preventDefault: () => {} });
+      }
+    }
+  }, [initialCode, isOpen]);
 
   // Step 2: User Details
   const [userData, setUserData] = useState({

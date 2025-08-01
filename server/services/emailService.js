@@ -45,13 +45,14 @@ const createEmailTemplate = (
             .email-container {
                 max-width: 600px;
                 margin: 0 auto;
-                background: rgba(255, 255, 255, 0.95);
+                background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%);
                 backdrop-filter: blur(20px);
                 border-radius: 24px;
                 overflow: hidden;
                 box-shadow: 
                     0 25px 50px -12px rgba(0, 0, 0, 0.25),
-                    0 0 0 1px rgba(255, 255, 255, 0.1);
+                    0 0 0 1px rgba(255, 255, 255, 0.1),
+                    0 0 40px rgba(59, 130, 246, 0.1);
                 border: 1px solid rgba(255, 255, 255, 0.2);
             }
             
@@ -62,6 +63,7 @@ const createEmailTemplate = (
                 color: white;
                 position: relative;
                 overflow: hidden;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             }
             
             .header::before {
@@ -72,28 +74,32 @@ const createEmailTemplate = (
                 right: 0;
                 bottom: 0;
                 background: 
-                    radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.3) 0%, transparent 50%),
-                    radial-gradient(circle at 80% 20%, rgba(147, 51, 234, 0.3) 0%, transparent 50%),
-                    radial-gradient(circle at 40% 40%, rgba(16, 185, 129, 0.2) 0%, transparent 50%);
-                animation: float 6s ease-in-out infinite;
+                    radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.4) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 20%, rgba(147, 51, 234, 0.4) 0%, transparent 50%),
+                    radial-gradient(circle at 40% 40%, rgba(6, 182, 212, 0.3) 0%, transparent 50%),
+                    radial-gradient(circle at 60% 60%, rgba(16, 185, 129, 0.2) 0%, transparent 50%);
+                animation: float 8s ease-in-out infinite;
             }
             
             @keyframes float {
-                0%, 100% { transform: translateY(0px) rotate(0deg); }
-                50% { transform: translateY(-10px) rotate(1deg); }
+                0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+                25% { transform: translateY(-8px) rotate(0.5deg) scale(1.02); }
+                50% { transform: translateY(-15px) rotate(1deg) scale(1.05); }
+                75% { transform: translateY(-8px) rotate(0.5deg) scale(1.02); }
             }
             
             .logo {
-                font-size: 32px;
+                font-size: 36px;
                 font-weight: bold;
-                margin-bottom: 12px;
+                margin-bottom: 16px;
                 position: relative;
                 z-index: 1;
                 text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-                background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #34d399 100%);
+                background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%);
                 -webkit-background-clip: text;
                 -webkit-text-fill-color: transparent;
                 background-clip: text;
+                letter-spacing: -1px;
             }
             
             .subtitle {
@@ -189,23 +195,27 @@ const createEmailTemplate = (
             }
             
             .footer {
-                background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+                background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #475569 75%, #64748b 100%);
                 padding: 30px;
                 text-align: center;
-                color: #64748b;
+                color: #cbd5e1;
                 font-size: 14px;
-                border-top: 1px solid rgba(0, 0, 0, 0.05);
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                position: relative;
+                overflow: hidden;
             }
             
             .footer-text {
-                font-weight: 500;
-                color: #475569;
+                font-weight: 600;
+                color: #e2e8f0;
                 margin-bottom: 10px;
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
             }
             
             .footer-subtitle {
                 font-size: 12px;
-                opacity: 0.7;
+                opacity: 0.8;
+                color: #94a3b8;
             }
             
             .floating-elements {
@@ -233,8 +243,10 @@ const createEmailTemplate = (
             .floating-element:nth-child(4) { top: 80%; left: 70%; animation-delay: 3s; }
             
             @keyframes float-particle {
-                0%, 100% { transform: translateY(0px) scale(1); opacity: 0.3; }
-                50% { transform: translateY(-20px) scale(1.2); opacity: 0.8; }
+                0%, 100% { transform: translateY(0px) scale(1) rotate(0deg); opacity: 0.3; }
+                25% { transform: translateY(-10px) scale(1.1) rotate(90deg); opacity: 0.6; }
+                50% { transform: translateY(-25px) scale(1.3) rotate(180deg); opacity: 0.9; }
+                75% { transform: translateY(-10px) scale(1.1) rotate(270deg); opacity: 0.6; }
             }
             
             @media (max-width: 600px) {
@@ -522,27 +534,36 @@ export const sendInvitationEmail = async (
 ) => {
   try {
     const transporter = createTransporter();
-    const joinUrl = `${process.env.CLIENT_URL}/join-company`;
+    const joinUrl = `${process.env.CLIENT_URL}/welcome?code=${invitationCode}`;
 
     const htmlContent = createEmailTemplate(
       `You're Invited to Join ${companyName} - EDMS Platform`,
       `
-        <p>Hello <strong>${userName}</strong>,</p>
-        <p>🎉 You've been invited to join the <strong>${companyName}</strong> document management system!</p>
-        <p>Your administrator has created an account for you to access our secure internal document management platform.</p>
+        <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%); border-radius: 16px; padding: 20px; margin-bottom: 20px; border: 1px solid rgba(59, 130, 246, 0.1);">
+            <p style="margin: 0 0 12px 0; font-size: 18px; color: #1e293b;">Hello <strong style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">${userName}</strong>,</p>
+            <p style="margin: 0 0 12px 0; font-size: 16px; color: #334155;">🎉 You've been invited to join the <strong style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">${companyName}</strong> document management system!</p>
+            <p style="margin: 0; font-size: 14px; color: #64748b;">Your administrator has created an account for you to access our secure internal document management platform.</p>
+        </div>
         
         <p>🔑 <strong>Your Invitation Code:</strong></p>
-        <p style="font-size: 24px; font-weight: bold; letter-spacing: 3px; text-align: center; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; padding: 10px;">${invitationCode}</p>
+        <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #475569 75%, #64748b 100%); padding: 20px; border-radius: 16px; margin: 20px 0; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);">
+            <p style="font-size: 28px; font-weight: bold; letter-spacing: 4px; text-align: center; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin: 0; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">${invitationCode}</p>
+        </div>
         
         <p>📋 <strong>How to Join:</strong></p>
         <ol style="margin: 15px 0; padding-left: 20px;">
-          <li>Click the "Join Company" button below</li>
-          <li>Enter your invitation code: <strong>${invitationCode}</strong></li>
-          <li>Complete your account setup</li>
-          <li>Start accessing your documents and workflows</li>
+          <li style="margin: 8px 0; padding: 8px 12px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); border-radius: 8px; border-left: 3px solid #3b82f6;">Click the "Join Company" button below (your invitation code will be automatically filled)</li>
+          <li style="margin: 8px 0; padding: 8px 12px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); border-radius: 8px; border-left: 3px solid #8b5cf6;">Complete your account setup</li>
+          <li style="margin: 8px 0; padding: 8px 12px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); border-radius: 8px; border-left: 3px solid #06b6d4;">Start accessing your documents and workflows</li>
         </ol>
         
-        <p>⏰ <strong>Important:</strong> This invitation code expires in 7 days. Please complete your registration before then.</p>
+        <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(34, 197, 94, 0.1) 100%); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 16px; margin: 20px 0;">
+            <p style="margin: 0; color: #065f46; font-weight: 600;">💡 <strong>Alternative:</strong> You can also manually enter your invitation code: <strong style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">${invitationCode}</strong></p>
+        </div>
+        
+        <div style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 16px; margin: 20px 0;">
+            <p style="margin: 0; color: #92400e; font-weight: 600;">⏰ <strong>Important:</strong> This invitation code expires in 7 days. Please complete your registration before then.</p>
+        </div>
         <p>If you have any questions, please contact your system administrator.</p>
       `,
       "Join Company",
@@ -1063,6 +1084,235 @@ export const sendUserPaymentFailureEmail = async (
   }
 };
 
+// New email for pending registration
+export const sendPendingRegistrationEmail = async (email, firstName) => {
+  try {
+    const transporter = createTransporter();
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Registration Received - EDMS</title>
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #475569 75%, #64748b 100%);
+            min-height: 100vh;
+            padding: 20px;
+          }
+          
+          .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 
+              0 25px 50px -12px rgba(0, 0, 0, 0.25),
+              0 0 0 1px rgba(255, 255, 255, 0.1),
+              0 0 40px rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+          }
+          
+          .header {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #475569 75%, #64748b 100%);
+            padding: 50px 30px;
+            text-align: center;
+            color: white;
+            position: relative;
+            overflow: hidden;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          }
+          
+          .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+              radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.4) 0%, transparent 50%),
+              radial-gradient(circle at 80% 20%, rgba(147, 51, 234, 0.4) 0%, transparent 50%),
+              radial-gradient(circle at 40% 40%, rgba(6, 182, 212, 0.3) 0%, transparent 50%),
+              radial-gradient(circle at 60% 60%, rgba(16, 185, 129, 0.2) 0%, transparent 50%);
+            animation: float 8s ease-in-out infinite;
+          }
+          
+          @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+            25% { transform: translateY(-8px) rotate(0.5deg) scale(1.02); }
+            50% { transform: translateY(-15px) rotate(1deg) scale(1.05); }
+            75% { transform: translateY(-8px) rotate(0.5deg) scale(1.02); }
+          }
+          
+          .logo {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 16px;
+            position: relative;
+            z-index: 1;
+            text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+          }
+          
+          .subtitle {
+            font-size: 18px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+          }
+          
+          .content {
+            padding: 50px 30px;
+            text-align: center;
+          }
+          
+          .icon {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 30px;
+            font-size: 50px;
+            color: white;
+            box-shadow: 0 15px 35px rgba(245, 158, 11, 0.3);
+          }
+          
+          .title {
+            font-size: 32px;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 20px;
+          }
+          
+          .message {
+            font-size: 18px;
+            color: #6b7280;
+            line-height: 1.6;
+            margin-bottom: 30px;
+          }
+          
+          .highlight {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 2px solid #fbbf24;
+            border-radius: 16px;
+            padding: 25px;
+            margin: 30px 0;
+            text-align: left;
+          }
+          
+          .highlight-title {
+            font-weight: bold;
+            color: #92400e;
+            font-size: 20px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+          }
+          
+          .highlight-text {
+            color: #78350f;
+            font-size: 16px;
+            line-height: 1.5;
+          }
+          
+          .footer {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e2e8f0;
+          }
+          
+          .footer-text {
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 10px;
+          }
+          
+          .footer-logo {
+            font-size: 20px;
+            font-weight: bold;
+            color: #3b82f6;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="email-container">
+          <div class="header">
+            <div class="logo">EDMS</div>
+            <div class="subtitle">Electronic Document Management System</div>
+          </div>
+          
+          <div class="content">
+            <div class="icon">⏳</div>
+            <h1 class="title">Registration Received!</h1>
+            <p class="message">
+              Hello <strong>${firstName}</strong>,<br><br>
+              Thank you for registering with EDMS! 🎉<br><br>
+              Your registration has been received and is currently under review by our Super Administrator.
+            </p>
+            
+            <div class="highlight">
+              <div class="highlight-title">
+                <span>📋</span>
+                What happens next?
+              </div>
+              <div class="highlight-text">
+                1. Super Admin will review your registration<br>
+                2. You'll receive an invitation email with a unique code<br>
+                3. Use the code to complete your account setup<br>
+                4. Get assigned to the appropriate department and role
+              </div>
+            </div>
+            
+            <p class="message">
+              You'll receive an email notification once your account has been approved and your invitation code is ready.
+            </p>
+          </div>
+          
+          <div class="footer">
+            <p class="footer-text">Thank you for choosing EDMS</p>
+            <div class="footer-logo">E 🗄️ MS</div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM,
+      to: email,
+      subject: "Registration Received - EDMS",
+      html: htmlContent,
+    };
+
+    const result = await transporter.sendMail(mailOptions);
+    console.log(`✅ PENDING REGISTRATION EMAIL SENT to ${email}`);
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    console.error("❌ Error sending pending registration email:", error);
+    throw error;
+  }
+};
+
 export default {
   sendPasswordResetEmail,
   sendWelcomeEmail,
@@ -1070,6 +1320,8 @@ export default {
   sendPasswordChangeSuccessEmail,
   sendEmail,
   sendIndustryInstanceInvitation,
+  sendInvitationEmail,
+  sendPendingRegistrationEmail,
   sendSubscriptionEmail,
   sendPlatformAdminNewSubscriptionEmail,
   sendPlatformAdminRenewalEmail,

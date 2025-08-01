@@ -19,7 +19,7 @@ import { toast } from "react-toastify";
 
 // API functions
 const fetchSystemStats = async () => {
-  const response = await fetch("/api/super-admin/stats", {
+  const response = await fetch("/api/dashboard/system-stats", {
     credentials: "include",
   });
   if (!response.ok) throw new Error("Failed to fetch system stats");
@@ -175,10 +175,10 @@ const SuperAdminDashboard = () => {
   }
 
   const stats = systemStats?.data || {
-    totalUsers: 0,
-    totalDocuments: 0,
-    totalDepartments: 0,
-    pendingApprovals: 0,
+    users: { total: 0, active: 0, pending: 0, invited: 0, inactive: 0 },
+    documents: { total: 0, pending: 0, approved: 0, rejected: 0 },
+    departments: { total: 0 },
+    invitations: { active: 0, used: 0 },
   };
 
   const activity = recentActivity?.data || [];
@@ -187,32 +187,54 @@ const SuperAdminDashboard = () => {
   const statCards = [
     {
       title: "Total Users",
-      value: stats.totalUsers,
+      value: stats.users?.total || 0,
       color: "from-blue-500 to-cyan-500",
       trend: "up",
       trendValue: "+12%",
-      description: "Active system users",
+      description: "All system users",
     },
     {
-      title: "Total Documents",
-      value: stats.totalDocuments,
+      title: "Active Users",
+      value: stats.users?.active || 0,
       color: "from-green-500 to-emerald-500",
       trend: "up",
       trendValue: "+8%",
+      description: "Fully active users",
+    },
+    {
+      title: "Pending Users",
+      value: stats.users?.pending || 0,
+      color: "from-yellow-500 to-orange-500",
+      description: "Awaiting role assignment",
+    },
+    {
+      title: "Invited Users",
+      value: stats.users?.invited || 0,
+      color: "from-purple-500 to-pink-500",
+      description: "Invitation sent",
+    },
+    {
+      title: "Total Documents",
+      value: stats.documents?.total || 0,
+      color: "from-indigo-500 to-purple-500",
       description: "Documents in system",
     },
     {
       title: "Departments",
-      value: stats.totalDepartments,
-      color: "from-purple-500 to-pink-500",
+      value: stats.departments?.total || 0,
+      color: "from-teal-500 to-cyan-500",
       description: "Active departments",
     },
     {
-      title: "Pending Approvals",
-      value: stats.pendingApprovals,
-      color: "from-orange-500 to-red-500",
-      trend: "down",
-      trendValue: "-5%",
+      title: "Active Invitations",
+      value: stats.invitations?.active || 0,
+      color: "from-pink-500 to-rose-500",
+      description: "Pending invitations",
+    },
+    {
+      title: "Pending Documents",
+      value: stats.documents?.pending || 0,
+      color: "from-amber-500 to-orange-500",
       description: "Awaiting approval",
     },
   ];
@@ -291,8 +313,8 @@ const SuperAdminDashboard = () => {
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-cyan-500/20 to-transparent rounded-full blur-2xl"></div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-6">
         {statCards.map((stat, index) => (
           <div
             key={index}

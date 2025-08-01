@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
-import Lottie from "lottie-react";
+
 import {
   HiCheckCircle,
   HiArrowRight,
@@ -15,16 +15,12 @@ import { authAPI } from "../../services/api";
 import EDMSLogo from "../../components/EDMSLogo";
 import { GradientSpinner } from "../../components/common";
 
-const successAnimationUrl =
-  "https://assets9.lottiefiles.com/packages/lf20_jbrw3hcz.json";
-
 const EmailVerificationSuccess = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [verifying, setVerifying] = useState(true);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
-  const [lottieLoaded, setLottieLoaded] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -149,17 +145,21 @@ const EmailVerificationSuccess = () => {
           className="text-center mb-4"
         >
           <div className="flex justify-center mb-4">
-            <Lottie
-              src={successAnimationUrl}
-              loop={false}
-              autoplay={true}
-              style={{ width: "120px", height: "120px" }}
-              onLoad={() => setLottieLoaded(true)}
-              onError={() => {
-                console.log("Lottie animation failed to load, using fallback");
-                setLottieLoaded(false);
-              }}
-            />
+            <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center animate-pulse">
+              <svg
+                className="w-12 h-12 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </div>
           </div>
           <motion.div
             initial={{ opacity: 0, y: 20 }}

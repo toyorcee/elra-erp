@@ -231,6 +231,210 @@ class NotificationService {
     });
   }
 
+  // Send document upload success notification to creator
+  async sendDocumentUploadSuccessNotification(
+    documentId,
+    creatorId,
+    documentTitle,
+    documentType,
+    category
+  ) {
+    return await this.createNotification({
+      recipient: creatorId,
+      type: "DOCUMENT_UPLOAD_SUCCESS",
+      title: "Document Upload Successful",
+      message: `Your document "${documentTitle}" has been successfully uploaded and processed with OCR.`,
+      data: {
+        documentId,
+        documentTitle,
+        documentType,
+        category,
+        action: "document_upload_success",
+        actionUrl: `/documents/${documentId}`,
+        timestamp: new Date(),
+      },
+      priority: "medium",
+    });
+  }
+
+  // Send document upload notification to department members (for future use)
+  async sendDocumentUploadDepartmentNotification(
+    documentId,
+    departmentId,
+    documentTitle,
+    documentType,
+    category,
+    creatorName
+  ) {
+    try {
+      // Get all users in the department
+      const departmentUsers = await User.find({
+        department: departmentId,
+        _id: { $ne: documentId }, // Exclude the creator
+      }).select("_id");
+
+      const notifications = [];
+
+      for (const user of departmentUsers) {
+        const notification = await this.createNotification({
+          recipient: user._id,
+          type: "DOCUMENT_UPLOAD_DEPARTMENT",
+          title: "New Document in Your Department",
+          message: `${creatorName} uploaded "${documentTitle}" to your department.`,
+          data: {
+            documentId,
+            documentTitle,
+            documentType,
+            category,
+            creatorName,
+            action: "document_upload_department",
+            actionUrl: `/documents/${documentId}`,
+            timestamp: new Date(),
+          },
+          priority: "low",
+        });
+
+        if (notification) {
+          notifications.push(notification);
+        }
+      }
+
+      return notifications;
+    } catch (error) {
+      console.error("Error sending department notifications:", error);
+      throw error;
+    }
+  }
+
+  // Send document upload notification to users with specific permissions (for future use)
+  async sendDocumentUploadPermissionNotification(
+    documentId,
+    permission,
+    documentTitle,
+    documentType,
+    category,
+    creatorName
+  ) {
+    try {
+      // Get users with specific permission
+      const usersWithPermission = await User.find({
+        "role.permissions": permission,
+      }).select("_id");
+
+      const notifications = [];
+
+      for (const user of usersWithPermission) {
+        const notification = await this.createNotification({
+          recipient: user._id,
+          type: "DOCUMENT_UPLOAD_PERMISSION",
+          title: "New Document Requires Attention",
+          message: `${creatorName} uploaded "${documentTitle}" that requires your attention.`,
+          data: {
+            documentId,
+            documentTitle,
+            documentType,
+            category,
+            creatorName,
+            permission,
+            action: "document_upload_permission",
+            actionUrl: `/documents/${documentId}`,
+            timestamp: new Date(),
+          },
+          priority: "medium",
+        });
+
+        if (notification) {
+          notifications.push(notification);
+        }
+      }
+
+      return notifications;
+    } catch (error) {
+      console.error("Error sending permission-based notifications:", error);
+      throw error;
+    }
+  }
+
+  // Send document OCR processing notification
+  async sendDocumentOCRProcessingNotification(
+    documentId,
+    creatorId,
+    documentTitle,
+    confidence,
+    extractedKeywords
+  ) {
+    return await this.createNotification({
+      recipient: creatorId,
+      type: "DOCUMENT_OCR_PROCESSING",
+      title: "Document OCR Processing Complete",
+      message: `OCR processing completed for "${documentTitle}" with ${(
+        confidence * 100
+      ).toFixed(1)}% confidence.`,
+      data: {
+        documentId,
+        documentTitle,
+        confidence,
+        extractedKeywords,
+        action: "document_ocr_processing",
+        actionUrl: `/documents/${documentId}`,
+        timestamp: new Date(),
+      },
+      priority: "low",
+    });
+  }
+
+  // Send document auto-approval notification
+  async sendDocumentAutoApprovalNotification(
+    documentId,
+    creatorId,
+    documentTitle,
+    documentType,
+    category
+  ) {
+    return await this.createNotification({
+      recipient: creatorId,
+      type: "DOCUMENT_AUTO_APPROVED",
+      title: "Document Auto-Approved",
+      message: `Your document "${documentTitle}" has been automatically approved and is now available in the system.`,
+      data: {
+        documentId,
+        documentTitle,
+        documentType,
+        category,
+        action: "document_auto_approved",
+        actionUrl: `/documents/${documentId}`,
+        timestamp: new Date(),
+      },
+      priority: "medium",
+    });
+  }
+
+  // Send document approval request notification
+  async sendDocumentApprovalRequestNotification(
+    documentId,
+    creatorId,
+    documentTitle,
+    documentType,
+    category
+  ) {
+    return await this.createNotification({
+      recipient: creatorId,
+      type: "DOCUMENT_PENDING_APPROVAL",
+      title: "Document Pending Approval",
+      message: `Your document "${documentTitle}" has been submitted for approval and is awaiting review.`,
+      data: {
+        documentId,
+        documentTitle,
+        documentType,
+        category,
+        action: "document_pending_approval",
+        actionUrl: `/documents/${documentId}`,
+        timestamp: new Date(),
+      },
+      priority: "medium",
+    });
+  }
+
   // Get user's notifications
   async getUserNotifications(userId, page = 1, limit = 20) {
     const skip = (page - 1) * limit;

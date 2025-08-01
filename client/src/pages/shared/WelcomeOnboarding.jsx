@@ -6,7 +6,7 @@ import {
   useTransform,
   useSpring,
 } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   HiOfficeBuilding,
   HiUserGroup,
@@ -29,14 +29,24 @@ const WelcomeOnboarding = () => {
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [comingSoonData, setComingSoonData] = useState({});
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  // Scroll to top on component mount
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
+  // Check for invitation code in URL parameters
+  useEffect(() => {
+    const invitationCode = searchParams.get("code");
+    if (invitationCode) {
+      setShowJoinCompanyModal(true);
+    }
+  }, [searchParams]);
+
+  // Get invitation code from URL
+  const invitationCode = searchParams.get("code");
+
   const getCards = () => {
-    // For client-specific branch - internal company system
     return [
       {
         id: 0,
@@ -560,6 +570,7 @@ const WelcomeOnboarding = () => {
           setShowJoinCompanyModal(false);
           navigate("/dashboard");
         }}
+        initialCode={invitationCode}
       />
 
       {/* Coming Soon Modal */}

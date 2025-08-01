@@ -45,7 +45,7 @@ const userSchema = new mongoose.Schema(
     role: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Role",
-      required: true,
+      required: false,
     },
     department: {
       type: mongoose.Schema.Types.ObjectId,
@@ -127,6 +127,11 @@ const userSchema = new mongoose.Schema(
     isEmailVerified: {
       type: Boolean,
       default: false,
+    },
+    status: {
+      type: String,
+      enum: ["ACTIVE", "PENDING_REGISTRATION", "INACTIVE", "SUSPENDED"],
+      default: "ACTIVE",
     },
     lastLogin: {
       type: Date,

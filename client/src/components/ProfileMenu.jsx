@@ -1,11 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  MdLogout,
-  MdSettings,
-  MdPerson,
-  MdNotifications,
-} from "react-icons/md";
+import { MdLogout, MdSettings, MdNotifications } from "react-icons/md";
 import { useAuth } from "../context/AuthContext";
 
 const getImageUrl = (avatarPath) => {
@@ -236,19 +231,6 @@ const ProfileMenu = () => {
 
           {/* Menu Items */}
           <div className="py-2">
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                navigate("/dashboard/profile");
-              }}
-              className="w-full flex items-center px-6 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group"
-            >
-              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3 group-hover:bg-blue-200 transition-colors duration-200">
-                <MdPerson className="w-4 h-4 text-blue-600" />
-              </div>
-              <span>My Profile</span>
-            </button>
-
             <button
               onClick={navigateToNotifications}
               className="w-full flex items-center px-6 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group"

@@ -1,5 +1,6 @@
 import User from "../models/User.js";
 import Role from "../models/Role.js";
+import Department from "../models/Department.js";
 import {
   hasPermission,
   canManageUser,
@@ -7,6 +8,13 @@ import {
 } from "../utils/permissionUtils.js";
 import { validateRegistration } from "../utils/validationUtils.js";
 import { checkPlanLimits } from "../middleware/planLimits.js";
+import AuditService from "../services/auditService.js";
+import {
+  validateRoleAssignment,
+  validateDepartmentAssignment,
+  validateRoleDepartmentCompatibility,
+  getAssignmentGuidance,
+} from "../utils/levelValidation.js";
 
 // Get all users (with role-based filtering)
 export const getAllUsers = async (req, res) => {
@@ -21,22 +29,46 @@ export const getAllUsers = async (req, res) => {
       });
     }
 
-    let query = { isActive: true };
+    let query = {};
 
-    // Filter by department if user is not admin
-    if (currentUser.role.level < 90) {
+    // For super admins, show all users including pending, invited, and active users
+    if (currentUser.role.level >= 90) {
+      query.$or = [
+        { isActive: true },
+        { status: "PENDING_REGISTRATION" },
+        { status: "INVITED" },
+        { status: "ACTIVE" },
+      ];
+    } else {
+      // For regular users, only show active users in their department
+      query.isActive = true;
       query.department = currentUser.department;
     }
 
+    // Exclude platform admin users - they should not appear in company user lists
+    query.email = { $not: /platformadmin/i };
+
     const users = await User.find(query)
       .populate("role", "name level description")
+      .populate("department", "name description")
       .populate("supervisor", "name email")
       .select("-password");
 
+    // Filter out platform admin users after population
+    // Include users with no role (pending registration) and users with non-platform-admin roles
+    // Filter users: include SUPER_ADMIN, regular users, and pending users; exclude PLATFORM_ADMIN
+    const filteredUsers = users.filter((user) => {
+      // If user has no role (pending registration), include them
+      if (!user.role) return true;
+
+      // If user has a role, only include if it's not PLATFORM_ADMIN
+      return user.role.name !== "PLATFORM_ADMIN";
+    });
+
     res.json({
       success: true,
-      data: users,
-      count: users.length,
+      data: filteredUsers,
+      count: filteredUsers.length,
     });
   } catch (error) {
     console.error("Get all users error:", error);
@@ -55,6 +87,7 @@ export const getUserById = async (req, res) => {
 
     const user = await User.findById(id)
       .populate("role", "name level description permissions")
+      .populate("department", "name description")
       .populate("supervisor", "name email")
       .populate("subordinates", "name email role")
       .select("-password");
@@ -206,20 +239,50 @@ export const updateUser = async (req, res) => {
     delete updateData.password;
     delete updateData.email; // Email should be changed through separate process
 
-    // If role is being updated, validate the change
-    if (updateData.role) {
-      const newRole = await Role.findById(updateData.role);
-      if (!newRole) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid role",
-        });
-      }
+    // Store old values for audit logging
+    const oldRole = user.role;
+    const oldDepartment = user.department;
 
-      if (newRole.level >= currentUser.role.level) {
+    // Validate role assignment if role is being updated
+    if (updateData.role) {
+      const roleValidation = await validateRoleAssignment(
+        currentUser,
+        updateData.role,
+        user._id
+      );
+      if (!roleValidation.isValid) {
         return res.status(403).json({
           success: false,
-          message: "You cannot assign a role equal to or higher than yours",
+          message: roleValidation.message,
+        });
+      }
+    }
+
+    // Validate department assignment if department is being updated
+    if (updateData.department) {
+      const deptValidation = await validateDepartmentAssignment(
+        currentUser,
+        updateData.department,
+        user._id
+      );
+      if (!deptValidation.isValid) {
+        return res.status(403).json({
+          success: false,
+          message: deptValidation.message,
+        });
+      }
+    }
+
+    // Validate role-department compatibility if both are being updated
+    if (updateData.role && updateData.department) {
+      const compatibilityValidation = await validateRoleDepartmentCompatibility(
+        updateData.role,
+        updateData.department
+      );
+      if (!compatibilityValidation.isValid) {
+        return res.status(400).json({
+          success: false,
+          message: compatibilityValidation.message,
         });
       }
     }
@@ -231,6 +294,66 @@ export const updateUser = async (req, res) => {
       .populate("role", "name level description")
       .populate("supervisor", "name email")
       .select("-password");
+
+    try {
+      if (
+        updateData.role &&
+        oldRole?.toString() !== updateData.role?.toString()
+      ) {
+        const oldRoleData = oldRole ? await Role.findById(oldRole) : null;
+        const newRoleData = await Role.findById(updateData.role);
+
+        await AuditService.logUserAction(
+          currentUser._id,
+          "USER_ROLE_CHANGED",
+          user._id,
+          {
+            company: currentUser.company,
+            oldRole: oldRoleData?.name || "No Role",
+            newRole: newRoleData?.name,
+            description: `Role changed from "${
+              oldRoleData?.name || "No Role"
+            }" to "${newRoleData?.name}" for user ${user.firstName} ${
+              user.lastName
+            }`,
+            ipAddress: req.ip,
+            userAgent: req.get("User-Agent"),
+          }
+        );
+      }
+
+      // Log department change if department was updated
+      if (
+        updateData.department &&
+        oldDepartment?.toString() !== updateData.department?.toString()
+      ) {
+        const oldDeptData = oldDepartment
+          ? await Department.findById(oldDepartment)
+          : null;
+        const newDeptData = await Department.findById(updateData.department);
+
+        await AuditService.logUserAction(
+          currentUser._id,
+          "USER_DEPARTMENT_CHANGED",
+          user._id,
+          {
+            company: currentUser.company,
+            oldDepartment: oldDeptData?.name || "No Department",
+            newDepartment: newDeptData?.name,
+            description: `Department changed from "${
+              oldDeptData?.name || "No Department"
+            }" to "${newDeptData?.name}" for user ${user.firstName} ${
+              user.lastName
+            }`,
+            ipAddress: req.ip,
+            userAgent: req.get("User-Agent"),
+          }
+        );
+      }
+    } catch (auditError) {
+      console.error("Audit logging error:", auditError);
+      // Don't fail the main operation if audit logging fails
+    }
 
     res.json({
       success: true,
@@ -353,14 +476,19 @@ export const getManageableUsers = async (req, res) => {
     const manageableUsers = await User.find({
       "role.level": { $lt: currentUser.role.level },
       isActive: true,
+      email: { $not: /platformadmin/i },
     })
       .populate("role", "name level description")
       .select("-password");
 
+    const filteredUsers = manageableUsers.filter(
+      (user) => user.role && user.role.name !== "PLATFORM_ADMIN"
+    );
+
     res.json({
       success: true,
-      data: manageableUsers,
-      count: manageableUsers.length,
+      data: filteredUsers,
+      count: filteredUsers.length,
     });
   } catch (error) {
     console.error("Get manageable users error:", error);
@@ -431,6 +559,124 @@ export const updateUserProfile = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to update profile",
+    });
+  }
+};
+
+// Get pending registration users (for debugging)
+export const getPendingRegistrationUsers = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    // Check if user has permission to view users
+    if (!hasPermission(currentUser, "user.view")) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to view users",
+      });
+    }
+
+    console.log("🔍 getPendingRegistrationUsers - Checking for pending users");
+    console.log(
+      "🔍 getPendingRegistrationUsers - Current user role level:",
+      currentUser.role.level
+    );
+
+    // Get all users with PENDING_REGISTRATION status
+    const pendingUsers = await User.find({
+      status: "PENDING_REGISTRATION",
+      email: { $not: /platformadmin/i },
+    })
+      .populate("role", "name level description")
+      .populate("department", "name")
+      .populate("company", "name")
+      .select("-password");
+
+    console.log(
+      "🔍 getPendingRegistrationUsers - Found pending users:",
+      pendingUsers.length
+    );
+    console.log(
+      "🔍 getPendingRegistrationUsers - Pending users:",
+      pendingUsers.map((u) => ({
+        id: u._id,
+        email: u.email,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        status: u.status,
+        isActive: u.isActive,
+        role: u.role?.name,
+        department: u.department?.name,
+        company: u.company?.name,
+        hasCompany: !!u.company,
+        hasDepartment: !!u.department,
+      }))
+    );
+
+    // Also check all users to see the total count
+    const allUsers = await User.find({
+      email: { $not: /platformadmin/i },
+    }).select("status isActive email");
+    console.log(
+      "🔍 getPendingRegistrationUsers - Total users in system:",
+      allUsers.length
+    );
+    console.log("🔍 getPendingRegistrationUsers - Status breakdown:", {
+      active: allUsers.filter((u) => u.isActive === true).length,
+      inactive: allUsers.filter((u) => u.isActive === false).length,
+      pending: allUsers.filter((u) => u.status === "PENDING_REGISTRATION")
+        .length,
+      active_status: allUsers.filter((u) => u.status === "ACTIVE").length,
+    });
+
+    res.json({
+      success: true,
+      data: pendingUsers,
+      count: pendingUsers.length,
+      debug: {
+        totalUsers: allUsers.length,
+        statusBreakdown: {
+          active: allUsers.filter((u) => u.isActive === true).length,
+          inactive: allUsers.filter((u) => u.isActive === false).length,
+          pending: allUsers.filter((u) => u.status === "PENDING_REGISTRATION")
+            .length,
+          active_status: allUsers.filter((u) => u.status === "ACTIVE").length,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get pending registration users error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch pending users",
+    });
+  }
+};
+
+// Get assignment guidance for current user
+export const getAssignmentGuidanceForUser = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    // Check if user has permission to assign roles/departments
+    if (!hasPermission(currentUser, "user.assign_role")) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to assign roles and departments",
+      });
+    }
+
+    const guidance = await getAssignmentGuidance(currentUser);
+
+    res.json({
+      success: true,
+      data: guidance,
+    });
+  } catch (error) {
+    console.error("Get assignment guidance error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get assignment guidance",
     });
   }
 };

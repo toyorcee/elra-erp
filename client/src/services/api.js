@@ -2,21 +2,9 @@ import axios from "axios";
 
 console.log("API Base URL:", import.meta.env.VITE_API_URL);
 
-// Check if user has valid cookies on app start
-const checkInitialAuth = () => {
-  const cookies = document.cookie.split(";").reduce((acc, cookie) => {
-    const [key, value] = cookie.trim().split("=");
-    acc[key] = value;
-    return acc;
-  }, {});
-
-  return !!(cookies.accessToken && cookies.accessToken !== "undefined");
-};
-
-let hasLoggedIn = checkInitialAuth();
+let hasLoggedIn = false;
 export const setHasLoggedIn = (value) => {
   hasLoggedIn = value;
-  console.log("🔐 Login state changed:", hasLoggedIn);
 };
 
 const api = axios.create({
@@ -53,7 +41,7 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
-    console.error("API Error:", {
+    console.error("❌ API Error:", {
       url: error.config?.url,
       method: error.config?.method,
       status: error.response?.status,
@@ -71,7 +59,7 @@ api.interceptors.response.use(
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
-      (hasLoggedIn || checkInitialAuth())
+      hasLoggedIn
     ) {
       if (isRefreshing) {
         return new Promise(function (resolve, reject) {
@@ -100,20 +88,89 @@ api.interceptors.response.use(
   }
 );
 
-// Auth API
 export const authAPI = {
-  register: (userData) => api.post("/auth/register", userData),
+  register: async (formData) => {
+    try {
+      console.log("[authAPI.register] Called with formData:", formData);
+      const response = await api.post("/auth/register", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      return response.data;
+    } catch (error) {
+      if (error.response && error.response.data) {
+        return {
+          success: false,
+          error: error.response.data.message || "Registration failed",
+        };
+      }
+      return { success: false, error: "Registration failed" };
+    }
+  },
+
   login: (credentials) => api.post("/auth/login", credentials),
-  logout: () => api.post("/auth/logout"),
-  refreshToken: () => api.post("/auth/refresh"),
+  logout: () => api.get("/auth/logout"),
   getMe: () => api.get("/auth/me"),
-  changePassword: (passwordData) =>
-    api.put("/auth/change-password", passwordData),
-  forgotPassword: (email) => api.post("/auth/forgot-password", { email }),
-  resetPassword: (resetData) => api.post("/auth/reset-password", resetData),
-  joinCompany: (joinData) => api.post("/auth/join-company", joinData),
-  verifyEmail: (token) => api.post("/auth/verify-email", { token }),
-  resendVerification: (email) => api.post("/auth/resend-verification", email),
+
+  updateProfile: async (formData) => {
+    try {
+      const response = await api.patch("/auth/updatedetails", formData);
+      return response.data;
+    } catch (error) {
+      if (error.response && error.response.data) {
+        return {
+          success: false,
+          error: error.response.data.message || "Profile update failed",
+        };
+      }
+      return { success: false, error: "Profile update failed" };
+    }
+  },
+
+  updatePassword: async (formData) => {
+    try {
+      const response = await api.patch("/auth/updatepassword", formData);
+      return response;
+    } catch (error) {
+      console.error("[authAPI.updatePassword] Error:", error);
+      throw error;
+    }
+  },
+
+  forgotPassword: async (data) => {
+    try {
+      const response = await api.post("/auth/forgotpassword", data);
+      return response.data;
+    } catch (error) {
+      console.error("[authAPI.forgotPassword] Error:", error);
+      throw error;
+    }
+  },
+
+  resetPassword: async (data) => {
+    try {
+      console.log(
+        "[authAPI.resetPassword] Attempting to reset password with data:",
+        {
+          token: data.token ? "present" : "missing",
+          passwordLength: data.password?.length,
+        }
+      );
+      const response = await api.post("/auth/resetpassword", {
+        token: data.token,
+        password: data.password,
+      });
+      console.log(
+        "[authAPI.resetPassword] Reset password response:",
+        response.data
+      );
+      return response.data;
+    } catch (error) {
+      console.error("[authAPI.resetPassword] Error:", error);
+      throw error;
+    }
+  },
 };
 
 // System Setup API

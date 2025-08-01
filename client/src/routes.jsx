@@ -6,7 +6,7 @@ import ResetPassword from "./pages/auth/ResetPassword";
 import RetrieveCredentials from "./pages/auth/RetrieveCredentials";
 import EmailVerification from "./pages/auth/EmailVerification";
 import EmailVerificationSuccess from "./pages/auth/EmailVerificationSuccess";
-import { Dashboard, Profile, Documents, Upload, Approvals } from "./pages/user";
+import { Dashboard, Documents, Upload } from "./pages/user";
 import Notifications from "./pages/shared/Notifications";
 import UserSettings from "./pages/user/Settings";
 import {
@@ -15,7 +15,9 @@ import {
   Departments,
   AuditLogs,
   Settings as AdminSettings,
+  RoleManagement,
 } from "./pages/admin";
+
 import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
 import ApprovalLevels from "./pages/admin/ApprovalLevels";
 import WorkflowTemplates from "./pages/admin/WorkflowTemplates";
@@ -37,23 +39,6 @@ import RoleRedirect from "./components/common/RoleRedirect";
 import { SidebarProvider } from "./context/SidebarContext";
 import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
 import TermsConditions from "./pages/legal/TermsConditions";
-
-// Placeholder components for missing admin pages
-const RolesManagement = () => (
-  <div className="p-8">
-    <h1 className="text-2xl font-bold mb-4">Roles Management</h1>
-    <p className="text-gray-600">
-      Roles management functionality coming soon...
-    </p>
-  </div>
-);
-
-const Analytics = () => (
-  <div className="p-8">
-    <h1 className="text-2xl font-bold mb-4">Analytics</h1>
-    <p className="text-gray-600">Analytics dashboard coming soon...</p>
-  </div>
-);
 
 const AppRoutes = () => {
   return (
@@ -102,8 +87,7 @@ const AppRoutes = () => {
         <Route index element={<Dashboard />} />
         <Route path="documents" element={<Documents />} />
         <Route path="upload" element={<Upload />} />
-        <Route path="approvals" element={<Approvals />} />
-        <Route path="profile" element={<Profile />} />
+
         <Route path="notifications" element={<Notifications />} />
         <Route path="settings" element={<UserSettings />} />
       </Route>
@@ -126,14 +110,14 @@ const AppRoutes = () => {
         <Route path="approval-levels" element={<ApprovalLevels />} />
         <Route path="workflow-templates" element={<WorkflowTemplates />} />
         <Route path="settings" element={<AdminSettings />} />
-        <Route path="roles" element={<RolesManagement />} />
-        <Route path="analytics" element={<Analytics />} />
-        <Route path="approvals" element={<Approvals />} />
+        <Route path="roles" element={<RoleManagement />} />
+
         <Route path="documents" element={<Documents />} />
         <Route path="upload" element={<Upload />} />
-        <Route path="audit" element={<AuditLogs />} />
-        <Route path="profile" element={<Profile />} />
+        <Route path="audit-logs" element={<AuditLogs />} />
         <Route path="notifications" element={<Notifications />} />
+        <Route path="archive" element={<Documents />} />
+        <Route path="audit" element={<AuditLogs />} />
       </Route>
 
       {/* Platform Admin routes - also use DashboardLayout */}
@@ -155,7 +139,6 @@ const AppRoutes = () => {
         <Route path="create-company" element={<CreateCompany />} />
         <Route path="subscriptions" element={<SubscriptionManagement />} />
         <Route path="pricing" element={<PricingManagement />} />
-        <Route path="profile" element={<Profile />} />
         <Route path="notifications" element={<Notifications />} />
       </Route>
 

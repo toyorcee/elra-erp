@@ -12,6 +12,7 @@ import { toast } from "react-toastify";
 import { getSystemOverview } from "../../services/superAdmin";
 import { Link } from "react-router-dom";
 import { StatsSkeleton, GridSkeleton } from "../../components/skeleton";
+import RecentActivities from "../../components/RecentActivities";
 
 const AdminDashboard = () => {
   const [overviewData, setOverviewData] = useState(null);
@@ -183,68 +184,15 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Recent Activity */}
-      {overviewData?.recentActivity && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Recent Users
-            </h3>
-            <div className="space-y-3">
-              {overviewData.recentActivity.users
-                ?.slice(0, 5)
-                .map((user, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div>
-                      <p className="font-medium text-gray-900">{user.name}</p>
-                      <p className="text-sm text-gray-600">{user.email}</p>
-                    </div>
-                    <span className="text-xs text-gray-500">
-                      {new Date(user.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Recent Documents
-            </h3>
-            <div className="space-y-3">
-              {overviewData.recentActivity.documents
-                ?.slice(0, 5)
-                .map((doc, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div>
-                      <p className="font-medium text-gray-900">{doc.title}</p>
-                      <p className="text-sm text-gray-600">
-                        by {doc.uploadedBy?.name}
-                      </p>
-                    </div>
-                    <span
-                      className={`px-2 py-1 text-xs rounded-full ${
-                        doc.status === "APPROVED"
-                          ? "bg-green-100 text-green-800"
-                          : doc.status === "PENDING"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {doc.status}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Recent Activities */}
+      <div className="bg-white rounded-lg shadow-sm border p-6">
+        <RecentActivities
+          userRole="admin"
+          maxItems={10}
+          showFilters={true}
+          compact={false}
+        />
+      </div>
     </div>
   );
 };

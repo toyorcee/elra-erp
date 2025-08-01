@@ -1,14 +1,42 @@
 import api from "./api";
 
-// Approval Levels
-export const getApprovalLevels = () => api.get("/approval-levels");
-export const getApprovalLevel = (id) => api.get(`/approval-levels/${id}`);
-export const createApprovalLevel = (data) => api.post("/approval-levels", data);
-export const updateApprovalLevel = (id, data) =>
-  api.put(`/approval-levels/${id}`, data);
-export const deleteApprovalLevel = (id) => api.delete(`/approval-levels/${id}`);
-export const getApprovalLevelsByDocumentType = (documentType) =>
-  api.get(`/approval-levels/document-type/${documentType}`);
+// Get all approval levels
+export const getApprovalLevels = async () => {
+  const response = await api.get("/approval-levels");
+  return response.data;
+};
+
+// Get single approval level
+export const getApprovalLevel = async (id) => {
+  const response = await api.get(`/approval-levels/${id}`);
+  return response.data;
+};
+
+// Create approval level
+export const createApprovalLevel = async (levelData) => {
+  const response = await api.post("/approval-levels", levelData);
+  return response.data;
+};
+
+// Update approval level
+export const updateApprovalLevel = async (id, levelData) => {
+  const response = await api.put(`/approval-levels/${id}`, levelData);
+  return response.data;
+};
+
+// Delete approval level
+export const deleteApprovalLevel = async (id) => {
+  const response = await api.delete(`/approval-levels/${id}`);
+  return response.data;
+};
+
+// Get approval levels by document type
+export const getApprovalLevelsByDocumentType = async (documentType) => {
+  const response = await api.get(
+    `/approval-levels/document-type/${documentType}`
+  );
+  return response.data;
+};
 
 // Workflow Templates
 export const getWorkflowTemplates = (documentType) =>

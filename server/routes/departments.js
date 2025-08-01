@@ -13,9 +13,7 @@ import {
   bulkDeleteDepartments,
   bulkCreateDepartments,
 } from "../controllers/departmentController.js";
-import { protect } from "../middleware/auth.js";
-import { checkRole } from "../middleware/auth.js";
-import { checkPlanLimits } from "../middleware/planLimits.js";
+import { protect, checkRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -39,10 +37,6 @@ const validateDepartment = [
     .optional()
     .isInt({ min: 1, max: 100 })
     .withMessage("Level must be between 1 and 100"),
-  body("color")
-    .optional()
-    .matches(/^#[0-9A-F]{6}$/i)
-    .withMessage("Color must be a valid hex color code"),
 ];
 
 // All routes require authentication
@@ -66,13 +60,7 @@ router.get("/:id", checkRole(80), getDepartmentById);
 router.get("/", checkRole(80), getAllDepartments);
 
 // Super Admin only routes
-router.post(
-  "/",
-  checkRole(100),
-  checkPlanLimits("createDepartment"),
-  validateDepartment,
-  createDepartment
-);
+router.post("/", createDepartment);
 router.put("/:id", checkRole(100), validateDepartment, updateDepartment);
 router.delete("/:id", checkRole(100), deleteDepartment);
 router.delete("/bulk-delete", checkRole(100), bulkDeleteDepartments);

@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import documentClassifications, {
   categories,
   documentTypes,
+  documentStatuses,
+  priorityLevels,
 } from "../constants/documentClassifications.js";
 
 const documentSchema = new mongoose.Schema(
@@ -55,20 +57,12 @@ const documentSchema = new mongoose.Schema(
     },
     priority: {
       type: String,
-      enum: ["Low", "Medium", "High", "Critical"],
+      enum: priorityLevels.map((p) => p.value),
       default: "Medium",
     },
     status: {
       type: String,
-      enum: [
-        "DRAFT",
-        "SUBMITTED",
-        "UNDER_REVIEW",
-        "APPROVED",
-        "REJECTED",
-        "ARCHIVED",
-        "EXPIRED",
-      ],
+      enum: documentStatuses.map((s) => s.value),
       default: "DRAFT",
     },
     reference: {

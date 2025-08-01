@@ -1,5 +1,8 @@
 import Document from "../models/Document.js";
 import User from "../models/User.js";
+import AuditLog from "../models/AuditLog.js";
+import Department from "../models/Department.js";
+import Role from "../models/Role.js";
 
 // Get dashboard data based on user role
 export const getDashboardData = async (req, res) => {
@@ -137,5 +140,63 @@ export const getMyPendingApprovals = async (req, res) => {
       success: false,
       message: "Failed to fetch pending approvals",
     });
+  }
+};
+
+// Get system stats for super admin
+export const getSystemStats = async () => {
+  try {
+    // Get total users
+    const totalUsers = await User.countDocuments({ isActive: true });
+
+    // Get total documents
+    const totalDocuments = await Document.countDocuments({ isActive: true });
+
+    // Get documents by status
+    const documentsByStatus = await Document.aggregate([
+      { $match: { isActive: true } },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]);
+
+    // Get total departments
+    const totalDepartments = await Department.countDocuments();
+
+    // Get total roles
+    const totalRoles = await Role.countDocuments();
+
+    // Get recent audit logs
+    const recentAuditLogs = await AuditLog.find()
+      .populate("user", "firstName lastName email")
+      .populate("document", "title")
+      .sort({ createdAt: -1 })
+      .limit(10);
+
+    // Get system activity (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const recentActivity = await AuditLog.countDocuments({
+      createdAt: { $gte: sevenDaysAgo },
+    });
+
+    // Get pending approvals
+    const pendingApprovals = await Document.countDocuments({
+      status: { $in: ["SUBMITTED", "UNDER_REVIEW"] },
+      isActive: true,
+    });
+
+    return {
+      totalUsers,
+      totalDocuments,
+      totalDepartments,
+      totalRoles,
+      pendingApprovals,
+      recentActivity,
+      documentsByStatus,
+      recentAuditLogs,
+    };
+  } catch (error) {
+    console.error("Get system stats error:", error);
+    throw error;
   }
 };

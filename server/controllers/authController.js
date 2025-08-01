@@ -5,6 +5,7 @@ import User from "../models/User.js";
 import Role from "../models/Role.js";
 import Company from "../models/Company.js";
 import Department from "../models/Department.js";
+import Notification from "../models/Notification.js";
 import {
   sendPasswordResetEmail,
   sendPasswordChangeSuccessEmail,
@@ -26,46 +27,52 @@ const generateRefreshToken = (userId) => {
 };
 
 // Reusable cookie options function
-const getCookieOptions = (maxAge) => {
+const getCookieOptions = () => {
   const isProd = process.env.NODE_ENV === "production";
 
-  return {
+  const options = {
     httpOnly: true,
     secure: isProd,
     sameSite: isProd ? "None" : "Lax",
     path: "/",
-    maxAge: maxAge,
-    ...(isProd &&
-      process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN }),
+    maxAge: parseInt(process.env.COOKIE_EXPIRE) * 24 * 60 * 60 * 1000,
   };
+
+  return options;
 };
 
 // Set token cookies
-const setTokenCookies = (res, accessToken, refreshToken) => {
-  const accessTokenMaxAge = process.env.ACCESS_TOKEN_EXPIRE
-    ? parseTimeToMs(process.env.ACCESS_TOKEN_EXPIRE)
-    : 15 * 60 * 1000;
+const setTokenCookies = (res, accessToken, refreshToken, req = null) => {
+  const isProd = process.env.NODE_ENV === "production";
 
-  const refreshTokenMaxAge = process.env.REFRESH_TOKEN_EXPIRE
-    ? parseTimeToMs(process.env.REFRESH_TOKEN_EXPIRE)
-    : 24 * 60 * 60 * 1000;
+  // Access token cookie (non-httpOnly for client access)
+  const accessTokenOptions = {
+    httpOnly: false,
+    secure: isProd,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 15 * 60 * 1000, // 15 minutes
+  };
 
-  // Set cookies with consistent options
-  res.cookie("accessToken", accessToken, getCookieOptions(accessTokenMaxAge));
-  res.cookie(
-    "refreshToken",
-    refreshToken,
-    getCookieOptions(refreshTokenMaxAge)
+  // Refresh token cookie (httpOnly for security)
+  const refreshTokenOptions = getCookieOptions();
+
+  console.log(
+    "🍪 Setting access token cookie with options:",
+    accessTokenOptions
+  );
+  console.log(
+    "🍪 Setting refresh token cookie with options:",
+    refreshTokenOptions
   );
 
-  console.log("🍪 Setting cookies:", {
-    accessToken: `httpOnly: true, secure: ${
-      process.env.NODE_ENV === "production"
-    }, sameSite: ${process.env.NODE_ENV === "production" ? "None" : "Lax"}`,
-    refreshToken: "httpOnly: true, secure, sameSite",
-    maxAge: accessTokenMaxAge,
-    environment: process.env.NODE_ENV || "development",
-  });
+  if (req) {
+    console.log("🍪 Request origin:", req.headers.origin);
+    console.log("🍪 Request host:", req.headers.host);
+  }
+
+  res.cookie("token", accessToken, accessTokenOptions);
+  res.cookie("refreshToken", refreshToken, refreshTokenOptions);
 };
 
 // Helper function to parse time strings to milliseconds
@@ -89,27 +96,11 @@ const parseTimeToMs = (timeString) => {
 
 // Clear token cookies
 const clearTokenCookies = (res) => {
-  const isProd = process.env.NODE_ENV === "production";
+  const cookieOptions = getCookieOptions();
+  console.log("🧹 Clearing token cookies with options:", cookieOptions);
 
-  const clearOptions = {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? "None" : "Lax",
-    path: "/",
-    ...(isProd &&
-      process.env.COOKIE_DOMAIN && { domain: process.env.COOKIE_DOMAIN }),
-  };
-
-  console.log("🗑️ Clearing cookies:", {
-    accessToken: `httpOnly: true, secure: ${isProd}, sameSite: ${
-      isProd ? "None" : "Lax"
-    }`,
-    refreshToken: "httpOnly: true, secure, sameSite",
-    environment: process.env.NODE_ENV || "development",
-  });
-
-  res.clearCookie("accessToken", clearOptions);
-  res.clearCookie("refreshToken", clearOptions);
+  res.clearCookie("token", { ...cookieOptions, maxAge: 0 });
+  res.clearCookie("refreshToken", { ...cookieOptions, maxAge: 0 });
 };
 
 // @desc    Register a new user
@@ -138,20 +129,23 @@ export const register = async (req, res) => {
       });
     }
 
-    // For client-specific branch: Everyone who registers becomes a superadmin
-
     let userRole;
     let company;
     let defaultDepartment;
 
-    // Create or find SUPER_ADMIN role
-    userRole = await Role.findOne({ name: "SUPER_ADMIN" });
-    if (!userRole) {
-      console.error("❌ SUPER_ADMIN role not found");
-      return res.status(500).json({
-        success: false,
-        message: "System configuration error. Please contact support.",
-      });
+    const existingSuperAdmin = await User.findOne({ isSuperadmin: true });
+
+    if (!existingSuperAdmin) {
+      userRole = await Role.findOne({ name: "SUPER_ADMIN" });
+      if (!userRole) {
+        console.error("❌ SUPER_ADMIN role not found");
+        return res.status(500).json({
+          success: false,
+          message: "System configuration error. Please contact support.",
+        });
+      }
+    } else {
+      userRole = null;
     }
 
     // Check if this is the first user (first superadmin)
@@ -210,12 +204,13 @@ export const register = async (req, res) => {
       password,
       firstName,
       lastName,
-      role: userRole._id,
+      role: userRole?._id, // May be null for new users
       company: company?._id,
       department: defaultDepartment?._id,
-      isSuperadmin: true, // Everyone becomes superadmin in client-specific branch
+      isSuperadmin: !existingSuperAdmin, // Only first user becomes superadmin
       isEmailVerified: false, // Email not verified yet
-      isActive: false, // Account not active until email verified
+      isActive: false, // Account not active until Super Admin approves
+      status: existingSuperAdmin ? "PENDING_REGISTRATION" : "ACTIVE", // New users are pending
       emailVerificationToken: activationToken,
       emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
     });
@@ -239,18 +234,65 @@ export const register = async (req, res) => {
     // Populate role, company, and department after saving
     await user.populate(["role", "company", "department"]);
 
-    // Send activation email (async - don't wait for it)
+    // Send appropriate email based on user status
     try {
-      const { sendAccountActivationEmail } = await import(
-        "../services/emailService.js"
-      );
-      await sendAccountActivationEmail(
-        user.email,
-        user.firstName || user.username,
-        activationToken
-      );
+      const { sendAccountActivationEmail, sendPendingRegistrationEmail } =
+        await import("../services/emailService.js");
+
+      if (existingSuperAdmin) {
+        // New user - send pending registration email
+        await sendPendingRegistrationEmail(
+          user.email,
+          user.firstName || user.username
+        );
+
+        // Notify Super Admin about new registration
+        console.log(
+          `📧 New user registration: ${user.email} - Notifying Super Admin`
+        );
+
+        // Send notification to all Super Admins
+        try {
+          const superAdmins = await User.find({ isSuperadmin: true }).select(
+            "_id"
+          );
+
+          for (const superAdmin of superAdmins) {
+            await Notification.create({
+              recipient: superAdmin._id,
+              type: "USER_REGISTRATION",
+              title: "New User Registration",
+              message: `New user ${user.firstName} ${user.lastName} (${user.email}) has registered and is waiting for approval.`,
+              data: {
+                newUserId: user._id,
+                newUserEmail: user.email,
+                newUserName: `${user.firstName} ${user.lastName}`,
+                registrationDate: user.createdAt,
+              },
+              isRead: false,
+              priority: "medium",
+            });
+          }
+
+          console.log(
+            `✅ Notifications sent to ${superAdmins.length} Super Admin(s)`
+          );
+        } catch (notificationError) {
+          console.error(
+            "❌ Error sending Super Admin notification:",
+            notificationError
+          );
+        }
+      } else {
+        // First user (Super Admin) - send activation email
+        await sendAccountActivationEmail(
+          user.email,
+          user.firstName || user.username,
+          activationToken
+        );
+      }
     } catch (error) {
-      console.error("Error sending activation email:", error);
+      console.error("Error sending email:", error);
     }
 
     // Return user data (without password) - NO TOKENS GENERATED
@@ -278,11 +320,13 @@ export const register = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message:
-        "Account created successfully! Please check your email to activate your account before logging in.",
+      message: existingSuperAdmin
+        ? "Account created successfully! Please wait for the Super Admin to approve your registration and send you an invitation code."
+        : "Account created successfully! Please check your email to activate your account before logging in.",
       data: {
         user: userResponse,
-        requiresEmailVerification: true,
+        requiresEmailVerification: !existingSuperAdmin,
+        requiresSuperAdminApproval: existingSuperAdmin,
       },
     });
   } catch (error) {
@@ -361,6 +405,17 @@ export const login = async (req, res) => {
       });
     }
 
+    // Check if user is pending registration
+    if (user.status === "PENDING_REGISTRATION") {
+      console.log("Login failed: user is pending registration");
+      return res.status(401).json({
+        success: false,
+        message:
+          "Your account is pending approval. Please wait for the Super Administrator to send you an invitation code.",
+        requiresSuperAdminApproval: true,
+      });
+    }
+
     // Check if email is verified
     if (!user.isEmailVerified) {
       console.log("Login failed: email not verified");
@@ -415,7 +470,7 @@ export const login = async (req, res) => {
     console.log("Login success:", user.email);
 
     // Set cookies
-    setTokenCookies(res, accessToken, refreshToken);
+    setTokenCookies(res, accessToken, refreshToken, req);
 
     // Return user data (without password)
     const userResponse = {
@@ -500,10 +555,7 @@ export const refreshToken = async (req, res) => {
     const { refreshToken } = req.cookies;
 
     if (!refreshToken) {
-      return res.status(401).json({
-        success: false,
-        message: "Refresh token is required",
-      });
+      return res.status(401).json({ message: "No refresh token provided" });
     }
 
     // Verify refresh token
@@ -511,92 +563,33 @@ export const refreshToken = async (req, res) => {
     const user = await User.findById(decoded.id);
 
     if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid refresh token",
-      });
-    }
-
-    // Check if user is active
-    if (!user.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: "Account is deactivated",
-      });
-    }
-
-    // Check if refresh token exists in user's refresh tokens
-    const refreshTokenExists = user.refreshTokens.find(
-      (rt) => rt.token === refreshToken
-    );
-
-    if (!refreshTokenExists) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid refresh token",
-      });
-    }
-
-    // Check if refresh token is expired
-    if (refreshTokenExists.expiresAt < new Date()) {
-      // Remove expired token
-      await user.removeRefreshToken(refreshToken);
-      return res.status(401).json({
-        success: false,
-        message: "Refresh token expired",
-      });
+      return res.status(401).json({ message: "User not found" });
     }
 
     // Generate new tokens
-    const newAccessToken = generateAccessToken(user._id);
+    const token = generateAccessToken(user._id);
     const newRefreshToken = generateRefreshToken(user._id);
 
-    // Calculate new refresh token expiration
-    const newRefreshTokenExpiresAt = new Date();
-    const refreshTokenExpiryMs = process.env.REFRESH_TOKEN_EXPIRE
-      ? parseTimeToMs(process.env.REFRESH_TOKEN_EXPIRE)
-      : 24 * 60 * 60 * 1000; // 1 day default
-    newRefreshTokenExpiresAt.setTime(
-      newRefreshTokenExpiresAt.getTime() + refreshTokenExpiryMs
+    // Set cookies with hardcoded values
+    const cookieOptions = getCookieOptions();
+    console.log("[refreshToken] Setting cookies with options:", cookieOptions);
+    res.cookie("token", token, cookieOptions);
+    res.cookie("refreshToken", newRefreshToken, {
+      ...cookieOptions,
+      maxAge: 604800000,
+    });
+    console.log(
+      "[refreshToken] Response cookies:",
+      res.getHeaders()["set-cookie"]
     );
-
-    // Remove old refresh token and add new one
-    await user.removeRefreshToken(refreshToken);
-    await user.addRefreshToken(newRefreshToken, newRefreshTokenExpiresAt);
-
-    // Set new cookies
-    setTokenCookies(res, newAccessToken, newRefreshToken);
 
     res.status(200).json({
       success: true,
-      message: "Token refreshed successfully",
-      data: {
-        accessToken: newAccessToken,
-        refreshToken: newRefreshToken,
-      },
+      token,
+      refreshToken: newRefreshToken,
     });
   } catch (error) {
-    console.error("Refresh token error:", error);
-
-    if (error.name === "JsonWebTokenError") {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid refresh token",
-      });
-    }
-
-    if (error.name === "TokenExpiredError") {
-      return res.status(401).json({
-        success: false,
-        message: "Refresh token expired",
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
-    });
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -736,7 +729,7 @@ export const changePassword = async (req, res) => {
         new Date(Date.now() + 24 * 60 * 60 * 1000)
       );
 
-      setTokenCookies(res, accessToken, refreshToken);
+      setTokenCookies(res, accessToken, refreshToken, req);
 
       res.status(200).json({
         success: true,
@@ -1081,7 +1074,7 @@ export const joinCompany = async (req, res) => {
     await user.addRefreshToken(refreshToken, refreshTokenExpiresAt);
 
     // Set cookies
-    setTokenCookies(res, accessToken, refreshToken);
+    setTokenCookies(res, accessToken, refreshToken, req);
 
     console.log("Join company success:", user.email);
 

@@ -259,29 +259,34 @@ const RedirectionSpinner = ({
 
             {/* Progress indicator */}
             <div className="flex items-center justify-center space-x-2 mb-6">
-              {steps.map((step, index) => (
-                <motion.div
-                  key={`step-${index}-${step.title}`}
-                  className={`w-3 h-3 rounded-full ${
-                    index <= currentStep ? "bg-blue-500" : "bg-white/20"
-                  }`}
-                  animate={{
-                    scale: index === currentStep ? [1, 1.3, 1] : 1,
-                    boxShadow:
-                      index === currentStep
-                        ? [
-                            "0 0 0 0 rgba(59, 130, 246, 0.4)",
-                            "0 0 0 10px rgba(59, 130, 246, 0)",
-                            "0 0 0 0 rgba(59, 130, 246, 0)",
-                          ]
-                        : "0 0 0 0 rgba(59, 130, 246, 0)",
-                  }}
-                  transition={{
-                    duration: 1.5,
-                    repeat: index === currentStep ? Infinity : 0,
-                  }}
-                />
-              ))}
+              {steps.map((step, index) => {
+                const isCurrentStep = index === currentStep;
+                const scaleAnimation = isCurrentStep ? [1, 1.3, 1] : 1;
+                const boxShadowAnimation = isCurrentStep
+                  ? [
+                      "0 0 0 0 rgba(59, 130, 246, 0.4)",
+                      "0 0 0 10px rgba(59, 130, 246, 0)",
+                      "0 0 0 0 rgba(59, 130, 246, 0)",
+                    ]
+                  : "0 0 0 0 rgba(59, 130, 246, 0)";
+
+                return (
+                  <motion.div
+                    key={`step-${index}-${step.title}`}
+                    className={`w-3 h-3 rounded-full ${
+                      index <= currentStep ? "bg-blue-500" : "bg-white/20"
+                    }`}
+                    animate={{
+                      scale: scaleAnimation,
+                      boxShadow: boxShadowAnimation,
+                    }}
+                    transition={{
+                      duration: 1.5,
+                      repeat: isCurrentStep ? Infinity : 0,
+                    }}
+                  />
+                );
+              })}
             </div>
 
             {/* Security notice */}

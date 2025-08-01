@@ -603,8 +603,24 @@ const DepartmentManagement = () => {
                       "bg-indigo-100",
                       "bg-gray-100",
                     ];
-                    const totalLevels = approvalLevelsData.data.length;
-                    const isLast = index === totalLevels - 1;
+
+                    // Avoid problematic conditional expressions
+                    let stepText = "";
+                    let isBold = false;
+
+                    if (index === 0) {
+                      stepText = "Document Created → ";
+                    }
+
+                    stepText += `${
+                      level.department || "Unknown Department"
+                    } (Level ${level.level || "Unknown"})`;
+
+                    if (index + 1 >= approvalLevelsData.data.length) {
+                      stepText += " → APPROVED";
+                      isBold = true;
+                    }
+
                     return (
                       <div
                         key={level._id || index}
@@ -617,11 +633,8 @@ const DepartmentManagement = () => {
                         >
                           {index + 1}
                         </span>
-                        <span className={isLast ? "font-semibold" : ""}>
-                          {index === 0 ? "Document Created → " : ""}
-                          {level.department || "Unknown Department"} (Level{" "}
-                          {level.level || "Unknown"})
-                          {isLast ? " → APPROVED" : ""}
+                        <span className={isBold ? "font-semibold" : ""}>
+                          {stepText}
                         </span>
                       </div>
                     );

@@ -625,78 +625,89 @@ const LandingPage = () => {
       <section ref={statsRef} className="py-16 bg-white/5 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
-            <motion.div
-              className="text-center"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              viewport={{ once: true }}
-            >
-              <motion.div
-                className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent mb-2"
-                animate={statsVisible ? { scale: [1, 1.1, 1] } : {}}
-                transition={{ duration: 0.3, delay: 0.5 }}
-              >
-                {animatedStats.documents.toLocaleString()}+
-              </motion.div>
-              <div className="text-white/70 font-medium text-sm uppercase tracking-wide">
-                Documents Managed
-              </div>
-            </motion.div>
-            <motion.div
-              className="text-center"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              viewport={{ once: true }}
-            >
-              <motion.div
-                className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent mb-2"
-                animate={statsVisible ? { scale: [1, 1.1, 1] } : {}}
-                transition={{ duration: 0.3, delay: 0.7 }}
-              >
-                {animatedStats.users.toLocaleString()}+
-              </motion.div>
-              <div className="text-white/70 font-medium text-sm uppercase tracking-wide">
-                Active Users
-              </div>
-            </motion.div>
-            <motion.div
-              className="text-center"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              viewport={{ once: true }}
-            >
-              <motion.div
-                className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent mb-2"
-                animate={statsVisible ? { scale: [1, 1.1, 1] } : {}}
-                transition={{ duration: 0.3, delay: 0.9 }}
-              >
-                {animatedStats.companies}+
-              </motion.div>
-              <div className="text-white/70 font-medium text-sm uppercase tracking-wide">
-                Companies Trust Us
-              </div>
-            </motion.div>
-            <motion.div
-              className="text-center"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              viewport={{ once: true }}
-            >
-              <motion.div
-                className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent mb-2"
-                animate={statsVisible ? { scale: [1, 1.1, 1] } : {}}
-                transition={{ duration: 0.3, delay: 1.1 }}
-              >
-                {animatedStats.uptime.toFixed(1)}%
-              </motion.div>
-              <div className="text-white/70 font-medium text-sm uppercase tracking-wide">
-                Uptime Guarantee
-              </div>
-            </motion.div>
+            {(() => {
+              const scaleAnimation = statsVisible ? [1, 1.1, 1] : 1;
+              const statsAnimation = statsVisible
+                ? { scale: scaleAnimation }
+                : {};
+
+              return (
+                <>
+                  <motion.div
+                    className="text-center"
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.1 }}
+                    viewport={{ once: true }}
+                  >
+                    <motion.div
+                      className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent mb-2"
+                      animate={statsAnimation}
+                      transition={{ duration: 0.3, delay: 0.5 }}
+                    >
+                      {animatedStats.documents.toLocaleString()}+
+                    </motion.div>
+                    <div className="text-white/70 font-medium text-sm uppercase tracking-wide">
+                      Documents Managed
+                    </div>
+                  </motion.div>
+                  <motion.div
+                    className="text-center"
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.2 }}
+                    viewport={{ once: true }}
+                  >
+                    <motion.div
+                      className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent mb-2"
+                      animate={statsAnimation}
+                      transition={{ duration: 0.3, delay: 0.7 }}
+                    >
+                      {animatedStats.users.toLocaleString()}+
+                    </motion.div>
+                    <div className="text-white/70 font-medium text-sm uppercase tracking-wide">
+                      Active Users
+                    </div>
+                  </motion.div>
+                  <motion.div
+                    className="text-center"
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.3 }}
+                    viewport={{ once: true }}
+                  >
+                    <motion.div
+                      className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent mb-2"
+                      animate={statsAnimation}
+                      transition={{ duration: 0.3, delay: 0.9 }}
+                    >
+                      {animatedStats.companies}+
+                    </motion.div>
+                    <div className="text-white/70 font-medium text-sm uppercase tracking-wide">
+                      Companies Trust Us
+                    </div>
+                  </motion.div>
+                  <motion.div
+                    className="text-center"
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.4 }}
+                    viewport={{ once: true }}
+                  >
+                    <motion.div
+                      className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent mb-2"
+                      animate={statsAnimation}
+                      transition={{ duration: 0.3, delay: 1.1 }}
+                    >
+                      {animatedStats.uptime.toFixed(1)}%
+                    </motion.div>
+                    <div className="text-white/70 font-medium text-sm uppercase tracking-wide">
+                      Uptime Guarantee
+                    </div>
+                  </motion.div>
+                </>
+              );
+            })()}
           </div>
         </div>
       </section>

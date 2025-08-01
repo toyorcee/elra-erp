@@ -18,14 +18,13 @@ const EDMSLogo = ({ variant = "light", className = "" }) => {
       <span
         className={`font-extrabold text-2xl md:text-3xl tracking-wide ${base} ${shadow}`}
         style={{
-          fontFamily: "'Poppins', ui-sans-serif, system-ui, sans-serif",
+          fontFamily:
+            "'Poppins', ui-sans-serif, system-ui, sans-serif !important",
           fontWeight: 800,
           letterSpacing: "0.05em",
           WebkitFontSmoothing: "antialiased",
           MozOsxFontSmoothing: "grayscale",
           fontStyle: "normal",
-          fontFamily:
-            "'Poppins', ui-sans-serif, system-ui, sans-serif !important",
         }}
       >
         E

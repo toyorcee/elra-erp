@@ -328,23 +328,29 @@ const DepartmentManagement = () => {
   };
 
   const getDepartmentHierarchy = (departments) => {
+    if (!Array.isArray(departments)) return [];
+
     const hierarchy = [];
     const parentMap = new Map();
 
     // Create parent-child map
     departments.forEach((dept) => {
-      if (dept.parentDepartment) {
+      if (dept && dept.parentDepartment) {
         if (!parentMap.has(dept.parentDepartment)) {
           parentMap.set(dept.parentDepartment, []);
         }
-        parentMap.get(dept.parentDepartment).push(dept);
-      } else {
+        const children = parentMap.get(dept.parentDepartment);
+        if (Array.isArray(children)) {
+          children.push(dept);
+        }
+      } else if (dept) {
         hierarchy.push(dept);
       }
     });
 
     // Recursively add children
     const addChildren = (parent) => {
+      if (!parent || !parent._id) return [];
       const children = parentMap.get(parent._id) || [];
       parent.children = children.map((child) => ({
         ...child,
@@ -515,10 +521,16 @@ const DepartmentManagement = () => {
           </h3>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {(() => {
+              if (!Array.isArray(departments)) return null;
+
               const levelGroups = departments.reduce((acc, dept) => {
-                const level = dept.level;
-                if (!acc[level]) acc[level] = [];
-                acc[level].push(dept);
+                if (dept && typeof dept.level !== "undefined") {
+                  const level = dept.level;
+                  if (!acc[level]) acc[level] = [];
+                  if (Array.isArray(acc[level])) {
+                    acc[level].push(dept);
+                  }
+                }
                 return acc;
               }, {});
 
@@ -536,11 +548,13 @@ const DepartmentManagement = () => {
                       Level {level}
                     </div>
                     <div className="text-lg text-gray-700 mb-3">
-                      {levelGroups[level].length} department
-                      {levelGroups[level].length !== 1 ? "s" : ""}
+                      {levelGroups[level]?.length || 0} department
+                      {(levelGroups[level]?.length || 0) !== 1 ? "s" : ""}
                     </div>
                     <div className="text-sm text-gray-500">
-                      {levelGroups[level].map((dept) => dept.name).join(", ")}
+                      {levelGroups[level]
+                        ?.map((dept) => dept?.name || "Unknown")
+                        .join(", ") || "No departments"}
                     </div>
                   </div>
                 </div>
@@ -576,7 +590,8 @@ const DepartmentManagement = () => {
                 🔄 Complete Document Flow:
               </h4>
               <div className="space-y-2 text-sm">
-                {approvalLevelsData?.data ? (
+                {approvalLevelsData?.data &&
+                Array.isArray(approvalLevelsData.data) ? (
                   approvalLevelsData.data.map((level, index) => {
                     const colors = [
                       "bg-blue-100",
@@ -588,9 +603,13 @@ const DepartmentManagement = () => {
                       "bg-indigo-100",
                       "bg-gray-100",
                     ];
-                    const isLast = index === approvalLevelsData.data.length - 1;
+                    const totalLevels = approvalLevelsData.data.length;
+                    const isLast = index === totalLevels - 1;
                     return (
-                      <div key={level._id} className="flex items-center gap-2">
+                      <div
+                        key={level._id || index}
+                        className="flex items-center gap-2"
+                      >
                         <span
                           className={`w-6 h-6 ${
                             colors[index % colors.length]
@@ -600,7 +619,8 @@ const DepartmentManagement = () => {
                         </span>
                         <span className={isLast ? "font-semibold" : ""}>
                           {index === 0 ? "Document Created → " : ""}
-                          {level.department} (Level {level.level})
+                          {level.department || "Unknown Department"} (Level{" "}
+                          {level.level || "Unknown"})
                           {isLast ? " → APPROVED" : ""}
                         </span>
                       </div>

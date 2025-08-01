@@ -20,7 +20,7 @@ const setTokenCookies = (res, accessToken, refreshToken) => {
     secure: isProd,
     sameSite: isProd ? "None" : "Lax",
     path: "/",
-    maxAge: parseInt(process.env.COOKIE_EXPIRE) * 24 * 60 * 60 * 1000,
+    maxAge: parseInt(process.env.COOKIE_EXPIRE || "7") * 24 * 60 * 60 * 1000,
   });
 };
 

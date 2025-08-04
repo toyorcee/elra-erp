@@ -24,6 +24,14 @@ export const resendInvitation = async (id) => {
   return response.data;
 };
 
+// Get invitations for a specific user
+export const getInvitationsForUser = async (email) => {
+  const response = await api.get("/invitations", {
+    params: { email, status: "active" },
+  });
+  return response.data;
+};
+
 // Cancel invitation
 export const cancelInvitation = async (id) => {
   const response = await api.delete(`/invitations/${id}`);
@@ -40,4 +48,4 @@ export const acceptInvitation = async (code) => {
 export const validateInvitationCode = async (code) => {
   const response = await api.post("/invitations/validate", { code });
   return response.data;
-}; 
+};

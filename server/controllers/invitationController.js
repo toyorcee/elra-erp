@@ -384,6 +384,67 @@ export const cancelInvitation = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Verify invitation code and return preview data (Public)
+// @route   POST /api/invitations/verify
+// @access  Public
+export const verifyInvitationCode = asyncHandler(async (req, res) => {
+  const { code } = req.body;
+
+  if (!code) {
+    return res.status(400).json({
+      success: false,
+      message: "Invitation code is required",
+    });
+  }
+
+  // Find invitation by code
+  const invitation = await Invitation.findOne({
+    code: code.toUpperCase(),
+    status: "active",
+    expiresAt: { $gt: new Date() },
+  }).populate("company department role");
+
+  if (!invitation) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid or expired invitation code",
+    });
+  }
+
+  res.json({
+    success: true,
+    message: "Invitation code verified successfully",
+    data: {
+      invitation: {
+        id: invitation._id,
+        code: invitation.code,
+        email: invitation.email,
+        firstName: invitation.firstName,
+        lastName: invitation.lastName,
+        position: invitation.position,
+        notes: invitation.notes,
+        expiresAt: invitation.expiresAt,
+        company: {
+          id: invitation.company._id,
+          name: invitation.company.name,
+          description: invitation.company.description,
+        },
+        department: {
+          id: invitation.department._id,
+          name: invitation.department.name,
+          description: invitation.department.description,
+        },
+        role: {
+          id: invitation.role._id,
+          name: invitation.role.name,
+          level: invitation.role.level,
+          description: invitation.role.description,
+        },
+      },
+    },
+  });
+});
+
 // @desc    Get invitation statistics (Super Admin only)
 // @route   GET /api/invitations/stats
 // @access  Private (Super Admin)

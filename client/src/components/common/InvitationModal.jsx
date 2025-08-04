@@ -13,12 +13,12 @@ import {
 } from "react-icons/md";
 import { sendInvitation } from "../../services/invitations";
 
-const InvitationModal = ({ 
-  isOpen, 
-  onClose, 
-  onSuccess, 
+const InvitationModal = ({
+  isOpen,
+  onClose,
+  onSuccess,
   userPermissions = {},
-  isSuperAdmin = false 
+  isSuperAdmin = false,
 }) => {
   const [formData, setFormData] = useState({
     email: "",
@@ -34,13 +34,13 @@ const InvitationModal = ({
   const positionRoleMapping = {
     "Claims Officer": "STAFF",
     "Claims Manager": "SUPERVISOR",
-    "Underwriter": "SENIOR_STAFF",
+    Underwriter: "SENIOR_STAFF",
     "Senior Underwriter": "SUPERVISOR",
     "Regional Manager": "MANAGER",
     "Compliance Officer": "SENIOR_STAFF",
-    "Auditor": "SENIOR_STAFF",
+    Auditor: "SENIOR_STAFF",
     "Finance Officer": "STAFF",
-    "Accountant": "STAFF",
+    Accountant: "STAFF",
     "HR Officer": "STAFF",
     "IT Support": "STAFF",
     "IT Manager": "SUPERVISOR",
@@ -53,13 +53,13 @@ const InvitationModal = ({
   const positionDepartmentMapping = {
     "Claims Officer": "CLAIMS",
     "Claims Manager": "CLAIMS",
-    "Underwriter": "UNDERWRITE",
+    Underwriter: "UNDERWRITE",
     "Senior Underwriter": "UNDERWRITE",
     "Regional Manager": "REGIONAL",
     "Compliance Officer": "COMPLIANCE",
-    "Auditor": "COMPLIANCE",
+    Auditor: "COMPLIANCE",
     "Finance Officer": "FINANCE",
-    "Accountant": "FINANCE",
+    Accountant: "FINANCE",
     "HR Officer": "HR",
     "IT Support": "IT",
     "IT Manager": "IT",
@@ -189,7 +189,9 @@ const InvitationModal = ({
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6 w-full max-w-md">
           <div className="text-center">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Access Denied</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">
+              Access Denied
+            </h2>
             <p className="text-gray-600 mb-4">
               You don't have permission to invite users.
             </p>
@@ -206,8 +208,8 @@ const InvitationModal = ({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-2 sm:p-4">
+      <div className="bg-white rounded-xl shadow-2xl p-4 sm:p-6 w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto transform transition-all duration-300 ease-out border border-gray-100">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h2 className="text-xl font-bold text-gray-900">
@@ -233,7 +235,7 @@ const InvitationModal = ({
               Staff Information
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address *
@@ -317,7 +319,7 @@ const InvitationModal = ({
               Role & Department (Auto-assigned)
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Assigned Role
@@ -363,18 +365,18 @@ const InvitationModal = ({
           </div>
 
           {/* Submit Button */}
-          <div className="flex justify-end space-x-3 pt-4">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
             >
               {loading ? (
                 <>
@@ -395,4 +397,4 @@ const InvitationModal = ({
   );
 };
 
-export default InvitationModal; 
+export default InvitationModal;

@@ -51,31 +51,15 @@ const setTokenCookies = (res, accessToken, refreshToken, req = null) => {
     secure: isProd,
     sameSite: "lax",
     path: "/",
-    maxAge: 15 * 60 * 1000, // 15 minutes
+    maxAge: 15 * 60 * 1000,
   };
 
-  // Refresh token cookie (httpOnly for security)
   const refreshTokenOptions = getCookieOptions();
-
-  console.log(
-    "🍪 Setting access token cookie with options:",
-    accessTokenOptions
-  );
-  console.log(
-    "🍪 Setting refresh token cookie with options:",
-    refreshTokenOptions
-  );
-
-  if (req) {
-    console.log("🍪 Request origin:", req.headers.origin);
-    console.log("🍪 Request host:", req.headers.host);
-  }
 
   res.cookie("token", accessToken, accessTokenOptions);
   res.cookie("refreshToken", refreshToken, refreshTokenOptions);
 };
 
-// Helper function to parse time strings to milliseconds
 const parseTimeToMs = (timeString) => {
   const unit = timeString.slice(-1);
   const value = parseInt(timeString.slice(0, -1));
@@ -97,7 +81,6 @@ const parseTimeToMs = (timeString) => {
 // Clear token cookies
 const clearTokenCookies = (res) => {
   const cookieOptions = getCookieOptions();
-  console.log("🧹 Clearing token cookies with options:", cookieOptions);
 
   res.clearCookie("token", { ...cookieOptions, maxAge: 0 });
   res.clearCookie("refreshToken", { ...cookieOptions, maxAge: 0 });
@@ -108,7 +91,6 @@ const clearTokenCookies = (res) => {
 // @access  Public
 export const register = async (req, res) => {
   try {
-    // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -120,8 +102,9 @@ export const register = async (req, res) => {
 
     const { username, email, password, firstName, lastName } = req.body;
 
-    // Check if user already exists
-    const existingUser = await User.findByEmailOrUsername(email);
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const existingUser = await User.findByEmailOrUsername(normalizedEmail);
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -138,7 +121,6 @@ export const register = async (req, res) => {
     if (!existingSuperAdmin) {
       userRole = await Role.findOne({ name: "SUPER_ADMIN" });
       if (!userRole) {
-        console.error("❌ SUPER_ADMIN role not found");
         return res.status(500).json({
           success: false,
           message: "System configuration error. Please contact support.",
@@ -150,6 +132,7 @@ export const register = async (req, res) => {
 
     // Check if this is the first user (first superadmin)
     const existingCompany = await Company.findOne();
+
     if (!existingCompany) {
       company = await Company.create({
         name: `${firstName} ${lastName}'s Company`,
@@ -173,8 +156,6 @@ export const register = async (req, res) => {
         isActive: true,
         createdBy: null, // Will be set after user creation
       });
-
-      console.log("✅ Created default company and department for superadmin");
     } else {
       // Use existing company and department
       company = existingCompany;
@@ -191,16 +172,16 @@ export const register = async (req, res) => {
       }
     }
 
-    // Generate activation token
+    // Generate activation token (using normalized email)
     const activationToken = jwt.sign(
-      { email, type: "activation" },
+      { email: normalizedEmail, type: "activation" },
       process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
 
     const user = new User({
       username,
-      email,
+      email: normalizedEmail,
       password,
       firstName,
       lastName,
@@ -246,11 +227,6 @@ export const register = async (req, res) => {
           user.firstName || user.username
         );
 
-        // Notify Super Admin about new registration
-        console.log(
-          `📧 New user registration: ${user.email} - Notifying Super Admin`
-        );
-
         // Send notification to all Super Admins
         try {
           const superAdmins = await User.find({ isSuperadmin: true }).select(
@@ -273,13 +249,9 @@ export const register = async (req, res) => {
               priority: "medium",
             });
           }
-
-          console.log(
-            `✅ Notifications sent to ${superAdmins.length} Super Admin(s)`
-          );
         } catch (notificationError) {
           console.error(
-            "❌ Error sending Super Admin notification:",
+            "Error sending Super Admin notification:",
             notificationError
           );
         }
@@ -330,11 +302,7 @@ export const register = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ REGISTRATION FAILED");
-    console.error("🔍 Error details:", error);
-    console.error("📝 Request body was:", req.body);
-    console.error("⏰ Error occurred at:", new Date().toISOString());
-    console.error("=".repeat(80));
+    console.error("Registration failed:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -368,7 +336,6 @@ export const login = async (req, res) => {
 
     // If not found, try without isActive filter for debugging
     if (!user) {
-      console.log("User not found with isActive filter, trying without...");
       user = await User.findOne({
         $or: [{ email: identifier.toLowerCase() }, { username: identifier }],
       })
@@ -376,20 +343,7 @@ export const login = async (req, res) => {
         .populate("role");
     }
 
-    console.log("Login attempt for:", identifier);
-    console.log("User found:", user ? "Yes" : "No");
-    if (user) {
-      console.log("User details:", {
-        email: user.email,
-        username: user.username,
-        isActive: user.isActive,
-        role: user.role?.name,
-        hasPassword: !!user.password,
-      });
-    }
-
     if (!user) {
-      console.log("Login failed: user not found");
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
@@ -398,7 +352,6 @@ export const login = async (req, res) => {
 
     // Check if user is active
     if (!user.isActive) {
-      console.log("Login failed: user is inactive");
       return res.status(401).json({
         success: false,
         message: "Account is deactivated",
@@ -407,7 +360,6 @@ export const login = async (req, res) => {
 
     // Check if user is pending registration
     if (user.status === "PENDING_REGISTRATION") {
-      console.log("Login failed: user is pending registration");
       return res.status(401).json({
         success: false,
         message:
@@ -418,7 +370,6 @@ export const login = async (req, res) => {
 
     // Check if email is verified
     if (!user.isEmailVerified) {
-      console.log("Login failed: email not verified");
       return res.status(401).json({
         success: false,
         message:
@@ -428,17 +379,12 @@ export const login = async (req, res) => {
     }
 
     // Check password
-    console.log("Attempting password comparison...");
     const isPasswordCorrect = await user.correctPassword(
       password,
       user.password
     );
-    console.log("Password comparison result:", isPasswordCorrect);
 
     if (!isPasswordCorrect) {
-      console.log("Login failed: incorrect password");
-      console.log("Provided password:", password);
-      console.log("Stored password hash:", user.password);
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
@@ -572,16 +518,11 @@ export const refreshToken = async (req, res) => {
 
     // Set cookies with hardcoded values
     const cookieOptions = getCookieOptions();
-    console.log("[refreshToken] Setting cookies with options:", cookieOptions);
     res.cookie("token", token, cookieOptions);
     res.cookie("refreshToken", newRefreshToken, {
       ...cookieOptions,
       maxAge: 604800000,
     });
-    console.log(
-      "[refreshToken] Response cookies:",
-      res.getHeaders()["set-cookie"]
-    );
 
     res.status(200).json({
       success: true,
@@ -639,12 +580,6 @@ export const getMe = async (req, res) => {
       createdAt: user.createdAt,
       avatar: user.avatar,
     };
-
-    console.log("📤 Sending user response:", {
-      roleName: userResponse.role?.name,
-      roleLevel: userResponse.role?.level,
-      roleId: userResponse.role?._id,
-    });
 
     res.status(200).json({
       success: true,
@@ -712,10 +647,6 @@ export const changePassword = async (req, res) => {
       user.passwordChangeRequired = false;
       user.lastPasswordChange = new Date();
       user.passwordChangedAt = new Date();
-
-      console.log(
-        `✅ User ${user.email} changed temporary password successfully`
-      );
     }
 
     await user.save();
@@ -790,14 +721,9 @@ export const forgotPassword = async (req, res) => {
     const clientIP = req.ip || req.connection.remoteAddress;
     const userAgent = req.get("User-Agent");
 
-    console.log(`🔐 Password reset attempt for email: ${email}`);
-    console.log(`📍 IP Address: ${clientIP}`);
-    console.log(`🌐 User Agent: ${userAgent}`);
-
     // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
-      console.log(`❌ Password reset failed: User not found - ${email}`);
       return res.status(200).json({
         success: true,
         message:
@@ -806,7 +732,6 @@ export const forgotPassword = async (req, res) => {
     }
 
     if (!user.isActive) {
-      console.log(`❌ Password reset failed: Account deactivated - ${email}`);
       return res.status(200).json({
         success: true,
         message:
@@ -818,8 +743,6 @@ export const forgotPassword = async (req, res) => {
     const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: process.env.PASSWORD_RESET_EXPIRE || "1h",
     });
-
-    console.log(`🔑 Reset token generated for user: ${user._id}`);
 
     // Save reset token to user (hashed)
     const saltRounds = parseInt(process.env.BCRYPT_ROUNDS) || 12;
@@ -833,11 +756,7 @@ export const forgotPassword = async (req, res) => {
     user.passwordResetExpires = new Date(Date.now() + resetTokenExpiry);
     await user.save();
 
-    console.log(`💾 Reset token saved to database for user: ${user._id}`);
-    console.log(`⏰ Token expires at: ${user.passwordResetExpires}`);
-
     // Send email with reset link
-    console.log(`📧 Sending password reset email to: ${user.email}`);
     const emailResult = await sendPasswordResetEmail(
       user.email,
       resetToken,
@@ -854,10 +773,6 @@ export const forgotPassword = async (req, res) => {
         message: "Failed to send password reset email. Please try again.",
       });
     }
-
-    console.log(`✅ Password reset email sent successfully!`);
-    console.log(`📧 Email Message ID: ${emailResult.messageId}`);
-    console.log(`🎯 Reset link sent to: ${user.email}`);
 
     res.status(200).json({
       success: true,
@@ -897,18 +812,15 @@ export const resetPassword = async (req, res) => {
     }
 
     const { token, newPassword } = req.body;
-    console.log("✅ Validation passed, processing reset...");
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("🔑 Token verified for user:", decoded.id);
 
     // Find user with reset token
     const user = await User.findById(decoded.id).select(
       "+passwordResetToken +passwordResetExpires"
     );
     if (!user) {
-      console.log("❌ User not found for token:", decoded.id);
       return res.status(400).json({
         success: false,
         message: "Invalid or expired reset token",
@@ -917,7 +829,6 @@ export const resetPassword = async (req, res) => {
 
     // Check if reset token exists and is not expired
     if (!user.passwordResetToken || !user.passwordResetExpires) {
-      console.log("❌ No reset token found for user:", user._id);
       return res.status(400).json({
         success: false,
         message: "Invalid or expired reset token",
@@ -925,7 +836,6 @@ export const resetPassword = async (req, res) => {
     }
 
     if (user.passwordResetExpires < new Date()) {
-      console.log("❌ Reset token expired for user:", user._id);
       return res.status(400).json({
         success: false,
         message: "Reset token has expired",
@@ -935,14 +845,11 @@ export const resetPassword = async (req, res) => {
     // Verify reset token
     const isTokenValid = await bcrypt.compare(token, user.passwordResetToken);
     if (!isTokenValid) {
-      console.log("❌ Invalid reset token for user:", user._id);
       return res.status(400).json({
         success: false,
         message: "Invalid reset token",
       });
     }
-
-    console.log("✅ Token validation successful, updating password...");
 
     // Update password
     user.password = newPassword;
@@ -953,7 +860,6 @@ export const resetPassword = async (req, res) => {
     user.refreshTokens = [];
 
     await user.save();
-    console.log("✅ Password updated successfully for user:", user._id);
 
     const emailResult = await sendPasswordChangeSuccessEmail(
       user.email,
@@ -965,8 +871,6 @@ export const resetPassword = async (req, res) => {
         "❌ Failed to send password change success email:",
         emailResult.error
       );
-    } else {
-      console.log("✅ Password change success email sent to:", user.email);
     }
 
     res.status(200).json({
@@ -1075,8 +979,6 @@ export const joinCompany = async (req, res) => {
 
     // Set cookies
     setTokenCookies(res, accessToken, refreshToken, req);
-
-    console.log("Join company success:", user.email);
 
     res.status(201).json({
       success: true,
@@ -1242,9 +1144,8 @@ export const resendVerificationEmail = async (req, res) => {
         user.firstName || user.username,
         activationToken
       );
-      console.log("✅ Verification email resent to:", user.email);
     } catch (error) {
-      console.error("❌ Error sending verification email:", error);
+      console.error("Error sending verification email:", error);
       return res.status(500).json({
         success: false,
         message: "Failed to send verification email",
@@ -1256,7 +1157,7 @@ export const resendVerificationEmail = async (req, res) => {
       message: "Verification email sent successfully",
     });
   } catch (error) {
-    console.error("❌ Resend verification failed:", error);
+    console.error("Resend verification failed:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",

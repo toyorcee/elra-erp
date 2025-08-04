@@ -34,10 +34,9 @@ const createEmailTemplate = (
             }
             
             body {
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 line-height: 1.6;
-                color: #333;
-                background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #475569 75%, #64748b 100%);
+                background: linear-gradient(135deg, #1e40af 0%, #3b82f6 25%, #6366f1 50%, #8b5cf6 75%, #a855f7 100%);
                 min-height: 100vh;
                 padding: 20px;
             }
@@ -45,25 +44,20 @@ const createEmailTemplate = (
             .email-container {
                 max-width: 600px;
                 margin: 0 auto;
-                background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%);
+                background: rgba(255, 255, 255, 0.95);
                 backdrop-filter: blur(20px);
-                border-radius: 24px;
+                border-radius: 16px;
                 overflow: hidden;
-                box-shadow: 
-                    0 25px 50px -12px rgba(0, 0, 0, 0.25),
-                    0 0 0 1px rgba(255, 255, 255, 0.1),
-                    0 0 40px rgba(59, 130, 246, 0.1);
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
                 border: 1px solid rgba(255, 255, 255, 0.2);
             }
             
             .header {
-                background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #475569 75%, #64748b 100%);
-                padding: 50px 30px;
+                background: linear-gradient(135deg, #1e40af 0%, #3b82f6 25%, #6366f1 50%, #8b5cf6 75%, #a855f7 100%);
+                padding: 40px 30px;
                 text-align: center;
                 color: white;
                 position: relative;
-                overflow: hidden;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             }
             
             .header::before {
@@ -89,17 +83,14 @@ const createEmailTemplate = (
             }
             
             .logo {
-                font-size: 36px;
-                font-weight: bold;
-                margin-bottom: 16px;
+                font-size: 32px;
+                font-weight: 700;
+                margin-bottom: 8px;
                 position: relative;
                 z-index: 1;
-                text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-                background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-                letter-spacing: -1px;
+                letter-spacing: -0.5px;
+                color: white;
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
             }
             
             .subtitle {
@@ -112,62 +103,45 @@ const createEmailTemplate = (
             }
             
             .content {
-                padding: 50px 30px;
-                background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.9) 100%);
+                padding: 40px 30px;
+                background: rgba(15, 23, 42, 0.8);
+                color: white;
             }
             
             .title {
                 font-size: 28px;
-                font-weight: bold;
-                color: #1e293b;
-                margin-bottom: 25px;
+                font-weight: 700;
+                color: white;
+                margin-bottom: 20px;
                 text-align: center;
-                background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-                position: relative;
-            }
-            
-            .title::after {
-                content: '';
-                position: absolute;
-                bottom: -8px;
-                left: 50%;
-                transform: translateX(-50%);
-                width: 60px;
-                height: 3px;
-                background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-                border-radius: 2px;
+                letter-spacing: -0.5px;
             }
             
             .message {
                 font-size: 16px;
-                color: #475569;
-                margin-bottom: 35px;
-                line-height: 1.8;
+                color: rgba(255, 255, 255, 0.9);
+                margin-bottom: 24px;
+                line-height: 1.6;
                 text-align: center;
             }
             
             .message strong {
-                color: #1e293b;
+                color: white;
                 font-weight: 600;
             }
             
             .action-button {
                 display: inline-block;
-                background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%);
+                background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
                 color: white;
                 text-decoration: none;
-                padding: 18px 36px;
-                border-radius: 50px;
-                font-weight: bold;
+                padding: 16px 32px;
+                border-radius: 12px;
+                font-weight: 600;
                 font-size: 16px;
                 text-align: center;
                 transition: all 0.3s ease;
-                box-shadow: 
-                    0 10px 25px -5px rgba(59, 130, 246, 0.4),
-                    0 0 0 1px rgba(255, 255, 255, 0.1);
+                box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.4);
                 position: relative;
                 overflow: hidden;
             }
@@ -190,32 +164,29 @@ const createEmailTemplate = (
             .action-button:hover {
                 transform: translateY(-2px);
                 box-shadow: 
-                    0 20px 40px -10px rgba(59, 130, 246, 0.6),
-                    0 0 0 1px rgba(255, 255, 255, 0.2);
+                    0 20px 40px -10px rgba(255, 215, 0, 0.6),
+                    0 0 0 1px rgba(255, 255, 255, 0.3);
             }
             
             .footer {
-                background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #475569 75%, #64748b 100%);
-                padding: 30px;
+                background: rgba(15, 23, 42, 0.9);
+                padding: 24px 30px;
                 text-align: center;
-                color: #cbd5e1;
+                color: white;
                 font-size: 14px;
-                border-top: 1px solid rgba(255, 255, 255, 0.1);
-                position: relative;
-                overflow: hidden;
+                border-top: 1px solid rgba(59, 130, 246, 0.3);
             }
             
             .footer-text {
                 font-weight: 600;
-                color: #e2e8f0;
-                margin-bottom: 10px;
-                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                color: white;
+                margin-bottom: 8px;
             }
             
             .footer-subtitle {
                 font-size: 12px;
                 opacity: 0.8;
-                color: #94a3b8;
+                color: rgba(255, 255, 255, 0.8);
             }
             
             .floating-elements {
@@ -540,9 +511,9 @@ export const sendInvitationEmail = async (
       `You're Invited to Join ${companyName} - EDMS Platform`,
       `
         <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%); border-radius: 16px; padding: 20px; margin-bottom: 20px; border: 1px solid rgba(59, 130, 246, 0.1);">
-            <p style="margin: 0 0 12px 0; font-size: 18px; color: #1e293b;">Hello <strong style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">${userName}</strong>,</p>
-            <p style="margin: 0 0 12px 0; font-size: 16px; color: #334155;">🎉 You've been invited to join the <strong style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">${companyName}</strong> document management system!</p>
-            <p style="margin: 0; font-size: 14px; color: #64748b;">Your administrator has created an account for you to access our secure internal document management platform.</p>
+            <p style="margin: 0 0 12px 0; font-size: 18px; color: #ffffff;">Hello <strong style="color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">${userName}</strong>,</p>
+            <p style="margin: 0 0 12px 0; font-size: 16px; color: #ffffff;">🎉 You've been invited to join the <strong style="color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">${companyName}</strong> document management system!</p>
+            <p style="margin: 0; font-size: 14px; color: #ffffff;">Your administrator has created an account for you to access our secure internal document management platform.</p>
         </div>
         
         <p>🔑 <strong>Your Invitation Code:</strong></p>
@@ -558,11 +529,11 @@ export const sendInvitationEmail = async (
         </ol>
         
         <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(34, 197, 94, 0.1) 100%); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 16px; margin: 20px 0;">
-            <p style="margin: 0; color: #065f46; font-weight: 600;">💡 <strong>Alternative:</strong> You can also manually enter your invitation code: <strong style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">${invitationCode}</strong></p>
+            <p style="margin: 0; color: #ffffff; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">💡 <strong>Alternative:</strong> You can also manually enter your invitation code: <strong style="color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">${invitationCode}</strong></p>
         </div>
         
         <div style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 16px; margin: 20px 0;">
-            <p style="margin: 0; color: #92400e; font-weight: 600;">⏰ <strong>Important:</strong> This invitation code expires in 7 days. Please complete your registration before then.</p>
+            <p style="margin: 0; color: #ffffff; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">⏰ <strong>Important:</strong> This invitation code expires in 3 days. Please complete your registration before then.</p>
         </div>
         <p>If you have any questions, please contact your system administrator.</p>
       `,
@@ -1103,10 +1074,9 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
           }
           
           body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.6;
-            color: #333;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #475569 75%, #64748b 100%);
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 25%, #6366f1 50%, #8b5cf6 75%, #a855f7 100%);
             min-height: 100vh;
             padding: 20px;
           }
@@ -1114,143 +1084,130 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
           .email-container {
             max-width: 600px;
             margin: 0 auto;
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%);
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
-            border-radius: 24px;
+            border-radius: 16px;
             overflow: hidden;
-            box-shadow: 
-              0 25px 50px -12px rgba(0, 0, 0, 0.25),
-              0 0 0 1px rgba(255, 255, 255, 0.1),
-              0 0 40px rgba(245, 158, 11, 0.1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
             border: 1px solid rgba(255, 255, 255, 0.2);
           }
           
           .header {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #475569 75%, #64748b 100%);
-            padding: 50px 30px;
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 25%, #6366f1 50%, #8b5cf6 75%, #a855f7 100%);
+            padding: 40px 30px;
             text-align: center;
             color: white;
             position: relative;
-            overflow: hidden;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          }
-          
-          .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: 
-              radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.4) 0%, transparent 50%),
-              radial-gradient(circle at 80% 20%, rgba(147, 51, 234, 0.4) 0%, transparent 50%),
-              radial-gradient(circle at 40% 40%, rgba(6, 182, 212, 0.3) 0%, transparent 50%),
-              radial-gradient(circle at 60% 60%, rgba(16, 185, 129, 0.2) 0%, transparent 50%);
-            animation: float 8s ease-in-out infinite;
-          }
-          
-          @keyframes float {
-            0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
-            25% { transform: translateY(-8px) rotate(0.5deg) scale(1.02); }
-            50% { transform: translateY(-15px) rotate(1deg) scale(1.05); }
-            75% { transform: translateY(-8px) rotate(0.5deg) scale(1.02); }
           }
           
           .logo {
-            font-size: 36px;
-            font-weight: bold;
-            margin-bottom: 16px;
-            position: relative;
-            z-index: 1;
-            text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
           }
           
           .subtitle {
-            font-size: 18px;
+            font-size: 14px;
             opacity: 0.9;
-            position: relative;
-            z-index: 1;
+            font-weight: 400;
           }
           
           .content {
-            padding: 50px 30px;
+            padding: 40px 30px;
             text-align: center;
+            background: rgba(15, 23, 42, 0.8);
+            color: white;
           }
           
-          .icon {
-            width: 100px;
-            height: 100px;
+          .status-icon {
+            width: 80px;
+            height: 80px;
             background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 30px;
-            font-size: 50px;
+            margin: 0 auto 24px;
+            font-size: 36px;
             color: white;
-            box-shadow: 0 15px 35px rgba(245, 158, 11, 0.3);
+            box-shadow: 0 10px 25px rgba(251, 191, 36, 0.3);
           }
           
           .title {
-            font-size: 32px;
-            font-weight: bold;
-            color: #1f2937;
-            margin-bottom: 20px;
+            font-size: 28px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 16px;
+            letter-spacing: -0.5px;
           }
           
           .message {
-            font-size: 18px;
-            color: #6b7280;
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.9);
             line-height: 1.6;
-            margin-bottom: 30px;
+            margin-bottom: 24px;
           }
           
-          .highlight {
-            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-            border: 2px solid #fbbf24;
-            border-radius: 16px;
-            padding: 25px;
-            margin: 30px 0;
+          .message strong {
+            color: white;
+            font-weight: 600;
+          }
+          
+          .info-card {
+            background: rgba(30, 58, 138, 0.3);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+            padding: 24px;
+            margin: 24px 0;
             text-align: left;
+            backdrop-filter: blur(10px);
           }
           
-          .highlight-title {
-            font-weight: bold;
-            color: #92400e;
-            font-size: 20px;
-            margin-bottom: 15px;
+          .info-title {
+            font-weight: 600;
+            color: white;
+            font-size: 18px;
+            margin-bottom: 12px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
           }
           
-          .highlight-text {
-            color: #78350f;
-            font-size: 16px;
-            line-height: 1.5;
+          .info-list {
+            color: white;
+            font-size: 15px;
+            line-height: 1.6;
+          }
+          
+          .info-list li {
+            color: white;
+          }
+          
+          .info-list br {
+            margin-bottom: 4px;
           }
           
           .footer {
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-            padding: 30px;
+            background: rgba(15, 23, 42, 0.9);
+            padding: 24px 30px;
             text-align: center;
-            border-top: 1px solid #e2e8f0;
+            border-top: 1px solid rgba(59, 130, 246, 0.3);
+            color: white;
           }
           
           .footer-text {
-            color: #64748b;
+            color: rgba(255, 255, 255, 0.8);
             font-size: 14px;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
           }
           
           .footer-logo {
-            font-size: 20px;
-            font-weight: bold;
-            color: #3b82f6;
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
           }
         </style>
       </head>
@@ -1262,7 +1219,7 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
           </div>
           
           <div class="content">
-            <div class="icon">⏳</div>
+            <div class="status-icon">⏳</div>
             <h1 class="title">Registration Received!</h1>
             <p class="message">
               Hello <strong>${firstName}</strong>,<br><br>
@@ -1270,27 +1227,27 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
               Your registration has been received and is currently under review by our Super Administrator.
             </p>
             
-            <div class="highlight">
-              <div class="highlight-title">
+            <div class="info-card">
+              <div class="info-title">
                 <span>📋</span>
                 What happens next?
               </div>
-              <div class="highlight-text">
+              <div class="info-list">
                 1. Super Admin will review your registration<br>
-                2. You'll receive an invitation email with a unique code<br>
+                2. You'll receive an invitation email with a special code<br>
                 3. Use the code to complete your account setup<br>
-                4. Get assigned to the appropriate department and role
+                4. Start using EDMS! 🚀
               </div>
             </div>
             
             <p class="message">
-              You'll receive an email notification once your account has been approved and your invitation code is ready.
+              We'll notify you as soon as your account is ready. Thank you for your patience!
             </p>
           </div>
           
           <div class="footer">
             <p class="footer-text">Thank you for choosing EDMS</p>
-            <div class="footer-logo">E 🗄️ MS</div>
+            <div class="footer-logo">EDMS</div>
           </div>
         </div>
       </body>

@@ -7,12 +7,16 @@ import {
   resendInvitation,
   cancelInvitation,
   getInvitationStats,
+  verifyInvitationCode,
 } from "../controllers/invitationController.js";
 import { protect, authorize } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// All routes require authentication
+// Public route for verifying invitation codes (no authentication required)
+router.post("/verify", verifyInvitationCode);
+
+// All other routes require authentication
 router.use(protect);
 
 // Validation middleware

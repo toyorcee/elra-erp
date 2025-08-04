@@ -235,9 +235,17 @@ export const updateUser = async (req, res) => {
       });
     }
 
+    // Prevent users from changing their own role (but allow other updates)
+    if (currentUser._id.toString() === user._id.toString() && updateData.role) {
+      return res.status(403).json({
+        success: false,
+        message: "You cannot change your own role",
+      });
+    }
+
     // Remove sensitive fields from update
     delete updateData.password;
-    delete updateData.email; // Email should be changed through separate process
+    delete updateData.email;
 
     // Store old values for audit logging
     const oldRole = user.role;
@@ -285,6 +293,17 @@ export const updateUser = async (req, res) => {
           message: compatibilityValidation.message,
         });
       }
+    }
+
+    // Keep user in PENDING_REGISTRATION status when role and department are assigned
+    // User will only become ACTIVE after completing the invitation process
+    if (
+      user.status === "PENDING_REGISTRATION" &&
+      updateData.role &&
+      updateData.department
+    ) {
+      // Don't auto-activate - keep status as PENDING_REGISTRATION
+      // User will become active only after completing invitation process
     }
 
     const updatedUser = await User.findByIdAndUpdate(id, updateData, {
@@ -576,12 +595,6 @@ export const getPendingRegistrationUsers = async (req, res) => {
       });
     }
 
-    console.log("🔍 getPendingRegistrationUsers - Checking for pending users");
-    console.log(
-      "🔍 getPendingRegistrationUsers - Current user role level:",
-      currentUser.role.level
-    );
-
     // Get all users with PENDING_REGISTRATION status
     const pendingUsers = await User.find({
       status: "PENDING_REGISTRATION",
@@ -592,42 +605,10 @@ export const getPendingRegistrationUsers = async (req, res) => {
       .populate("company", "name")
       .select("-password");
 
-    console.log(
-      "🔍 getPendingRegistrationUsers - Found pending users:",
-      pendingUsers.length
-    );
-    console.log(
-      "🔍 getPendingRegistrationUsers - Pending users:",
-      pendingUsers.map((u) => ({
-        id: u._id,
-        email: u.email,
-        firstName: u.firstName,
-        lastName: u.lastName,
-        status: u.status,
-        isActive: u.isActive,
-        role: u.role?.name,
-        department: u.department?.name,
-        company: u.company?.name,
-        hasCompany: !!u.company,
-        hasDepartment: !!u.department,
-      }))
-    );
-
     // Also check all users to see the total count
     const allUsers = await User.find({
       email: { $not: /platformadmin/i },
     }).select("status isActive email");
-    console.log(
-      "🔍 getPendingRegistrationUsers - Total users in system:",
-      allUsers.length
-    );
-    console.log("🔍 getPendingRegistrationUsers - Status breakdown:", {
-      active: allUsers.filter((u) => u.isActive === true).length,
-      inactive: allUsers.filter((u) => u.isActive === false).length,
-      pending: allUsers.filter((u) => u.status === "PENDING_REGISTRATION")
-        .length,
-      active_status: allUsers.filter((u) => u.status === "ACTIVE").length,
-    });
 
     res.json({
       success: true,

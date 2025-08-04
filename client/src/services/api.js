@@ -92,11 +92,7 @@ export const authAPI = {
   register: async (formData) => {
     try {
       console.log("[authAPI.register] Called with formData:", formData);
-      const response = await api.post("/auth/register", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      const response = await api.post("/auth/register", formData);
       return response.data;
     } catch (error) {
       if (error.response && error.response.data) {
@@ -168,6 +164,34 @@ export const authAPI = {
       return response.data;
     } catch (error) {
       console.error("[authAPI.resetPassword] Error:", error);
+      throw error;
+    }
+  },
+
+  resendVerification: async (data) => {
+    try {
+      console.log(
+        "[authAPI.resendVerification] Attempting to resend verification email:",
+        data
+      );
+      const response = await api.post("/auth/resend-verification", data);
+      console.log("[authAPI.resendVerification] Response:", response.data);
+      return response;
+    } catch (error) {
+      console.error("[authAPI.resendVerification] Error:", error);
+      throw error;
+    }
+  },
+};
+
+// Invitation API
+export const invitationAPI = {
+  verifyCode: async (code) => {
+    try {
+      const response = await api.post("/invitations/verify", { code });
+      return response.data;
+    } catch (error) {
+      console.error("[invitationAPI.verifyCode] Error:", error);
       throw error;
     }
   },

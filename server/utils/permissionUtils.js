@@ -103,7 +103,7 @@ export const hasPermission = (user, permission, resource = null) => {
 export const canManageUser = (currentUser, targetUser, action) => {
   if (!currentUser || !targetUser) return false;
 
-  // Super admin can manage anyone
+  // Super admin can manage anyone (including themselves for profile updates)
   if (currentUser.role.level >= PERMISSION_LEVELS.SUPER_ADMIN) return true;
 
   // Users can't manage users with higher or equal role levels

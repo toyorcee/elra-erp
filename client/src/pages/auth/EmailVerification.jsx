@@ -25,12 +25,7 @@ const EmailVerification = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // Background images for the animated background
-  const backgroundImages = [
-    "/src/assets/login.jpg",
-    "/src/assets/signup.jpg",
-    "/src/assets/hero1.jpg",
-    "/src/assets/hero2.jpg",
-  ];
+  const backgroundImages = [loginImage, signupImage, hero1Image, hero2Image];
 
   // Animation variants
   const containerVariants = {

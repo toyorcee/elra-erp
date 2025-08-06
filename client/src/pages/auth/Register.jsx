@@ -16,6 +16,10 @@ import { useAuth } from "../../context/AuthContext";
 import EDMSLogo from "../../components/EDMSLogo";
 import "../../styles/Register.css";
 import { toast } from "react-toastify";
+import loginImage from "../../assets/login.jpg";
+import signupImage from "../../assets/signup.jpg";
+import hero1Image from "../../assets/hero1.jpg";
+import hero2Image from "../../assets/hero2.jpg";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -47,12 +51,7 @@ const Register = () => {
   }
 
   // Background images for the animated background
-  const backgroundImages = [
-    "/src/assets/login.jpg",
-    "/src/assets/signup.jpg",
-    "/src/assets/hero1.jpg",
-    "/src/assets/hero2.jpg",
-  ];
+  const backgroundImages = [loginImage, signupImage, hero1Image, hero2Image];
 
   // Animation variants
   const containerVariants = {

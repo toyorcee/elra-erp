@@ -14,6 +14,10 @@ import {
 import { authAPI, handleApiError } from "../../services/api";
 import EDMSLogo from "../../components/EDMSLogo";
 import { GradientSpinner } from "../../components/common";
+import loginImage from "../../assets/login.jpg";
+import signupImage from "../../assets/signup.jpg";
+import hero1Image from "../../assets/hero1.jpg";
+import hero2Image from "../../assets/hero2.jpg";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
@@ -24,12 +28,7 @@ const ForgotPassword = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // Background images for the animated background
-  const backgroundImages = [
-    "/src/assets/login.jpg",
-    "/src/assets/signup.jpg",
-    "/src/assets/hero1.jpg",
-    "/src/assets/hero2.jpg",
-  ];
+  const backgroundImages = [loginImage, signupImage, hero1Image, hero2Image];
 
   // Animation variants
   const containerVariants = {

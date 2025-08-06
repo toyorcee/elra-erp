@@ -1,19 +1,20 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
+import { MdVisibility, MdVisibilityOff, MdEmail, MdLock } from "react-icons/md";
+import { useAuth } from "../../context/AuthContext";
+import loginImage from "../../assets/login.jpg";
+import signupImage from "../../assets/signup.jpg";
+import hero1Image from "../../assets/hero1.jpg";
+import hero2Image from "../../assets/hero2.jpg";
 import { toast } from "react-toastify";
 import {
-  HiMail,
-  HiLockClosed,
-  HiEye,
-  HiEyeOff,
   HiArrowRight,
   HiSparkles,
   HiShieldCheck,
   HiOfficeBuilding,
   HiUser,
 } from "react-icons/hi";
-import { useAuth } from "../../context/AuthContext";
 import EDMSLogo from "../../components/EDMSLogo";
 import { GradientSpinner } from "../../components/common";
 
@@ -29,10 +30,10 @@ const Login = () => {
 
   // Background images for the animated background
   const backgroundImages = [
-    "/src/assets/login.jpg",
-    "/src/assets/signup.jpg",
-    "/src/assets/hero1.jpg",
-    "/src/assets/hero2.jpg",
+    loginImage,
+    signupImage,
+    hero1Image,
+    hero2Image,
   ];
 
   // Animation variants
@@ -263,7 +264,7 @@ const Login = () => {
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <HiMail className="h-5 w-5 text-white/50" />
+                      <MdEmail className="h-5 w-5 text-white/50" />
                     </div>
                     <input
                       type="email"
@@ -292,7 +293,7 @@ const Login = () => {
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <HiLockClosed className="h-5 w-5 text-white/50" />
+                      <MdLock className="h-5 w-5 text-white/50" />
                     </div>
                     <input
                       type={showPassword ? "text" : "password"}
@@ -311,9 +312,9 @@ const Login = () => {
                       className="absolute inset-y-0 right-0 pr-3 flex items-center"
                     >
                       {showPassword ? (
-                        <HiEyeOff className="h-5 w-5 text-white/50 hover:text-white/70 transition-colors" />
+                        <MdVisibilityOff className="h-5 w-5 text-white/50 hover:text-white/70 transition-colors" />
                       ) : (
-                        <HiEye className="h-5 w-5 text-white/50 hover:text-white/70 transition-colors" />
+                        <MdVisibility className="h-5 w-5 text-white/50 hover:text-white/70 transition-colors" />
                       )}
                     </button>
                   </div>

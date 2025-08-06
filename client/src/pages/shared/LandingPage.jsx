@@ -23,6 +23,22 @@ import {
 } from "react-icons/hi";
 import EDMSLogo from "../../components/EDMSLogo";
 import { useAuth } from "../../context/AuthContext";
+// Import all assets
+import electronicDocument1 from "../../assets/ElectronicDocument1.jpg";
+import office1 from "../../assets/Office1.jpg";
+import office2 from "../../assets/Office2.jpg";
+import office3 from "../../assets/Office3.jpg";
+import encryption1 from "../../assets/Encryption1.jpg";
+import cloud1 from "../../assets/cloud1.jpg";
+import hero1 from "../../assets/hero1.jpg";
+import electronicDocument2 from "../../assets/ElectronicDocument2.jpg";
+import encryption2 from "../../assets/Encryption2.jpg";
+import office4 from "../../assets/Office4.jpg";
+import graphs1 from "../../assets/graphs1.jpg";
+import cloud2 from "../../assets/cloud2.jpg";
+import graphs2 from "../../assets/graphs2.jpg";
+import hero2 from "../../assets/hero2.jpg";
+import illustration1 from "../../assets/illustration1.jpg";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -49,43 +65,43 @@ const LandingPage = () => {
       word: "Document Workflows",
       description:
         "Transform paper chaos into digital clarity. Organize, search, and access millions of documents instantly with AI-powered categorization and enterprise-grade security.",
-      image: "/src/assets/ElectronicDocument1.jpg",
+      image: electronicDocument1,
     },
     {
       word: "Approval Systems",
       description:
         "Intelligent approval workflows with real-time routing and notifications. Parallel processing, automated escalation, and zero bottlenecks keep decisions flowing smoothly.",
-      image: "/src/assets/Office1.jpg",
+      image: office1,
     },
     {
       word: "Team Collaboration",
       description:
         "Securely powered instant communication within document contexts. Chat, collaborate, and make decisions faster with seamless team messaging integration.",
-      image: "/src/assets/Office2.jpg",
+      image: office2,
     },
     {
       word: "Smart Automation",
       description:
         "Never miss critical updates with intelligent email and in-app alerts. Customizable notifications for approvals, deadlines, messages, and document changes.",
-      image: "/src/assets/Office3.jpg",
+      image: office3,
     },
     {
       word: "Enterprise Security",
       description:
         "Military-grade protection for your most sensitive data. Zero-trust architecture, end-to-end encryption, and comprehensive audit trails you can trust.",
-      image: "/src/assets/Encryption1.jpg",
+      image: encryption1,
     },
     {
       word: "Cloud Platform",
       description:
         "Access your documents anywhere, anytime. Global CDN, 99.9% uptime, and seamless synchronization across all your devices and locations.",
-      image: "/src/assets/cloud1.jpg",
+      image: cloud1,
     },
     {
       word: "Business Intelligence",
       description:
         "Lead your industry into the future. Replace legacy processes with intelligent workflows that scale with your ambitions and adapt to your growth.",
-      image: "/src/assets/hero1.jpg",
+      image: hero1,
     },
   ];
 
@@ -183,7 +199,7 @@ const LandingPage = () => {
       description:
         "AI-powered categorization, OCR text extraction, and lightning-fast search across all your business documents.",
       gradient: "from-blue-500 to-cyan-500",
-      backgroundImage: "/src/assets/ElectronicDocument2.jpg",
+      backgroundImage: electronicDocument2,
     },
     {
       icon: HiUsers,
@@ -191,7 +207,7 @@ const LandingPage = () => {
       description:
         "Scale across departments and subsidiaries with isolated workspaces and customizable organizational structures.",
       gradient: "from-cyan-500 to-purple-500",
-      backgroundImage: "/src/assets/Office2.jpg",
+      backgroundImage: office2,
     },
     {
       icon: HiShieldCheck,
@@ -199,7 +215,7 @@ const LandingPage = () => {
       description:
         "Military-grade encryption, granular permissions, and comprehensive audit trails for complete document security.",
       gradient: "from-purple-500 to-blue-500",
-      backgroundImage: "/src/assets/Encryption2.jpg",
+      backgroundImage: encryption2,
     },
     {
       icon: HiCog,
@@ -207,7 +223,7 @@ const LandingPage = () => {
       description:
         "Intelligent approval routing with real-time email and in-app notifications. Automated escalation, parallel approvals, and conditional logic ensure documents never get stuck in bottlenecks.",
       gradient: "from-green-500 to-blue-500",
-      backgroundImage: "/src/assets/Office3.jpg",
+      backgroundImage: office3,
     },
     {
       icon: HiTrendingUp,
@@ -215,7 +231,7 @@ const LandingPage = () => {
       description:
         "Real-time dashboards, usage analytics, and performance metrics to optimize your document processes.",
       gradient: "from-blue-500 to-purple-500",
-      backgroundImage: "/src/assets/graphs1.jpg",
+      backgroundImage: graphs1,
     },
     {
       icon: HiBell,
@@ -223,7 +239,7 @@ const LandingPage = () => {
       description:
         "Never miss critical updates with intelligent email and in-app notifications. Customizable alerts for approvals, deadlines, document changes, and system events keep your team synchronized.",
       gradient: "from-orange-500 to-red-500",
-      backgroundImage: "/src/assets/Office1.jpg",
+      backgroundImage: office1,
     },
     {
       icon: HiChat,
@@ -231,7 +247,7 @@ const LandingPage = () => {
       description:
         "Seamless team communication with instant messaging, document discussions, and Socket.IO-powered real-time collaboration. Chat directly within document contexts for faster decision-making.",
       gradient: "from-pink-500 to-purple-500",
-      backgroundImage: "/src/assets/Office2.jpg",
+      backgroundImage: office2,
     },
     {
       icon: HiGlobe,
@@ -239,7 +255,7 @@ const LandingPage = () => {
       description:
         "99.9% uptime, global CDN, and seamless mobile access for your distributed workforce.",
       gradient: "from-cyan-500 to-green-500",
-      backgroundImage: "/src/assets/cloud2.jpg",
+      backgroundImage: cloud2,
     },
   ];
 
@@ -878,7 +894,7 @@ const LandingPage = () => {
         <div
           className="absolute inset-0 opacity-5"
           style={{
-            backgroundImage: `url('/src/assets/Office4.jpg')`,
+            backgroundImage: `url(${office4})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
@@ -935,7 +951,7 @@ const LandingPage = () => {
                 <div
                   className="h-80 relative"
                   style={{
-                    backgroundImage: `url('/src/assets/graphs2.jpg')`,
+                    backgroundImage: `url(${graphs2})`,
                     backgroundSize: "cover",
                     backgroundPosition: "center",
                   }}
@@ -981,7 +997,7 @@ const LandingPage = () => {
         <div
           className="absolute inset-0 opacity-5"
           style={{
-            backgroundImage: `url('/src/assets/hero2.jpg')`,
+            backgroundImage: `url(${hero2})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
@@ -1058,7 +1074,7 @@ const LandingPage = () => {
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('/src/assets/illustration1.jpg')`,
+            backgroundImage: `url(${illustration1})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}

@@ -15,7 +15,6 @@ import { createServer } from "http";
 import { EventEmitter } from "events";
 import chalk from "chalk";
 import xss from "xss-clean";
-
 import { Server as SocketIOServer } from "socket.io";
 import Message from "./models/Message.js";
 import User from "./models/User.js";
@@ -380,34 +379,87 @@ io.on("connection", async (socket) => {
 
   // Handle chat message
   socket.on("sendMessage", async (data) => {
-    // data: { sender, recipient, content, document }
     try {
       const { sender, recipient, content, document } = data;
+
+      // Validate required fields
+      if (!sender || !recipient || !content) {
+        socket.emit("error", {
+          message: "Sender, recipient, and content are required",
+        });
+        return;
+      }
+
+      // Validate that sender matches the authenticated user
+      if (sender !== userId) {
+        socket.emit("error", { message: "Unauthorized: sender mismatch" });
+        return;
+      }
+
+      // Check if recipient exists
+      const recipientUser = await User.findById(recipient);
+      if (!recipientUser) {
+        socket.emit("error", { message: "Recipient not found" });
+        return;
+      }
+
       const message = new Message({ sender, recipient, content, document });
       await message.save();
+
+      await message.populate("sender", "name email avatar firstName lastName");
+      await message.populate(
+        "recipient",
+        "name email avatar firstName lastName"
+      );
+      if (document) {
+        await message.populate("document", "title reference");
+      }
+
+      // Create notification for recipient
+      if (typeof global.notificationService !== "undefined") {
+        await global.notificationService.createNotification({
+          recipient: recipient,
+          type: "MESSAGE_RECEIVED",
+          title: `New message from ${
+            message.sender.name || message.sender.firstName
+          }`,
+          message:
+            content.length > 50 ? `${content.substring(0, 50)}...` : content,
+          data: {
+            senderId: sender,
+            messageId: message._id,
+            actionUrl: `/messages?conversation=${sender}`,
+            priority: "medium",
+          },
+        });
+      }
 
       // Emit to recipient if online
       const recipientSocketId = onlineUsers.get(recipient);
       if (recipientSocketId) {
         io.to(recipientSocketId).emit("receiveMessage", {
           _id: message._id,
-          sender,
-          recipient,
-          content,
-          document,
+          sender: message.sender,
+          recipient: message.recipient,
+          content: message.content,
+          document: message.document,
           createdAt: message.createdAt,
+          isRead: false,
         });
       }
-      // Optionally emit to sender for confirmation
+
+      // Emit to sender for confirmation
       socket.emit("messageSent", {
         _id: message._id,
-        sender,
-        recipient,
-        content,
-        document,
+        sender: message.sender,
+        recipient: message.recipient,
+        content: message.content,
+        document: message.document,
         createdAt: message.createdAt,
+        isRead: false,
       });
     } catch (err) {
+      console.error("Send message error:", err);
       socket.emit("error", { message: "Failed to send message" });
     }
   });
@@ -420,9 +472,60 @@ io.on("connection", async (socket) => {
         message.isRead = true;
         message.readAt = new Date();
         await message.save();
+
+        // Emit read status to sender if online
+        const senderSocketId = onlineUsers.get(message.sender.toString());
+        if (senderSocketId) {
+          io.to(senderSocketId).emit("messagesRead", {
+            readerId: userId,
+            messageId: messageId,
+          });
+        }
       }
     } catch (err) {
-      // Ignore
+      console.error("Mark message read error:", err);
+    }
+  });
+
+  // Handle typing status
+  socket.on("typing", async ({ recipientId, isTyping }) => {
+    try {
+      const recipientSocketId = onlineUsers.get(recipientId);
+      if (recipientSocketId) {
+        io.to(recipientSocketId).emit("userTyping", {
+          userId: userId,
+          isTyping,
+        });
+      }
+    } catch (err) {
+      console.error("Typing status error:", err);
+    }
+  });
+
+  // Handle message deletion
+  socket.on("deleteMessage", async ({ messageId, userId }) => {
+    try {
+      const message = await Message.findOne({
+        _id: messageId,
+        sender: userId,
+        isActive: true,
+      });
+
+      if (message) {
+        message.isActive = false;
+        await message.save();
+
+        // Emit message deletion to recipient if online
+        const recipientSocketId = onlineUsers.get(message.recipient.toString());
+        if (recipientSocketId) {
+          io.to(recipientSocketId).emit("messageDeleted", {
+            messageId: messageId,
+            deletedBy: userId,
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Delete message error:", err);
     }
   });
 

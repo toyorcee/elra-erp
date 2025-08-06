@@ -316,7 +316,6 @@ export const register = async (req, res) => {
 // @access  Public
 export const login = async (req, res) => {
   try {
-    console.log("Login attempt:", req.body.identifier);
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -332,7 +331,7 @@ export const login = async (req, res) => {
     // Find user by email or username and include password
     let user = await User.findByEmailOrUsername(identifier)
       .select("+password")
-      .populate("role");
+      .populate("role department");
 
     // If not found, try without isActive filter for debugging
     if (!user) {
@@ -340,7 +339,7 @@ export const login = async (req, res) => {
         $or: [{ email: identifier.toLowerCase() }, { username: identifier }],
       })
         .select("+password")
-        .populate("role");
+        .populate("role department");
     }
 
     if (!user) {
@@ -413,7 +412,6 @@ export const login = async (req, res) => {
     // Update last login
     user.lastLogin = new Date();
     await user.save();
-    console.log("Login success:", user.email);
 
     // Set cookies
     setTokenCookies(res, accessToken, refreshToken, req);
@@ -432,6 +430,7 @@ export const login = async (req, res) => {
       employeeId: user.employeeId,
       department: user.department,
       role: user.role,
+      permissions: user.role?.permissions || [],
       isActive: user.isActive,
       lastLogin: user.lastLogin,
       createdAt: user.createdAt,
@@ -504,7 +503,6 @@ export const refreshToken = async (req, res) => {
       return res.status(401).json({ message: "No refresh token provided" });
     }
 
-    // Verify refresh token
     const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id);
 
@@ -512,13 +510,14 @@ export const refreshToken = async (req, res) => {
       return res.status(401).json({ message: "User not found" });
     }
 
-    // Generate new tokens
     const token = generateAccessToken(user._id);
     const newRefreshToken = generateRefreshToken(user._id);
 
-    // Set cookies with hardcoded values
     const cookieOptions = getCookieOptions();
-    res.cookie("token", token, cookieOptions);
+    res.cookie("token", token, {
+      ...cookieOptions,
+      httpOnly: false,
+    });
     res.cookie("refreshToken", newRefreshToken, {
       ...cookieOptions,
       maxAge: 604800000,
@@ -530,6 +529,7 @@ export const refreshToken = async (req, res) => {
       refreshToken: newRefreshToken,
     });
   } catch (error) {
+    console.error("Refresh token error:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -539,28 +539,14 @@ export const refreshToken = async (req, res) => {
 // @access  Private
 export const getMe = async (req, res) => {
   try {
-    console.log("🔍 /me endpoint called for user ID:", req.user.id);
-
     const user = await User.findById(req.user.id).populate("role department");
 
     if (!user) {
-      console.log("❌ User not found for ID:", req.user.id);
       return res.status(404).json({
         success: false,
         message: "User not found",
       });
     }
-
-    console.log("✅ User found:", {
-      id: user._id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      roleId: user.role?._id,
-      roleName: user.role?.name,
-      roleLevel: user.role?.level,
-      department: user.department?.name,
-    });
 
     const userResponse = {
       id: user._id,
@@ -575,6 +561,7 @@ export const getMe = async (req, res) => {
       employeeId: user.employeeId,
       department: user.department,
       role: user.role,
+      permissions: user.role?.permissions || [],
       isActive: user.isActive,
       lastLogin: user.lastLogin,
       createdAt: user.createdAt,
@@ -588,7 +575,7 @@ export const getMe = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Get me error:", error);
+    console.error("Get me error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -931,39 +918,75 @@ export const joinCompany = async (req, res) => {
       });
     }
 
-    // Check if user already exists
-    const existingUser = await User.findByEmailOrUsername(userData.email);
-    if (existingUser) {
+    let existingUser = await User.findOne({
+      email: invitation.email,
+    }).populate("role department company");
+
+    if (!existingUser) {
+      existingUser = await User.findOne({
+        email: { $regex: new RegExp(`^${invitation.email}$`, "i") },
+      }).populate("role department company");
+    }
+
+    if (!existingUser) {
       return res.status(400).json({
         success: false,
-        message: "User with this email already exists",
+        message: `No user found with email ${invitation.email}. Please ensure you have registered with this email address.`,
       });
     }
 
-    // Create new user with invitation data
-    const user = new User({
-      ...userData,
-      company: invitation.company._id,
-      department: invitation.department._id,
-      role: invitation.role._id,
-      isActive: true,
-      isEmailVerified: true,
-    });
+    // Check if user is in the correct status for invitation acceptance
+    if (existingUser.status === "ACTIVE" && existingUser.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: "This account is already active. You can log in directly.",
+      });
+    }
 
-    await user.save();
+    if (existingUser.status === "INVITED") {
+      // User has been invited but not yet activated - this is fine
+    } else if (existingUser.status === "PENDING_REGISTRATION") {
+      // User is pending registration - this is also fine
+    } else {
+      console.log(
+        "⚠️ User found but with unexpected status:",
+        existingUser.status
+      );
+    }
 
-    // Mark invitation as used
+    // Always use the invitation's role/department as it represents the admin's intent
+    existingUser.company = invitation.company._id;
+    existingUser.department = invitation.department._id;
+    existingUser.role = invitation.role._id;
+    existingUser.isActive = true;
+    existingUser.status = "ACTIVE";
+    existingUser.isEmailVerified = true;
+
+    const isPasswordCorrect = await existingUser.correctPassword(
+      userData.password,
+      existingUser.password
+    );
+
+    if (!isPasswordCorrect) {
+      return res.status(401).json({
+        success: false,
+        message:
+          "Invalid credentials. Please check your username and password.",
+      });
+    }
+
+    await existingUser.save();
+
     invitation.status = "used";
-    invitation.usedBy = user._id;
+    invitation.usedBy = existingUser._id;
     invitation.usedAt = new Date();
     await invitation.save();
 
-    // Populate role after saving
-    await user.populate("role");
+    await existingUser.populate("role department");
 
     // Generate tokens
-    const accessToken = generateAccessToken(user._id);
-    const refreshToken = generateRefreshToken(user._id);
+    const accessToken = generateAccessToken(existingUser._id);
+    const refreshToken = generateRefreshToken(existingUser._id);
 
     // Calculate refresh token expiration
     const refreshTokenExpiresAt = new Date();
@@ -975,23 +998,24 @@ export const joinCompany = async (req, res) => {
     );
 
     // Save refresh token to user
-    await user.addRefreshToken(refreshToken, refreshTokenExpiresAt);
+    await existingUser.addRefreshToken(refreshToken, refreshTokenExpiresAt);
 
     // Set cookies
     setTokenCookies(res, accessToken, refreshToken, req);
 
     res.status(201).json({
       success: true,
-      message: "Successfully joined company",
+      message: "Account verified and successfully joined company",
       data: {
         user: {
-          id: user._id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
+          id: existingUser._id,
+          email: existingUser.email,
+          firstName: existingUser.firstName,
+          lastName: existingUser.lastName,
+          role: invitation.role,
           company: invitation.company,
-          department: invitation.department,
+          department: existingUser.department,
+          permissions: invitation.role?.permissions || [],
         },
         accessToken,
       },
@@ -1051,6 +1075,15 @@ export const verifyEmail = async (req, res) => {
     user.emailVerificationExpires = undefined;
     await user.save();
 
+    // 🔍 MINIMAL LOGGING: Track account activation
+    console.log(
+      `🔍 [ACCOUNT ACTIVATION] User: ${user.email} | Role: ${
+        user.role?.name || "No Role"
+      } | Department: ${user.department?.name || "No Department"} | Status: ${
+        user.status || "ACTIVE"
+      }`
+    );
+
     // Send welcome notification and email after verification
     try {
       const welcomeService = new WelcomeNotificationService(global.io);
@@ -1067,7 +1100,7 @@ export const verifyEmail = async (req, res) => {
         "Email verified successfully! You can now log in to your account.",
     });
   } catch (error) {
-    console.error("❌ Email verification failed:", error);
+    console.error("Email verification failed:", error);
 
     if (error.name === "JsonWebTokenError") {
       return res.status(400).json({

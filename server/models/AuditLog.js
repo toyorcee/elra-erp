@@ -200,7 +200,7 @@ auditLogSchema.pre("save", async function (next) {
           name: `${user.firstName} ${user.lastName}`,
           email: user.email,
           role: user.role,
-          department: user.department?.name || "N/A",
+          department: user.department?.code || "N/A",
         };
       }
     } catch (error) {
@@ -232,6 +232,7 @@ auditLogSchema.statics.getRecentActivity = async function (options = {}) {
     startDate,
     endDate,
     riskLevel,
+    department,
     companyFilter = {},
   } = options;
 
@@ -241,6 +242,23 @@ auditLogSchema.statics.getRecentActivity = async function (options = {}) {
   if (resourceType) query.resourceType = resourceType;
   if (action) query.action = action;
   if (riskLevel) query.riskLevel = riskLevel;
+
+  // Add department filter if provided
+  if (department) {
+    // Only show activities from users in the same department
+    // If user has no department (N/A), don't show any activities
+    if (department !== "N/A") {
+      query["userDetails.department"] = department;
+    } else {
+      // If the logged-in user has no department, don't show any activities
+      query["userDetails.department"] = "NONEXISTENT_DEPARTMENT";
+    }
+  }
+
+  // If userId is provided, filter by the specific user (show only their activities)
+  if (userId) {
+    query.userId = userId;
+  }
 
   if (startDate || endDate) {
     query.timestamp = {};

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import * as HiIcons from "react-icons/hi";
 import {
   MdLogout,
@@ -8,8 +9,14 @@ import {
   MdNotifications,
   MdPushPin,
 } from "react-icons/md";
-import { getNavigationForRole, getRoleTitle } from "../config/sidebarConfig";
+import {
+  getNavigationForRole,
+  getRoleTitle,
+  getDepartmentInfo,
+  getDepartmentSpecificItems,
+} from "../config/sidebarConfig";
 import { useAuth } from "../context/AuthContext";
+import LogoutConfirmationModal from "./common/LogoutConfirmationModal";
 
 const getImageUrl = (avatarPath) => {
   if (!avatarPath) return null;
@@ -35,12 +42,12 @@ const Sidebar = ({ onExpandedChange, onPinnedChange }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [pinned, setPinned] = useState(false);
 
   const isExpanded = pinned ? true : expanded;
 
-  // Notify parent of state changes
   useEffect(() => {
     if (onExpandedChange) {
       onExpandedChange(expanded);
@@ -61,8 +68,12 @@ const Sidebar = ({ onExpandedChange, onPinnedChange }) => {
     if (!pinned) setExpanded(false);
   };
 
-  const handleLogout = async () => {
+  const handleLogoutClick = () => {
     setIsProfileOpen(false);
+    setShowLogoutModal(true);
+  };
+
+  const handleLogoutConfirm = async () => {
     await logout();
     navigate("/login");
   };
@@ -150,61 +161,149 @@ const Sidebar = ({ onExpandedChange, onPinnedChange }) => {
             background: transparent;
           }
         `}</style>
-        <nav className="space-y-2">
+        <nav className="space-y-4">
           {(() => {
+            // Debug logging
+            console.log("🔍 [Sidebar] User data:", {
+              roleLevel: user?.role?.level,
+              departmentCode: user?.department?.code,
+              departmentName: user?.department?.name,
+              permissions: user?.permissions,
+            });
+
             const navigationItems = getNavigationForRole(
-              user?.role?.level || 10
+              user?.role?.level || 10,
+              user?.department?.code || null,
+              user?.permissions || []
             );
 
-            return navigationItems;
-          })().map((item) => {
-            const Icon = HiIcons[item.icon] || HiIcons.HiOutlineDocumentText;
-            const isActive = location.pathname === item.path;
+            console.log("🔍 [Sidebar] Navigation items:", navigationItems);
+            console.log("🔍 [Sidebar] getNavigationForRole called with:", {
+              roleLevel: user?.role?.level || 10,
+              departmentCode: user?.department?.code || null,
+              permissions: user?.permissions || [],
+            });
 
-            return (
-              <Link
-                key={item.label}
-                to={item.path}
-                className={`group flex items-center p-3 rounded-xl transition-all duration-300 relative ${
-                  isExpanded
-                    ? isActive
-                      ? "bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg"
-                      : "text-white/80 hover:bg-white/20 hover:text-white"
-                    : isActive
-                    ? "text-cyan-400"
-                    : "text-white/80 hover:text-white"
-                }`}
-                title={!isExpanded ? item.label : ""}
-              >
-                <div
-                  className={`flex items-center transition-all duration-300 ${
-                    isExpanded ? "space-x-3 w-full" : "justify-center w-full"
-                  }`}
-                >
-                  <div
-                    className={`p-2 rounded-lg transition-all duration-300 flex-shrink-0 ${
-                      isExpanded
-                        ? isActive
-                          ? "bg-white/20"
-                          : "bg-white/10 group-hover:bg-white/20"
-                        : "bg-transparent"
-                    }`}
-                  >
-                    <Icon size={20} />
+            // Group items by section
+            const groupedItems = navigationItems.reduce((acc, item) => {
+              if (!acc[item.section]) {
+                acc[item.section] = [];
+              }
+              acc[item.section].push(item);
+              return acc;
+            }, {});
+
+            return Object.entries(groupedItems).map(([section, items]) => (
+              <div key={section} className="space-y-2">
+                {/* Section Header (only show when expanded) */}
+                {isExpanded && (
+                  <div className="px-3 py-1">
+                    <h3 className="text-xs font-semibold text-white/60 uppercase tracking-wider">
+                      {section === "common" && "General"}
+                      {section === "documents" && "Documents"}
+                      {section === "workflow" && "Workflows"}
+                      {section === "admin" && "Administration"}
+                      {section === "department" && "Department"}
+                      {section === "platform" && "Platform"}
+                      {section === "system" && "System"}
+                      {section === "communication" && "Communication"}
+                      {section === "profile" && "Profile"}
+                    </h3>
                   </div>
-                  {isExpanded && (
-                    <span
-                      className={`font-medium transition-all duration-300 ${
-                        isActive ? "text-white" : "text-white/90"
-                      }`}
-                    >
-                      {item.label}
-                    </span>
-                  )}
+                )}
+
+                {/* Section Items */}
+                <div className="space-y-1">
+                  {items.map((item) => {
+                    const Icon =
+                      HiIcons[item.icon] || HiIcons.HiOutlineDocumentText;
+                    const isActive = location.pathname === item.path;
+                    const isDepartmentSpecific =
+                      item.departments &&
+                      !item.departments.includes("all") &&
+                      item.departments.length > 0;
+                    const departmentInfo = isDepartmentSpecific
+                      ? getDepartmentInfo(item.departments[0])
+                      : null;
+
+                    return (
+                      <Link
+                        key={item.label}
+                        to={item.path}
+                        className={`group flex items-center p-3 rounded-xl transition-all duration-300 relative ${
+                          isExpanded
+                            ? isActive
+                              ? "bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg"
+                              : "text-white/80 hover:bg-white/20 hover:text-white"
+                            : isActive
+                            ? "text-cyan-400"
+                            : "text-white/80 hover:text-white"
+                        }`}
+                        title={!isExpanded ? item.label : ""}
+                      >
+                        <div
+                          className={`flex items-center transition-all duration-300 ${
+                            isExpanded
+                              ? "space-x-3 w-full"
+                              : "justify-center w-full"
+                          }`}
+                        >
+                          <div
+                            className={`p-2 rounded-lg transition-all duration-300 flex-shrink-0 ${
+                              isExpanded
+                                ? isActive
+                                  ? "bg-white/20"
+                                  : "bg-white/10 group-hover:bg-white/20"
+                                : "bg-transparent"
+                            }`}
+                          >
+                            <Icon size={20} />
+                          </div>
+                          {isExpanded && (
+                            <div className="flex-1 flex items-center justify-between">
+                              <span
+                                className={`font-medium transition-all duration-300 ${
+                                  isActive ? "text-white" : "text-white/90"
+                                }`}
+                              >
+                                {item.label}
+                              </span>
+                              {/* Department indicator */}
+                              {isDepartmentSpecific && departmentInfo && (
+                                <span
+                                  className={`text-xs px-2 py-1 rounded-full ${
+                                    departmentInfo.color === "blue"
+                                      ? "bg-blue-500/20 text-blue-300"
+                                      : departmentInfo.color === "green"
+                                      ? "bg-green-500/20 text-green-300"
+                                      : departmentInfo.color === "purple"
+                                      ? "bg-purple-500/20 text-purple-300"
+                                      : departmentInfo.color === "red"
+                                      ? "bg-red-500/20 text-red-300"
+                                      : departmentInfo.color === "emerald"
+                                      ? "bg-emerald-500/20 text-emerald-300"
+                                      : departmentInfo.color === "pink"
+                                      ? "bg-pink-500/20 text-pink-300"
+                                      : departmentInfo.color === "indigo"
+                                      ? "bg-indigo-500/20 text-indigo-300"
+                                      : departmentInfo.color === "amber"
+                                      ? "bg-amber-500/20 text-amber-300"
+                                      : "bg-gray-500/20 text-gray-300"
+                                  }`}
+                                >
+                                  {departmentInfo.code}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </Link>
+                    );
+                  })}
                 </div>
-              </Link>
-            );
-          })}
+              </div>
+            ));
+          })()}
         </nav>
       </div>
 
@@ -345,7 +444,7 @@ const Sidebar = ({ onExpandedChange, onPinnedChange }) => {
 
                   {/* Sign Out Button */}
                   <button
-                    onClick={handleLogout}
+                    onClick={handleLogoutClick}
                     className="w-full flex items-center px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-200 group"
                   >
                     <div className="w-6 h-6 bg-red-100 rounded-lg flex items-center justify-center mr-3 group-hover:bg-red-200 transition-colors duration-200">
@@ -391,6 +490,18 @@ const Sidebar = ({ onExpandedChange, onPinnedChange }) => {
           onClick={() => setIsProfileOpen(false)}
         />
       )}
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal &&
+        createPortal(
+          <LogoutConfirmationModal
+            isOpen={showLogoutModal}
+            onClose={() => setShowLogoutModal(false)}
+            onConfirm={handleLogoutConfirm}
+            user={user}
+          />,
+          document.body
+        )}
     </aside>
   );
 };

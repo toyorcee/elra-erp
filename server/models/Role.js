@@ -45,6 +45,7 @@ const roleSchema = new mongoose.Schema(
           "document.share",
           "document.export",
           "document.archive",
+          "document.scan",
 
           // User management permissions
           "user.create",

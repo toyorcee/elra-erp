@@ -7,6 +7,11 @@ import RetrieveCredentials from "./pages/auth/RetrieveCredentials";
 import EmailVerification from "./pages/auth/EmailVerification";
 import EmailVerificationSuccess from "./pages/auth/EmailVerificationSuccess";
 import { Dashboard, Documents, Upload } from "./pages/user";
+import DepartmentDocuments from "./pages/user/DepartmentDocuments";
+import DepartmentDashboard from "./pages/user/DepartmentDashboard";
+import Workflows from "./pages/user/Workflows";
+import DepartmentStaff from "./pages/user/DepartmentStaff";
+import Archive from "./pages/user/Archive";
 import Notifications from "./pages/shared/Notifications";
 import UserSettings from "./pages/user/Settings";
 import {
@@ -84,9 +89,12 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Dashboard />} />
-        <Route path="documents" element={<Documents />} />
+        <Route index element={<DepartmentDashboard />} />
+        <Route path="documents" element={<DepartmentDocuments />} />
         <Route path="upload" element={<Upload />} />
+        <Route path="workflows" element={<Workflows />} />
+        <Route path="department/staff" element={<DepartmentStaff />} />
+        <Route path="archive" element={<Archive />} />
 
         <Route path="notifications" element={<Notifications />} />
         <Route path="settings" element={<UserSettings />} />
@@ -114,6 +122,8 @@ const AppRoutes = () => {
 
         <Route path="documents" element={<Documents />} />
         <Route path="upload" element={<Upload />} />
+        <Route path="workflows" element={<Workflows />} />
+        <Route path="staff" element={<DepartmentStaff />} />
         <Route path="audit-logs" element={<AuditLogs />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="archive" element={<Documents />} />
@@ -137,6 +147,11 @@ const AppRoutes = () => {
         <Route path="create-instance" element={<CreateIndustryInstance />} />
         <Route path="companies" element={<CompanyList />} />
         <Route path="create-company" element={<CreateCompany />} />
+        <Route path="documents" element={<Documents />} />
+        <Route path="upload" element={<Upload />} />
+        <Route path="archive" element={<Documents />} />
+        <Route path="workflows" element={<Workflows />} />
+        <Route path="staff" element={<DepartmentStaff />} />
         <Route path="subscriptions" element={<SubscriptionManagement />} />
         <Route path="pricing" element={<PricingManagement />} />
         <Route path="notifications" element={<Notifications />} />

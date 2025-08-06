@@ -53,6 +53,7 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     if (originalRequest.url === "/auth/refresh") {
+      console.log("🔄 Refresh token request failed, not retrying");
       return Promise.reject(error);
     }
 
@@ -61,7 +62,14 @@ api.interceptors.response.use(
       !originalRequest._retry &&
       hasLoggedIn
     ) {
+      console.log("🔄 Attempting token refresh...", {
+        hasLoggedIn,
+        isRefreshing,
+        url: originalRequest.url,
+      });
+
       if (isRefreshing) {
+        console.log("⏳ Token refresh already in progress, queuing request");
         return new Promise(function (resolve, reject) {
           failedQueue.push({ resolve, reject });
         })
@@ -73,15 +81,24 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
+        console.log("🔄 Calling refresh endpoint...");
         await api.post("/auth/refresh");
+        console.log("✅ Token refresh successful");
         processQueue(null);
         return api(originalRequest);
       } catch (refreshError) {
+        console.error("❌ Token refresh failed:", refreshError);
         processQueue(refreshError, null);
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
       }
+    } else {
+      console.log("❌ Not attempting refresh:", {
+        status: error.response?.status,
+        hasRetry: originalRequest._retry,
+        hasLoggedIn,
+      });
     }
 
     return Promise.reject(error);
@@ -182,6 +199,18 @@ export const authAPI = {
       throw error;
     }
   },
+
+  joinCompany: async (data) => {
+    try {
+      console.log("[authAPI.joinCompany] Attempting to join company:", data);
+      const response = await api.post("/auth/join-company", data);
+      console.log("[authAPI.joinCompany] Response:", response.data);
+      return response;
+    } catch (error) {
+      console.error("[authAPI.joinCompany] Error:", error);
+      throw error;
+    }
+  },
 };
 
 // Invitation API
@@ -191,7 +220,6 @@ export const invitationAPI = {
       const response = await api.post("/invitations/verify", { code });
       return response.data;
     } catch (error) {
-      console.error("[invitationAPI.verifyCode] Error:", error);
       throw error;
     }
   },

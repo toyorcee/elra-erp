@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   HiX,
@@ -10,7 +10,6 @@ import {
   HiArrowRight,
   HiUser,
 } from "react-icons/hi";
-import { invitationAPI } from "../../services/api";
 
 const InvitationPreviewModal = ({
   isOpen,
@@ -19,8 +18,7 @@ const InvitationPreviewModal = ({
   invitationCode,
   previewData,
 }) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [loading] = useState(false);
 
   const handleProceed = () => {
     if (previewData) {
@@ -33,6 +31,20 @@ const InvitationPreviewModal = ({
   }
 
   const { invitation } = previewData.data;
+
+  // Fallback for missing invitation data
+  if (!invitation) {
+    return null;
+  }
+
+  // Ensure all required fields exist
+  const safeInvitation = {
+    company: invitation.company || { name: "Unknown Company", description: "" },
+    role: invitation.role || { name: "Unknown Role" },
+    department: invitation.department || { name: "Unknown Department" },
+    position: invitation.position || null,
+    notes: invitation.notes || null,
+  };
 
   return (
     <AnimatePresence>
@@ -59,7 +71,7 @@ const InvitationPreviewModal = ({
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold text-white">
-                      Welcome to {invitation.company.name}!
+                      Welcome to {safeInvitation.company.name}!
                     </h2>
                     <p className="text-purple-200 text-sm">
                       You're about to join our amazing team
@@ -85,10 +97,10 @@ const InvitationPreviewModal = ({
                   </div>
                   <div className="flex-1">
                     <h3 className="text-xl font-bold text-white">
-                      {invitation.company.name}
+                      {safeInvitation.company.name}
                     </h3>
                     <p className="text-purple-200 text-sm">
-                      {invitation.company.description ||
+                      {safeInvitation.company.description ||
                         "Document Management System"}
                     </p>
                   </div>
@@ -108,7 +120,7 @@ const InvitationPreviewModal = ({
                         Your Role
                       </p>
                       <p className="text-white font-bold">
-                        {invitation.role.name}
+                        {safeInvitation.role.name}
                       </p>
                     </div>
                   </div>
@@ -125,7 +137,7 @@ const InvitationPreviewModal = ({
                         Department
                       </p>
                       <p className="text-white font-bold">
-                        {invitation.department.name}
+                        {safeInvitation.department.name}
                       </p>
                     </div>
                   </div>
@@ -133,7 +145,7 @@ const InvitationPreviewModal = ({
               </div>
 
               {/* Position */}
-              {invitation.position && (
+              {safeInvitation.position && (
                 <div className="bg-gradient-to-r from-orange-500/10 to-red-500/10 rounded-xl p-4 border border-orange-500/20">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg">
@@ -144,7 +156,7 @@ const InvitationPreviewModal = ({
                         Position
                       </p>
                       <p className="text-white font-bold">
-                        {invitation.position}
+                        {safeInvitation.position}
                       </p>
                     </div>
                   </div>
@@ -186,10 +198,10 @@ const InvitationPreviewModal = ({
               </div>
 
               {/* Notes */}
-              {invitation.notes && (
+              {safeInvitation.notes && (
                 <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 rounded-xl p-4 border border-yellow-500/20">
                   <p className="text-yellow-200 text-sm">
-                    <strong>Note:</strong> {invitation.notes}
+                    <strong>Note:</strong> {safeInvitation.notes}
                   </p>
                 </div>
               )}

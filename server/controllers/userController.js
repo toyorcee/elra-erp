@@ -314,6 +314,19 @@ export const updateUser = async (req, res) => {
       .populate("supervisor", "name email")
       .select("-password");
 
+    if (
+      user.status === "PENDING_REGISTRATION" &&
+      updateData.role &&
+      updateData.department
+    ) {
+      const newRoleData = await Role.findById(updateData.role);
+      const newDeptData = await Department.findById(updateData.department);
+
+      console.log(
+        `🔍 [USER ASSIGNMENT] User: ${user.email} | Role: ${newRoleData?.name} (Level ${newRoleData?.level}) | Department: ${newDeptData?.name} (Level ${newDeptData?.level}) | Status: ${user.status}`
+      );
+    }
+
     try {
       if (
         updateData.role &&

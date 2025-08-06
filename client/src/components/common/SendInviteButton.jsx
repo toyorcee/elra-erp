@@ -39,7 +39,6 @@ const SendInviteButton = ({
     onSuccess: () => {
       queryClient.invalidateQueries(["users"]);
       queryClient.invalidateQueries(["invitations"]);
-      toast.success("Invitation sent successfully!");
       onSuccess && onSuccess();
       setShowConfirmation(false);
     },

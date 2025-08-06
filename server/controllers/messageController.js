@@ -1,6 +1,33 @@
 import Message from "../models/Message.js";
 import User from "../models/User.js";
-import { io } from "../server.js";
+
+function getSocketIdByUserId(userId) {
+  return null;
+}
+
+async function createMessageNotification(message, recipient) {
+  try {
+    if (typeof global.notificationService !== "undefined") {
+      await global.notificationService.createNotification({
+        recipient: recipient._id,
+        type: "MESSAGE_RECEIVED",
+        title: `New message from ${message.sender.name}`,
+        message:
+          message.content.length > 50
+            ? `${message.content.substring(0, 50)}...`
+            : message.content,
+        data: {
+          senderId: message.sender._id,
+          messageId: message._id,
+          actionUrl: `/messages?conversation=${message.sender._id}`,
+          priority: "medium",
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Error creating message notification:", error);
+  }
+}
 
 export const getChatHistory = async (req, res) => {
   try {
@@ -19,22 +46,22 @@ export const getChatHistory = async (req, res) => {
     // Get messages between the two users
     const messages = await Message.find({
       $or: [
-        { sender: currentUser.userId, recipient: otherUserId },
-        { sender: otherUserId, recipient: currentUser.userId },
+        { sender: currentUser._id, recipient: otherUserId },
+        { sender: otherUserId, recipient: currentUser._id },
       ],
       isActive: true,
     })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .populate("sender", "name email avatar")
-      .populate("recipient", "name email avatar")
+      .populate("sender", "name email avatar firstName lastName")
+      .populate("recipient", "name email avatar firstName lastName")
       .populate("document", "title reference");
 
     const total = await Message.countDocuments({
       $or: [
-        { sender: currentUser.userId, recipient: otherUserId },
-        { sender: otherUserId, recipient: currentUser.userId },
+        { sender: currentUser._id, recipient: otherUserId },
+        { sender: otherUserId, recipient: currentUser._id },
       ],
       isActive: true,
     });
@@ -43,7 +70,7 @@ export const getChatHistory = async (req, res) => {
     await Message.updateMany(
       {
         sender: otherUserId,
-        recipient: currentUser.userId,
+        recipient: currentUser._id,
         isRead: false,
         isActive: true,
       },
@@ -55,7 +82,7 @@ export const getChatHistory = async (req, res) => {
 
     res.json({
       success: true,
-      data: messages.reverse(), // Show oldest first
+      data: messages.reverse(),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -126,17 +153,30 @@ export const getConversations = async (req, res) => {
     const populatedConversations = await Message.populate(conversations, [
       {
         path: "_id",
-        select: "name email avatar lastSeen isOnline",
+        select:
+          "name email avatar firstName lastName lastSeen isOnline department role",
         model: "User",
+        populate: [
+          {
+            path: "department",
+            select: "name",
+            model: "Department",
+          },
+          {
+            path: "role",
+            select: "name level",
+            model: "Role",
+          },
+        ],
       },
       {
         path: "lastMessage.sender",
-        select: "name email avatar",
+        select: "name email avatar firstName lastName",
         model: "User",
       },
       {
         path: "lastMessage.recipient",
-        select: "name email avatar",
+        select: "name email avatar firstName lastName",
         model: "User",
       },
       {
@@ -159,7 +199,7 @@ export const getConversations = async (req, res) => {
   }
 };
 
-// Send a message (HTTP endpoint for non-Socket.IO clients)
+// Send a message
 export const sendMessage = async (req, res) => {
   try {
     const currentUser = req.user;
@@ -172,7 +212,6 @@ export const sendMessage = async (req, res) => {
       });
     }
 
-    // Check if recipient exists
     const recipient = await User.findById(recipientId);
     if (!recipient) {
       return res.status(404).json({
@@ -181,9 +220,8 @@ export const sendMessage = async (req, res) => {
       });
     }
 
-    // Create message
     const message = new Message({
-      sender: currentUser.userId,
+      sender: currentUser._id,
       recipient: recipientId,
       content: content.trim(),
       document: documentId || null,
@@ -191,23 +229,39 @@ export const sendMessage = async (req, res) => {
 
     await message.save();
 
-    // Populate sender and recipient details
-    await message.populate("sender", "name email avatar");
-    await message.populate("recipient", "name email avatar");
+    await message.populate("sender", "name email avatar firstName lastName");
+    await message.populate("recipient", "name email avatar firstName lastName");
     if (documentId) {
       await message.populate("document", "title reference");
     }
 
-    // Emit real-time message to recipient if online
-    const recipientSocketId = getSocketIdByUserId(recipientId);
-    if (recipientSocketId) {
-      io.to(recipientSocketId).emit("receiveMessage", {
+    await createMessageNotification(message, recipient);
+
+    if (global.io) {
+      global.io.to(recipientId.toString()).emit("receiveMessage", {
         _id: message._id,
         sender: message.sender,
         recipient: message.recipient,
         content: message.content,
         document: message.document,
         createdAt: message.createdAt,
+        isRead: false,
+      });
+
+      global.io.to(recipientId.toString()).emit("messageDelivered", {
+        messageId: message._id,
+        recipientId: recipientId,
+        deliveredAt: new Date(),
+      });
+
+      global.io.to(currentUser._id.toString()).emit("messageSent", {
+        _id: message._id,
+        sender: message.sender,
+        recipient: message.recipient,
+        content: message.content,
+        document: message.document,
+        createdAt: message.createdAt,
+        isRead: false,
       });
     }
 
@@ -234,7 +288,7 @@ export const markMessagesAsRead = async (req, res) => {
     const result = await Message.updateMany(
       {
         sender: senderId,
-        recipient: currentUser.userId,
+        recipient: currentUser._id,
         isRead: false,
         isActive: true,
       },
@@ -243,6 +297,14 @@ export const markMessagesAsRead = async (req, res) => {
         readAt: new Date(),
       }
     );
+
+    // Emit read status to sender if online
+    if (global.io && result.modifiedCount > 0) {
+      global.io.to(senderId.toString()).emit("messagesRead", {
+        readerId: currentUser._id,
+        count: result.modifiedCount,
+      });
+    }
 
     res.json({
       success: true,
@@ -264,10 +326,13 @@ export const getOnlineUsers = async (req, res) => {
 
     // Get all users with online status
     const users = await User.find({
-      _id: { $ne: currentUser.userId },
+      _id: { $ne: currentUser._id },
       isActive: true,
     })
-      .select("name email avatar lastSeen isOnline department role")
+      .select(
+        "name email avatar firstName lastName lastSeen isOnline department role"
+      )
+      .populate("department", "name")
       .populate("role", "name level");
 
     res.json({
@@ -292,6 +357,14 @@ export const updateLastSeen = async (req, res) => {
       lastSeen: new Date(),
       isOnline: true,
     });
+
+    // Emit online status to other users
+    if (global.io) {
+      global.io.broadcast.emit("userOnline", {
+        userId: currentUser.userId,
+        lastSeen: new Date(),
+      });
+    }
 
     res.json({
       success: true,
@@ -352,6 +425,14 @@ export const deleteMessage = async (req, res) => {
     message.isActive = false;
     await message.save();
 
+    // Emit message deletion to recipient if online
+    if (global.io) {
+      global.io.to(message.recipient.toString()).emit("messageDeleted", {
+        messageId: message._id,
+        deletedBy: currentUser.userId,
+      });
+    }
+
     res.json({
       success: true,
       message: "Message deleted successfully",
@@ -365,10 +446,120 @@ export const deleteMessage = async (req, res) => {
   }
 };
 
-// Helper function to get socket ID by user ID
-function getSocketIdByUserId(userId) {
-  // This would need to be implemented based on your socket connection management
-  // For now, we'll return null and handle it in the socket connection
-  return null;
-}
- 
+// Get user typing status
+export const updateTypingStatus = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const { recipientId, isTyping } = req.body;
+
+    if (global.io) {
+      global.io.to(recipientId.toString()).emit("userTyping", {
+        userId: currentUser.userId,
+        isTyping,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Typing status updated",
+    });
+  } catch (error) {
+    console.error("Update typing status error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update typing status",
+    });
+  }
+};
+
+// Get available users based on approval hierarchy
+export const getAvailableUsers = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const { search } = req.query;
+
+    // Get current user with populated role and department
+    const userWithDetails = await User.findById(currentUser._id)
+      .populate("role", "name level")
+      .populate("department", "name");
+
+    if (!userWithDetails) {
+      console.error("❌ User not found:", currentUser._id);
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Build query based on user's role and approval hierarchy
+    let query = {
+      _id: { $ne: currentUser._id }, // Exclude current user
+      isActive: true,
+    };
+
+    // Add search filter if provided
+    if (search) {
+      query.$or = [
+        { firstName: { $regex: search, $options: "i" } },
+        { lastName: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+        { name: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // Get users based on approval hierarchy from database
+    let users;
+
+    if (userWithDetails.role?.level >= 100) {
+      // Super Admin and Platform Admin can message anyone in the company
+      users = await User.find(query)
+        .select(
+          "firstName lastName email name avatar department role lastSeen isOnline"
+        )
+        .populate("department", "name")
+        .populate("role", "name level")
+        .limit(50);
+    } else if (userWithDetails.role?.level >= 50) {
+      // Department Admin can message within their department and superiors
+      users = await User.find({
+        ...query,
+        $or: [
+          { department: userWithDetails.department?._id },
+          { "role.level": { $gte: userWithDetails.role?.level } },
+        ],
+      })
+        .select(
+          "firstName lastName email name avatar department role lastSeen isOnline"
+        )
+        .populate("department", "name")
+        .populate("role", "name level")
+        .limit(50);
+    } else {
+      // Regular users can message within their department and superiors
+      users = await User.find({
+        ...query,
+        $or: [
+          { department: userWithDetails.department?._id },
+          { "role.level": { $gte: userWithDetails.role?.level } },
+        ],
+      })
+        .select(
+          "firstName lastName email name avatar department role lastSeen isOnline"
+        )
+        .populate("department", "name")
+        .populate("role", "name level")
+        .limit(30);
+    }
+
+    res.json({
+      success: true,
+      data: users,
+    });
+  } catch (error) {
+    console.error("❌ Get available users error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch available users",
+    });
+  }
+};

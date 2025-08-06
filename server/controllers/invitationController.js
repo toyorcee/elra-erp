@@ -411,7 +411,7 @@ export const verifyInvitationCode = asyncHandler(async (req, res) => {
     });
   }
 
-  res.json({
+  const responseData = {
     success: true,
     message: "Invitation code verified successfully",
     data: {
@@ -442,7 +442,9 @@ export const verifyInvitationCode = asyncHandler(async (req, res) => {
         },
       },
     },
-  });
+  };
+
+  res.json(responseData);
 });
 
 // @desc    Get invitation statistics (Super Admin only)

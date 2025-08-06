@@ -383,7 +383,11 @@ const RecentActivities = ({
                   {!compact && (
                     <>
                       <p className="text-sm text-gray-600 mt-1">
-                        {activity.details}
+                        {typeof activity.details === "string"
+                          ? activity.details
+                          : activity.details?.description ||
+                            JSON.stringify(activity.details) ||
+                            "No details available"}
                       </p>
 
                       {activity.userName && (

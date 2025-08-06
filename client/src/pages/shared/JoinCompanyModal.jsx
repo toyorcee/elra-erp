@@ -6,11 +6,103 @@ import {
   HiEyeOff,
   HiKey,
   HiUser,
-  HiLockClosed,
+  HiSparkles,
 } from "react-icons/hi";
 import { authAPI, invitationAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import InvitationPreviewModal from "../../components/common/InvitationPreviewModal";
+
+// Beautiful Loading Component for Verification
+const VerificationLoading = () => (
+  <motion.div
+    initial={{ opacity: 0, scale: 0.9 }}
+    animate={{ opacity: 1, scale: 1 }}
+    className="flex flex-col items-center justify-center p-8 space-y-6"
+  >
+    {/* Animated Logo */}
+    <motion.div
+      animate={{
+        rotate: [0, 360],
+        scale: [1, 1.1, 1],
+      }}
+      transition={{
+        rotate: { duration: 2, repeat: Infinity, ease: "linear" },
+        scale: { duration: 1.5, repeat: Infinity, ease: "easeInOut" },
+      }}
+      className="relative"
+    >
+      <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg">
+        <HiSparkles className="w-8 h-8 text-white" />
+      </div>
+      {/* Orbiting dots */}
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+        className="absolute inset-0"
+      >
+        <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-purple-400 rounded-full" />
+        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-blue-400 rounded-full" />
+        <div className="absolute top-1/2 -left-2 transform -translate-y-1/2 w-3 h-3 bg-indigo-400 rounded-full" />
+        <div className="absolute top-1/2 -right-2 transform -translate-y-1/2 w-3 h-3 bg-cyan-400 rounded-full" />
+      </motion.div>
+    </motion.div>
+
+    {/* Loading Text */}
+    <div className="text-center space-y-2">
+      <motion.h3
+        animate={{ opacity: [0.5, 1, 0.5] }}
+        transition={{ duration: 2, repeat: Infinity }}
+        className="text-xl font-bold text-white"
+      >
+        Verifying Invitation
+      </motion.h3>
+      <motion.p
+        animate={{ opacity: [0.3, 0.7, 0.3] }}
+        transition={{ duration: 1.5, repeat: Infinity, delay: 0.5 }}
+        className="text-purple-200 text-sm"
+      >
+        Checking your invitation code...
+      </motion.p>
+    </div>
+
+    {/* Progress Bar */}
+    <div className="w-64 h-2 bg-white/10 rounded-full overflow-hidden">
+      <motion.div
+        animate={{ x: [-256, 256] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        className="h-full bg-gradient-to-r from-transparent via-purple-500 to-transparent"
+      />
+    </div>
+
+    {/* Status Steps */}
+    <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-2">
+        <motion.div
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ duration: 1, repeat: Infinity, delay: 0 }}
+          className="w-2 h-2 bg-green-400 rounded-full"
+        />
+        <span className="text-green-300 text-xs">Validating</span>
+      </div>
+      <div className="flex items-center space-x-2">
+        <motion.div
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ duration: 1, repeat: Infinity, delay: 0.3 }}
+          className="w-2 h-2 bg-blue-400 rounded-full"
+        />
+        <span className="text-blue-300 text-xs">Loading</span>
+      </div>
+      <div className="flex items-center space-x-2">
+        <motion.div
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ duration: 1, repeat: Infinity, delay: 0.6 }}
+          className="w-2 h-2 bg-purple-400 rounded-full"
+        />
+        <span className="text-purple-300 text-xs">Preparing</span>
+      </div>
+    </div>
+  </motion.div>
+);
 
 const JoinCompanyModal = ({ isOpen, onClose, onSuccess, initialCode = "" }) => {
   const [step, setStep] = useState(1);
@@ -19,20 +111,25 @@ const JoinCompanyModal = ({ isOpen, onClose, onSuccess, initialCode = "" }) => {
   const [success, setSuccess] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [previewData, setPreviewData] = useState(null);
+  const [verifying, setVerifying] = useState(false);
 
-  // Step 1: Invitation Code
   const [invitationCode, setInvitationCode] = useState(initialCode);
 
-  // Update invitation code when initialCode prop changes
   useEffect(() => {
     if (initialCode && initialCode !== invitationCode) {
       setInvitationCode(initialCode);
-      // Auto-verify the code if it's provided
       if (isOpen && initialCode) {
-        handleInvitationCodeSubmit({ preventDefault: () => {} });
+        handleInvitationCodeSubmit(null, initialCode);
       }
     }
   }, [initialCode, isOpen]);
+
+  useEffect(() => {
+    if (isOpen && initialCode && !previewData) {
+      setInvitationCode(initialCode);
+      handleInvitationCodeSubmit(null, initialCode);
+    }
+  }, [isOpen, initialCode]);
 
   // Step 2: User Details
   const [userData, setUserData] = useState({
@@ -46,14 +143,16 @@ const JoinCompanyModal = ({ isOpen, onClose, onSuccess, initialCode = "" }) => {
 
   const { login } = useAuth();
 
-  const handleInvitationCodeSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  const handleInvitationCodeSubmit = async (e, code = null) => {
+    if (e) e.preventDefault();
+    setVerifying(true);
     setError("");
+
+    const codeToVerify = code || invitationCode;
 
     try {
       // First, verify the invitation code and get preview data
-      const previewResponse = await invitationAPI.verifyCode(invitationCode);
+      const previewResponse = await invitationAPI.verifyCode(codeToVerify);
 
       if (previewResponse.success) {
         setPreviewData(previewResponse);
@@ -64,19 +163,37 @@ const JoinCompanyModal = ({ isOpen, onClose, onSuccess, initialCode = "" }) => {
         err.response?.data?.message || "Failed to verify invitation code"
       );
     } finally {
-      setLoading(false);
+      setVerifying(false);
     }
   };
 
   const handlePreviewProceed = () => {
     setShowPreview(false);
     setStep(2);
+
+    if (previewData?.data?.invitation) {
+      const { firstName } = previewData.data.invitation;
+      const username = firstName || "user"; 
+      setUserData((prev) => ({
+        ...prev,
+        username: username,
+      }));
+    }
   };
 
   const handleUserSetupSubmit = async (e) => {
     e.preventDefault();
+    console.log("🚀 handleUserSetupSubmit called");
+    console.log("📝 Form data:", { invitationCode, userData });
     setLoading(true);
     setError("");
+
+    // Validate all required fields
+    if (!userData.username || !userData.password || !userData.confirmPassword) {
+      setError("Please fill in all fields");
+      setLoading(false);
+      return;
+    }
 
     // Validate passwords match
     if (userData.password !== userData.confirmPassword) {
@@ -85,14 +202,14 @@ const JoinCompanyModal = ({ isOpen, onClose, onSuccess, initialCode = "" }) => {
       return;
     }
 
-    // Validate password strength
-    if (userData.password.length < 6) {
-      setError("Password must be at least 6 characters long");
-      setLoading(false);
-      return;
-    }
-
     try {
+      console.log("📡 Calling authAPI.joinCompany with:", {
+        invitationCode,
+        userData: {
+          ...userData,
+          password: userData.password,
+        },
+      });
       const response = await authAPI.joinCompany({
         invitationCode,
         userData: {
@@ -102,10 +219,9 @@ const JoinCompanyModal = ({ isOpen, onClose, onSuccess, initialCode = "" }) => {
       });
 
       if (response.data.success) {
-        setSuccess("Account created successfully! Logging you in...");
-
-        // Auto-login the user
-        await login(userData.username, userData.password);
+        setSuccess(
+          "Account verified and activated successfully! You can now log in with your credentials."
+        );
 
         // Close modal and redirect
         setTimeout(() => {
@@ -114,6 +230,8 @@ const JoinCompanyModal = ({ isOpen, onClose, onSuccess, initialCode = "" }) => {
         }, 2000);
       }
     } catch (err) {
+      console.error("❌ Error in handleUserSetupSubmit:", err);
+      console.error("❌ Error response:", err.response?.data);
       setError(err.response?.data?.message || "Failed to create account");
     } finally {
       setLoading(false);
@@ -122,10 +240,13 @@ const JoinCompanyModal = ({ isOpen, onClose, onSuccess, initialCode = "" }) => {
 
   const handleClose = () => {
     setStep(1);
-    setInvitationCode("");
+    setInvitationCode(initialCode || "");
     setUserData({ username: "", password: "", confirmPassword: "" });
     setError("");
     setSuccess("");
+    setShowPreview(false);
+    setPreviewData(null);
+    setVerifying(false);
     onClose();
   };
 
@@ -162,12 +283,12 @@ const JoinCompanyModal = ({ isOpen, onClose, onSuccess, initialCode = "" }) => {
                     <h2 className="text-xl font-bold text-white">
                       {step === 1
                         ? "Enter Invitation Code"
-                        : "Complete Account Setup"}
+                        : "Verify Your Account"}
                     </h2>
                     <p className="text-white/60 text-sm">
                       {step === 1
                         ? "Join your organization"
-                        : "Set up your password"}
+                        : "Confirm your credentials for security"}
                     </p>
                   </div>
                 </div>
@@ -206,50 +327,57 @@ const JoinCompanyModal = ({ isOpen, onClose, onSuccess, initialCode = "" }) => {
 
                 {/* Step 1: Invitation Code */}
                 {step === 1 && (
-                  <motion.form
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    onSubmit={handleInvitationCodeSubmit}
-                    className="space-y-4"
-                  >
-                    <div>
-                      <label className="block text-white/80 text-sm font-medium mb-2">
-                        Invitation Code
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={invitationCode}
-                          onChange={(e) =>
-                            setInvitationCode(e.target.value.toUpperCase())
-                          }
-                          placeholder="Enter your invitation code"
-                          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-blue-500 transition-colors"
-                          maxLength={16}
-                          required
-                        />
-                        <HiKey className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5" />
-                      </div>
-                      <p className="text-white/50 text-xs mt-2">
-                        Enter the 8-character code provided by your
-                        administrator
-                      </p>
-                    </div>
+                  <>
+                    {verifying ? (
+                      <VerificationLoading />
+                    ) : (
+                      <motion.form
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        onSubmit={handleInvitationCodeSubmit}
+                        className="space-y-4"
+                      >
+                        <div>
+                          <label className="block text-white/80 text-sm font-medium mb-2">
+                            Invitation Code
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={invitationCode}
+                              onChange={(e) =>
+                                setInvitationCode(e.target.value.toUpperCase())
+                              }
+                              placeholder="Enter your invitation code"
+                              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-blue-500 transition-colors"
+                              maxLength={16}
+                              required
+                            />
+                            <HiKey className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5" />
+                          </div>
+                          <p className="text-white/50 text-xs mt-2">
+                            {initialCode
+                              ? "Code loaded from invitation link"
+                              : "Enter the 8-character code provided by your administrator"}
+                          </p>
+                        </div>
 
-                    {error && (
-                      <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                        <p className="text-red-400 text-sm">{error}</p>
-                      </div>
+                        {error && (
+                          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                            <p className="text-red-400 text-sm">{error}</p>
+                          </div>
+                        )}
+
+                        <button
+                          type="submit"
+                          disabled={!invitationCode?.trim()}
+                          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 px-6 rounded-xl font-semibold transition-all duration-300"
+                        >
+                          {initialCode ? "Continue with Code" : "Verify Code"}
+                        </button>
+                      </motion.form>
                     )}
-
-                    <button
-                      type="submit"
-                      disabled={loading || !invitationCode?.trim()}
-                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 px-6 rounded-xl font-semibold transition-all duration-300"
-                    >
-                      {loading ? "Verifying..." : "Verify Code"}
-                    </button>
-                  </motion.form>
+                  </>
                 )}
 
                 {/* Step 2: User Setup */}
@@ -260,6 +388,15 @@ const JoinCompanyModal = ({ isOpen, onClose, onSuccess, initialCode = "" }) => {
                     onSubmit={handleUserSetupSubmit}
                     className="space-y-4"
                   >
+                    <div className="text-center mb-6">
+                      <p className="text-purple-200 text-sm">
+                        Please verify your existing credentials to activate your
+                        account
+                      </p>
+                      <p className="text-yellow-200 text-xs mt-2">
+                        🔒 This step ensures only you can activate your account
+                      </p>
+                    </div>
                     <div>
                       <label className="block text-white/80 text-sm font-medium mb-2">
                         Username
@@ -268,18 +405,15 @@ const JoinCompanyModal = ({ isOpen, onClose, onSuccess, initialCode = "" }) => {
                         <input
                           type="text"
                           value={userData.username}
-                          onChange={(e) =>
-                            setUserData({
-                              ...userData,
-                              username: e.target.value,
-                            })
-                          }
-                          placeholder="Choose a username"
-                          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-blue-500 transition-colors"
+                          readOnly
+                          className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white cursor-not-allowed"
                           required
                         />
                         <HiUser className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5" />
                       </div>
+                      <p className="text-white/50 text-xs mt-2">
+                        Username is pre-filled from your invitation
+                      </p>
                     </div>
 
                     <div>
@@ -296,7 +430,7 @@ const JoinCompanyModal = ({ isOpen, onClose, onSuccess, initialCode = "" }) => {
                               password: e.target.value,
                             })
                           }
-                          placeholder="Create a password"
+                          placeholder="Enter your password"
                           className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-white/40 focus:outline-none focus:border-blue-500 transition-colors"
                           required
                         />
@@ -378,7 +512,9 @@ const JoinCompanyModal = ({ isOpen, onClose, onSuccess, initialCode = "" }) => {
                         }
                         className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 px-6 rounded-xl font-semibold transition-all duration-300"
                       >
-                        {loading ? "Creating Account..." : "Create Account"}
+                        {loading
+                          ? "Verifying Credentials..."
+                          : "Verify & Activate"}
                       </button>
                     </div>
                   </motion.form>

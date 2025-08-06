@@ -6,6 +6,7 @@ import {
   processOCR,
 } from "../services/documents";
 import { toast } from "react-toastify";
+import { canScanDocuments } from "../constants/userRoles";
 
 import {
   MdCloudUpload,
@@ -81,6 +82,7 @@ const DocumentScanning = ({ context = "user" }) => {
   const hasBypassPermission = user?.role?.permissions?.includes(
     "document.bypass_approval"
   );
+  const hasScanPermission = canScanDocuments(user);
 
   // File size limits based on role
   const maxFileSize = isSuperAdmin ? 50 * 1024 * 1024 : 25 * 1024 * 1024; // 50MB for super admin, 25MB for others
@@ -197,6 +199,12 @@ const DocumentScanning = ({ context = "user" }) => {
   };
 
   const handleScanDocument = async () => {
+    // Check if user has scanning permission
+    if (!hasScanPermission) {
+      toast.error("You don't have permission to scan documents");
+      return;
+    }
+
     console.log("🚀 [DocumentScanning] Starting OCR scan process:", {
       fileName: selectedFile?.name,
       fileSize: selectedFile?.size,
@@ -204,6 +212,7 @@ const DocumentScanning = ({ context = "user" }) => {
       context: context,
       userRole: user?.role?.name,
       hasBypassPermission: hasBypassPermission,
+      hasScanPermission: hasScanPermission,
     });
 
     if (!selectedFile) {
@@ -393,21 +402,6 @@ const DocumentScanning = ({ context = "user" }) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
-  // Check if user has upload permission
-  if (!hasUploadPermission) {
-    return (
-      <div className="w-full max-w-6xl mx-auto py-6">
-        <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-6 text-center">
-          <h2 className="text-xl font-bold text-red-300 mb-2">Access Denied</h2>
-          <p className="text-red-200">
-            You don't have permission to upload documents. Please contact your
-            administrator.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   // Show loading state while fetching metadata
   if (metadataLoading) {
     return (
@@ -428,10 +422,10 @@ const DocumentScanning = ({ context = "user" }) => {
   return (
     <div className="w-full max-w-6xl mx-auto py-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white mb-2">
+        <h1 className="text-2xl font-bold text-black mb-2">
           Document Scanning & OCR (Optical Character Recognition)
         </h1>
-        <p className="text-gray-300">
+        <p className="text-blue-600">
           Scan physical documents and automatically extract text, classify
           content, and generate metadata using OCR (Optical Character
           Recognition) technology.
@@ -440,10 +434,10 @@ const DocumentScanning = ({ context = "user" }) => {
 
         {/* Step-by-Step Guide */}
         <div className="mt-4 p-4 bg-green-900/20 border border-green-500/30 rounded-lg backdrop-blur-sm">
-          <h3 className="text-green-300 font-semibold mb-2">
+          <h3 className="text-blue-600 font-semibold mb-2">
             📋 Step-by-Step Process:
           </h3>
-          <ol className="text-sm text-gray-300 space-y-2">
+          <ol className="text-sm text-black space-y-2">
             <li>
               <strong>Step 1:</strong> Choose your scanning method (camera, file
               upload, or scanner)
@@ -476,10 +470,10 @@ const DocumentScanning = ({ context = "user" }) => {
 
         {/* Scanning Options Info */}
         <div className="mt-4 p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg backdrop-blur-sm">
-          <h3 className="text-blue-300 font-semibold mb-2">
+          <h3 className="text-blue-600 font-semibold mb-2">
             📱 Available Scanning Methods:
           </h3>
-          <ul className="text-sm text-gray-300 space-y-1">
+          <ul className="text-sm text-black space-y-1">
             <li>
               • <strong>Physical Scanner:</strong> Connect USB scanner to your
               computer → Scan document → File automatically appears
@@ -497,7 +491,7 @@ const DocumentScanning = ({ context = "user" }) => {
               scanning → Capture document → File automatically saved
             </li>
           </ul>
-          <p className="text-xs text-blue-200 mt-2">
+          <p className="text-xs text-black mt-2">
             <strong>Note:</strong> After selecting your scanning method and
             getting a file, proceed to Step 3 to process with OCR.
           </p>
@@ -505,10 +499,10 @@ const DocumentScanning = ({ context = "user" }) => {
 
         {/* Document Categories Info */}
         <div className="mt-4 p-4 bg-purple-900/20 border border-purple-500/30 rounded-lg backdrop-blur-sm">
-          <h3 className="text-purple-300 font-semibold mb-2">
+          <h3 className="text-blue-600 font-semibold mb-2">
             📂 Document Categories & Sections:
           </h3>
-          <div className="text-sm text-gray-300">
+          <div className="text-sm text-black">
             <p className="mb-2">
               <strong>Main Categories:</strong>{" "}
               {documentMetadata?.categories?.join(", ") || "Loading..."}
@@ -527,7 +521,7 @@ const DocumentScanning = ({ context = "user" }) => {
 
         {!isSuperAdmin && (
           <div className="mt-2 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg backdrop-blur-sm">
-            <p className="text-blue-200 text-sm">
+            <p className="text-black text-sm">
               <strong>Note:</strong> File size limit:{" "}
               {formatFileSize(maxFileSize)}.
               {!hasBypassPermission && " Approval workflow will be applied."}
@@ -539,8 +533,8 @@ const DocumentScanning = ({ context = "user" }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* File Upload Section */}
         <div className="bg-white/5 backdrop-blur-xl rounded-2xl shadow-2xl p-6 border border-white/20">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
-            <MdScanner className="mr-2" />
+          <h2 className="text-lg font-semibold text-blue-600 mb-4 flex items-center">
+            <MdScanner className="mr-2 text-blue-600" />
             Document Upload
           </h2>
 
@@ -588,12 +582,12 @@ const DocumentScanning = ({ context = "user" }) => {
               </div>
             ) : (
               <div className="space-y-4">
-                <MdCloudUpload className="w-12 h-12 text-gray-400 mx-auto" />
+                <MdCloudUpload className="w-12 h-12 text-blue-600 mx-auto" />
                 <div>
-                  <p className="text-white font-medium">
+                  <p className="text-black font-medium">
                     Drop your document here
                   </p>
-                  <p className="text-gray-300 text-sm">or click to browse</p>
+                  <p className="text-black text-sm">or click to browse</p>
                 </div>
                 <input
                   ref={fileInputRef}
@@ -615,7 +609,7 @@ const DocumentScanning = ({ context = "user" }) => {
           </div>
 
           {/* Scan Button */}
-          {selectedFile && !ocrResults && (
+          {selectedFile && !ocrResults && hasScanPermission && (
             <div className="mt-4">
               <button
                 onClick={handleScanDocument}
@@ -638,12 +632,22 @@ const DocumentScanning = ({ context = "user" }) => {
               </button>
             </div>
           )}
+
+          {/* Permission Denied Message */}
+          {selectedFile && !ocrResults && !hasScanPermission && (
+            <div className="mt-4 p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
+              <div className="flex items-center text-red-300">
+                <MdSecurity className="mr-2" />
+                <span>You don't have permission to scan documents</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* OCR Results Section */}
         <div className="bg-white/5 backdrop-blur-xl rounded-2xl shadow-2xl p-6 border border-white/20">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
-            <MdAutoFixHigh className="mr-2" />
+          <h2 className="text-lg font-semibold text-blue-600 mb-4 flex items-center">
+            <MdAutoFixHigh className="mr-2 text-blue-600" />
             OCR Results
           </h2>
 
@@ -772,8 +776,8 @@ const DocumentScanning = ({ context = "user" }) => {
             </div>
           ) : (
             <div className="text-center py-8">
-              <MdAutoFixHigh className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-300">
+              <MdAutoFixHigh className="w-12 h-12 text-blue-600 mx-auto mb-4" />
+              <p className="text-black">
                 Upload a document and click "Scan Document with OCR" to extract
                 text and metadata.
               </p>

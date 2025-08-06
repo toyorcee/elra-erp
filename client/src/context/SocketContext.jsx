@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 import { toast } from "react-toastify";
+import { SocketEventTypes } from "../types/messageTypes";
 
 const SocketContext = createContext();
 
@@ -16,21 +17,10 @@ export const useSocket = () => {
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
-
-  let authContext = null;
-  try {
-    authContext = useAuth();
-  } catch (error) {
-    console.log("🔍 SocketProvider: Auth context not ready yet");
-  }
-
-  const { user, isAuthenticated } = authContext || {
-    user: null,
-    isAuthenticated: false,
-  };
+  const { user, logout } = useAuth();
 
   useEffect(() => {
-    if (!isAuthenticated || !user) {
+    if (!user) {
       if (socket) {
         socket.disconnect();
         setSocket(null);
@@ -45,74 +35,70 @@ export const SocketProvider = ({ children }) => {
       : "http://localhost:5000";
 
     const newSocket = io(socketUrl, {
-      query: { userId: user._id },
-      withCredentials: true,
+      auth: {
+        token: user.token,
+      },
       transports: ["websocket", "polling"],
-      timeout: 20000,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
     });
 
     // Connection events
     newSocket.on("connect", () => {
-      console.log("✅ Socket.IO connected:", newSocket.id);
+      console.log("🔌 Socket connected:", newSocket.id);
       setIsConnected(true);
     });
 
-    newSocket.on("disconnect", () => {
-      console.log("❌ Socket.IO disconnected");
+    newSocket.on("disconnect", (reason) => {
+      console.log("🔌 Socket disconnected:", reason);
       setIsConnected(false);
     });
 
     newSocket.on("connect_error", (error) => {
-      console.error("❌ Socket.IO connection error:", error);
+      console.error("🔌 Socket connection error:", error);
       setIsConnected(false);
+
+      if (error.message === "Authentication failed") {
+        toast.error("Authentication failed. Please log in again.");
+        logout();
+      }
     });
 
-    // Real-time notifications
-    newSocket.on("newNotification", (notification) => {
-      console.log("🔔 New notification received:", notification);
-
-      // Show toast notification
-      toast.info(notification.message, {
-        position: "top-right",
-        autoClose: 5000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-      });
+    // Message events
+    newSocket.on(SocketEventTypes.RECEIVE_MESSAGE, (message) => {
+      console.log("💬 Message received via socket:", message);
+      toast.info(
+        `New message from ${
+          message.sender?.firstName || message.sender?.name || "Unknown"
+        }`
+      );
     });
 
-    // User online/offline events
-    newSocket.on("userOnline", ({ userId }) => {
-      console.log("👤 User online:", userId);
+    newSocket.on(SocketEventTypes.MESSAGE_SENT, (message) => {
+      console.log("✅ Message sent confirmation:", message);
     });
 
-    newSocket.on("userOffline", ({ userId }) => {
-      console.log("👤 User offline:", userId);
+    newSocket.on(SocketEventTypes.MESSAGE_READ, (data) => {
+      console.log("👁️ Messages read:", data);
     });
 
-    // Chat messages
-    newSocket.on("receiveMessage", (message) => {
-      console.log("💬 New message received:", message);
-
-      // Show toast for new messages
-      toast.info(`New message from ${message.sender?.name || "User"}`, {
-        position: "top-right",
-        autoClose: 3000,
-      });
+    newSocket.on(SocketEventTypes.USER_TYPING, (data) => {
+      console.log("⌨️ User typing:", data);
     });
 
-    newSocket.on("messageSent", (message) => {
-      console.log("✅ Message sent successfully:", message);
+    newSocket.on(SocketEventTypes.MESSAGE_DELETED, (data) => {
+      console.log("🗑️ Message deleted:", data);
     });
 
-    // Error handling
-    newSocket.on("error", (error) => {
+    newSocket.on(SocketEventTypes.USER_ONLINE, (data) => {
+      console.log("🟢 User online:", data);
+    });
+
+    newSocket.on(SocketEventTypes.USER_OFFLINE, (data) => {
+      console.log("🔴 User offline:", data);
+    });
+
+    newSocket.on(SocketEventTypes.ERROR, (error) => {
       console.error("❌ Socket error:", error);
-      toast.error("Connection error. Please refresh the page.");
+      toast.error(error.message || "An error occurred");
     });
 
     setSocket(newSocket);
@@ -121,18 +107,32 @@ export const SocketProvider = ({ children }) => {
     return () => {
       newSocket.disconnect();
     };
-  }, [isAuthenticated, user]);
+  }, [user, logout]);
 
   // Socket methods
-  const sendMessage = (data) => {
+  const sendMessage = (messageData) => {
     if (socket && isConnected) {
-      socket.emit("sendMessage", data);
+      socket.emit(SocketEventTypes.SEND_MESSAGE, messageData);
+    } else {
+      console.warn("Socket not connected, cannot send message");
     }
   };
 
-  const markMessageRead = (messageId) => {
+  const markMessageRead = (senderId) => {
     if (socket && isConnected) {
-      socket.emit("markMessageRead", { messageId, userId: user?._id });
+      socket.emit(SocketEventTypes.MESSAGE_READ, { senderId });
+    }
+  };
+
+  const updateTypingStatus = (recipientId, isTyping) => {
+    if (socket && isConnected) {
+      socket.emit(SocketEventTypes.TYPING, { recipientId, isTyping });
+    }
+  };
+
+  const deleteMessage = (messageId) => {
+    if (socket && isConnected) {
+      socket.emit(SocketEventTypes.MESSAGE_DELETED, { messageId });
     }
   };
 
@@ -141,6 +141,8 @@ export const SocketProvider = ({ children }) => {
     isConnected,
     sendMessage,
     markMessageRead,
+    updateTypingStatus,
+    deleteMessage,
   };
 
   return (

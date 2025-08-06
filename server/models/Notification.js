@@ -29,6 +29,7 @@ const notificationSchema = new mongoose.Schema(
         "DOCUMENT_UPLOAD_DEPARTMENT",
         "DOCUMENT_UPLOAD_PERMISSION",
         "USER_REGISTRATION",
+        "MESSAGE_RECEIVED",
       ],
       required: true,
     },

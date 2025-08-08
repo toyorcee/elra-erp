@@ -236,8 +236,11 @@ export const uploadDocument = async (req, res) => {
           suggestedTags: ocrMetadata.keywords || [],
         },
       };
+      // Auto-assign user's department if not provided
       if (department && department.trim() !== "") {
         docData.department = department;
+      } else if (currentUser.department?.code) {
+        docData.department = currentUser.department.code;
       }
       const document = new Document(docData);
 

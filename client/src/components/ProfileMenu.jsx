@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import { MdLogout, MdSettings, MdNotifications } from "react-icons/md";
 import { useAuth } from "../context/AuthContext";
+import LogoutConfirmationModal from "./common/LogoutConfirmationModal";
 
 const getImageUrl = (avatarPath) => {
   if (!avatarPath) return null;
@@ -17,19 +19,14 @@ const ProfileMenu = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // Debug logging
-  console.log("🔍 ProfileMenu: User data:", {
-    user,
-    roleName: user?.role?.name,
-    roleLevel: user?.role?.level,
-    roleId: user?.role?._id,
-    firstName: user?.firstName,
-    lastName: user?.lastName,
-  });
-
-  const handleLogout = async () => {
+  const handleLogoutClick = () => {
     setIsOpen(false);
+    setShowLogoutModal(true);
+  };
+
+  const handleLogoutConfirm = async () => {
     await logout();
     navigate("/login");
   };
@@ -75,7 +72,7 @@ const ProfileMenu = () => {
       {/* Desktop Profile Section */}
       <div className="hidden lg:flex items-center space-x-3">
         {/* User Info */}
-        <div className="flex items-center space-x-3 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 rounded-xl px-3 py-2 border border-white/20 hover:from-blue-600 hover:via-purple-600 hover:to-blue-700 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-xl backdrop-blur-sm">
+        <div className="flex items-center space-x-3 bg-blue-600 hover:bg-blue-700 rounded-xl px-3 py-2 border border-white/20 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-xl backdrop-blur-sm">
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg bg-white/20 backdrop-blur-sm overflow-hidden border border-white/30">
             {user?.avatar ? (
               <img
@@ -106,8 +103,8 @@ const ProfileMenu = () => {
 
         {/* Sign Out Button */}
         <button
-          onClick={handleLogout}
-          className="p-2 rounded-lg bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 text-white hover:from-blue-600 hover:via-purple-600 hover:to-blue-700 transition-all duration-200 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
+          onClick={handleLogoutClick}
+          className="p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
           title="Sign out"
         >
           <MdLogout
@@ -119,7 +116,7 @@ const ProfileMenu = () => {
         {/* Dropdown Toggle for Additional Options */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="p-2 rounded-lg bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 text-white hover:from-blue-600 hover:via-purple-600 hover:to-blue-700 transition-all duration-300 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
+          className="p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all duration-300 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
         >
           <div
             className={`w-4 h-4 transition-transform duration-300 ${
@@ -146,7 +143,7 @@ const ProfileMenu = () => {
       {/* Mobile Profile Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="lg:hidden flex items-center space-x-2 p-2 rounded-lg bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 text-white hover:from-blue-600 hover:via-purple-600 hover:to-blue-700 transition-all duration-300 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
+        className="lg:hidden flex items-center space-x-2 p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all duration-300 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
       >
         <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg lg:hidden overflow-hidden border border-white/30">
           {user?.avatar ? (
@@ -261,7 +258,7 @@ const ProfileMenu = () => {
 
             {/* Sign Out Button */}
             <button
-              onClick={handleLogout}
+              onClick={handleLogoutClick}
               className="w-full flex items-center px-6 py-3 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-200 group"
             >
               <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mr-3 group-hover:bg-red-200 transition-colors duration-200">
@@ -280,6 +277,18 @@ const ProfileMenu = () => {
           onClick={() => setIsOpen(false)}
         />
       )}
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal &&
+        createPortal(
+          <LogoutConfirmationModal
+            isOpen={showLogoutModal}
+            onClose={() => setShowLogoutModal(false)}
+            onConfirm={handleLogoutConfirm}
+            user={user}
+          />,
+          document.body
+        )}
     </div>
   );
 };

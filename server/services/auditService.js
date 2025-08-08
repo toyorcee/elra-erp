@@ -154,9 +154,14 @@ class AuditService {
   /**
    * Get recent activity for dashboard
    */
-  static async getRecentActivity(limit = 10, companyFilter = {}) {
+  static async getRecentActivity(options = {}) {
     try {
-      return await AuditLog.getRecentActivity({ limit, companyFilter });
+      const { limit = 10, companyFilter = {}, department } = options;
+      return await AuditLog.getRecentActivity({
+        limit,
+        companyFilter,
+        department,
+      });
     } catch (error) {
       console.error("Error getting recent activity:", error);
       return [];

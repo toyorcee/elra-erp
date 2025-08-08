@@ -3,10 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
-  HiMail,
-  HiLockClosed,
-  HiEye,
-  HiEyeOff,
   HiArrowRight,
   HiSparkles,
   HiShieldCheck,
@@ -393,9 +389,9 @@ const Login = () => {
                       className="absolute inset-y-0 right-0 pr-4 flex items-center"
                     >
                       {showPassword ? (
-                        <HiEyeOff className="h-5 w-5 text-white/50 hover:text-white/70 transition-colors" />
+                        <MdVisibilityOff className="h-5 w-5 text-white/50 hover:text-white/70 transition-colors" />
                       ) : (
-                        <HiEye className="h-5 w-5 text-white/50 hover:text-white/70 transition-colors" />
+                        <MdVisibility className="h-5 w-5 text-white/50 hover:text-white/70 transition-colors" />
                       )}
                     </button>
                   </div>

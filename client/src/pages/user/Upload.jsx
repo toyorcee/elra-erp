@@ -1,80 +1,164 @@
 import React, { useState, useRef } from "react";
-import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { uploadDocument } from "../../services/documents";
 import { toast } from "react-toastify";
+import { motion } from "framer-motion";
+import { canUploadDocuments } from "../../constants/userRoles";
 import {
   MdCloudUpload,
   MdDescription,
+  MdSecurity,
+  MdTrendingUp,
+  MdPeople,
+  MdSpeed,
+  MdWork,
+  MdStar,
+  MdFolder,
+  MdFileUpload,
+  MdClose,
   MdCheckCircle,
-  MdDelete,
+  MdError,
+  MdInfo,
 } from "react-icons/md";
-import GradientSpinner from "../../components/common/GradientSpinner";
-import { getDepartments } from "../../services/departments";
-import {
-  categories,
-  documentClassifications,
-} from "../../constants/documentClassifications";
+import { uploadDocument } from "../../services/documents";
 
 const Upload = () => {
   const { user } = useAuth();
-  const location = useLocation();
   const fileInputRef = useRef(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [selectedFile, setSelectedFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
-  const [departments, setDepartments] = useState([]);
-
-  React.useEffect(() => {
-    async function fetchDepartments() {
-      try {
-        const data = await getDepartments();
-        let depts = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.departments)
-          ? data.departments
-          : Array.isArray(data?.data?.departments)
-          ? data.data.departments
-          : Array.isArray(data?.docs)
-          ? data.docs
-          : [];
-        setDepartments(depts);
-        console.log("[Upload.jsx] Departments fetched:", depts);
-      } catch (err) {
-        toast.error("Failed to fetch departments");
-        setDepartments([]);
-      }
-    }
-    fetchDepartments();
-  }, []);
-
-  const isAdmin = user?.role?.level >= 90;
-  const isSuperAdmin = user?.role?.level >= 100;
-  const isManager = user?.role?.level >= 80;
-  const maxFileSize = isAdmin ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
-  const canBypassApproval = isSuperAdmin;
-  const canSetHighPriority = isManager;
-  const canSetConfidential = isSuperAdmin;
-  const canSelectDepartment = isAdmin;
-
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [formData, setFormData] = useState({
-    title: "",
+    name: "",
     description: "",
-    category: "General",
-    documentType: "Other",
-    priority: canSetHighPriority ? "Medium" : "Medium",
+    category: "",
+    priority: "medium",
     tags: "",
-    isConfidential: false,
-    department: isAdmin
-      ? ""
-      : typeof user?.department === "object"
-      ? user.department.code
-      : user?.department || "",
-    bypassApproval: false,
   });
 
-  const priorities = ["Low", "Medium", "High", "Critical"];
+  // Permission check
+  const hasUploadPermission = canUploadDocuments(user);
+
+  // Redirect if user doesn't have upload permission
+  if (!hasUploadPermission) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-8 border border-white/20 shadow-xl text-center">
+          <MdError className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Access Denied
+          </h2>
+          <p className="text-gray-600 mb-4">
+            You don't have permission to upload documents.
+          </p>
+          <p className="text-sm text-gray-500">
+            Contact your administrator to request upload permissions.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Department-specific configuration
+  const departmentConfig = {
+    CLAIMS: {
+      name: "Claims Department",
+      icon: MdDescription,
+      color: "from-blue-500 to-cyan-500",
+      categories: [
+        "Claims Reports",
+        "Insurance Policies",
+        "Damage Assessments",
+        "Settlement Documents",
+      ],
+    },
+    UNDERWRITE: {
+      name: "Underwriting Department",
+      icon: MdSecurity,
+      color: "from-purple-500 to-pink-500",
+      categories: [
+        "Risk Assessments",
+        "Policy Underwriting",
+        "Financial Analysis",
+        "Compliance Reports",
+      ],
+    },
+    FINANCE: {
+      name: "Finance Department",
+      icon: MdTrendingUp,
+      color: "from-green-500 to-emerald-500",
+      categories: [
+        "Financial Reports",
+        "Budget Documents",
+        "Audit Reports",
+        "Tax Documents",
+      ],
+    },
+    COMPLIANCE: {
+      name: "Compliance Department",
+      icon: MdSecurity,
+      color: "from-red-500 to-orange-500",
+      categories: [
+        "Compliance Reports",
+        "Audit Documents",
+        "Regulatory Filings",
+        "Policy Documents",
+      ],
+    },
+    HR: {
+      name: "HR Department",
+      icon: MdPeople,
+      color: "from-indigo-500 to-purple-500",
+      categories: [
+        "Employee Records",
+        "HR Policies",
+        "Performance Reviews",
+        "Training Materials",
+      ],
+    },
+    IT: {
+      name: "IT Department",
+      icon: MdSpeed,
+      color: "from-cyan-500 to-blue-500",
+      categories: [
+        "System Documentation",
+        "Network Configs",
+        "Security Protocols",
+        "Technical Reports",
+      ],
+    },
+    REGIONAL: {
+      name: "Regional Operations",
+      icon: MdWork,
+      color: "from-amber-500 to-orange-500",
+      categories: [
+        "Regional Reports",
+        "Field Operations",
+        "Local Policies",
+        "Regional Data",
+      ],
+    },
+    EXECUTIVE: {
+      name: "Executive Management",
+      icon: MdStar,
+      color: "from-gray-600 to-gray-800",
+      categories: [
+        "Strategic Plans",
+        "Executive Reports",
+        "Board Documents",
+        "Policy Decisions",
+      ],
+    },
+  };
+
+  const currentDept = departmentConfig[user?.department?.code] || {
+    name: "Documents",
+    icon: MdFolder,
+    color: "from-gray-500 to-gray-700",
+    categories: ["General Documents", "Reports", "Policies", "Other"],
+  };
+
+  const DeptIcon = currentDept.icon;
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -92,177 +176,28 @@ const Upload = () => {
     setDragActive(false);
 
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0]);
+      handleFiles(e.dataTransfer.files);
     }
   };
 
-  const handleFileSelect = (file) => {
-    // Comprehensive list of supported file types
-    const validTypes = [
-      // PDF documents
-      "application/pdf",
-
-      // Microsoft Office documents
-      "application/msword", // .doc
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-      "application/vnd.ms-excel", // .xls
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
-      "application/vnd.ms-powerpoint", // .ppt
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
-
-      // OpenDocument formats
-      "application/vnd.oasis.opendocument.text", // .odt
-      "application/vnd.oasis.opendocument.spreadsheet", // .ods
-      "application/vnd.oasis.opendocument.presentation", // .odp
-
-      // Text files
-      "text/plain", // .txt
-      "text/csv", // .csv
-      "text/html", // .html
-      "text/css", // .css
-      "text/javascript", // .js
-
-      // Image files
-      "image/jpeg", // .jpg, .jpeg
-      "image/png", // .png
-      "image/gif", // .gif
-      "image/bmp", // .bmp
-      "image/tiff", // .tiff
-      "image/webp", // .webp
-      "image/svg+xml", // .svg
-
-      // Archive files
-      "application/zip", // .zip
-      "application/x-rar-compressed", // .rar
-      "application/x-7z-compressed", // .7z
-
-      // Other common formats
-      "application/json", // .json
-      "application/xml", // .xml
-      "application/rtf", // .rtf
-    ];
-
-    if (!validTypes.includes(file.type)) {
-      toast.error(
-        "Invalid file type. Supported formats: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, ODT, ODS, ODP, TXT, CSV, HTML, CSS, JS, JPG, PNG, GIF, BMP, TIFF, WEBP, SVG, ZIP, RAR, 7Z, JSON, XML, RTF"
-      );
-      return;
-    }
-
-    if (file.size > maxFileSize) {
-      toast.error(
-        `File size must be less than ${maxFileSize / (1024 * 1024)}MB`
-      );
-      return;
-    }
-
-    setSelectedFile(file);
-
-    if (!formData.title) {
-      setFormData((prev) => ({
-        ...prev,
-        title: file.name.replace(/\.[^/.]+$/, ""),
-      }));
-    }
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    if (name === "department") {
-      console.log("[Upload.jsx] Department selected:", value);
-    }
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
+  const handleFiles = (files) => {
+    const newFiles = Array.from(files).map((file) => ({
+      file,
+      id: Math.random().toString(36).substr(2, 9),
+      name: file.name,
+      size: file.size,
+      type: file.type,
     }));
+    setSelectedFiles((prev) => [...prev, ...newFiles]);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    console.log("[Upload.jsx] Form data before submit:", formData);
-
-    if (!selectedFile) {
-      toast.error("Please select a file to upload");
-      return;
-    }
-
-    if (!formData.title.trim()) {
-      toast.error("Please enter a document title");
-      return;
-    }
-
-    setIsUploading(true);
-    setUploadProgress(0);
-
-    try {
-      // Enforce role-based restrictions on the frontend
-      const submissionData = {
-        ...formData,
-        // Force priority to Medium for non-managers
-        priority: canSetHighPriority ? formData.priority : "Medium",
-        // Force department to user's department for non-admins
-        department: canSelectDepartment
-          ? formData.department
-          : typeof user?.department === "object"
-          ? user.department.code
-          : user?.department || "",
-        // Force confidential to false for non-super-admins
-        isConfidential: canSetConfidential ? formData.isConfidential : false,
-      };
-
-      console.log("[Upload.jsx] Submitting document:", submissionData);
-      console.log(
-        "[Upload.jsx] FormData department value:",
-        submissionData.department
-      );
-      const formDataToSend = new FormData();
-      formDataToSend.append("document", selectedFile);
-      formDataToSend.append("title", submissionData.title);
-      formDataToSend.append("description", submissionData.description);
-      formDataToSend.append("category", submissionData.category);
-      formDataToSend.append("documentType", submissionData.documentType);
-      formDataToSend.append("priority", submissionData.priority);
-      formDataToSend.append("tags", submissionData.tags);
-      formDataToSend.append("isConfidential", submissionData.isConfidential);
-      if (submissionData.department) {
-        formDataToSend.append("department", submissionData.department);
-      }
-
-      const response = await uploadDocument(formDataToSend);
-
-      toast.success("Document uploaded successfully!");
-
-      setSelectedFile(null);
-      setFormData({
-        title: "",
-        description: "",
-        category: "General",
-        documentType: "Other",
-        priority: canSetHighPriority ? "Medium" : "Medium",
-        tags: "",
-        isConfidential: false,
-        department:
-          typeof user?.department === "object"
-            ? user.department.code
-            : user?.department || "",
-      });
-      setUploadProgress(0);
-
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    } catch (error) {
-      console.error("Upload error:", error);
-      toast.error(error.response?.data?.message || "Failed to upload document");
-    } finally {
-      setIsUploading(false);
-    }
+  const removeFile = (fileId) => {
+    setSelectedFiles((prev) => prev.filter((f) => f.id !== fileId));
   };
 
-  const removeFile = () => {
-    setSelectedFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+  const handleFileInput = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFiles(e.target.files);
     }
   };
 
@@ -274,389 +209,304 @@ const Upload = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (selectedFiles.length === 0) {
+      toast.error("Please select at least one file to upload");
+      return;
+    }
+
+    if (!formData.name.trim()) {
+      toast.error("Please enter a document name");
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    try {
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const fileData = selectedFiles[i];
+        const progress = ((i + 1) / selectedFiles.length) * 100;
+        setUploadProgress(progress);
+
+        const uploadFormData = new FormData();
+        uploadFormData.append("file", fileData.file);
+        uploadFormData.append(
+          "name",
+          formData.name + (selectedFiles.length > 1 ? ` (${i + 1})` : "")
+        );
+        uploadFormData.append("description", formData.description);
+        uploadFormData.append("category", formData.category);
+        uploadFormData.append("priority", formData.priority);
+        uploadFormData.append("tags", formData.tags);
+        uploadFormData.append("department", user?.department?.code);
+
+        await uploadDocument(uploadFormData);
+      }
+
+      toast.success("Documents uploaded successfully!");
+      setSelectedFiles([]);
+      setFormData({
+        name: "",
+        description: "",
+        category: "",
+        priority: "medium",
+        tags: "",
+      });
+      setUploadProgress(0);
+    } catch (error) {
+      toast.error("Failed to upload documents");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
-    <div className="w-full max-w-4xl mx-auto py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white mb-2">Upload Document</h1>
-        <p className="text-gray-200">
-          Upload and manage your documents with comprehensive metadata
-        </p>
-        {isAdmin && (
-          <div className="mt-2 p-3 bg-blue-900/30 border border-blue-500/30 rounded-lg">
-            <p className="text-sm text-blue-200">
-              <strong>Admin Mode:</strong> You can upload files up to{" "}
-              {maxFileSize / (1024 * 1024)}MB
-              {canBypassApproval && " and bypass approval workflow"}
-              {canSetConfidential && " and mark documents as confidential"}
-            </p>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Header Section */}
+      <div className="bg-gradient-to-r from-white/80 to-white/60 backdrop-blur-xl border-b border-white/20 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="flex items-center gap-4">
+            <div
+              className={`p-3 rounded-xl bg-gradient-to-r ${currentDept.color} text-white shadow-lg`}
+            >
+              <DeptIcon size={28} />
+            </div>
+            <div>
+              <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">
+                Upload Documents
+              </h1>
+              <p className="text-gray-600 mt-1">
+                Upload documents to {currentDept.name}
+              </p>
+            </div>
           </div>
-        )}
-        {!isAdmin && (
-          <div className="mt-2 p-3 bg-gray-900/30 border border-gray-500/30 rounded-lg">
-            <p className="text-sm text-gray-200">
-              <strong>User Mode:</strong> You can upload files up to{" "}
-              {maxFileSize / (1024 * 1024)}MB. Some fields are read-only based
-              on your role level.
-            </p>
-          </div>
-        )}
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-white/20">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
-            <MdCloudUpload className="mr-2 text-blue-300" />
-            File Upload
-          </h2>
+      <div className="max-w-4xl mx-auto px-6 py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white/70 backdrop-blur-xl rounded-2xl p-8 border border-white/20 shadow-xl"
+        >
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {/* File Upload Area */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-4">
+                Select Files
+              </label>
 
-          <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              dragActive
-                ? "border-blue-400 bg-blue-50"
-                : selectedFile
-                ? "border-green-400 bg-green-50"
-                : "border-gray-300 hover:border-gray-400"
-            }`}
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-          >
-            {selectedFile ? (
-              <div className="space-y-4">
-                <MdCheckCircle className="w-12 h-12 text-green-500 mx-auto" />
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900">
-                    {selectedFile.name}
-                  </h3>
-                  <p className="text-sm text-gray-500">
-                    {formatFileSize(selectedFile.size)}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={removeFile}
-                  className="inline-flex items-center px-3 py-2 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                >
-                  <MdDelete className="mr-1" />
-                  Remove File
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <MdCloudUpload className="w-12 h-12 text-gray-400 mx-auto" />
-                <div>
-                  <h3 className="text-lg font-medium text-white">
-                    Drop your file here
-                  </h3>
-                  <p className="text-sm text-gray-300">
-                    or click to browse from your computer
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400 transition-all duration-200 transform hover:-translate-y-1 shadow-lg hover:shadow-xl"
-                >
-                  Choose File
-                </button>
+              <div
+                className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 ${
+                  dragActive
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-300 hover:border-gray-400"
+                }`}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+              >
                 <input
                   ref={fileInputRef}
                   type="file"
-                  onChange={(e) =>
-                    e.target.files?.[0] && handleFileSelect(e.target.files[0])
-                  }
-                  className="hidden"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.txt,.csv,.html,.css,.js,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.webp,.svg,.zip,.rar,.7z,.json,.xml,.rtf"
+                  multiple
+                  onChange={handleFileInput}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
+
+                <div className="space-y-4">
+                  <div className="p-4 rounded-full inline-flex bg-blue-100 text-blue-600 shadow-lg">
+                    <MdCloudUpload size={32} />
+                  </div>
+                  <div>
+                    <p className="text-lg font-semibold text-gray-900">
+                      Drop files here or click to browse
+                    </p>
+                    <p className="text-gray-600 mt-2">
+                      Support for PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, JPG, PNG
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Selected Files */}
+            {selectedFiles.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Selected Files ({selectedFiles.length})
+                </h3>
+                <div className="space-y-3">
+                  {selectedFiles.map((file) => (
+                    <motion.div
+                      key={file.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200"
+                    >
+                      <div className="flex items-center gap-3">
+                        <MdFileUpload className="text-blue-500" size={24} />
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {file.name}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {formatFileSize(file.size)}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(file.id)}
+                        className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        <MdClose size={20} />
+                      </button>
+                    </motion.div>
+                  ))}
+                </div>
               </div>
             )}
-          </div>
 
-          {isUploading && (
-            <div className="mt-4">
-              <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                <span>Uploading...</span>
-                <span>{uploadProgress}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${uploadProgress}%` }}
-                ></div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-white/20">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
-            <MdDescription className="mr-2 text-blue-300" />
-            Document Information
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-white mb-2">
-                Document Title *
-              </label>
-              <input
-                type="text"
-                name="title"
-                value={formData.title}
-                onChange={handleInputChange}
-                required
-                className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent text-white placeholder-gray-300 backdrop-blur-sm"
-                placeholder="Enter document title"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-white mb-2">
-                Category
-              </label>
-              <select
-                name="category"
-                value={formData.category}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent text-white backdrop-blur-sm appearance-none cursor-pointer"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                  backgroundPosition: "right 0.5rem center",
-                  backgroundRepeat: "no-repeat",
-                  backgroundSize: "1.5em 1.5em",
-                  paddingRight: "2.5rem",
-                }}
-              >
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-white mb-2">
-                Document Type
-              </label>
-              <select
-                name="documentType"
-                value={formData.documentType}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent text-white backdrop-blur-sm appearance-none cursor-pointer"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                  backgroundPosition: "right 0.5rem center",
-                  backgroundRepeat: "no-repeat",
-                  backgroundSize: "1.5em 1.5em",
-                  paddingRight: "2.5rem",
-                }}
-              >
-                {documentClassifications[formData.category]?.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-white mb-2">
-                Priority
-                {!canSetHighPriority && (
-                  <span className="text-xs text-gray-400 ml-1">
-                    (Read-only)
-                  </span>
-                )}
-              </label>
-              <select
-                name="priority"
-                value={formData.priority}
-                onChange={handleInputChange}
-                disabled={!canSetHighPriority}
-                className={`w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent text-white backdrop-blur-sm appearance-none cursor-pointer ${
-                  !canSetHighPriority ? "opacity-50 cursor-not-allowed" : ""
-                }`}
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                  backgroundPosition: "right 0.5rem center",
-                  backgroundRepeat: "no-repeat",
-                  backgroundSize: "1.5em 1.5em",
-                  paddingRight: "2.5rem",
-                }}
-              >
-                {priorities.map((priority) => (
-                  <option
-                    key={priority}
-                    value={priority}
-                    className="bg-gray-800 text-white"
-                  >
-                    {priority}
-                  </option>
-                ))}
-              </select>
-              {!canSetHighPriority && (
-                <p className="text-xs text-gray-300 mt-1">
-                  Only managers and above can set high priority levels
-                </p>
-              )}
-            </div>
-
-            {isAdmin ? (
+            {/* Document Details */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-white mb-2">
-                  Department
-                </label>
-                <select
-                  name="department"
-                  value={formData.department}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent text-white backdrop-blur-sm appearance-none cursor-pointer"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
-                    backgroundPosition: "right 0.5rem center",
-                    backgroundRepeat: "no-repeat",
-                    backgroundSize: "1.5em 1.5em",
-                    paddingRight: "2.5rem",
-                  }}
-                >
-                  <option value="" className="bg-gray-800 text-white">
-                    General (All Departments)
-                  </option>
-                  {Array.isArray(departments) &&
-                    departments.map((dept) => (
-                      <option
-                        key={dept._id}
-                        value={dept.code}
-                        className="bg-gray-800 text-white"
-                      >
-                        {dept.name}
-                      </option>
-                    ))}
-                </select>
-                <p className="text-xs text-gray-300 mt-1">
-                  Leave empty for general documents, or select specific
-                  department
-                </p>
-              </div>
-            ) : (
-              <div>
-                <label className="block text-sm font-medium text-white mb-2">
-                  Department{" "}
-                  <span className="text-xs text-gray-400">(Read-only)</span>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Document Name *
                 </label>
                 <input
                   type="text"
-                  value={
-                    typeof user?.department === "object"
-                      ? user.department.name
-                      : user?.department || "General"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
                   }
-                  disabled
-                  className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white opacity-50 cursor-not-allowed backdrop-blur-sm"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/50 backdrop-blur-sm"
+                  placeholder="Enter document name"
+                  required
                 />
-                <p className="text-xs text-gray-300 mt-1">
-                  Documents will be uploaded to your assigned department
-                </p>
               </div>
-            )}
 
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-white mb-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Category
+                </label>
+                <select
+                  value={formData.category}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/50 backdrop-blur-sm"
+                >
+                  <option value="">Select category</option>
+                  {currentDept.categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Priority
+                </label>
+                <select
+                  value={formData.priority}
+                  onChange={(e) =>
+                    setFormData({ ...formData, priority: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/50 backdrop-blur-sm"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Tags
+                </label>
+                <input
+                  type="text"
+                  value={formData.tags}
+                  onChange={(e) =>
+                    setFormData({ ...formData, tags: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/50 backdrop-blur-sm"
+                  placeholder="Enter tags (comma separated)"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Description
               </label>
               <textarea
-                name="description"
                 value={formData.description}
-                onChange={handleInputChange}
-                rows={3}
-                className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent text-white placeholder-gray-300 backdrop-blur-sm"
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/50 backdrop-blur-sm"
                 placeholder="Enter document description"
               />
             </div>
 
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-white mb-2">
-                Tags
-              </label>
-              <input
-                type="text"
-                name="tags"
-                value={formData.tags}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 bg-white/20 border border-white/30 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent text-white placeholder-gray-300 backdrop-blur-sm"
-                placeholder="Enter tags separated by commas"
-              />
-              <p className="text-sm text-gray-300 mt-1">
-                Use tags to make documents easier to find
-              </p>
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  name="isConfidential"
-                  checked={formData.isConfidential}
-                  onChange={handleInputChange}
-                  disabled={!canSetConfidential}
-                  className={`h-4 w-4 text-blue-400 focus:ring-blue-400 border-white/30 rounded bg-white/20 ${
-                    !canSetConfidential ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                />
-                <span
-                  className={`ml-2 text-sm ${
-                    !canSetConfidential ? "text-gray-400" : "text-white"
-                  }`}
-                >
-                  Mark as confidential document
-                  {!canSetConfidential && (
-                    <span className="text-xs text-gray-400 ml-1">
-                      (Super Admin only)
-                    </span>
-                  )}
-                </span>
-              </label>
-              {!canSetConfidential && (
-                <p className="text-xs text-gray-300 mt-1 ml-6">
-                  Only Super Administrators can mark documents as confidential
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end space-x-4">
-          <Link
-            to={
-              location.pathname.includes("/admin")
-                ? "/admin/documents"
-                : "/dashboard/documents"
-            }
-            className="px-6 py-2 border border-white/30 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400 transition-all duration-200"
-          >
-            Back to Documents
-          </Link>
-          <button
-            type="submit"
-            disabled={isUploading || !selectedFile}
-            className="px-6 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-all duration-200 transform hover:-translate-y-1 shadow-lg hover:shadow-xl"
-          >
-            {isUploading ? (
-              <>
-                <GradientSpinner size="sm" variant="primary" className="mr-2" />
-                Uploading...
-              </>
-            ) : (
-              <>
-                <MdCloudUpload className="mr-2" />
-                Upload Document
-              </>
+            {/* Upload Progress */}
+            {uploading && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-700">
+                    Uploading...
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    {Math.round(uploadProgress)}%
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-gradient-to-r from-blue-500 to-cyan-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
             )}
-          </button>
-        </div>
-      </form>
+
+            {/* Submit Button */}
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={uploading || selectedFiles.length === 0}
+                className={`px-8 py-3 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 ${
+                  uploading || selectedFiles.length === 0
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : `bg-gradient-to-r ${currentDept.color} text-white hover:shadow-lg hover:scale-105`
+                }`}
+              >
+                {uploading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <MdCloudUpload size={20} />
+                    Upload Documents
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </motion.div>
+      </div>
     </div>
   );
 };

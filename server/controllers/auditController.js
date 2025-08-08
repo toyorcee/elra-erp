@@ -18,6 +18,7 @@ export const getRecentActivity = asyncHandler(async (req, res) => {
     startDate,
     endDate,
     riskLevel,
+    department,
   } = req.query;
 
   // Add company filter for data isolation
@@ -31,6 +32,7 @@ export const getRecentActivity = asyncHandler(async (req, res) => {
     startDate,
     endDate,
     riskLevel,
+    department,
     companyFilter, // Add company filter to options
   };
 
@@ -235,18 +237,21 @@ export const getAuditDashboard = asyncHandler(async (req, res) => {
   const highRiskActivities = await AuditService.getRecentActivity({
     riskLevel: "HIGH",
     limit: 10,
+    companyFilter: req.user.company ? { company: req.user.company } : {},
   });
 
   // Get recent document activities
   const documentActivities = await AuditService.getRecentActivity({
     resourceType: "DOCUMENT",
     limit: 10,
+    companyFilter: req.user.company ? { company: req.user.company } : {},
   });
 
   // Get recent user activities
   const userActivities = await AuditService.getRecentActivity({
     resourceType: "USER",
     limit: 10,
+    companyFilter: req.user.company ? { company: req.user.company } : {},
   });
 
   const dashboardData = {

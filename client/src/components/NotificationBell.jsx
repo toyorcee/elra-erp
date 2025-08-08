@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { MdNotifications, MdNotificationsActive } from "react-icons/md";
 import { toast } from "react-toastify";
 import notificationService from "../services/notifications";
@@ -12,6 +13,7 @@ const NotificationBell = ({ className = "" }) => {
   const dropdownRef = useRef(null);
   const queryClient = useQueryClient();
   const { socket, isConnected } = useSocket();
+  const navigate = useNavigate();
 
   // Fetch unread count
   const {
@@ -126,6 +128,14 @@ const NotificationBell = ({ className = "" }) => {
     }
   };
 
+  const handleNotificationClick = (notification) => {
+    setIsOpen(false);
+    // Navigate to notifications page with the specific notification selected
+    navigate("/dashboard/notifications", {
+      state: { selectedNotificationId: notification._id },
+    });
+  };
+
   const getNotificationIcon = (type) => {
     switch (type) {
       case "DOCUMENT_APPROVAL":
@@ -178,7 +188,7 @@ const NotificationBell = ({ className = "" }) => {
       {/* Notification Bell Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2.5 rounded-xl bg-gradient-to-r from-blue-500 via-cyan-500 to-purple-500 hover:from-blue-600 hover:via-cyan-600 hover:to-purple-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+        className="relative p-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
         title="Notifications"
       >
         {unreadCount > 0 ? (
@@ -231,9 +241,10 @@ const NotificationBell = ({ className = "" }) => {
                 {notifications.map((notification) => (
                   <div
                     key={notification._id}
-                    className={`p-4 hover:bg-gray-50 transition-colors duration-200 border-l-4 ${getPriorityColor(
+                    className={`p-4 hover:bg-gray-50 transition-colors duration-200 border-l-4 cursor-pointer ${getPriorityColor(
                       notification.data?.priority || "medium"
                     )} ${!notification.isRead ? "bg-blue-50" : ""}`}
+                    onClick={() => handleNotificationClick(notification)}
                   >
                     <div className="flex items-start space-x-3">
                       <div className="flex-shrink-0 text-lg">
@@ -259,16 +270,20 @@ const NotificationBell = ({ className = "" }) => {
                         <div className="flex items-center space-x-2 mt-2">
                           {!notification.isRead && (
                             <button
-                              onClick={() => handleMarkAsRead(notification._id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkAsRead(notification._id);
+                              }}
                               className="text-xs text-blue-600 hover:text-blue-800"
                             >
                               Mark as read
                             </button>
                           )}
                           <button
-                            onClick={() =>
-                              handleDeleteNotification(notification._id)
-                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteNotification(notification._id);
+                            }}
                             className="text-xs text-red-600 hover:text-red-800"
                           >
                             Delete
@@ -289,7 +304,7 @@ const NotificationBell = ({ className = "" }) => {
                 onClick={() => {
                   setIsOpen(false);
                   // Navigate to full notifications page
-                  window.location.href = "/dashboard/notifications";
+                  navigate("/dashboard/notifications");
                 }}
                 className="text-xs text-blue-600 hover:text-blue-800 font-medium w-full text-center"
               >

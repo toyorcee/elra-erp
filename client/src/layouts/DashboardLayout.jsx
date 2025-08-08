@@ -1,14 +1,15 @@
 import React, { useState, createContext, useContext, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { MdMenu } from "react-icons/md";
+import { MdMenu, MdChat } from "react-icons/md";
 import Sidebar from "../components/Sidebar";
 import ProfileMenu from "../components/ProfileMenu";
 import ELRALogo from "../components/ELRALogo";
 import NotificationBell from "../components/NotificationBell";
+import MessageDropdown from "../components/MessageDropdown";
 import PasswordChangeModal from "../components/common/PasswordChangeModal";
 import { useAuth } from "../context/AuthContext";
+import { useMessages } from "../hooks/useMessages";
 
-// Create context for sidebar state
 const SidebarContext = createContext();
 
 export const useSidebar = () => {
@@ -29,6 +30,14 @@ const DashboardLayout = () => {
   const location = useLocation();
 
   const isSidebarActuallyExpanded = sidebarPinned ? true : sidebarExpanded;
+  const totalUnreadMessages = getTotalUnreadCount ? getTotalUnreadCount() : 0;
+
+  console.log("🔍 Message icon debug:", {
+    messagesHook: !!messagesHook,
+    getTotalUnreadCount: !!getTotalUnreadCount,
+    totalUnreadMessages,
+    showMessageDropdown,
+  });
 
   useEffect(() => {
     if (user && !loading) {
@@ -89,6 +98,23 @@ const DashboardLayout = () => {
 
               {/* Right side */}
               <div className="flex items-center space-x-4">
+                {/* Message Icon - Always visible like other icons */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowMessageDropdown(!showMessageDropdown)}
+                    className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors relative cursor-pointer"
+                  >
+                    <MdChat size={24} />
+                    <span
+                      className={`absolute -top-1 -right-1 w-5 h-5 text-white text-xs rounded-full flex items-center justify-center font-bold ${
+                        totalUnreadMessages === 0 ? "bg-gray-400" : "bg-red-500"
+                      }`}
+                    >
+                      {totalUnreadMessages > 99 ? "99+" : totalUnreadMessages}
+                    </span>
+                  </button>
+                </div>
+
                 <NotificationBell />
 
                 <ProfileMenu />
@@ -96,6 +122,12 @@ const DashboardLayout = () => {
             </div>
           </div>
         </nav>
+
+        {/* Message Dropdown */}
+        <MessageDropdown
+          isOpen={showMessageDropdown}
+          onClose={() => setShowMessageDropdown(false)}
+        />
 
         {/* Main Content Area */}
         <div className="flex flex-1 pt-16 min-h-screen">
@@ -141,7 +173,6 @@ const DashboardLayout = () => {
       <PasswordChangeModal
         isOpen={showPasswordModal}
         onClose={() => {
-          // Don't allow closing if password change is required
           if (user?.passwordChangeRequired || user?.isTemporaryPassword) {
             return;
           }

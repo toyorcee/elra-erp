@@ -44,6 +44,49 @@ const roleSchema = new mongoose.Schema(
     permissions: [
       {
         type: String,
+<<<<<<< HEAD
+=======
+        enum: [
+          // Document permissions
+          "document.upload",
+          "document.view",
+          "document.edit",
+          "document.delete",
+          "document.approve",
+          "document.reject",
+          "document.share",
+          "document.export",
+          "document.archive",
+          "document.scan",
+
+          // User management permissions
+          "user.create",
+          "user.view",
+          "user.edit",
+          "user.delete",
+          "user.assign_role",
+          "user.view_permissions",
+
+          // Workflow permissions
+          "workflow.create",
+          "workflow.start",
+          "workflow.approve",
+          "workflow.reject",
+          "workflow.delegate",
+          "workflow.view",
+
+          // System permissions
+          "system.settings",
+          "system.reports",
+          "system.audit",
+          "system.backup",
+
+          "company.create",
+          "company.view",
+          "company.edit",
+          "company.delete",
+        ],
+>>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
       },
     ],
     departmentAccess: [

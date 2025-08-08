@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import * as HiIcons from "react-icons/hi";
 import {
   MdLogout,
@@ -15,6 +16,7 @@ import {
   hasSectionAccess,
 } from "../config/sidebarConfig";
 import { useAuth } from "../context/AuthContext";
+import LogoutConfirmationModal from "./common/LogoutConfirmationModal";
 
 const getImageUrl = (avatarPath) => {
   if (!avatarPath) return null;
@@ -40,12 +42,12 @@ const Sidebar = ({ onExpandedChange, onPinnedChange }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [pinned, setPinned] = useState(false);
 
   const isExpanded = pinned ? true : expanded;
 
-  // Notify parent of state changes
   useEffect(() => {
     if (onExpandedChange) {
       onExpandedChange(expanded);
@@ -66,8 +68,12 @@ const Sidebar = ({ onExpandedChange, onPinnedChange }) => {
     if (!pinned) setExpanded(false);
   };
 
-  const handleLogout = async () => {
+  const handleLogoutClick = () => {
     setIsProfileOpen(false);
+    setShowLogoutModal(true);
+  };
+
+  const handleLogoutConfirm = async () => {
     await logout();
     navigate("/login");
   };

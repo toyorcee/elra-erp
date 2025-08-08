@@ -153,15 +153,10 @@ const Users = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    console.log("🚀 handleSubmit called - Starting user update process...");
-    console.log("📝 Form data being submitted:", formData);
-    console.log("👤 Editing user:", editingUser);
 
     try {
       if (editingUser) {
-        console.log("🔄 Updating existing user...");
         await updateUser(editingUser._id, formData);
-        console.log("✅ User updated successfully");
 
         if (
           editingUser.status === "PENDING_REGISTRATION" &&

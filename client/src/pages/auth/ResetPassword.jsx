@@ -19,6 +19,10 @@ import {
 import { authAPI, handleApiError } from "../../services/api";
 import ELRALogo from "../../components/ELRALogo";
 import { GradientSpinner } from "../../components/common";
+import loginImage from "../../assets/login.jpg";
+import signupImage from "../../assets/signup.jpg";
+import hero1Image from "../../assets/hero1.jpg";
+import hero2Image from "../../assets/hero2.jpg";
 
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();

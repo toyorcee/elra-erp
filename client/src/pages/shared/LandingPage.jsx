@@ -19,6 +19,22 @@ import {
 } from "react-icons/hi";
 import ELRALogo from "../../components/ELRALogo";
 import { useAuth } from "../../context/AuthContext";
+// Import all assets
+import electronicDocument1 from "../../assets/ElectronicDocument1.jpg";
+import office1 from "../../assets/Office1.jpg";
+import office2 from "../../assets/Office2.jpg";
+import office3 from "../../assets/Office3.jpg";
+import encryption1 from "../../assets/Encryption1.jpg";
+import cloud1 from "../../assets/cloud1.jpg";
+import hero1 from "../../assets/hero1.jpg";
+import electronicDocument2 from "../../assets/ElectronicDocument2.jpg";
+import encryption2 from "../../assets/Encryption2.jpg";
+import office4 from "../../assets/Office4.jpg";
+import graphs1 from "../../assets/graphs1.jpg";
+import cloud2 from "../../assets/cloud2.jpg";
+import graphs2 from "../../assets/graphs2.jpg";
+import hero2 from "../../assets/hero2.jpg";
+import illustration1 from "../../assets/illustration1.jpg";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -54,38 +70,74 @@ const LandingPage = () => {
     {
       word: "Human Resources",
       description:
+<<<<<<< HEAD
         "Streamline employee management, recruitment, onboarding, and performance tracking with intelligent HR workflows and automated processes.",
       icon: HiUsers,
+=======
+        "Transform paper chaos into digital clarity. Organize, search, and access millions of documents instantly with AI-powered categorization and enterprise-grade security.",
+      image: electronicDocument1,
+>>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
     },
     {
       word: "Payroll",
       description:
+<<<<<<< HEAD
         "Automated salary processing, benefits management, and payroll reporting with tax calculations and payment tracking.",
       icon: HiCurrencyDollar,
+=======
+        "Intelligent approval workflows with real-time routing and notifications. Parallel processing, automated escalation, and zero bottlenecks keep decisions flowing smoothly.",
+      image: office1,
+>>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
     },
     {
       word: "Procurement",
       description:
+<<<<<<< HEAD
         "End-to-end procurement management from purchase requisitions to vendor management and inventory tracking.",
       icon: HiShoppingCart,
+=======
+        "Securely powered instant communication within document contexts. Chat, collaborate, and make decisions faster with seamless team messaging integration.",
+      image: office2,
+>>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
     },
     {
       word: "Accounting",
       description:
+<<<<<<< HEAD
         "Complete financial management with expense tracking, revenue management, and comprehensive financial reporting.",
       icon: HiChartBar,
+=======
+        "Never miss critical updates with intelligent email and in-app alerts. Customizable notifications for approvals, deadlines, messages, and document changes.",
+      image: office3,
+>>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
     },
     {
       word: "Communication",
       description:
+<<<<<<< HEAD
         "Internal messaging, announcements, and collaboration tools to keep your team connected and informed.",
       icon: HiChat,
+=======
+        "Military-grade protection for your most sensitive data. Zero-trust architecture, end-to-end encryption, and comprehensive audit trails you can trust.",
+      image: encryption1,
+    },
+    {
+      word: "Cloud Platform",
+      description:
+        "Access your documents anywhere, anytime. Global CDN, 99.9% uptime, and seamless synchronization across all your devices and locations.",
+      image: cloud1,
+>>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
     },
     {
       word: "Business Intelligence",
       description:
+<<<<<<< HEAD
         "Advanced analytics and reporting to drive data-driven decisions and optimize your business operations.",
       icon: HiTrendingUp,
+=======
+        "Lead your industry into the future. Replace legacy processes with intelligent workflows that scale with your ambitions and adapt to your growth.",
+      image: hero1,
+>>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
     },
   ];
 
@@ -180,11 +232,28 @@ const LandingPage = () => {
 
   const features = [
     {
+<<<<<<< HEAD
+=======
+      icon: HiDocumentText,
+      title: "Intelligent Document Hub",
+      description:
+        "AI-powered categorization, OCR text extraction, and lightning-fast search across all your business documents.",
+      gradient: "from-blue-500 to-cyan-500",
+      backgroundImage: electronicDocument2,
+    },
+    {
+>>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
       icon: HiUsers,
       title: "Human Resources",
       description:
+<<<<<<< HEAD
         "Complete HR management with recruitment, onboarding, performance tracking, and employee self-service portal.",
       gradient: "from-purple-500 to-teal-500",
+=======
+        "Scale across departments and subsidiaries with isolated workspaces and customizable organizational structures.",
+      gradient: "from-cyan-500 to-purple-500",
+      backgroundImage: office2,
+>>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
     },
     {
       icon: HiCurrencyDollar,
@@ -199,11 +268,16 @@ const LandingPage = () => {
       description:
         "End-to-end procurement management from requisitions to vendor management and inventory tracking.",
       gradient: "from-purple-500 to-blue-500",
+<<<<<<< HEAD
+=======
+      backgroundImage: encryption2,
+>>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
     },
     {
       icon: HiChartBar,
       title: "Accounting",
       description:
+<<<<<<< HEAD
         "Complete financial management with expense tracking, revenue management, and financial reporting.",
       gradient: "from-blue-500 to-purple-500",
     },
@@ -213,11 +287,17 @@ const LandingPage = () => {
       description:
         "Internal messaging, announcements, and collaboration tools to keep your team connected and informed.",
       gradient: "from-purple-500 to-pink-500",
+=======
+        "Intelligent approval routing with real-time email and in-app notifications. Automated escalation, parallel approvals, and conditional logic ensure documents never get stuck in bottlenecks.",
+      gradient: "from-green-500 to-blue-500",
+      backgroundImage: office3,
+>>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
     },
     {
       icon: HiTrendingUp,
       title: "Business Intelligence",
       description:
+<<<<<<< HEAD
         "Advanced analytics and reporting to drive data-driven decisions and optimize your business operations.",
       gradient: "from-pink-500 to-purple-500",
     },
@@ -227,13 +307,39 @@ const LandingPage = () => {
       description:
         "Enterprise-grade security with role-based access control, audit trails, and compliance management.",
       gradient: "from-purple-500 to-green-500",
+=======
+        "Real-time dashboards, usage analytics, and performance metrics to optimize your document processes.",
+      gradient: "from-blue-500 to-purple-500",
+      backgroundImage: graphs1,
+    },
+    {
+      icon: HiBell,
+      title: "Smart Notifications Hub",
+      description:
+        "Never miss critical updates with intelligent email and in-app notifications. Customizable alerts for approvals, deadlines, document changes, and system events keep your team synchronized.",
+      gradient: "from-orange-500 to-red-500",
+      backgroundImage: office1,
+    },
+    {
+      icon: HiChat,
+      title: "Real-Time Messaging",
+      description:
+        "Seamless team communication with instant messaging, document discussions, and Socket.IO-powered real-time collaboration. Chat directly within document contexts for faster decision-making.",
+      gradient: "from-pink-500 to-purple-500",
+      backgroundImage: office2,
+>>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
     },
     {
       icon: HiGlobe,
       title: "Cloud-Native Platform",
       description:
         "99.9% uptime, global CDN, and seamless mobile access for your distributed workforce.",
+<<<<<<< HEAD
       gradient: "from-green-500 to-purple-500",
+=======
+      gradient: "from-cyan-500 to-green-500",
+      backgroundImage: cloud2,
+>>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
     },
   ];
 
@@ -667,6 +773,7 @@ const LandingPage = () => {
       </section>
 
       {/* Benefits Section */}
+<<<<<<< HEAD
       <section id="benefits" className="relative z-10 px-6 py-20">
         <div className="max-w-6xl mx-auto">
           <motion.div
@@ -703,13 +810,130 @@ const LandingPage = () => {
                 <p className="text-white/90 text-lg">{benefit}</p>
               </motion.div>
             ))}
+=======
+      <section
+        id="benefits"
+        className="relative py-24 bg-white/2 overflow-hidden"
+      >
+        {/* Background Image */}
+        <div
+          className="absolute inset-0 opacity-5"
+          style={{
+            backgroundImage: `url(${office4})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            <motion.div
+              initial={{ opacity: 0, x: -50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8 }}
+              viewport={{ once: true }}
+            >
+              <h2 className="text-3xl lg:text-4xl font-bold mb-6">
+                Why Industry Leaders Choose EDMS
+              </h2>
+              <p className="text-lg lg:text-xl text-white/70 mb-8 leading-relaxed">
+                Trusted by Fortune 500 companies and growing enterprises
+                worldwide to transform their document workflows
+              </p>
+              <div className="space-y-4">
+                {benefits.map((benefit, index) => (
+                  <motion.div
+                    key={index}
+                    className="flex items-center space-x-4 p-4 bg-white/5 backdrop-blur-sm rounded-xl hover:bg-white/8 transition-all duration-300 hover:translate-x-2 group border border-white/5"
+                    initial={{ opacity: 0, x: -30 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5, delay: index * 0.1 }}
+                    viewport={{ once: true }}
+                  >
+                    <HiCheckCircle className="text-2xl text-green-400 flex-shrink-0 group-hover:scale-110 transition-transform duration-300" />
+                    <span className="text-white font-medium">{benefit}</span>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, x: 50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8 }}
+              viewport={{ once: true }}
+              className="relative"
+            >
+              <div className="bg-white/10 backdrop-blur-xl rounded-2xl overflow-hidden shadow-2xl shadow-black/20 border border-white/10">
+                <div className="bg-white/10 px-6 py-4 flex items-center space-x-4">
+                  <div className="flex space-x-2">
+                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  </div>
+                  <span className="text-white/80 font-semibold">
+                    EDMS Dashboard
+                  </span>
+                </div>
+                <div
+                  className="h-80 relative"
+                  style={{
+                    backgroundImage: `url(${graphs2})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }}
+                >
+                  <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm">
+                    <div className="flex h-full">
+                      <div className="w-48 bg-white/5 p-6 space-y-4">
+                        <div className="h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg"></div>
+                        <div className="h-10 bg-white/10 rounded-lg"></div>
+                        <div className="h-10 bg-white/10 rounded-lg"></div>
+                        <div className="h-10 bg-white/10 rounded-lg"></div>
+                      </div>
+                      <div className="flex-1 p-6">
+                        <div className="h-16 bg-white/10 rounded-xl mb-6"></div>
+                        <div className="grid grid-cols-2 gap-4 h-44">
+                          <div className="bg-white/10 rounded-xl animate-pulse"></div>
+                          <div
+                            className="bg-white/10 rounded-xl animate-pulse"
+                            style={{ animationDelay: "0.5s" }}
+                          ></div>
+                          <div
+                            className="bg-white/10 rounded-xl animate-pulse"
+                            style={{ animationDelay: "1s" }}
+                          ></div>
+                          <div
+                            className="bg-white/10 rounded-xl animate-pulse"
+                            style={{ animationDelay: "1.5s" }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+>>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
           </div>
         </div>
       </section>
 
       {/* Testimonials Section */}
+<<<<<<< HEAD
       <section id="testimonials" className="relative z-10 px-6 py-20">
         <div className="max-w-6xl mx-auto">
+=======
+      <section id="testimonials" className="relative py-24 overflow-hidden">
+        {/* Background Image */}
+        <div
+          className="absolute inset-0 opacity-5"
+          style={{
+            backgroundImage: `url(${hero2})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+>>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -784,8 +1008,23 @@ const LandingPage = () => {
       </section>
 
       {/* CTA Section */}
+<<<<<<< HEAD
       <section className="relative z-10 px-6 py-20">
         <div className="max-w-4xl mx-auto text-center">
+=======
+      <section className="relative py-24 overflow-hidden">
+        {/* Background Image */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `url(${illustration1})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-900/80 via-purple-900/80 to-cyan-900/80"></div>
+        <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+>>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}

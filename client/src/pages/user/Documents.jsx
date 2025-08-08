@@ -1,6 +1,18 @@
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "react-toastify";
+import { useAuth } from "../../context/AuthContext";
+import {
+  canViewDocuments,
+  canEditDocuments,
+  canDeleteDocuments,
+  canApproveDocuments,
+  canShareDocuments,
+  canExportDocuments,
+  canArchiveDocuments,
+  canScanDocuments,
+  canUploadDocuments,
+} from "../../constants/userRoles";
 import {
   MdSearch,
   MdFilterList,
@@ -45,6 +57,7 @@ import {
 } from "../../utils/fileUtils";
 
 const Documents = () => {
+  const { user } = useAuth();
   const location = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -71,6 +84,17 @@ const Documents = () => {
     document: null,
   });
 
+  // Permission checks
+  const hasViewPermission = canViewDocuments(user);
+  const hasEditPermission = canEditDocuments(user);
+  const hasDeletePermission = canDeleteDocuments(user);
+  const hasApprovePermission = canApproveDocuments(user);
+  const hasSharePermission = canShareDocuments(user);
+  const hasExportPermission = canExportDocuments(user);
+  const hasArchivePermission = canArchiveDocuments(user);
+  const hasScanPermission = canScanDocuments(user);
+  const hasUploadPermission = canUploadDocuments(user);
+
   const handleSelectDoc = (id) => {
     setSelectedDocs((prev) =>
       prev.includes(id) ? prev.filter((docId) => docId !== id) : [...prev, id]
@@ -92,6 +116,7 @@ const Documents = () => {
       sortBy,
       sortOrder,
       currentPage,
+      user?.department?.code, 
     ],
     queryFn: () => {
       const params = {
@@ -103,6 +128,8 @@ const Documents = () => {
         priority: selectedPriority !== "all" ? selectedPriority : undefined,
         sortBy,
         sortOrder,
+        // Add department filter if user has a department
+        department: user?.department?.code || undefined,
       };
 
       // Remove undefined values
@@ -413,34 +440,60 @@ const Documents = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2">
-            Documents
+            {user?.department?.code === "CLAIMS" && "Claims Documents"}
+            {user?.department?.code === "UNDERWRITE" &&
+              "Underwriting Documents"}
+            {user?.department?.code === "FINANCE" && "Financial Reports"}
+            {user?.department?.code === "COMPLIANCE" && "Compliance Documents"}
+            {user?.department?.code === "HR" && "HR Documents"}
+            {user?.department?.code === "IT" && "IT Documents"}
+            {user?.department?.code === "REGIONAL" && "Regional Documents"}
+            {user?.department?.code === "EXECUTIVE" && "Executive Documents"}
+            {(!user?.department?.code ||
+              ![
+                "CLAIMS",
+                "UNDERWRITE",
+                "FINANCE",
+                "COMPLIANCE",
+                "HR",
+                "IT",
+                "REGIONAL",
+                "EXECUTIVE",
+              ].includes(user?.department?.code)) &&
+              "Documents"}
           </h1>
           <p className="text-sm sm:text-base text-gray-600">
-            Manage and organize your documents efficiently
+            {user?.department?.code
+              ? `Manage and organize ${user.department.name} documents efficiently`
+              : "Manage and organize your documents efficiently"}
           </p>
         </div>
         <div className="flex gap-2 mt-4 sm:mt-0">
-          <Link
-            to={
-              location.pathname.includes("/admin")
-                ? "/admin/upload"
-                : "/dashboard/upload"
-            }
-            className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 transform hover:-translate-y-1 shadow-lg hover:shadow-xl cursor-pointer text-sm sm:text-base font-medium"
-          >
-            <MdAdd className="mr-1 sm:mr-2 text-sm sm:text-base" />
-            <span className="hidden sm:inline">Upload Document</span>
-            <span className="sm:hidden">Upload</span>
-          </Link>
+          {hasUploadPermission && (
+            <Link
+              to={
+                location.pathname.includes("/admin")
+                  ? "/admin/upload"
+                  : "/dashboard/upload"
+              }
+              className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 transform hover:-translate-y-1 shadow-lg hover:shadow-xl cursor-pointer text-sm sm:text-base font-medium"
+            >
+              <MdAdd className="mr-1 sm:mr-2 text-sm sm:text-base" />
+              <span className="hidden sm:inline">Upload Document</span>
+              <span className="sm:hidden">Upload</span>
+            </Link>
+          )}
 
-          <button
-            onClick={() => setShowScanning(true)}
-            className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 transform hover:-translate-y-1 shadow-lg hover:shadow-xl cursor-pointer text-sm sm:text-base font-medium"
-          >
-            <MdScanner className="mr-1 sm:mr-2 text-sm sm:text-base" />
-            <span className="hidden sm:inline">Scan Document</span>
-            <span className="sm:hidden">Scan</span>
-          </button>
+          {hasScanPermission && (
+            <button
+              onClick={() => setShowScanning(true)}
+              className="inline-flex items-center px-3 sm:px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 transform hover:-translate-y-1 shadow-lg hover:shadow-xl cursor-pointer text-sm sm:text-base font-medium"
+            >
+              <MdScanner className="mr-1 sm:mr-2 text-sm sm:text-base" />
+              <span className="hidden sm:inline">Scan Document</span>
+              <span className="sm:hidden">Scan</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1090,7 +1143,7 @@ const Documents = () => {
               ? "No documents match your current filters. Try adjusting your search criteria."
               : "You haven't uploaded any documents yet. Start by uploading your first document."}
           </p>
-          {!hasActiveFilters && (
+          {!hasActiveFilters && hasUploadPermission && (
             <Link
               to="/dashboard/upload"
               className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 transform hover:-translate-y-1 shadow-lg hover:shadow-xl font-medium"

@@ -1,6 +1,6 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { Login, Register, Unauthorized } from "./pages/auth";
+import { Login, Unauthorized } from "./pages/auth";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
 import RetrieveCredentials from "./pages/auth/RetrieveCredentials";
@@ -53,7 +53,8 @@ const AppRoutes = () => {
       <Route path="/" element={<LandingPage />} />
       <Route path="/system-setup" element={<SystemSetupOnboarding />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      {/* Register route disabled for internal ministry system */}
+      {/* <Route path="/register" element={<Register />} /> */}
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/retrieve-credentials" element={<RetrieveCredentials />} />

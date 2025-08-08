@@ -15,14 +15,15 @@ const GradientSpinner = ({
   };
 
   const variantClasses = {
-    primary: "from-purple-500 via-purple-600 to-teal-500",
-    secondary: "from-teal-500 via-teal-600 to-purple-500",
+    primary: "from-green-500 via-emerald-500 to-green-600",
+    secondary: "from-emerald-500 via-green-500 to-emerald-600",
     success: "from-green-500 via-emerald-500 to-teal-600",
     warning: "from-yellow-500 via-orange-500 to-red-600",
     error: "from-red-500 via-pink-500 to-rose-600",
     purple: "from-purple-400 via-purple-500 to-purple-600",
     teal: "from-teal-400 via-teal-500 to-teal-600",
     light: "from-white via-gray-100 to-gray-200",
+    "white-green": "from-white via-green-100 to-green-200",
   };
 
   const textSizeClasses = {
@@ -142,14 +143,15 @@ const GradientSpinner = ({
 // Helper function to get gradient colors for conic gradient
 const getGradientColors = (variant) => {
   const colors = {
-    primary: "#8b5cf6, #7c3aed, #14b8a6",
-    secondary: "#14b8a6, #0d9488, #8b5cf6",
+    primary: "#10b981, #059669, #16a34a",
+    secondary: "#059669, #10b981, #16a34a",
     success: "#10b981, #059669, #14b8a6",
     warning: "#f59e0b, #d97706, #ef4444",
     error: "#ef4444, #dc2626, #f43f5e",
     purple: "#a78bfa, #8b5cf6, #7c3aed",
     teal: "#5eead4, #14b8a6, #0d9488",
     light: "#ffffff, #f3f4f6, #e5e7eb",
+    "white-green": "#ffffff, #dcfce7, #bbf7d0",
   };
   return colors[variant] || colors.primary;
 };

@@ -89,8 +89,8 @@ const Login = () => {
   // Safety check - wait for auth to be initialized
   if (!initialized) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-teal-900 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-emerald-900 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-white/30 border-t-green-400 rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -137,15 +137,15 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-teal-900 relative overflow-hidden">
+    <div className="min-h-screen bg-white relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="fixed inset-0">
-        {/* Gradient Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-purple-800 to-teal-900" />
+        {/* White Background */}
+        <div className="absolute inset-0 bg-white" />
 
         {/* Animated Circles */}
         <motion.div
-          className="absolute top-20 left-20 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl"
+          className="absolute top-20 left-20 w-72 h-72 bg-green-500/10 rounded-full blur-3xl"
           animate={{
             scale: [1, 1.2, 1],
             opacity: [0.3, 0.6, 0.3],
@@ -157,7 +157,7 @@ const Login = () => {
           }}
         />
         <motion.div
-          className="absolute bottom-20 right-20 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl"
+          className="absolute bottom-20 right-20 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl"
           animate={{
             scale: [1.2, 1, 1.2],
             opacity: [0.4, 0.7, 0.4],
@@ -196,7 +196,7 @@ const Login = () => {
       <div className="relative z-10 min-h-screen flex">
         {/* Left Side - Brand & Info - Fixed */}
         <motion.div
-          className="hidden lg:flex lg:w-1/2 flex-col justify-center px-12 py-8 fixed left-0 top-0 h-full"
+          className="hidden lg:flex lg:w-1/2 flex-col justify-center px-12 py-8 fixed left-0 top-0 h-full bg-gradient-to-br from-green-600 via-green-700 to-emerald-700"
           variants={slideInVariants}
           initial="hidden"
           animate="visible"
@@ -220,7 +220,7 @@ const Login = () => {
               transition={{ delay: 0.3 }}
             >
               Welcome to{" "}
-              <span className="bg-gradient-to-r from-purple-400 to-teal-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
                 ELRA ERP
               </span>
             </motion.h1>
@@ -242,22 +242,22 @@ const Login = () => {
                   icon: <HiShieldCheck className="w-6 h-6" />,
                   title: "Enterprise Security",
                   description: "Bank-level encryption and compliance",
-                  color: "from-purple-500/20 to-purple-600/20",
-                  iconColor: "text-purple-400",
+                  color: "from-green-500/20 to-green-600/20",
+                  iconColor: "text-green-400",
                 },
                 {
                   icon: <HiChartBar className="w-6 h-6" />,
                   title: "Smart Analytics",
                   description: "AI-powered insights and reporting",
-                  color: "from-teal-500/20 to-teal-600/20",
-                  iconColor: "text-teal-400",
+                  color: "from-emerald-500/20 to-emerald-600/20",
+                  iconColor: "text-emerald-400",
                 },
                 {
                   icon: <HiCog className="w-6 h-6" />,
                   title: "Seamless Integration",
                   description: "Connect all your business processes",
-                  color: "from-purple-500/20 to-teal-500/20",
-                  iconColor: "text-purple-400",
+                  color: "from-green-500/20 to-emerald-500/20",
+                  iconColor: "text-green-400",
                 },
               ].map((feature, index) => (
                 <motion.div
@@ -314,12 +314,12 @@ const Login = () => {
 
             {/* Login Card */}
             <motion.div
-              className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-8 shadow-2xl"
+              className="bg-gradient-to-br from-green-600 via-green-700 to-emerald-700 backdrop-blur-xl border border-green-500/20 rounded-3xl p-8 shadow-2xl"
               variants={fadeInVariants}
             >
               <div className="text-center mb-8">
                 <h2 className="text-3xl font-bold text-white mb-2">Sign In</h2>
-                <p className="text-white/70">Access your ELRA ERP workspace</p>
+                <p className="text-white/90">Access your ELRA ERP workspace</p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -338,13 +338,13 @@ const Login = () => {
                 <motion.div variants={fadeInVariants}>
                   <label
                     htmlFor="email"
-                    className="block text-sm font-medium text-white/90 mb-3"
+                    className="block text-sm font-medium text-white mb-3"
                   >
                     Email Address
                   </label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <HiMail className="h-5 w-5 text-white/50 group-focus-within:text-purple-400 transition-colors" />
+                      <HiMail className="h-5 w-5 text-white/50 group-focus-within:text-green-400 transition-colors" />
                     </div>
                     <input
                       type="email"
@@ -352,7 +352,7 @@ const Login = () => {
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
-                      className={`w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400 backdrop-blur-sm transition-all duration-300 ${
+                      className={`w-full pl-12 pr-4 py-4 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 backdrop-blur-sm transition-all duration-300 ${
                         errors.email ? "border-red-400/50" : ""
                       }`}
                       placeholder="Enter your email"
@@ -367,13 +367,13 @@ const Login = () => {
                 <motion.div variants={fadeInVariants}>
                   <label
                     htmlFor="password"
-                    className="block text-sm font-medium text-white/90 mb-3"
+                    className="block text-sm font-medium text-white mb-3"
                   >
                     Password
                   </label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <HiLockClosed className="h-5 w-5 text-white/50 group-focus-within:text-purple-400 transition-colors" />
+                      <HiLockClosed className="h-5 w-5 text-white/50 group-focus-within:text-green-400 transition-colors" />
                     </div>
                     <input
                       type={showPassword ? "text" : "password"}
@@ -381,7 +381,7 @@ const Login = () => {
                       name="password"
                       value={formData.password}
                       onChange={handleChange}
-                      className={`w-full pl-12 pr-12 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400 backdrop-blur-sm transition-all duration-300 ${
+                      className={`w-full pl-12 pr-12 py-4 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 backdrop-blur-sm transition-all duration-300 ${
                         errors.password ? "border-red-400/50" : ""
                       }`}
                       placeholder="Enter your password"
@@ -409,7 +409,7 @@ const Login = () => {
                 <motion.div variants={fadeInVariants} className="text-right">
                   <Link
                     to="/forgot-password"
-                    className="text-sm text-teal-400 hover:text-teal-300 transition-colors duration-300"
+                    className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors duration-300"
                   >
                     Forgot your password?
                   </Link>
@@ -419,13 +419,13 @@ const Login = () => {
                 <motion.button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-purple-600 to-teal-600 hover:from-purple-700 hover:to-teal-700 text-white py-4 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-2"
+                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-4 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-2"
                   variants={fadeInVariants}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
                   {loading ? (
-                    <GradientSpinner size="sm" variant="light" />
+                    <GradientSpinner size="sm" variant="white-green" />
                   ) : (
                     <>
                       <span>Sign In to ELRA</span>
@@ -434,27 +434,27 @@ const Login = () => {
                   )}
                 </motion.button>
 
-                {/* Divider */}
+                {/* Internal System Notice */}
                 <motion.div variants={fadeInVariants} className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-white/20" />
                   </div>
                   <div className="relative flex justify-center text-sm">
                     <span className="px-4 bg-transparent text-white/50">
-                      New to ELRA?
+                      Internal System
                     </span>
                   </div>
                 </motion.div>
 
-                {/* Register Link */}
+                {/* Ministry Notice */}
                 <motion.div variants={fadeInVariants}>
-                  <Link
-                    to="/register"
-                    className="w-full bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 text-white py-4 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2"
-                  >
-                    <HiUser className="w-5 h-5" />
-                    <span>Create ELRA Account</span>
-                  </Link>
+                  <div className="w-full bg-white/10 border border-white/20 text-white py-4 px-6 rounded-xl text-center">
+                    <HiShieldCheck className="w-5 h-5 mx-auto mb-2 text-emerald-400" />
+                    <span className="text-sm">Federal Ministry of Finance</span>
+                    <p className="text-xs text-white/70 mt-1">
+                      ELRA - Equipment Leasing Registration Authority
+                    </p>
+                  </div>
                 </motion.div>
               </form>
             </motion.div>
@@ -466,7 +466,7 @@ const Login = () => {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.8 }}
             >
-              <p className="text-white/50 text-sm">
+              <p className="text-gray-600 text-sm">
                 © {new Date().getFullYear()} ELRA - Equipment Leasing
                 Registration Authority
               </p>

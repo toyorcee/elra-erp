@@ -969,7 +969,7 @@ const ResetPassword = () => {
                   whileTap={{ scale: 0.98 }}
                 >
                   {loading ? (
-                    <GradientSpinner size="sm" variant="light" />
+                    <GradientSpinner size="sm" variant="white-green" />
                   ) : (
                     <>
                       <span>Update Password</span>

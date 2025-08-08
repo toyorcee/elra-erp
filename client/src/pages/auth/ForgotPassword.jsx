@@ -379,15 +379,15 @@ const ForgotPassword = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-teal-900 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-emerald-900 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="fixed inset-0">
         {/* Gradient Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-purple-800 to-teal-900" />
+        <div className="absolute inset-0 bg-gradient-to-br from-green-900 via-green-800 to-emerald-900" />
 
         {/* Animated Circles */}
         <motion.div
-          className="absolute top-20 left-20 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl"
+          className="absolute top-20 left-20 w-72 h-72 bg-green-500/10 rounded-full blur-3xl"
           animate={{
             scale: [1, 1.2, 1],
             opacity: [0.3, 0.6, 0.3],
@@ -618,7 +618,7 @@ const ForgotPassword = () => {
                   whileTap={{ scale: 0.98 }}
                 >
                   {loading ? (
-                    <GradientSpinner size="sm" variant="light" />
+                    <GradientSpinner size="sm" variant="white-green" />
                   ) : (
                     <>
                       <span>Send Reset Link</span>

@@ -319,7 +319,7 @@ const EmailVerification = () => {
                   className="w-full bg-gradient-to-r from-purple-600 to-teal-600 hover:from-purple-700 hover:to-teal-700 disabled:from-gray-600 disabled:to-gray-700 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2 disabled:cursor-not-allowed"
                 >
                   {resendLoading ? (
-                    <GradientSpinner size="sm" variant="light" />
+                    <GradientSpinner size="sm" variant="white-green" />
                   ) : (
                     <HiRefresh className="w-5 h-5" />
                   )}

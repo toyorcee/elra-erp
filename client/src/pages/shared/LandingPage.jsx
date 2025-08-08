@@ -16,6 +16,10 @@ import {
   HiShoppingCart,
   HiOfficeBuilding,
   HiChartBar,
+  HiLockClosed,
+  HiDocumentText,
+  HiCog,
+  HiKey,
 } from "react-icons/hi";
 import ELRALogo from "../../components/ELRALogo";
 import { useAuth } from "../../context/AuthContext";
@@ -49,22 +53,14 @@ const LandingPage = () => {
   }, []);
 
   const [animatedStats, setAnimatedStats] = useState({
-    companies: 0,
     users: 0,
     modules: 0,
-    uptime: 0,
+    departments: 0,
+    roles: 0,
   });
 
   // Background images for hero carousel
-  const heroImages = [
-    "/src/assets/hero1.jpg",
-    "/src/assets/hero2.jpg",
-    "/src/assets/Office1.jpg",
-    "/src/assets/Office2.jpg",
-    "/src/assets/Office3.jpg",
-    "/src/assets/cloud1.jpg",
-    "/src/assets/cloud2.jpg",
-  ];
+  const heroImages = [hero1, hero2, office1, office2, office3, cloud1, cloud2];
 
   const heroContent = [
     {
@@ -130,10 +126,10 @@ const LandingPage = () => {
     if (!statsVisible) return;
 
     const targets = {
-      companies: 500,
-      users: 10000,
-      modules: 10,
-      uptime: 99.9,
+      users: 250,
+      modules: 8,
+      departments: 12,
+      roles: 15,
     };
     const duration = 2500;
     const steps = 100;
@@ -142,10 +138,6 @@ const LandingPage = () => {
     const timer = setInterval(() => {
       setAnimatedStats((prev) => {
         const newStats = {
-          companies: Math.min(
-            prev.companies + Math.ceil(targets.companies / steps),
-            targets.companies
-          ),
           users: Math.min(
             prev.users + Math.ceil(targets.users / steps),
             targets.users
@@ -154,18 +146,22 @@ const LandingPage = () => {
             prev.modules + Math.ceil(targets.modules / steps),
             targets.modules
           ),
-          uptime: Math.min(
-            Math.round((prev.uptime + targets.uptime / steps) * 10) / 10,
-            targets.uptime
+          departments: Math.min(
+            prev.departments + Math.ceil(targets.departments / steps),
+            targets.departments
+          ),
+          roles: Math.min(
+            prev.roles + Math.ceil(targets.roles / steps),
+            targets.roles
           ),
         };
 
         // Stop animation when all targets are reached
         if (
-          newStats.companies >= targets.companies &&
           newStats.users >= targets.users &&
           newStats.modules >= targets.modules &&
-          newStats.uptime >= targets.uptime
+          newStats.departments >= targets.departments &&
+          newStats.roles >= targets.roles
         ) {
           clearInterval(timer);
         }
@@ -200,56 +196,56 @@ const LandingPage = () => {
       title: "Human Resources",
       description:
         "Complete HR management with recruitment, onboarding, performance tracking, and employee self-service portal.",
-      gradient: "from-purple-500 to-teal-500",
+      gradient: "from-green-500 to-emerald-500",
     },
     {
       icon: HiCurrencyDollar,
       title: "Payroll & Benefits",
       description:
         "Automated payroll processing, benefits administration, tax calculations, and comprehensive reporting.",
-      gradient: "from-teal-500 to-purple-500",
+      gradient: "from-emerald-500 to-green-500",
     },
     {
       icon: HiShoppingCart,
       title: "Procurement",
       description:
         "End-to-end procurement management from requisitions to vendor management and inventory tracking.",
-      gradient: "from-purple-500 to-blue-500",
+      gradient: "from-green-500 to-emerald-600",
     },
     {
       icon: HiChartBar,
       title: "Accounting",
       description:
         "Complete financial management with expense tracking, revenue management, and financial reporting.",
-      gradient: "from-blue-500 to-purple-500",
+      gradient: "from-emerald-600 to-green-500",
     },
     {
       icon: HiChat,
       title: "Communication",
       description:
         "Internal messaging, announcements, and collaboration tools to keep your team connected and informed.",
-      gradient: "from-purple-500 to-pink-500",
+      gradient: "from-green-500 to-emerald-700",
     },
     {
       icon: HiTrendingUp,
       title: "Business Intelligence",
       description:
         "Advanced analytics and reporting to drive data-driven decisions and optimize your business operations.",
-      gradient: "from-pink-500 to-purple-500",
+      gradient: "from-emerald-700 to-green-500",
     },
     {
       icon: HiShieldCheck,
       title: "Security & Compliance",
       description:
         "Enterprise-grade security with role-based access control, audit trails, and compliance management.",
-      gradient: "from-purple-500 to-green-500",
+      gradient: "from-green-500 to-emerald-800",
     },
     {
       icon: HiGlobe,
       title: "Cloud-Native Platform",
       description:
         "99.9% uptime, global CDN, and seamless mobile access for your distributed workforce.",
-      gradient: "from-green-500 to-purple-500",
+      gradient: "from-emerald-800 to-green-500",
     },
   ];
 
@@ -260,7 +256,6 @@ const LandingPage = () => {
       company: "Metropolitan Healthcare Group",
       content:
         "Before ELRA, our HR processes were scattered across different systems. Now we've streamlined employee management and cut onboarding time by 60%. Our compliance team loves the automated audit trails.",
-      avatar: "/src/assets/blackwoman1.jpg",
     },
     {
       name: "David Thompson",
@@ -268,7 +263,6 @@ const LandingPage = () => {
       company: "Riverside Manufacturing",
       content:
         "We were drowning in manual processes across our 12 facilities. ELRA gave us a unified ERP platform that scales beautifully. The workflow automation alone has eliminated 3 full-time positions worth of manual work.",
-      avatar: "/src/assets/whitemansmiling.jpg",
     },
     {
       name: "Angela Martinez",
@@ -276,7 +270,6 @@ const LandingPage = () => {
       company: "Summit Financial Services",
       content:
         "In financial services, data security isn't optional - it's everything. ELRA's enterprise-grade security and granular permissions give me peace of mind. When auditors ask for specific reports, I can generate them instantly.",
-      avatar: "/src/assets/smilingwhitewoman.jpg",
     },
     {
       name: "Marcus Johnson",
@@ -284,7 +277,6 @@ const LandingPage = () => {
       company: "Urban Development Corporation",
       content:
         "Managing procurement across multiple sites was a nightmare. ELRA transformed our operations - vendors, contractors, and stakeholders now collaborate seamlessly. We've reduced project delays by 35%.",
-      avatar: "/src/assets/blackmale1.jpg",
     },
     {
       name: "Dr. Patricia Chen",
@@ -292,31 +284,29 @@ const LandingPage = () => {
       company: "BioTech Innovations Lab",
       content:
         "Data integrity is critical in our field. ELRA's integrated approach has revolutionized how our global team manages research data. The analytics features help us make data-driven decisions faster than ever.",
-      avatar: "/src/assets/blackwoman2.jpg",
     },
     {
       name: "Robert Anderson",
       role: "Executive Vice President",
-      company: "Anderson & Associates",
+      company: "Global Manufacturing Corp",
       content:
-        "After 25 years in business, I thought I'd seen every ERP system. ELRA is different - it actually understands how modern businesses work. Our team is 40% more efficient with the integrated workflows.",
-      avatar: "/src/assets/ceo.jpg",
+        "ELRA has been a game-changer for our international operations. The multi-language support and compliance features ensure we meet regulatory requirements across all jurisdictions.",
     },
   ];
 
   const benefits = [
-    "Integrated ERP modules for seamless business operations",
-    "Real-time analytics and business intelligence",
-    "Enterprise-grade security and compliance",
-    "Cloud-native platform with 99.9% uptime",
-    "Mobile-first design for remote work",
-    "Customizable workflows and automation",
-    "Multi-tenant architecture for scalability",
-    "24/7 customer support and training",
+    "Enterprise-grade security with SOC 2 Type II compliance",
+    "Role-based access control and audit trails",
+    "Real-time data synchronization across all modules",
+    "Customizable workflows and approval processes",
+    "Comprehensive reporting and analytics dashboard",
+    "Mobile-responsive design for field operations",
+    "24/7 technical support and system monitoring",
+    "Seamless integration with existing enterprise systems",
   ];
 
   const handleGetStarted = () => {
-    navigate("/modules");
+    navigate("/login");
   };
 
   const handleSignIn = () => {
@@ -324,259 +314,218 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-teal-900 overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute top-20 left-20 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl"
-          animate={{
-            x: [0, 100, 0],
-            y: [0, -50, 0],
-          }}
-          transition={{
-            duration: 20,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-        />
-        <motion.div
-          className="absolute top-40 right-20 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl"
-          animate={{
-            x: [0, -80, 0],
-            y: [0, 60, 0],
-          }}
-          transition={{
-            duration: 25,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-        />
-        <motion.div
-          className="absolute bottom-20 left-1/3 w-64 h-64 bg-purple-400/10 rounded-full blur-3xl"
-          animate={{
-            x: [0, 60, 0],
-            y: [0, -40, 0],
-          }}
-          transition={{
-            duration: 18,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-        />
-      </div>
-
+    <div className="min-h-screen bg-white">
       {/* Navigation */}
-      <nav className="relative z-10 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <ELRALogo variant="light" size="md" />
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo */}
+            <div className="flex items-center">
+              <ELRALogo variant="dark" size="md" />
+            </div>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            <Link
-              to="#features"
-              className="text-white/80 hover:text-white transition-colors font-medium"
-            >
-              Features
-            </Link>
-            <Link
-              to="#benefits"
-              className="text-white/80 hover:text-white transition-colors font-medium"
-            >
-              Benefits
-            </Link>
-            <Link
-              to="#testimonials"
-              className="text-white/80 hover:text-white transition-colors font-medium"
-            >
-              Testimonials
-            </Link>
-            <button
-              onClick={handleSignIn}
-              className="bg-white/10 backdrop-blur-sm border border-white/20 text-white px-6 py-2 rounded-full hover:bg-white/20 transition-all duration-300 font-medium"
-            >
-              Sign In
-            </button>
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center space-x-8">
+              <a
+                href="#features"
+                className="text-gray-700 hover:text-green-600 font-medium transition-colors"
+              >
+                Features
+              </a>
+              <a
+                href="#benefits"
+                className="text-gray-700 hover:text-green-600 font-medium transition-colors"
+              >
+                Benefits
+              </a>
+              <a
+                href="#testimonials"
+                className="text-gray-700 hover:text-green-600 font-medium transition-colors"
+              >
+                Testimonials
+              </a>
+              <Link
+                to="/modules"
+                className="text-gray-700 hover:text-green-600 font-medium transition-colors"
+              >
+                Modules
+              </Link>
+              <button
+                onClick={handleSignIn}
+                className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+              >
+                Sign In
+              </button>
+            </div>
+
+            {/* Mobile menu button */}
+            <div className="md:hidden">
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="text-gray-700 hover:text-green-600"
+              >
+                {mobileMenuOpen ? (
+                  <HiX className="h-6 w-6" />
+                ) : (
+                  <HiMenu className="h-6 w-6" />
+                )}
+              </button>
+            </div>
           </div>
-
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden text-white p-2"
-          >
-            {mobileMenuOpen ? (
-              <HiX className="w-6 h-6" />
-            ) : (
-              <HiMenu className="w-6 h-6" />
-            )}
-          </button>
         </div>
 
-        {/* Mobile Menu */}
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="md:hidden bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg mt-4 overflow-hidden"
-            >
-              <div className="px-4 py-4 space-y-4">
-                <Link
-                  to="#features"
-                  className="block text-white/80 hover:text-white transition-colors font-medium"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Features
-                </Link>
-                <Link
-                  to="#benefits"
-                  className="block text-white/80 hover:text-white transition-colors font-medium"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Benefits
-                </Link>
-                <Link
-                  to="#testimonials"
-                  className="block text-white/80 hover:text-white transition-colors font-medium"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Testimonials
-                </Link>
-                <button
-                  onClick={() => {
-                    handleSignIn();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="w-full bg-white/10 border border-white/20 text-white px-6 py-2 rounded-full hover:bg-white/20 transition-all duration-300 font-medium"
-                >
-                  Sign In
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Mobile Navigation */}
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-white border-t border-gray-200">
+            <div className="px-2 pt-2 pb-3 space-y-1">
+              <a
+                href="#features"
+                className="block px-3 py-2 text-gray-700 hover:text-green-600 font-medium"
+              >
+                Features
+              </a>
+              <a
+                href="#benefits"
+                className="block px-3 py-2 text-gray-700 hover:text-green-600 font-medium"
+              >
+                Benefits
+              </a>
+              <a
+                href="#testimonials"
+                className="block px-3 py-2 text-gray-700 hover:text-green-600 font-medium"
+              >
+                Testimonials
+              </a>
+              <Link
+                to="/modules"
+                className="block px-3 py-2 text-gray-700 hover:text-green-600 font-medium"
+              >
+                Modules
+              </Link>
+              <button
+                onClick={handleSignIn}
+                className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+              >
+                Sign In
+              </button>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Hero Section */}
-      <section className="relative z-10 px-6 py-20 overflow-hidden">
-        {/* Background Image Carousel */}
-        <div className="absolute inset-0 z-0">
-          <AnimatePresence mode="wait">
+      <section className="relative pt-16 overflow-hidden bg-gradient-to-br from-green-600 via-green-700 to-emerald-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32">
+          <div className="text-center">
             <motion.div
-              key={currentBgImage}
-              initial={{ opacity: 0, scale: 1.1 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ duration: 1.5, ease: "easeInOut" }}
-              className="absolute inset-0"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
             >
-              <img
-                src={heroImages[currentBgImage]}
-                alt="ELRA ERP Background"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-900/80 via-purple-800/70 to-teal-900/80"></div>
-            </motion.div>
-          </AnimatePresence>
-        </div>
+              <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 drop-shadow-2xl">
+                Federal Ministry of{" "}
+                <span className="bg-gradient-to-r from-green-300 via-emerald-300 to-green-400 bg-clip-text text-transparent animate-pulse">
+                  Finance
+                </span>
+              </h1>
 
-        <div className="relative z-10 max-w-7xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="mb-8"
-          >
-            <h1 className="text-5xl md:text-7xl font-bold text-white mb-6">
-              ELRA{" "}
-              <span className="bg-gradient-to-r from-purple-400 to-teal-400 bg-clip-text text-transparent">
-                ERP System
-              </span>
-            </h1>
-
-            {/* Static Subtext */}
-            <p className="text-lg md:text-xl text-white/90 mb-3 font-medium">
-              Explore Seamless
-            </p>
-
-            {/* Animated Changing Module Headers */}
-            <div className="h-16 md:h-20 mb-2 flex items-center justify-center">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={currentWordIndex}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 1.5, ease: "easeInOut" }}
-                  className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-purple-400 to-teal-400 bg-clip-text text-transparent"
-                >
-                  {heroContent[currentWordIndex].word}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            {/* Static Management Text */}
-            <p className="text-lg md:text-xl text-white/90 mb-6 font-medium">
-              Management
-            </p>
-
-            <p className="text-xl md:text-2xl text-white/90 max-w-3xl mx-auto leading-relaxed">
-              Transform your business with our comprehensive Enterprise Resource
-              Planning solution. Manage HR, payroll, procurement, accounting,
-              and communication in one unified platform.
-            </p>
-          </motion.div>
-
-          {/* Animated Feature Cards */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto mb-12"
-          >
-            {heroContent.slice(0, 4).map((content, index) => (
-              <motion.div
-                key={index}
-                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 text-center"
-                whileHover={{ scale: 1.05, y: -5 }}
-                transition={{ duration: 0.3 }}
+              {/* Static Subtext */}
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.3 }}
+                className="text-xl md:text-2xl text-white/95 mb-6 font-semibold drop-shadow-lg"
               >
-                <content.icon className="w-8 h-8 text-purple-300 mx-auto mb-2" />
-                <p className="text-white/90 text-sm font-medium">
-                  {content.word}
-                </p>
-              </motion.div>
-            ))}
-          </motion.div>
+                Internal ERP System
+              </motion.p>
 
-          {/* CTA Buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center items-center"
-          >
-            <button
-              onClick={handleGetStarted}
-              className="bg-gradient-to-r from-purple-500 to-teal-500 text-white px-8 py-4 rounded-full font-semibold text-lg hover:from-purple-600 hover:to-teal-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center space-x-2"
+              {/* Animated Changing Module Headers */}
+              <div className="h-24 md:h-28 mb-6 flex items-center justify-center">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={currentWordIndex}
+                    initial={{ opacity: 0, y: 30, scale: 0.8 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -30, scale: 0.8 }}
+                    transition={{ duration: 1.2, ease: "easeInOut" }}
+                    className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-green-200 via-emerald-200 to-green-300 bg-clip-text text-transparent text-center drop-shadow-xl"
+                  >
+                    {heroContent[currentWordIndex].word}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+
+              {/* Animated Description */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.6 }}
+                className="mb-8"
+              >
+                <AnimatePresence mode="wait">
+                  <motion.p
+                    key={currentWordIndex}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 1, ease: "easeInOut" }}
+                    className="text-lg md:text-xl text-white/90 max-w-4xl mx-auto leading-relaxed font-medium"
+                  >
+                    {heroContent[currentWordIndex].description}
+                  </motion.p>
+                </AnimatePresence>
+              </motion.div>
+            </motion.div>
+
+            {/* CTA Buttons */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.8 }}
+              className="flex flex-col sm:flex-row gap-6 justify-center items-center"
             >
-              <span>Get Started</span>
-              <HiArrowRight className="w-5 h-5" />
-            </button>
-            <button
-              onClick={handleSignIn}
-              className="bg-white/10 backdrop-blur-sm border border-white/20 text-white px-8 py-4 rounded-full font-semibold text-lg hover:bg-white/20 transition-all duration-300 flex items-center space-x-2"
-            >
-              <HiStar className="w-5 h-5" />
-              <span>Sign In</span>
-            </button>
-          </motion.div>
+              <motion.button
+                onClick={handleGetStarted}
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                className="bg-gradient-to-r from-green-500 via-emerald-500 to-green-600 text-white px-10 py-5 rounded-xl font-bold text-xl hover:from-green-600 hover:via-emerald-600 hover:to-green-700 transition-all duration-300 shadow-2xl hover:shadow-green-500/25 flex items-center space-x-3 border-2 border-green-400/20"
+              >
+                <span>Internal Access</span>
+                <HiArrowRight className="w-6 h-6 animate-pulse" />
+              </motion.button>
+              <motion.button
+                onClick={handleSignIn}
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                className="bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white px-10 py-5 rounded-xl font-bold text-xl hover:bg-white/20 transition-all duration-300 shadow-2xl hover:shadow-white/25 flex items-center space-x-3"
+              >
+                <HiLockClosed className="w-6 h-6" />
+                <span>Secure Login</span>
+              </motion.button>
+            </motion.div>
+          </div>
         </div>
       </section>
 
       {/* Stats Section */}
-      <section ref={statsRef} className="relative z-10 px-6 py-16">
+      <section ref={statsRef} className="relative z-10 px-6 py-16 bg-green-50">
         <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              System Overview
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Comprehensive ERP platform serving the Federal Ministry of
+              Finance's internal operations and regulatory functions
+            </p>
+          </motion.div>
+
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -584,57 +533,57 @@ const LandingPage = () => {
             viewport={{ once: true }}
             className="grid grid-cols-2 md:grid-cols-4 gap-8"
           >
-            <div className="text-center">
+            <div className="text-center bg-white rounded-xl p-6 shadow-lg border border-green-100">
               <motion.div
-                className="text-4xl md:text-5xl font-bold text-white mb-2"
+                className="text-4xl md:text-5xl font-bold text-green-600 mb-2"
                 initial={{ scale: 0 }}
                 animate={statsVisible ? { scale: 1 } : { scale: 0 }}
                 transition={{ duration: 0.5, delay: 0.1 }}
               >
-                {animatedStats.companies.toLocaleString()}+
+                {animatedStats.users}
               </motion.div>
-              <p className="text-white/70">Companies</p>
+              <p className="text-gray-600 font-medium">Active Users</p>
             </div>
-            <div className="text-center">
+            <div className="text-center bg-white rounded-xl p-6 shadow-lg border border-green-100">
               <motion.div
-                className="text-4xl md:text-5xl font-bold text-white mb-2"
+                className="text-4xl md:text-5xl font-bold text-green-600 mb-2"
                 initial={{ scale: 0 }}
                 animate={statsVisible ? { scale: 1 } : { scale: 0 }}
                 transition={{ duration: 0.5, delay: 0.2 }}
               >
-                {animatedStats.users.toLocaleString()}+
+                {animatedStats.modules}
               </motion.div>
-              <p className="text-white/70">Users</p>
+              <p className="text-gray-600 font-medium">System Modules</p>
             </div>
-            <div className="text-center">
+            <div className="text-center bg-white rounded-xl p-6 shadow-lg border border-green-100">
               <motion.div
-                className="text-4xl md:text-5xl font-bold text-white mb-2"
+                className="text-4xl md:text-5xl font-bold text-green-600 mb-2"
                 initial={{ scale: 0 }}
                 animate={statsVisible ? { scale: 1 } : { scale: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
               >
-                {animatedStats.modules}
+                {animatedStats.departments}
               </motion.div>
-              <p className="text-white/70">Modules</p>
+              <p className="text-gray-600 font-medium">Departments</p>
             </div>
-            <div className="text-center">
+            <div className="text-center bg-white rounded-xl p-6 shadow-lg border border-green-100">
               <motion.div
-                className="text-4xl md:text-5xl font-bold text-white mb-2"
+                className="text-4xl md:text-5xl font-bold text-green-600 mb-2"
                 initial={{ scale: 0 }}
                 animate={statsVisible ? { scale: 1 } : { scale: 0 }}
                 transition={{ duration: 0.5, delay: 0.4 }}
               >
-                {animatedStats.uptime}%
+                {animatedStats.roles}
               </motion.div>
-              <p className="text-white/70">Uptime</p>
+              <p className="text-gray-600 font-medium">User Roles</p>
             </div>
           </motion.div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="relative z-10 px-6 py-20">
-        <div className="max-w-7xl mx-auto">
+      <section id="features" className="relative z-10 px-6 py-20 bg-green-600">
+        <div className="max-w-6xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -644,13 +593,13 @@ const LandingPage = () => {
           >
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
               Complete{" "}
-              <span className="bg-gradient-to-r from-purple-400 to-teal-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-green-200 to-emerald-200 bg-clip-text text-transparent">
                 ERP Solution
               </span>
             </h2>
-            <p className="text-xl text-white/80 max-w-3xl mx-auto">
-              Everything you need to run your business efficiently in one
-              integrated platform
+            <p className="text-xl text-white/90 max-w-3xl mx-auto">
+              Comprehensive enterprise management platform designed for
+              government compliance and security
             </p>
           </motion.div>
 
@@ -662,7 +611,7 @@ const LandingPage = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: index * 0.1 }}
                 viewport={{ once: true }}
-                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 hover:bg-white/20 transition-all duration-300 group"
+                className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 group border border-gray-100"
                 whileHover={{ y: -5 }}
               >
                 <div
@@ -670,10 +619,10 @@ const LandingPage = () => {
                 >
                   <feature.icon className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-3">
+                <h3 className="text-xl font-semibold text-gray-900 mb-3">
                   {feature.title}
                 </h3>
-                <p className="text-white/70 leading-relaxed">
+                <p className="text-gray-600 leading-relaxed">
                   {feature.description}
                 </p>
               </motion.div>
@@ -682,8 +631,134 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* Security & Compliance Section */}
+      <section className="relative z-10 px-6 py-20 bg-white">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8 }}
+              viewport={{ once: true }}
+            >
+              <h2 className="text-4xl font-bold text-gray-900 mb-6">
+                Enterprise{" "}
+                <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                  Security & Compliance
+                </span>
+              </h2>
+              <p className="text-xl text-gray-600 mb-8">
+                Built for government agencies and regulated industries with the
+                highest security standards
+              </p>
+
+              <div className="space-y-6">
+                <div className="flex items-start space-x-4">
+                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                    <HiShieldCheck className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      SOC 2 Type II Certified
+                    </h3>
+                    <p className="text-gray-600">
+                      Enterprise-grade security with comprehensive audit trails
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-4">
+                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                    <HiKey className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Role-Based Access Control
+                    </h3>
+                    <p className="text-gray-600">
+                      Granular permissions and multi-factor authentication
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-4">
+                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                    <HiDocumentText className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Compliance Ready
+                    </h3>
+                    <p className="text-gray-600">
+                      Built-in compliance frameworks for government regulations
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8 }}
+              viewport={{ once: true }}
+              className="relative"
+            >
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-8 border border-green-100">
+                <div className="space-y-6">
+                  <div className="flex items-center space-x-3">
+                    <HiShieldCheck className="w-8 h-8 text-green-600" />
+                    <h3 className="text-xl font-semibold text-gray-900">
+                      Security Features
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-700 font-medium">
+                          Data Encryption
+                        </span>
+                        <HiCheckCircle className="w-5 h-5 text-green-600" />
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-700 font-medium">
+                          Audit Logging
+                        </span>
+                        <HiCheckCircle className="w-5 h-5 text-green-600" />
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-700 font-medium">
+                          Access Monitoring
+                        </span>
+                        <HiCheckCircle className="w-5 h-5 text-green-600" />
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg p-4 border border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-700 font-medium">
+                          Backup & Recovery
+                        </span>
+                        <HiCheckCircle className="w-5 h-5 text-green-600" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
       {/* Benefits Section */}
-      <section id="benefits" className="relative z-10 px-6 py-20">
+      <section id="benefits" className="relative z-10 px-6 py-20 bg-gray-50">
         <div className="max-w-6xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -692,14 +767,15 @@ const LandingPage = () => {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-              Why Choose{" "}
-              <span className="bg-gradient-to-r from-purple-400 to-teal-400 bg-clip-text text-transparent">
-                ELRA
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+              System{" "}
+              <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                Benefits
               </span>
             </h2>
-            <p className="text-xl text-white/80 max-w-3xl mx-auto">
-              Experience the power of integrated business management
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Comprehensive features designed for government efficiency and
+              compliance
             </p>
           </motion.div>
 
@@ -711,12 +787,12 @@ const LandingPage = () => {
                 whileInView={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.6, delay: index * 0.1 }}
                 viewport={{ once: true }}
-                className="flex items-start space-x-4"
+                className="flex items-start space-x-4 bg-gradient-to-r from-green-600 to-emerald-600 p-6 rounded-xl shadow-lg border border-green-500/20"
               >
-                <div className="w-6 h-6 bg-gradient-to-r from-purple-500 to-teal-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                  <HiCheckCircle className="w-4 h-4 text-white" />
+                <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center flex-shrink-0 mt-1 shadow-sm">
+                  <HiCheckCircle className="w-4 h-4 text-green-600" />
                 </div>
-                <p className="text-white/90 text-lg">{benefit}</p>
+                <p className="text-white text-lg font-medium">{benefit}</p>
               </motion.div>
             ))}
           </div>
@@ -724,7 +800,7 @@ const LandingPage = () => {
       </section>
 
       {/* Testimonials Section */}
-      <section id="testimonials" className="relative z-10 px-6 py-20">
+      <section id="testimonials" className="relative z-10 px-6 py-20 bg-white">
         <div className="max-w-6xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -733,15 +809,15 @@ const LandingPage = () => {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-              What Our{" "}
-              <span className="bg-gradient-to-r from-purple-400 to-teal-400 bg-clip-text text-transparent">
-                Clients Say
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+              Trusted by{" "}
+              <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                Government Leaders
               </span>
             </h2>
-            <p className="text-xl text-white/80 max-w-3xl mx-auto">
-              Join thousands of satisfied customers who have transformed their
-              business with ELRA
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              See how government agencies are transforming their operations with
+              ELRA
             </p>
           </motion.div>
 
@@ -753,26 +829,32 @@ const LandingPage = () => {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -100 }}
                 transition={{ duration: 0.5 }}
-                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-8 md:p-12"
+                className="bg-gray-50 rounded-2xl p-8 md:p-12 border border-gray-200"
               >
-                <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
-                  <div className="flex-shrink-0">
-                    <img
-                      src={testimonials[currentSlide].avatar}
-                      alt={testimonials[currentSlide].name}
-                      className="w-20 h-20 rounded-full object-cover border-4 border-white/20"
-                    />
-                  </div>
-                  <div className="flex-1 text-center md:text-left">
-                    <p className="text-white/90 text-lg md:text-xl leading-relaxed mb-6 italic">
+                <div className="text-center max-w-4xl mx-auto">
+                  <div className="mb-8">
+                    <p className="text-xl md:text-2xl text-gray-700 leading-relaxed italic">
                       "{testimonials[currentSlide].content}"
                     </p>
-                    <div>
-                      <h4 className="text-white font-semibold text-lg">
+                  </div>
+
+                  <div className="flex items-center justify-center space-x-4">
+                    <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center">
+                      <span className="text-white font-bold text-xl">
+                        {testimonials[currentSlide].name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </span>
+                    </div>
+                    <div className="text-left">
+                      <h4 className="text-lg font-semibold text-gray-900">
                         {testimonials[currentSlide].name}
                       </h4>
-                      <p className="text-white/70">
-                        {testimonials[currentSlide].role} at{" "}
+                      <p className="text-gray-600">
+                        {testimonials[currentSlide].role}
+                      </p>
+                      <p className="text-green-600 font-medium">
                         {testimonials[currentSlide].company}
                       </p>
                     </div>
@@ -781,16 +863,13 @@ const LandingPage = () => {
               </motion.div>
             </AnimatePresence>
 
-            {/* Testimonial Indicators */}
             <div className="flex justify-center mt-8 space-x-2">
               {testimonials.map((_, index) => (
                 <button
                   key={index}
                   onClick={() => setCurrentSlide(index)}
-                  className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                    index === currentSlide
-                      ? "bg-gradient-to-r from-purple-400 to-teal-400"
-                      : "bg-white/30"
+                  className={`w-3 h-3 rounded-full transition-colors ${
+                    index === currentSlide ? "bg-green-600" : "bg-gray-300"
                   }`}
                 />
               ))}
@@ -800,7 +879,7 @@ const LandingPage = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="relative z-10 px-6 py-20">
+      <section className="relative z-10 px-6 py-20 bg-gradient-to-r from-green-600 to-emerald-600">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -810,28 +889,26 @@ const LandingPage = () => {
           >
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
               Ready to Transform Your{" "}
-              <span className="bg-gradient-to-r from-purple-400 to-teal-400 bg-clip-text text-transparent">
-                Business?
-              </span>
+              <span className="text-green-100">Operations?</span>
             </h2>
-            <p className="text-xl text-white/80 mb-8 max-w-2xl mx-auto">
-              Join thousands of companies that have already streamlined their
+            <p className="text-xl text-green-100 mb-8 max-w-2xl mx-auto">
+              Join government agencies that have already streamlined their
               operations with ELRA ERP
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
                 onClick={handleGetStarted}
-                className="bg-gradient-to-r from-purple-500 to-teal-500 text-white px-8 py-4 rounded-full font-semibold text-lg hover:from-purple-600 hover:to-teal-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center space-x-2"
+                className="bg-white text-green-600 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gray-50 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center space-x-2"
               >
-                <span>Start Your Free Trial</span>
+                <span>Request Access</span>
                 <HiArrowRight className="w-5 h-5" />
               </button>
               <button
                 onClick={handleSignIn}
-                className="bg-white/10 backdrop-blur-sm border border-white/20 text-white px-8 py-4 rounded-full font-semibold text-lg hover:bg-white/20 transition-all duration-300 flex items-center justify-center space-x-2"
+                className="bg-transparent border-2 border-white text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-white/10 transition-all duration-300 flex items-center justify-center space-x-2"
               >
-                <HiStar className="w-5 h-5" />
-                <span>Sign In</span>
+                <HiLockClosed className="w-5 h-5" />
+                <span>Secure Login</span>
               </button>
             </div>
           </motion.div>
@@ -839,24 +916,24 @@ const LandingPage = () => {
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 px-6 py-12 border-t border-white/10">
+      <footer className="relative z-10 px-6 py-12 bg-gradient-to-r from-green-600 to-emerald-600 text-white">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="col-span-1 md:col-span-2">
               <ELRALogo variant="light" size="md" />
-              <p className="text-white/70 mt-4 max-w-md">
-                Transform your business with our comprehensive Enterprise
-                Resource Planning solution. Manage HR, payroll, procurement,
-                accounting, and communication in one unified platform.
+              <p className="text-white/90 mt-4 max-w-md">
+                ELRA - Equipment Leasing Registration Authority. Secure,
+                compliant enterprise resource planning for government agencies
+                and regulated industries.
               </p>
             </div>
             <div>
-              <h3 className="text-white font-semibold mb-4">Product</h3>
+              <h3 className="text-white font-semibold mb-4">System</h3>
               <ul className="space-y-2">
                 <li>
                   <a
                     href="#features"
-                    className="text-white/70 hover:text-white transition-colors"
+                    className="text-white/80 hover:text-white transition-colors"
                   >
                     Features
                   </a>
@@ -864,7 +941,7 @@ const LandingPage = () => {
                 <li>
                   <a
                     href="#benefits"
-                    className="text-white/70 hover:text-white transition-colors"
+                    className="text-white/80 hover:text-white transition-colors"
                   >
                     Benefits
                   </a>
@@ -872,7 +949,7 @@ const LandingPage = () => {
                 <li>
                   <a
                     href="#testimonials"
-                    className="text-white/70 hover:text-white transition-colors"
+                    className="text-white/80 hover:text-white transition-colors"
                   >
                     Testimonials
                   </a>
@@ -880,7 +957,7 @@ const LandingPage = () => {
                 <li>
                   <Link
                     to="/modules"
-                    className="text-white/70 hover:text-white transition-colors"
+                    className="text-white/80 hover:text-white transition-colors"
                   >
                     Modules
                   </Link>
@@ -888,12 +965,12 @@ const LandingPage = () => {
               </ul>
             </div>
             <div>
-              <h3 className="text-white font-semibold mb-4">Company</h3>
+              <h3 className="text-white font-semibold mb-4">Support</h3>
               <ul className="space-y-2">
                 <li>
                   <Link
                     to="/legal/privacy"
-                    className="text-white/70 hover:text-white transition-colors"
+                    className="text-white/80 hover:text-white transition-colors"
                   >
                     Privacy Policy
                   </Link>
@@ -901,7 +978,7 @@ const LandingPage = () => {
                 <li>
                   <Link
                     to="/legal/terms"
-                    className="text-white/70 hover:text-white transition-colors"
+                    className="text-white/80 hover:text-white transition-colors"
                   >
                     Terms of Service
                   </Link>
@@ -909,26 +986,27 @@ const LandingPage = () => {
                 <li>
                   <a
                     href="#"
-                    className="text-white/70 hover:text-white transition-colors"
+                    className="text-white/80 hover:text-white transition-colors"
                   >
-                    Support
+                    System Status
                   </a>
                 </li>
                 <li>
                   <a
                     href="#"
-                    className="text-white/70 hover:text-white transition-colors"
+                    className="text-white/80 hover:text-white transition-colors"
                   >
-                    Contact
+                    Contact Support
                   </a>
                 </li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-white/10 mt-8 pt-8 text-center">
-            <p className="text-white/50">
-              &copy; {new Date().getFullYear()} ELRA ERP System. All rights
-              reserved.
+
+          <div className="border-t border-white/20 mt-8 pt-8 text-center">
+            <p className="text-white/70">
+              © {new Date().getFullYear()} ELRA - Equipment Leasing Registration
+              Authority. All rights reserved.
             </p>
           </div>
         </div>

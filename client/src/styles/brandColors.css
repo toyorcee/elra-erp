@@ -1,58 +1,60 @@
-/* EDMS Brand Color System */
+/* ELRA Brand Color System - Green & White Theme */
 :root {
-  /* Primary Brand Colors - Based on Login/Register gradients */
+  /* Primary Brand Colors - Green & White */
   --primary-gradient: linear-gradient(
     135deg,
-    #1e40af 0%,
-    #0891b2 50%,
-    #7c3aed 100%
+    #059669 0%,
+    #10b981 50%,
+    #34d399 100%
   );
   --primary-gradient-hover: linear-gradient(
     135deg,
-    #1d4ed8 0%,
-    #0e7490 50%,
-    #6d28d9 100%
+    #047857 0%,
+    #059669 50%,
+    #10b981 100%
   );
 
-  /* Secondary Brand Colors - Green to Blue variant */
+  /* Secondary Brand Colors - White to Green variant */
   --secondary-gradient: linear-gradient(
     135deg,
-    #059669 0%,
-    #1e40af 50%,
-    #7c3aed 100%
+    #ffffff 0%,
+    #f0fdf4 50%,
+    #059669 100%
   );
   --secondary-gradient-hover: linear-gradient(
     135deg,
-    #047857 0%,
-    #1d4ed8 50%,
-    #6d28d9 100%
+    #f8fafc 0%,
+    #ecfdf5 50%,
+    #047857 100%
   );
 
   /* Individual Color Stops */
-  --primary-blue: #1e40af;
-  --primary-blue-hover: #1d4ed8;
-  --primary-cyan: #0891b2;
-  --primary-cyan-hover: #0e7490;
-  --primary-purple: #7c3aed;
-  --primary-purple-hover: #6d28d9;
+  --primary-green: #059669;
+  --primary-green-hover: #047857;
+  --primary-green-light: #10b981;
+  --primary-green-light-hover: #059669;
+  --primary-green-lighter: #34d399;
+  --primary-green-lighter-hover: #10b981;
 
-  --secondary-green: #059669;
-  --secondary-green-hover: #047857;
+  --secondary-white: #ffffff;
+  --secondary-white-hover: #f8fafc;
+  --secondary-green-light: #f0fdf4;
+  --secondary-green-light-hover: #ecfdf5;
 
   /* Background Gradients */
-  --bg-primary: linear-gradient(135deg, #1e40af 0%, #0891b2 50%, #7c3aed 100%);
+  --bg-primary: linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%);
   --bg-secondary: linear-gradient(
     135deg,
-    #059669 0%,
-    #1e40af 50%,
-    #7c3aed 100%
+    #ffffff 0%,
+    #f0fdf4 50%,
+    #059669 100%
   );
-  --bg-light: linear-gradient(135deg, #dbeafe 0%, #cffafe 50%, #f3e8ff 100%);
+  --bg-light: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #d1fae5 100%);
 
   /* Text Colors */
   --text-primary: #1e293b;
   --text-secondary: #64748b;
-  --text-light: #f8fafc;
+  --text-light: #ffffff;
   --text-muted: #94a3b8;
 
   /* Status Colors */
@@ -67,13 +69,13 @@
 
   /* Border Colors */
   --border-primary: #e2e8f0;
-  --border-focus: #1e40af;
+  --border-focus: #059669;
   --border-error: #fca5a5;
 
   /* Shadow Colors */
-  --shadow-primary: rgba(30, 64, 175, 0.1);
-  --shadow-secondary: rgba(5, 150, 105, 0.1);
-  --shadow-purple: rgba(124, 58, 237, 0.1);
+  --shadow-primary: rgba(5, 150, 105, 0.1);
+  --shadow-secondary: rgba(255, 255, 255, 0.1);
+  --shadow-green: rgba(16, 185, 129, 0.1);
 
   /* Component Specific */
   --sidebar-bg: rgba(255, 255, 255, 0.3);
@@ -96,11 +98,11 @@
 }
 
 .text-brand-primary {
-  color: var(--primary-blue);
+  color: var(--primary-green);
 }
 
 .text-brand-secondary {
-  color: var(--secondary-green);
+  color: var(--secondary-green-light);
 }
 
 .border-brand-primary {
@@ -158,7 +160,7 @@
 /* Focus States */
 .focus-brand-primary:focus {
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
 }
 
 /* Loading States */

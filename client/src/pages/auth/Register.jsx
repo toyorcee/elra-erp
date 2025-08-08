@@ -99,7 +99,7 @@ const Register = () => {
   // Safety check - wait for auth to be initialized
   if (!initialized) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-teal-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-emerald-900 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
       </div>
     );
@@ -232,15 +232,15 @@ const Register = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-teal-900 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-emerald-900 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="fixed inset-0">
         {/* Gradient Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-purple-800 to-teal-900" />
+        <div className="absolute inset-0 bg-gradient-to-br from-green-900 via-green-800 to-emerald-900" />
 
         {/* Animated Circles */}
         <motion.div
-          className="absolute top-20 left-20 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl"
+          className="absolute top-20 left-20 w-72 h-72 bg-green-500/10 rounded-full blur-3xl"
           animate={{
             scale: [1, 1.2, 1],
             opacity: [0.3, 0.6, 0.3],
@@ -252,7 +252,7 @@ const Register = () => {
           }}
         />
         <motion.div
-          className="absolute bottom-20 right-20 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl"
+          className="absolute bottom-20 right-20 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl"
           animate={{
             scale: [1.2, 1, 1.2],
             opacity: [0.4, 0.7, 0.4],
@@ -315,7 +315,7 @@ const Register = () => {
               transition={{ delay: 0.3 }}
             >
               Join{" "}
-              <span className="bg-gradient-to-r from-purple-400 to-teal-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
                 ELRA ERP
               </span>
             </motion.h1>
@@ -337,22 +337,22 @@ const Register = () => {
                   icon: <HiShieldCheck className="w-6 h-6" />,
                   title: "Secure Registration",
                   description: "Bank-level encryption and data protection",
-                  color: "from-purple-500/20 to-purple-600/20",
-                  iconColor: "text-purple-400",
+                  color: "from-green-500/20 to-green-600/20",
+                  iconColor: "text-green-400",
                 },
                 {
                   icon: <HiSparkles className="w-6 h-6" />,
                   title: "Instant Access",
                   description: "Get started immediately after verification",
-                  color: "from-teal-500/20 to-teal-600/20",
-                  iconColor: "text-teal-400",
+                  color: "from-emerald-500/20 to-emerald-600/20",
+                  iconColor: "text-emerald-400",
                 },
                 {
                   icon: <HiOfficeBuilding className="w-6 h-6" />,
                   title: "Full ERP Access",
                   description: "All modules and features included",
-                  color: "from-purple-500/20 to-teal-500/20",
-                  iconColor: "text-purple-400",
+                  color: "from-green-500/20 to-emerald-500/20",
+                  iconColor: "text-green-400",
                 },
               ].map((feature, index) => (
                 <motion.div
@@ -438,7 +438,7 @@ const Register = () => {
                   </label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <HiUser className="h-5 w-5 text-white/50 group-focus-within:text-purple-400 transition-colors" />
+                      <HiUser className="h-5 w-5 text-white/50 group-focus-within:text-green-400 transition-colors" />
                     </div>
                     <input
                       type="text"
@@ -723,7 +723,7 @@ const Register = () => {
                 <motion.button
                   type="submit"
                   disabled={submitting}
-                  className="w-full bg-gradient-to-r from-purple-600 to-teal-600 hover:from-purple-700 hover:to-teal-700 text-white py-4 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-2"
+                  className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-4 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-green-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-2"
                   variants={fadeInVariants}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}

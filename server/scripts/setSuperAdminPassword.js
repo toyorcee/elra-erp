@@ -91,3 +91,4 @@ const setSuperAdminPassword = async () => {
 // Run the script
 setSuperAdminPassword();
 
+

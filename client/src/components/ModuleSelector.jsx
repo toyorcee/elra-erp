@@ -34,16 +34,36 @@ const allModules = [
     icon: "FaUsers",
     path: "/dashboard/hr",
     isReady: true,
-    color: "from-purple-500 to-purple-600",
-    bgColor: "bg-purple-50",
-    borderColor: "border-purple-200",
+    color: "from-green-500 to-green-600",
+    bgColor: "bg-green-50",
+    borderColor: "border-green-200",
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
     processFlow: {
-      dataEntry: ["Employee profiles", "Recruitment applications", "Performance reviews", "Training records"],
-      processing: ["Candidate screening", "Performance calculations", "Training scheduling", "Workflow automation"],
-      output: ["Employee reports", "Performance analytics", "Training certificates", "HR dashboards"],
-      approval: ["Hiring decisions", "Performance ratings", "Training approvals", "Policy changes"]
-    }
+      dataEntry: [
+        "Employee profiles",
+        "Recruitment applications",
+        "Performance reviews",
+        "Training records",
+      ],
+      processing: [
+        "Candidate screening",
+        "Performance calculations",
+        "Training scheduling",
+        "Workflow automation",
+      ],
+      output: [
+        "Employee reports",
+        "Performance analytics",
+        "Training certificates",
+        "HR dashboards",
+      ],
+      approval: [
+        "Hiring decisions",
+        "Performance ratings",
+        "Training approvals",
+        "Policy changes",
+      ],
+    },
   },
   {
     title: "Payroll Management",
@@ -51,16 +71,36 @@ const allModules = [
     icon: "FaMoneyCheckAlt",
     path: "/dashboard/payroll",
     isReady: true,
-    color: "from-teal-500 to-teal-600",
-    bgColor: "bg-teal-50",
-    borderColor: "border-teal-200",
+    color: "from-emerald-500 to-emerald-600",
+    bgColor: "bg-emerald-50",
+    borderColor: "border-emerald-200",
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
     processFlow: {
-      dataEntry: ["Time sheets", "Salary information", "Benefits data", "Deduction records"],
-      processing: ["Salary calculations", "Tax computations", "Benefit deductions", "Overtime calculations"],
-      output: ["Payroll reports", "Salary payments", "Tax filings", "Benefit statements"],
-      approval: ["Payroll approval", "Benefit changes", "Salary adjustments", "Tax submissions"]
-    }
+      dataEntry: [
+        "Time sheets",
+        "Salary information",
+        "Benefits data",
+        "Deduction records",
+      ],
+      processing: [
+        "Salary calculations",
+        "Tax computations",
+        "Benefit deductions",
+        "Overtime calculations",
+      ],
+      output: [
+        "Payroll reports",
+        "Salary payments",
+        "Tax filings",
+        "Benefit statements",
+      ],
+      approval: [
+        "Payroll approval",
+        "Benefit changes",
+        "Salary adjustments",
+        "Tax submissions",
+      ],
+    },
   },
   {
     title: "Procurement",
@@ -68,16 +108,36 @@ const allModules = [
     icon: "FaShoppingCart",
     path: "/dashboard/procurement",
     isReady: true,
-    color: "from-pink-500 to-pink-600",
-    bgColor: "bg-pink-50",
-    borderColor: "border-pink-200",
+    color: "from-green-600 to-emerald-600",
+    bgColor: "bg-green-50",
+    borderColor: "border-green-200",
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
     processFlow: {
-      dataEntry: ["Purchase requests", "Vendor information", "Inventory needs", "Contract terms"],
-      processing: ["Vendor evaluation", "Price comparisons", "Inventory tracking", "Order processing"],
-      output: ["Purchase orders", "Vendor reports", "Inventory reports", "Cost analysis"],
-      approval: ["Purchase approvals", "Vendor selection", "Contract approvals", "Payment authorizations"]
-    }
+      dataEntry: [
+        "Purchase requests",
+        "Vendor information",
+        "Inventory needs",
+        "Contract terms",
+      ],
+      processing: [
+        "Vendor evaluation",
+        "Price comparisons",
+        "Inventory tracking",
+        "Order processing",
+      ],
+      output: [
+        "Purchase orders",
+        "Vendor reports",
+        "Inventory reports",
+        "Cost analysis",
+      ],
+      approval: [
+        "Purchase approvals",
+        "Vendor selection",
+        "Contract approvals",
+        "Payment authorizations",
+      ],
+    },
   },
   {
     title: "Accounting",
@@ -85,16 +145,36 @@ const allModules = [
     icon: "FaChartLine",
     path: "/dashboard/accounts",
     isReady: true,
-    color: "from-blue-500 to-blue-600",
-    bgColor: "bg-blue-50",
-    borderColor: "border-blue-200",
+    color: "from-emerald-600 to-green-600",
+    bgColor: "bg-emerald-50",
+    borderColor: "border-emerald-200",
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
     processFlow: {
-      dataEntry: ["Financial transactions", "Expense records", "Revenue data", "Budget information"],
-      processing: ["Journal entries", "Account reconciliation", "Budget calculations", "Financial analysis"],
-      output: ["Financial statements", "Budget reports", "Cash flow analysis", "Audit trails"],
-      approval: ["Financial approvals", "Budget approvals", "Expense approvals", "Audit approvals"]
-    }
+      dataEntry: [
+        "Financial transactions",
+        "Expense records",
+        "Revenue data",
+        "Budget information",
+      ],
+      processing: [
+        "Journal entries",
+        "Account reconciliation",
+        "Budget calculations",
+        "Financial analysis",
+      ],
+      output: [
+        "Financial statements",
+        "Budget reports",
+        "Cash flow analysis",
+        "Audit trails",
+      ],
+      approval: [
+        "Financial approvals",
+        "Budget approvals",
+        "Expense approvals",
+        "Audit approvals",
+      ],
+    },
   },
   {
     title: "Communication",
@@ -102,16 +182,36 @@ const allModules = [
     icon: "FaComments",
     path: "/dashboard/communication",
     isReady: true,
-    color: "from-indigo-500 to-indigo-600",
-    bgColor: "bg-indigo-50",
-    borderColor: "border-indigo-200",
+    color: "from-green-500 to-emerald-500",
+    bgColor: "bg-green-50",
+    borderColor: "border-green-200",
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF", "VIEWER"],
     processFlow: {
-      dataEntry: ["Messages & announcements", "Meeting requests", "File uploads", "Collaboration data"],
-      processing: ["Message routing", "Notification generation", "File processing", "Thread management"],
-      output: ["Delivered messages", "Meeting schedules", "Shared files", "Communication logs"],
-      approval: ["Message approvals", "Announcement approvals", "File sharing permissions", "Meeting scheduling"]
-    }
+      dataEntry: [
+        "Messages & announcements",
+        "Meeting requests",
+        "File uploads",
+        "Collaboration data",
+      ],
+      processing: [
+        "Message routing",
+        "Notification generation",
+        "File processing",
+        "Thread management",
+      ],
+      output: [
+        "Delivered messages",
+        "Meeting schedules",
+        "Shared files",
+        "Communication logs",
+      ],
+      approval: [
+        "Message approvals",
+        "Announcement approvals",
+        "File sharing permissions",
+        "Meeting scheduling",
+      ],
+    },
   },
 ];
 
@@ -295,7 +395,7 @@ function ModuleSelector() {
 
   if (modules.length === 0) {
     return (
-      <div className="h-screen w-full bg-gradient-to-br from-purple-50 to-teal-50 flex flex-col items-center justify-center">
+      <div className="h-screen w-full bg-gradient-to-br from-green-50 to-emerald-50 flex flex-col items-center justify-center">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-800 mb-4">
             No Modules Available
@@ -305,7 +405,7 @@ function ModuleSelector() {
           </p>
           <button
             onClick={() => navigate("/dashboard")}
-            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
           >
             Back to Dashboard
           </button>
@@ -315,7 +415,7 @@ function ModuleSelector() {
   }
 
   return (
-    <div className="h-screen w-full bg-gradient-to-br from-purple-50 via-white to-teal-50 flex flex-col items-center justify-center overflow-hidden">
+    <div className="h-screen w-full bg-gradient-to-br from-green-50 via-white to-emerald-50 flex flex-col items-center justify-center overflow-hidden">
       {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold text-gray-800 mb-2">
@@ -334,7 +434,7 @@ function ModuleSelector() {
           onClick={() => navigateSlide(-1)}
           className="absolute left-4 z-30 p-4 rounded-full bg-white shadow-lg hover:shadow-xl transition-shadow border border-gray-200"
         >
-          <ChevronLeftIcon className="h-6 w-6 text-purple-600" />
+          <ChevronLeftIcon className="h-6 w-6 text-green-600" />
         </button>
 
         <div className="relative flex items-center justify-center w-full h-[500px] overflow-hidden">
@@ -368,7 +468,7 @@ function ModuleSelector() {
                     shadow-2xl rounded-3xl p-8 flex flex-col items-center 
                     justify-center border-2 cursor-pointer group
                     ${module.borderColor}
-                    ${offset === 0 ? "ring-4 ring-purple-300 shadow-3xl" : ""}
+                    ${offset === 0 ? "ring-4 ring-green-300 shadow-3xl" : ""}
                     hover:shadow-3xl transition-all duration-300`}
                   onClick={() => handleModuleClick(module)}
                 >
@@ -392,9 +492,9 @@ function ModuleSelector() {
 
                     {/* Animated Module Count Badge - Only for centered module */}
                     {offset === 0 && (
-                      <div className="absolute -top-2 -right-2 w-8 h-8 bg-white rounded-full border-2 border-purple-200 shadow-lg flex items-center justify-center">
+                      <div className="absolute -top-2 -right-2 w-8 h-8 bg-white rounded-full border-2 border-green-200 shadow-lg flex items-center justify-center">
                         <motion.span
-                          className="text-purple-600 font-bold text-sm"
+                          className="text-green-600 font-bold text-sm"
                           initial={{ scale: 0, rotate: -180 }}
                           animate={{ scale: 1, rotate: 0 }}
                           transition={{
@@ -424,7 +524,7 @@ function ModuleSelector() {
                         {module.permissions.map((permission, idx) => (
                           <span
                             key={idx}
-                            className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full"
+                            className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full"
                           >
                             {permission}
                           </span>
@@ -451,7 +551,7 @@ function ModuleSelector() {
           onClick={() => navigateSlide(1)}
           className="absolute right-4 z-30 p-4 rounded-full bg-white shadow-lg hover:shadow-xl transition-shadow border border-gray-200"
         >
-          <ChevronRightIcon className="h-6 w-6 text-purple-600" />
+          <ChevronRightIcon className="h-6 w-6 text-green-600" />
         </button>
       </div>
 
@@ -463,8 +563,8 @@ function ModuleSelector() {
             onClick={() => setCurrentIndex(index)}
             className={`w-4 h-4 rounded-full transition-all duration-300 border-2 ${
               index === currentIndex
-                ? "bg-purple-600 border-purple-600 scale-110 shadow-lg"
-                : "bg-white border-gray-300 hover:border-purple-400 hover:scale-105"
+                ? "bg-green-600 border-green-600 scale-110 shadow-lg"
+                : "bg-white border-gray-300 hover:border-green-400 hover:scale-105"
             }`}
           />
         ))}
@@ -472,7 +572,7 @@ function ModuleSelector() {
 
       {/* Footer */}
       <footer className="absolute bottom-8 text-center w-full">
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mx-8 shadow-lg border border-purple-100">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mx-8 shadow-lg border border-green-100">
           <div className="flex items-center justify-center mb-2">
             <ELRALogo variant="dark" size="sm" />
           </div>
@@ -500,7 +600,7 @@ function ModuleSelector() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.8, opacity: 0, y: 20 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-purple-100"
+              className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-green-100"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Close Button */}
@@ -513,7 +613,7 @@ function ModuleSelector() {
 
               {/* Modal Content */}
               <div className="text-center">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-purple-500 to-teal-500 flex items-center justify-center">
+                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
                   <div className="text-white text-3xl">
                     {selectedModule?.icon}
                   </div>
@@ -530,7 +630,7 @@ function ModuleSelector() {
                 <div className="space-y-4">
                   <button
                     onClick={handleLogin}
-                    className="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-teal-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-teal-700 transform hover:scale-105 transition-all duration-200 shadow-lg"
+                    className="w-full py-4 px-6 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-xl hover:from-green-700 hover:to-emerald-700 transform hover:scale-105 transition-all duration-200 shadow-lg"
                   >
                     <div className="flex items-center justify-center space-x-2">
                       <FaSignInAlt className="h-5 w-5" />
@@ -540,7 +640,7 @@ function ModuleSelector() {
 
                   <button
                     onClick={handleExploreMore}
-                    className="w-full py-4 px-6 bg-white border-2 border-purple-200 text-purple-700 font-semibold rounded-xl hover:bg-purple-50 hover:border-purple-300 transform hover:scale-105 transition-all duration-200"
+                    className="w-full py-4 px-6 bg-white border-2 border-green-200 text-green-700 font-semibold rounded-xl hover:bg-green-50 hover:border-green-300 transform hover:scale-105 transition-all duration-200"
                   >
                     <div className="flex items-center justify-center space-x-2">
                       <FaCompass className="h-5 w-5" />

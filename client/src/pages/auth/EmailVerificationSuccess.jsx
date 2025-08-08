@@ -12,7 +12,7 @@ import {
   HiUser,
 } from "react-icons/hi";
 import { authAPI } from "../../services/api";
-import EDMSLogo from "../../components/EDMSLogo";
+import ELRALogo from "../../components/ELRALogo";
 import { GradientSpinner } from "../../components/common";
 
 const EmailVerificationSuccess = () => {
@@ -268,7 +268,7 @@ const EmailVerificationSuccess = () => {
           transition={{ delay: 1.1 }}
           className="mt-6"
         >
-          <EDMSLogo variant="light" className="h-6" />
+          <ELRALogo variant="light" size="sm" />
         </motion.div>
       </div>
     </div>

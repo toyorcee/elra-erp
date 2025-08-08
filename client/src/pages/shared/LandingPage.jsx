@@ -2,26 +2,22 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  HiDocumentText,
   HiUsers,
-  HiUser,
-  HiUserGroup,
   HiShieldCheck,
-  HiCog,
   HiTrendingUp,
   HiGlobe,
-  HiLightningBolt,
   HiCheckCircle,
   HiArrowRight,
   HiMenu,
   HiX,
-  HiBell,
   HiChat,
   HiStar,
-  HiSparkles,
-  HiInformationCircle,
+  HiCurrencyDollar,
+  HiShoppingCart,
+  HiOfficeBuilding,
+  HiChartBar,
 } from "react-icons/hi";
-import EDMSLogo from "../../components/EDMSLogo";
+import ELRALogo from "../../components/ELRALogo";
 import { useAuth } from "../../context/AuthContext";
 
 const LandingPage = () => {
@@ -29,7 +25,6 @@ const LandingPage = () => {
   const { isAuthenticated } = useAuth();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Scroll to top on component mount
@@ -38,54 +33,59 @@ const LandingPage = () => {
   }, []);
 
   const [animatedStats, setAnimatedStats] = useState({
-    documents: 0,
-    users: 0,
     companies: 0,
+    users: 0,
+    modules: 0,
     uptime: 0,
   });
 
+  // Background images for hero carousel
+  const heroImages = [
+    "/src/assets/hero1.jpg",
+    "/src/assets/hero2.jpg",
+    "/src/assets/Office1.jpg",
+    "/src/assets/Office2.jpg",
+    "/src/assets/Office3.jpg",
+    "/src/assets/cloud1.jpg",
+    "/src/assets/cloud2.jpg",
+  ];
+
   const heroContent = [
     {
-      word: "Document Workflows",
+      word: "Human Resources",
       description:
-        "Transform paper chaos into digital clarity. Organize, search, and access millions of documents instantly with AI-powered categorization and enterprise-grade security.",
-      image: "/src/assets/ElectronicDocument1.jpg",
+        "Streamline employee management, recruitment, onboarding, and performance tracking with intelligent HR workflows and automated processes.",
+      icon: HiUsers,
     },
     {
-      word: "Approval Systems",
+      word: "Payroll",
       description:
-        "Intelligent approval workflows with real-time routing and notifications. Parallel processing, automated escalation, and zero bottlenecks keep decisions flowing smoothly.",
-      image: "/src/assets/Office1.jpg",
+        "Automated salary processing, benefits management, and payroll reporting with tax calculations and payment tracking.",
+      icon: HiCurrencyDollar,
     },
     {
-      word: "Team Collaboration",
+      word: "Procurement",
       description:
-        "Securely powered instant communication within document contexts. Chat, collaborate, and make decisions faster with seamless team messaging integration.",
-      image: "/src/assets/Office2.jpg",
+        "End-to-end procurement management from purchase requisitions to vendor management and inventory tracking.",
+      icon: HiShoppingCart,
     },
     {
-      word: "Smart Automation",
+      word: "Accounting",
       description:
-        "Never miss critical updates with intelligent email and in-app alerts. Customizable notifications for approvals, deadlines, messages, and document changes.",
-      image: "/src/assets/Office3.jpg",
+        "Complete financial management with expense tracking, revenue management, and comprehensive financial reporting.",
+      icon: HiChartBar,
     },
     {
-      word: "Enterprise Security",
+      word: "Communication",
       description:
-        "Military-grade protection for your most sensitive data. Zero-trust architecture, end-to-end encryption, and comprehensive audit trails you can trust.",
-      image: "/src/assets/Encryption1.jpg",
-    },
-    {
-      word: "Cloud Platform",
-      description:
-        "Access your documents anywhere, anytime. Global CDN, 99.9% uptime, and seamless synchronization across all your devices and locations.",
-      image: "/src/assets/cloud1.jpg",
+        "Internal messaging, announcements, and collaboration tools to keep your team connected and informed.",
+      icon: HiChat,
     },
     {
       word: "Business Intelligence",
       description:
-        "Lead your industry into the future. Replace legacy processes with intelligent workflows that scale with your ambitions and adapt to your growth.",
-      image: "/src/assets/hero1.jpg",
+        "Advanced analytics and reporting to drive data-driven decisions and optimize your business operations.",
+      icon: HiTrendingUp,
     },
   ];
 
@@ -114,9 +114,9 @@ const LandingPage = () => {
     if (!statsVisible) return;
 
     const targets = {
-      documents: 50000,
-      users: 2500,
-      companies: 150,
+      companies: 500,
+      users: 10000,
+      modules: 10,
       uptime: 99.9,
     };
     const duration = 2500;
@@ -126,29 +126,29 @@ const LandingPage = () => {
     const timer = setInterval(() => {
       setAnimatedStats((prev) => {
         const newStats = {
-          documents: Math.min(
-            prev.documents + Math.ceil(targets.documents / steps),
-            targets.documents
+          companies: Math.min(
+            prev.companies + Math.ceil(targets.companies / steps),
+            targets.companies
           ),
           users: Math.min(
             prev.users + Math.ceil(targets.users / steps),
             targets.users
           ),
-          companies: Math.min(
-            prev.companies + Math.ceil(targets.companies / steps),
-            targets.companies
+          modules: Math.min(
+            prev.modules + Math.ceil(targets.modules / steps),
+            targets.modules
           ),
           uptime: Math.min(
-            prev.uptime + targets.uptime / steps,
+            Math.round((prev.uptime + targets.uptime / steps) * 10) / 10,
             targets.uptime
           ),
         };
 
         // Stop animation when all targets are reached
         if (
-          newStats.documents >= targets.documents &&
-          newStats.users >= targets.users &&
           newStats.companies >= targets.companies &&
+          newStats.users >= targets.users &&
+          newStats.modules >= targets.modules &&
           newStats.uptime >= targets.uptime
         ) {
           clearInterval(timer);
@@ -168,78 +168,72 @@ const LandingPage = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Synchronized background image and word carousel
+  const [currentBgImage, setCurrentBgImage] = useState(0);
   useEffect(() => {
     const timer = setInterval(() => {
+      setCurrentBgImage((prev) => (prev + 1) % heroImages.length);
       setCurrentWordIndex((prev) => (prev + 1) % heroContent.length);
-      setCurrentImageIndex((prev) => (prev + 1) % heroContent.length);
-    }, 4000); // Increased to 4 seconds for better readability
+    }, 5000);
     return () => clearInterval(timer);
-  }, [heroContent.length]);
+  }, [heroImages.length, heroContent.length]);
 
   const features = [
     {
-      icon: HiDocumentText,
-      title: "Intelligent Document Hub",
-      description:
-        "AI-powered categorization, OCR text extraction, and lightning-fast search across all your business documents.",
-      gradient: "from-blue-500 to-cyan-500",
-      backgroundImage: "/src/assets/ElectronicDocument2.jpg",
-    },
-    {
       icon: HiUsers,
-      title: "Enterprise Multi-Tenancy",
+      title: "Human Resources",
       description:
-        "Scale across departments and subsidiaries with isolated workspaces and customizable organizational structures.",
-      gradient: "from-cyan-500 to-purple-500",
-      backgroundImage: "/src/assets/Office2.jpg",
+        "Complete HR management with recruitment, onboarding, performance tracking, and employee self-service portal.",
+      gradient: "from-purple-500 to-teal-500",
     },
     {
-      icon: HiShieldCheck,
-      title: "Zero-Trust Security",
+      icon: HiCurrencyDollar,
+      title: "Payroll & Benefits",
       description:
-        "Military-grade encryption, granular permissions, and comprehensive audit trails for complete document security.",
+        "Automated payroll processing, benefits administration, tax calculations, and comprehensive reporting.",
+      gradient: "from-teal-500 to-purple-500",
+    },
+    {
+      icon: HiShoppingCart,
+      title: "Procurement",
+      description:
+        "End-to-end procurement management from requisitions to vendor management and inventory tracking.",
       gradient: "from-purple-500 to-blue-500",
-      backgroundImage: "/src/assets/Encryption2.jpg",
     },
     {
-      icon: HiCog,
-      title: "Seamless Approval Workflows",
+      icon: HiChartBar,
+      title: "Accounting",
       description:
-        "Intelligent approval routing with real-time email and in-app notifications. Automated escalation, parallel approvals, and conditional logic ensure documents never get stuck in bottlenecks.",
-      gradient: "from-green-500 to-blue-500",
-      backgroundImage: "/src/assets/Office3.jpg",
+        "Complete financial management with expense tracking, revenue management, and financial reporting.",
+      gradient: "from-blue-500 to-purple-500",
+    },
+    {
+      icon: HiChat,
+      title: "Communication",
+      description:
+        "Internal messaging, announcements, and collaboration tools to keep your team connected and informed.",
+      gradient: "from-purple-500 to-pink-500",
     },
     {
       icon: HiTrendingUp,
       title: "Business Intelligence",
       description:
-        "Real-time dashboards, usage analytics, and performance metrics to optimize your document processes.",
-      gradient: "from-blue-500 to-purple-500",
-      backgroundImage: "/src/assets/graphs1.jpg",
-    },
-    {
-      icon: HiBell,
-      title: "Smart Notifications Hub",
-      description:
-        "Never miss critical updates with intelligent email and in-app notifications. Customizable alerts for approvals, deadlines, document changes, and system events keep your team synchronized.",
-      gradient: "from-orange-500 to-red-500",
-      backgroundImage: "/src/assets/Office1.jpg",
-    },
-    {
-      icon: HiChat,
-      title: "Real-Time Messaging",
-      description:
-        "Seamless team communication with instant messaging, document discussions, and Socket.IO-powered real-time collaboration. Chat directly within document contexts for faster decision-making.",
+        "Advanced analytics and reporting to drive data-driven decisions and optimize your business operations.",
       gradient: "from-pink-500 to-purple-500",
-      backgroundImage: "/src/assets/Office2.jpg",
+    },
+    {
+      icon: HiShieldCheck,
+      title: "Security & Compliance",
+      description:
+        "Enterprise-grade security with role-based access control, audit trails, and compliance management.",
+      gradient: "from-purple-500 to-green-500",
     },
     {
       icon: HiGlobe,
       title: "Cloud-Native Platform",
       description:
         "99.9% uptime, global CDN, and seamless mobile access for your distributed workforce.",
-      gradient: "from-cyan-500 to-green-500",
-      backgroundImage: "/src/assets/cloud2.jpg",
+      gradient: "from-green-500 to-purple-500",
     },
   ];
 
@@ -249,7 +243,7 @@ const LandingPage = () => {
       role: "VP of Operations",
       company: "Metropolitan Healthcare Group",
       content:
-        "Before EDMS, our patient records were scattered across different systems. Now we've cut document retrieval time from 15 minutes to under 30 seconds. Our compliance team loves the automated audit trails - it's saved us countless hours during regulatory reviews.",
+        "Before ELRA, our HR processes were scattered across different systems. Now we've streamlined employee management and cut onboarding time by 60%. Our compliance team loves the automated audit trails.",
       avatar: "/src/assets/blackwoman1.jpg",
     },
     {
@@ -257,15 +251,15 @@ const LandingPage = () => {
       role: "Chief Technology Officer",
       company: "Riverside Manufacturing",
       content:
-        "We were drowning in paper processes across our 12 facilities. EDMS gave us a unified digital workspace that scales beautifully. The workflow automation alone has eliminated 3 full-time positions worth of manual document routing. ROI was evident within 6 months.",
+        "We were drowning in manual processes across our 12 facilities. ELRA gave us a unified ERP platform that scales beautifully. The workflow automation alone has eliminated 3 full-time positions worth of manual work.",
       avatar: "/src/assets/whitemansmiling.jpg",
     },
     {
       name: "Angela Martinez",
-      role: "Director of Legal Affairs",
+      role: "Director of Finance",
       company: "Summit Financial Services",
       content:
-        "In financial services, document security isn't optional - it's everything. EDMS's zero-trust architecture and granular permissions give me peace of mind. When auditors ask for specific documents from 2019, I can pull them up in seconds instead of days.",
+        "In financial services, data security isn't optional - it's everything. ELRA's enterprise-grade security and granular permissions give me peace of mind. When auditors ask for specific reports, I can generate them instantly.",
       avatar: "/src/assets/smilingwhitewoman.jpg",
     },
     {
@@ -273,7 +267,7 @@ const LandingPage = () => {
       role: "Senior Project Manager",
       company: "Urban Development Corporation",
       content:
-        "Managing construction documents across multiple sites was a nightmare. EDMS transformed our project delivery - architects, contractors, and city officials now collaborate seamlessly. We've reduced project delays by 35% just from better document coordination.",
+        "Managing procurement across multiple sites was a nightmare. ELRA transformed our operations - vendors, contractors, and stakeholders now collaborate seamlessly. We've reduced project delays by 35%.",
       avatar: "/src/assets/blackmale1.jpg",
     },
     {
@@ -281,94 +275,124 @@ const LandingPage = () => {
       role: "Research Director",
       company: "BioTech Innovations Lab",
       content:
-        "Research data integrity is critical in our field. EDMS's version control and collaboration features have revolutionized how our global team shares findings. The AI-powered search finds relevant research papers in our 50TB database instantly - it's like having a research assistant.",
+        "Data integrity is critical in our field. ELRA's integrated approach has revolutionized how our global team manages research data. The analytics features help us make data-driven decisions faster than ever.",
       avatar: "/src/assets/blackwoman2.jpg",
     },
     {
       name: "Robert Anderson",
       role: "Executive Vice President",
-      company: "Anderson & Associates Law Firm",
+      company: "Anderson & Associates",
       content:
-        "After 25 years in legal practice, I thought I'd seen every document management system. EDMS is different - it actually understands how lawyers work. Case file organization, client confidentiality, and billable hour tracking are seamlessly integrated. Our junior associates are 40% more efficient.",
+        "After 25 years in business, I thought I'd seen every ERP system. ELRA is different - it actually understands how modern businesses work. Our team is 40% more efficient with the integrated workflows.",
       avatar: "/src/assets/ceo.jpg",
     },
   ];
 
   const benefits = [
-    "Seamless approval workflows with intelligent routing",
-    "Real-time messaging and Socket.IO-powered collaboration",
-    "Instant email and in-app notifications for all stakeholders",
-    "Document-context chat for faster decision-making",
-    "Automated escalation and parallel approval processes",
-    "Reduce document search time by 90% with AI-powered search",
-    "Meet SOX, GDPR, and industry compliance requirements",
-    "Enterprise-grade 99.9% uptime with global redundancy",
-    "Smart notification preferences and customizable alerts",
-    "Zero bottlenecks with conditional workflow logic",
+    "Integrated ERP modules for seamless business operations",
+    "Real-time analytics and business intelligence",
+    "Enterprise-grade security and compliance",
+    "Cloud-native platform with 99.9% uptime",
+    "Mobile-first design for remote work",
+    "Customizable workflows and automation",
+    "Multi-tenant architecture for scalability",
+    "24/7 customer support and training",
   ];
 
+  const handleGetStarted = () => {
+    navigate("/modules");
+  };
+
+  const handleSignIn = () => {
+    navigate("/login");
+  };
+
   return (
-    <div className="min-h-screen bg-slate-900 text-white overflow-x-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-teal-900 overflow-hidden">
+      {/* Animated Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <motion.div
+          className="absolute top-20 left-20 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl"
+          animate={{
+            x: [0, 100, 0],
+            y: [0, -50, 0],
+          }}
+          transition={{
+            duration: 20,
+            repeat: Infinity,
+            ease: "linear",
+          }}
+        />
+        <motion.div
+          className="absolute top-40 right-20 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl"
+          animate={{
+            x: [0, -80, 0],
+            y: [0, 60, 0],
+          }}
+          transition={{
+            duration: 25,
+            repeat: Infinity,
+            ease: "linear",
+          }}
+        />
+        <motion.div
+          className="absolute bottom-20 left-1/3 w-64 h-64 bg-purple-400/10 rounded-full blur-3xl"
+          animate={{
+            x: [0, 60, 0],
+            y: [0, -40, 0],
+          }}
+          transition={{
+            duration: 18,
+            repeat: Infinity,
+            ease: "linear",
+          }}
+        />
+      </div>
+
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-slate-900/95 backdrop-blur-xl border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <EDMSLogo />
-            </div>
+      <nav className="relative z-10 px-6 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <ELRALogo variant="light" size="md" />
 
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-8">
-              <a
-                href="#features"
-                className="text-white/80 hover:text-white transition-colors duration-300 font-medium relative group"
-              >
-                Features
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
-              </a>
-
-              <a
-                href="#benefits"
-                className="text-white/80 hover:text-white transition-colors duration-300 font-medium relative group"
-              >
-                Benefits
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
-              </a>
-              <a
-                href="#testimonials"
-                className="text-white/80 hover:text-white transition-colors duration-300 font-medium relative group"
-              >
-                Testimonials
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 group-hover:w-full transition-all duration-300"></span>
-              </a>
-              <Link
-                to="/login"
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-2 rounded-full font-semibold transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/25"
-              >
-                Sign In
-              </Link>
-            </div>
-
-            {/* Mobile Hamburger Button */}
-            <div className="md:hidden">
-              <motion.button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="text-white p-2 rounded-lg hover:bg-white/10 transition-colors duration-300"
-                whileTap={{ scale: 0.95 }}
-              >
-                <motion.div
-                  animate={{ rotate: mobileMenuOpen ? 90 : 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  {mobileMenuOpen ? (
-                    <HiX className="w-6 h-6" />
-                  ) : (
-                    <HiMenu className="w-6 h-6" />
-                  )}
-                </motion.div>
-              </motion.button>
-            </div>
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-8">
+            <Link
+              to="#features"
+              className="text-white/80 hover:text-white transition-colors font-medium"
+            >
+              Features
+            </Link>
+            <Link
+              to="#benefits"
+              className="text-white/80 hover:text-white transition-colors font-medium"
+            >
+              Benefits
+            </Link>
+            <Link
+              to="#testimonials"
+              className="text-white/80 hover:text-white transition-colors font-medium"
+            >
+              Testimonials
+            </Link>
+            <button
+              onClick={handleSignIn}
+              className="bg-white/10 backdrop-blur-sm border border-white/20 text-white px-6 py-2 rounded-full hover:bg-white/20 transition-all duration-300 font-medium"
+            >
+              Sign In
+            </button>
           </div>
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden text-white p-2"
+          >
+            {mobileMenuOpen ? (
+              <HiX className="w-6 h-6" />
+            ) : (
+              <HiMenu className="w-6 h-6" />
+            )}
+          </button>
         </div>
 
         {/* Mobile Menu */}
@@ -378,89 +402,39 @@ const LandingPage = () => {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.3, ease: "easeInOut" }}
-              className="md:hidden bg-slate-900/98 backdrop-blur-xl border-t border-white/10 overflow-hidden"
+              className="md:hidden bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg mt-4 overflow-hidden"
             >
-              <div className="px-4 py-6 space-y-4">
-                {/* Mobile Navigation Links */}
-                <motion.a
-                  href="#features"
+              <div className="px-4 py-4 space-y-4">
+                <Link
+                  to="#features"
+                  className="block text-white/80 hover:text-white transition-colors font-medium"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block text-white/80 hover:text-white font-medium py-3 px-4 rounded-lg hover:bg-white/5 transition-all duration-300"
-                  initial={{ x: -20, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ delay: 0.1 }}
                 >
                   Features
-                </motion.a>
-
-                <motion.a
-                  href="#benefits"
+                </Link>
+                <Link
+                  to="#benefits"
+                  className="block text-white/80 hover:text-white transition-colors font-medium"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block text-white/80 hover:text-white font-medium py-3 px-4 rounded-lg hover:bg-white/5 transition-all duration-300"
-                  initial={{ x: -20, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ delay: 0.3 }}
                 >
                   Benefits
-                </motion.a>
-                <motion.a
-                  href="#testimonials"
+                </Link>
+                <Link
+                  to="#testimonials"
+                  className="block text-white/80 hover:text-white transition-colors font-medium"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block text-white/80 hover:text-white font-medium py-3 px-4 rounded-lg hover:bg-white/5 transition-all duration-300"
-                  initial={{ x: -20, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ delay: 0.4 }}
                 >
                   Testimonials
-                </motion.a>
-
-                {/* Mobile Action Buttons */}
-                <div className="pt-4 space-y-3 border-t border-white/10">
-                  <motion.div
-                    initial={{ x: -20, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    transition={{ delay: 0.4 }}
-                  >
-                    <button
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        navigate("/welcome");
-                      }}
-                      className="block w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-center py-3 px-6 rounded-full font-semibold transition-all duration-300 transform hover:scale-105"
-                    >
-                      Get Started
-                    </button>
-                  </motion.div>
-                  <motion.div
-                    initial={{ x: -20, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    transition={{ delay: 0.5 }}
-                  >
-                    <button
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        navigate("/login");
-                      }}
-                      className="block w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-center py-3 px-6 rounded-full font-semibold transition-all duration-300 transform hover:scale-105"
-                    >
-                      Sign In
-                    </button>
-                  </motion.div>
-                  <motion.div
-                    initial={{ x: -20, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    transition={{ delay: 0.6 }}
-                  >
-                    <Link
-                      to="/login"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="block w-full bg-transparent border-2 border-white/20 hover:border-white/40 hover:bg-white/10 text-white text-center py-3 px-6 rounded-full font-semibold transition-all duration-300"
-                    >
-                      Sign In
-                    </Link>
-                  </motion.div>
-                </div>
+                </Link>
+                <button
+                  onClick={() => {
+                    handleSignIn();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full bg-white/10 border border-white/20 text-white px-6 py-2 rounded-full hover:bg-white/20 transition-all duration-300 font-medium"
+                >
+                  Sign In
+                </button>
               </div>
             </motion.div>
           )}
@@ -468,401 +442,224 @@ const LandingPage = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center overflow-hidden">
-        {/* Background Image Slider */}
-        <div className="fixed inset-0">
-          {heroContent.map((content, index) => (
-            <div
-              key={index}
-              className={`absolute inset-0 transition-opacity duration-1000 ${
-                index === currentImageIndex ? "opacity-100" : "opacity-0"
-              }`}
-              style={{
-                backgroundImage: `url(${content.image})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-                backgroundRepeat: "no-repeat",
-              }}
-            />
-          ))}
-          {/* Dark overlay for text clarity */}
-          <div className="absolute inset-0 bg-slate-900/70"></div>
-          {/* Gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/80 via-slate-900/40 to-transparent"></div>
+      <section className="relative z-10 px-6 py-20 overflow-hidden">
+        {/* Background Image Carousel */}
+        <div className="absolute inset-0 z-0">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentBgImage}
+              initial={{ opacity: 0, scale: 1.1 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 1.5, ease: "easeInOut" }}
+              className="absolute inset-0"
+            >
+              <img
+                src={heroImages[currentBgImage]}
+                alt="ELRA ERP Background"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-900/80 via-purple-800/70 to-teal-900/80"></div>
+            </motion.div>
+          </AnimatePresence>
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              className="text-center lg:text-left"
-            >
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-6">
-                Revolutionize Your
-                <div className="h-16 sm:h-20 overflow-hidden mt-2">
-                  <motion.span
-                    key={currentWordIndex}
-                    initial={{ y: 100, opacity: 0, scale: 0.8 }}
-                    animate={{ y: 0, opacity: 1, scale: 1 }}
-                    exit={{ y: -100, opacity: 0, scale: 0.8 }}
-                    transition={{ duration: 0.8, ease: "easeOut" }}
-                    className="block bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent"
-                  >
-                    {heroContent[currentWordIndex]?.word}
-                  </motion.span>
-                </div>
-              </h1>
-              <motion.p
-                key={`desc-${currentWordIndex}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="text-lg sm:text-xl text-white/90 mb-8 leading-relaxed max-w-2xl"
+        <div className="relative z-10 max-w-7xl mx-auto text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="mb-8"
+          >
+            <h1 className="text-5xl md:text-7xl font-bold text-white mb-6">
+              ELRA{" "}
+              <span className="bg-gradient-to-r from-purple-400 to-teal-400 bg-clip-text text-transparent">
+                ERP System
+              </span>
+            </h1>
+
+            {/* Static Subtext */}
+            <p className="text-lg md:text-xl text-white/90 mb-3 font-medium">
+              Explore Seamless
+            </p>
+
+            {/* Animated Changing Module Headers */}
+            <div className="h-16 md:h-20 mb-2 flex items-center justify-center">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentWordIndex}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 1.5, ease: "easeInOut" }}
+                  className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-purple-400 to-teal-400 bg-clip-text text-transparent"
+                >
+                  {heroContent[currentWordIndex].word}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Static Management Text */}
+            <p className="text-lg md:text-xl text-white/90 mb-6 font-medium">
+              Management
+            </p>
+
+            <p className="text-xl md:text-2xl text-white/90 max-w-3xl mx-auto leading-relaxed">
+              Transform your business with our comprehensive Enterprise Resource
+              Planning solution. Manage HR, payroll, procurement, accounting,
+              and communication in one unified platform.
+            </p>
+          </motion.div>
+
+          {/* Animated Feature Cards */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto mb-12"
+          >
+            {heroContent.slice(0, 4).map((content, index) => (
+              <motion.div
+                key={index}
+                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 text-center"
+                whileHover={{ scale: 1.05, y: -5 }}
+                transition={{ duration: 0.3 }}
               >
-                {heroContent[currentWordIndex]?.description}
-              </motion.p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                <button
-                  onClick={() => navigate("/welcome")}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4 rounded-full font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-500/25 flex items-center justify-center"
-                >
-                  <span>Get Started</span>
-                  <HiArrowRight className="ml-2" />
-                </button>
-                <button
-                  onClick={() => navigate("/login")}
-                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-4 rounded-full font-semibold transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl hover:shadow-green-500/25 flex items-center justify-center"
-                >
-                  <HiStar className="mr-2" />
-                  Sign In
-                </button>
-              </div>
-            </motion.div>
+                <content.icon className="w-8 h-8 text-purple-300 mx-auto mb-2" />
+                <p className="text-white/90 text-sm font-medium">
+                  {content.word}
+                </p>
+              </motion.div>
+            ))}
+          </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="relative h-96 lg:h-[500px] hidden lg:block"
+          {/* CTA Buttons */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
+            className="flex flex-col sm:flex-row gap-4 justify-center items-center"
+          >
+            <button
+              onClick={handleGetStarted}
+              className="bg-gradient-to-r from-purple-500 to-teal-500 text-white px-8 py-4 rounded-full font-semibold text-lg hover:from-purple-600 hover:to-teal-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center space-x-2"
             >
-              <div className="relative w-full h-full">
-                {/* Top Row */}
-                <motion.div
-                  animate={{ y: [0, -20, 0] }}
-                  transition={{
-                    duration: 6,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                  className="absolute top-8 left-8 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 flex flex-col items-center space-y-3"
-                >
-                  <HiDocumentText className="text-3xl text-blue-400" />
-                  <span className="text-white font-semibold text-center">
-                    Smart Organization
-                  </span>
-                </motion.div>
-
-                <motion.div
-                  animate={{ y: [0, -15, 0] }}
-                  transition={{
-                    duration: 6,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                    delay: 2,
-                  }}
-                  className="absolute top-8 right-8 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 flex flex-col items-center space-y-3"
-                >
-                  <HiShieldCheck className="text-3xl text-green-400" />
-                  <span className="text-white font-semibold text-center">
-                    Secure Access
-                  </span>
-                </motion.div>
-
-                {/* Bottom Row */}
-                <motion.div
-                  animate={{ y: [0, -25, 0] }}
-                  transition={{
-                    duration: 6,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                    delay: 4,
-                  }}
-                  className="absolute bottom-8 left-8 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 flex flex-col items-center space-y-3"
-                >
-                  <HiUsers className="text-3xl text-purple-400" />
-                  <span className="text-white font-semibold text-center">
-                    Team Collaboration
-                  </span>
-                </motion.div>
-
-                <motion.div
-                  animate={{ y: [0, -30, 0] }}
-                  transition={{
-                    duration: 6,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                    delay: 6,
-                  }}
-                  className="absolute bottom-8 right-8 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 flex flex-col items-center space-y-3"
-                >
-                  <HiShieldCheck className="text-3xl text-green-400" />
-                  <span className="text-white font-semibold text-center">
-                    Secure Payments
-                  </span>
-                  <span className="text-green-400 text-xs text-center">
-                    PCI DSS Compliant
-                  </span>
-                </motion.div>
-              </div>
-            </motion.div>
-          </div>
+              <span>Get Started</span>
+              <HiArrowRight className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleSignIn}
+              className="bg-white/10 backdrop-blur-sm border border-white/20 text-white px-8 py-4 rounded-full font-semibold text-lg hover:bg-white/20 transition-all duration-300 flex items-center space-x-2"
+            >
+              <HiStar className="w-5 h-5" />
+              <span>Sign In</span>
+            </button>
+          </motion.div>
         </div>
       </section>
 
       {/* Stats Section */}
-      <section ref={statsRef} className="py-16 bg-white/5 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
-            {(() => {
-              const scaleAnimation = statsVisible ? [1, 1.1, 1] : 1;
-              const statsAnimation = statsVisible
-                ? { scale: scaleAnimation }
-                : {};
-
-              return (
-                <>
-                  <motion.div
-                    className="text-center"
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.1 }}
-                    viewport={{ once: true }}
-                  >
-                    <motion.div
-                      className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent mb-2"
-                      animate={statsAnimation}
-                      transition={{ duration: 0.3, delay: 0.5 }}
-                    >
-                      {animatedStats.documents.toLocaleString()}+
-                    </motion.div>
-                    <div className="text-white/70 font-medium text-sm uppercase tracking-wide">
-                      Documents Managed
-                    </div>
-                  </motion.div>
-                  <motion.div
-                    className="text-center"
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.2 }}
-                    viewport={{ once: true }}
-                  >
-                    <motion.div
-                      className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent mb-2"
-                      animate={statsAnimation}
-                      transition={{ duration: 0.3, delay: 0.7 }}
-                    >
-                      {animatedStats.users.toLocaleString()}+
-                    </motion.div>
-                    <div className="text-white/70 font-medium text-sm uppercase tracking-wide">
-                      Active Users
-                    </div>
-                  </motion.div>
-                  <motion.div
-                    className="text-center"
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.3 }}
-                    viewport={{ once: true }}
-                  >
-                    <motion.div
-                      className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent mb-2"
-                      animate={statsAnimation}
-                      transition={{ duration: 0.3, delay: 0.9 }}
-                    >
-                      {animatedStats.companies}+
-                    </motion.div>
-                    <div className="text-white/70 font-medium text-sm uppercase tracking-wide">
-                      Companies Trust Us
-                    </div>
-                  </motion.div>
-                  <motion.div
-                    className="text-center"
-                    initial={{ opacity: 0, y: 30 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.4 }}
-                    viewport={{ once: true }}
-                  >
-                    <motion.div
-                      className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent mb-2"
-                      animate={statsAnimation}
-                      transition={{ duration: 0.3, delay: 1.1 }}
-                    >
-                      {animatedStats.uptime.toFixed(1)}%
-                    </motion.div>
-                    <div className="text-white/70 font-medium text-sm uppercase tracking-wide">
-                      Uptime Guarantee
-                    </div>
-                  </motion.div>
-                </>
-              );
-            })()}
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works Section */}
-      <section
-        id="how-it-works"
-        className="py-24 bg-gradient-to-b from-slate-800/30 to-slate-900/50 relative"
-      >
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-50">
-          <div
-            className="w-full h-full"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-              backgroundSize: "60px 60px",
-            }}
-          ></div>
-        </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section ref={statsRef} className="relative z-10 px-6 py-16">
+        <div className="max-w-6xl mx-auto">
           <motion.div
-            className="text-center mb-20"
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.8 }}
             viewport={{ once: true }}
+            className="grid grid-cols-2 md:grid-cols-4 gap-8"
           >
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-500/20 rounded-2xl mb-6">
-              <HiSparkles className="w-8 h-8 text-blue-400" />
+            <div className="text-center">
+              <motion.div
+                className="text-4xl md:text-5xl font-bold text-white mb-2"
+                initial={{ scale: 0 }}
+                animate={statsVisible ? { scale: 1 } : { scale: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+              >
+                {animatedStats.companies.toLocaleString()}+
+              </motion.div>
+              <p className="text-white/70">Companies</p>
             </div>
-            <h2 className="text-4xl sm:text-5xl font-bold text-white mb-6">
-              How It Works
-            </h2>
-            <p className="text-xl text-white/70 max-w-3xl mx-auto leading-relaxed">
-              Get started in minutes with our intelligent setup process designed
-              for modern organizations
-            </p>
+            <div className="text-center">
+              <motion.div
+                className="text-4xl md:text-5xl font-bold text-white mb-2"
+                initial={{ scale: 0 }}
+                animate={statsVisible ? { scale: 1 } : { scale: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+              >
+                {animatedStats.users.toLocaleString()}+
+              </motion.div>
+              <p className="text-white/70">Users</p>
+            </div>
+            <div className="text-center">
+              <motion.div
+                className="text-4xl md:text-5xl font-bold text-white mb-2"
+                initial={{ scale: 0 }}
+                animate={statsVisible ? { scale: 1 } : { scale: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+              >
+                {animatedStats.modules}
+              </motion.div>
+              <p className="text-white/70">Modules</p>
+            </div>
+            <div className="text-center">
+              <motion.div
+                className="text-4xl md:text-5xl font-bold text-white mb-2"
+                initial={{ scale: 0 }}
+                animate={statsVisible ? { scale: 1 } : { scale: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+              >
+                {animatedStats.uptime}%
+              </motion.div>
+              <p className="text-white/70">Uptime</p>
+            </div>
           </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
-            <motion.div
-              className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-8 text-center"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              viewport={{ once: true }}
-            >
-              <div className="w-16 h-16 bg-blue-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <HiUser className="w-8 h-8 text-blue-400" />
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-4">
-                1. Register & Setup
-              </h3>
-              <p className="text-white/70">
-                Register as the first superadmin and choose your industry
-                template or create custom workflows
-              </p>
-            </motion.div>
-
-            <motion.div
-              className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-8 text-center"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              viewport={{ once: true }}
-            >
-              <div className="w-16 h-16 bg-green-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <HiUserGroup className="w-8 h-8 text-green-400" />
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-4">
-                2. Invite Team
-              </h3>
-              <p className="text-white/70">
-                Send invitation codes to your team members who can join with
-                secure access
-              </p>
-            </motion.div>
-
-            <motion.div
-              className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-8 text-center"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              viewport={{ once: true }}
-            >
-              <div className="w-16 h-16 bg-purple-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <HiDocumentText className="w-8 h-8 text-purple-400" />
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-4">
-                3. Start Working
-              </h3>
-              <p className="text-white/70">
-                Upload documents, create approval workflows, and collaborate
-                seamlessly
-              </p>
-            </motion.div>
-          </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section
-        id="features"
-        className="py-24 bg-gradient-to-b from-slate-900/50 to-slate-900 relative"
-      >
-        {/* Section Divider */}
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section id="features" className="relative z-10 px-6 py-20">
+        <div className="max-w-7xl mx-auto">
           <motion.div
-            className="text-center mb-16"
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.8 }}
             viewport={{ once: true }}
+            className="text-center mb-16"
           >
-            <h2 className="text-3xl lg:text-4xl font-bold mb-4">
-              Enterprise-Grade Document Management
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+              Complete{" "}
+              <span className="bg-gradient-to-r from-purple-400 to-teal-400 bg-clip-text text-transparent">
+                ERP Solution
+              </span>
             </h2>
-            <p className="text-lg lg:text-xl text-white/70 max-w-3xl mx-auto leading-relaxed">
-              Comprehensive features designed for organizations that demand
-              security, scalability, and efficiency
+            <p className="text-xl text-white/80 max-w-3xl mx-auto">
+              Everything you need to run your business efficiently in one
+              integrated platform
             </p>
           </motion.div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {features.map((feature, index) => (
               <motion.div
                 key={index}
-                className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 text-center hover:bg-white/8 hover:border-white/20 transition-all duration-300 hover:shadow-2xl hover:shadow-black/20 group overflow-hidden"
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: index * 0.1 }}
                 viewport={{ once: true }}
+                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 hover:bg-white/20 transition-all duration-300 group"
                 whileHover={{ y: -5 }}
               >
-                {/* Background Image */}
                 <div
-                  className="absolute inset-0 opacity-10 group-hover:opacity-20 transition-opacity duration-300"
-                  style={{
-                    backgroundImage: `url(${feature.backgroundImage})`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                  }}
-                />
-                <div className="relative z-10">
-                  <div
-                    className={`w-20 h-20 rounded-2xl bg-gradient-to-r ${feature.gradient} flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg`}
-                  >
-                    <feature.icon className="text-2xl text-white" />
-                  </div>
-                  <h3 className="text-xl font-bold mb-4">{feature.title}</h3>
-                  <p className="text-white/70 leading-relaxed">
-                    {feature.description}
-                  </p>
+                  className={`w-12 h-12 bg-gradient-to-r ${feature.gradient} rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}
+                >
+                  <feature.icon className="w-6 h-6 text-white" />
                 </div>
+                <h3 className="text-xl font-semibold text-white mb-3">
+                  {feature.title}
+                </h3>
+                <p className="text-white/70 leading-relaxed">
+                  {feature.description}
+                </p>
               </motion.div>
             ))}
           </div>
@@ -870,181 +667,115 @@ const LandingPage = () => {
       </section>
 
       {/* Benefits Section */}
-      <section
-        id="benefits"
-        className="relative py-24 bg-white/2 overflow-hidden"
-      >
-        {/* Background Image */}
-        <div
-          className="absolute inset-0 opacity-5"
-          style={{
-            backgroundImage: `url('/src/assets/Office4.jpg')`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-            <motion.div
-              initial={{ opacity: 0, x: -50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8 }}
-              viewport={{ once: true }}
-            >
-              <h2 className="text-3xl lg:text-4xl font-bold mb-6">
-                Why Industry Leaders Choose EDMS
-              </h2>
-              <p className="text-lg lg:text-xl text-white/70 mb-8 leading-relaxed">
-                Trusted by Fortune 500 companies and growing enterprises
-                worldwide to transform their document workflows
-              </p>
-              <div className="space-y-4">
-                {benefits.map((benefit, index) => (
-                  <motion.div
-                    key={index}
-                    className="flex items-center space-x-4 p-4 bg-white/5 backdrop-blur-sm rounded-xl hover:bg-white/8 transition-all duration-300 hover:translate-x-2 group border border-white/5"
-                    initial={{ opacity: 0, x: -30 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5, delay: index * 0.1 }}
-                    viewport={{ once: true }}
-                  >
-                    <HiCheckCircle className="text-2xl text-green-400 flex-shrink-0 group-hover:scale-110 transition-transform duration-300" />
-                    <span className="text-white font-medium">{benefit}</span>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, x: 50 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.8 }}
-              viewport={{ once: true }}
-              className="relative"
-            >
-              <div className="bg-white/10 backdrop-blur-xl rounded-2xl overflow-hidden shadow-2xl shadow-black/20 border border-white/10">
-                <div className="bg-white/10 px-6 py-4 flex items-center space-x-4">
-                  <div className="flex space-x-2">
-                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  </div>
-                  <span className="text-white/80 font-semibold">
-                    EDMS Dashboard
-                  </span>
+      <section id="benefits" className="relative z-10 px-6 py-20">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+              Why Choose{" "}
+              <span className="bg-gradient-to-r from-purple-400 to-teal-400 bg-clip-text text-transparent">
+                ELRA
+              </span>
+            </h2>
+            <p className="text-xl text-white/80 max-w-3xl mx-auto">
+              Experience the power of integrated business management
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {benefits.map((benefit, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, x: index % 2 === 0 ? -30 : 30 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+                viewport={{ once: true }}
+                className="flex items-start space-x-4"
+              >
+                <div className="w-6 h-6 bg-gradient-to-r from-purple-500 to-teal-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                  <HiCheckCircle className="w-4 h-4 text-white" />
                 </div>
-                <div
-                  className="h-80 relative"
-                  style={{
-                    backgroundImage: `url('/src/assets/graphs2.jpg')`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                  }}
-                >
-                  <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm">
-                    <div className="flex h-full">
-                      <div className="w-48 bg-white/5 p-6 space-y-4">
-                        <div className="h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg"></div>
-                        <div className="h-10 bg-white/10 rounded-lg"></div>
-                        <div className="h-10 bg-white/10 rounded-lg"></div>
-                        <div className="h-10 bg-white/10 rounded-lg"></div>
-                      </div>
-                      <div className="flex-1 p-6">
-                        <div className="h-16 bg-white/10 rounded-xl mb-6"></div>
-                        <div className="grid grid-cols-2 gap-4 h-44">
-                          <div className="bg-white/10 rounded-xl animate-pulse"></div>
-                          <div
-                            className="bg-white/10 rounded-xl animate-pulse"
-                            style={{ animationDelay: "0.5s" }}
-                          ></div>
-                          <div
-                            className="bg-white/10 rounded-xl animate-pulse"
-                            style={{ animationDelay: "1s" }}
-                          ></div>
-                          <div
-                            className="bg-white/10 rounded-xl animate-pulse"
-                            style={{ animationDelay: "1.5s" }}
-                          ></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
+                <p className="text-white/90 text-lg">{benefit}</p>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Testimonials Section */}
-      <section id="testimonials" className="relative py-24 overflow-hidden">
-        {/* Background Image */}
-        <div
-          className="absolute inset-0 opacity-5"
-          style={{
-            backgroundImage: `url('/src/assets/hero2.jpg')`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section id="testimonials" className="relative z-10 px-6 py-20">
+        <div className="max-w-6xl mx-auto">
           <motion.div
-            className="text-center mb-16"
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.8 }}
             viewport={{ once: true }}
+            className="text-center mb-16"
           >
-            <h2 className="text-3xl lg:text-4xl font-bold mb-4">
-              Trusted by Industry Leaders
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+              What Our{" "}
+              <span className="bg-gradient-to-r from-purple-400 to-teal-400 bg-clip-text text-transparent">
+                Clients Say
+              </span>
             </h2>
-            <p className="text-lg lg:text-xl text-white/70 max-w-3xl mx-auto leading-relaxed">
-              See how organizations are transforming their document management
-              with EDMS
+            <p className="text-xl text-white/80 max-w-3xl mx-auto">
+              Join thousands of satisfied customers who have transformed their
+              business with ELRA
             </p>
           </motion.div>
-          <div className="relative overflow-hidden rounded-2xl">
-            <div
-              className="flex transition-transform duration-500 ease-in-out"
-              style={{ transform: `translateX(-${currentSlide * 100}%)` }}
-            >
-              {testimonials.map((testimonial, index) => (
-                <div key={index} className="w-full flex-shrink-0 px-4">
-                  <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 lg:p-12 text-center max-w-4xl mx-auto">
-                    <div className="mb-8">
-                      <p className="text-lg lg:text-xl text-white/90 italic leading-relaxed">
-                        "{testimonial.content}"
+
+          <div className="relative">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentSlide}
+                initial={{ opacity: 0, x: 100 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -100 }}
+                transition={{ duration: 0.5 }}
+                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-8 md:p-12"
+              >
+                <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
+                  <div className="flex-shrink-0">
+                    <img
+                      src={testimonials[currentSlide].avatar}
+                      alt={testimonials[currentSlide].name}
+                      className="w-20 h-20 rounded-full object-cover border-4 border-white/20"
+                    />
+                  </div>
+                  <div className="flex-1 text-center md:text-left">
+                    <p className="text-white/90 text-lg md:text-xl leading-relaxed mb-6 italic">
+                      "{testimonials[currentSlide].content}"
+                    </p>
+                    <div>
+                      <h4 className="text-white font-semibold text-lg">
+                        {testimonials[currentSlide].name}
+                      </h4>
+                      <p className="text-white/70">
+                        {testimonials[currentSlide].role} at{" "}
+                        {testimonials[currentSlide].company}
                       </p>
-                    </div>
-                    <div className="flex items-center justify-center space-x-4">
-                      <img
-                        src={testimonial.avatar}
-                        alt={testimonial.name}
-                        className="w-16 h-16 rounded-full object-cover"
-                      />
-                      <div className="text-left">
-                        <h4 className="font-bold text-white">
-                          {testimonial.name}
-                        </h4>
-                        <p className="text-white/70">{testimonial.role}</p>
-                        <span className="text-white/50 text-sm">
-                          {testimonial.company}
-                        </span>
-                      </div>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-            <div className="flex justify-center space-x-2 mt-8">
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Testimonial Indicators */}
+            <div className="flex justify-center mt-8 space-x-2">
               {testimonials.map((_, index) => (
                 <button
                   key={index}
+                  onClick={() => setCurrentSlide(index)}
                   className={`w-3 h-3 rounded-full transition-all duration-300 ${
                     index === currentSlide
-                      ? "bg-gradient-to-r from-blue-500 to-purple-500 scale-125"
-                      : "bg-white/30 hover:bg-white/50"
+                      ? "bg-gradient-to-r from-purple-400 to-teal-400"
+                      : "bg-white/30"
                   }`}
-                  onClick={() => setCurrentSlide(index)}
                 />
               ))}
             </div>
@@ -1053,153 +784,135 @@ const LandingPage = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="relative py-24 overflow-hidden">
-        {/* Background Image */}
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url('/src/assets/illustration1.jpg')`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-900/80 via-purple-900/80 to-cyan-900/80"></div>
-        <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section className="relative z-10 px-6 py-20">
+        <div className="max-w-4xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
             viewport={{ once: true }}
           >
-            <h2 className="text-3xl lg:text-5xl font-bold mb-6 leading-tight">
-              Ready to Transform Your Document Workflows?
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
+              Ready to Transform Your{" "}
+              <span className="bg-gradient-to-r from-purple-400 to-teal-400 bg-clip-text text-transparent">
+                Business?
+              </span>
             </h2>
-            <p className="text-lg lg:text-xl text-white/80 mb-10 leading-relaxed max-w-2xl mx-auto">
-              Choose the perfect plan for your organization. Start with our
-              flexible pricing and scale as you grow. Experience the future of
-              document management today.
+            <p className="text-xl text-white/80 mb-8 max-w-2xl mx-auto">
+              Join thousands of companies that have already streamlined their
+              operations with ELRA ERP
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                to="/register"
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-10 py-4 rounded-full font-semibold text-lg transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-500/25 flex items-center justify-center"
+              <button
+                onClick={handleGetStarted}
+                className="bg-gradient-to-r from-purple-500 to-teal-500 text-white px-8 py-4 rounded-full font-semibold text-lg hover:from-purple-600 hover:to-teal-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center space-x-2"
               >
-                Start Your Free Trial
-                <HiArrowRight className="ml-2" />
-              </Link>
-              <Link
-                to="/login"
-                className="bg-transparent border-2 border-white/20 hover:border-white/40 hover:bg-white/10 text-white px-10 py-4 rounded-full font-semibold text-lg transition-all duration-300 flex items-center justify-center"
+                <span>Start Your Free Trial</span>
+                <HiArrowRight className="w-5 h-5" />
+              </button>
+              <button
+                onClick={handleSignIn}
+                className="bg-white/10 backdrop-blur-sm border border-white/20 text-white px-8 py-4 rounded-full font-semibold text-lg hover:bg-white/20 transition-all duration-300 flex items-center justify-center space-x-2"
               >
-                Sign In
-              </Link>
+                <HiStar className="w-5 h-5" />
+                <span>Sign In</span>
+              </button>
             </div>
           </motion.div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 bg-black/50 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
-            <div className="lg:col-span-1 flex flex-col items-center justify-center text-center">
-              <EDMSLogo />
-              <p className="text-white/70 mt-4 leading-relaxed">
-                Transforming document management for modern enterprises
+      <footer className="relative z-10 px-6 py-12 border-t border-white/10">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div className="col-span-1 md:col-span-2">
+              <ELRALogo variant="light" size="md" />
+              <p className="text-white/70 mt-4 max-w-md">
+                Transform your business with our comprehensive Enterprise
+                Resource Planning solution. Manage HR, payroll, procurement,
+                accounting, and communication in one unified platform.
               </p>
             </div>
-            <div className="lg:col-span-4 grid grid-cols-1 md:grid-cols-4 gap-8">
-              <div className="flex flex-col items-center justify-center text-center">
-                <h4 className="font-bold text-white mb-4">Product</h4>
-                <div className="space-y-2">
+            <div>
+              <h3 className="text-white font-semibold mb-4">Product</h3>
+              <ul className="space-y-2">
+                <li>
                   <a
                     href="#features"
-                    className="block text-white/70 hover:text-white transition-colors duration-300"
+                    className="text-white/70 hover:text-white transition-colors"
                   >
                     Features
                   </a>
-                  <a
-                    href="#pricing"
-                    className="block text-white/70 hover:text-white transition-colors duration-300"
-                  >
-                    Pricing
-                  </a>
+                </li>
+                <li>
                   <a
                     href="#benefits"
-                    className="block text-white/70 hover:text-white transition-colors duration-300"
+                    className="text-white/70 hover:text-white transition-colors"
                   >
                     Benefits
                   </a>
-                </div>
-              </div>
-              <div className="flex flex-col items-center justify-center text-center">
-                <h4 className="font-bold text-white mb-4">Company</h4>
-                <div className="space-y-2">
+                </li>
+                <li>
                   <a
-                    href="#about"
-                    className="block text-white/70 hover:text-white transition-colors duration-300"
+                    href="#testimonials"
+                    className="text-white/70 hover:text-white transition-colors"
                   >
-                    About
+                    Testimonials
                   </a>
-                  <a
-                    href="#contact"
-                    className="block text-white/70 hover:text-white transition-colors duration-300"
-                  >
-                    Contact
-                  </a>
-                  <a
-                    href="#careers"
-                    className="block text-white/70 hover:text-white transition-colors duration-300"
-                  >
-                    Careers
-                  </a>
-                </div>
-              </div>
-              <div className="flex flex-col items-center justify-center text-center">
-                <h4 className="font-bold text-white mb-4">Support</h4>
-                <div className="space-y-2">
-                  <a
-                    href="#help"
-                    className="block text-white/70 hover:text-white transition-colors duration-300"
-                  >
-                    Help Center
-                  </a>
-                  <a
-                    href="#docs"
-                    className="block text-white/70 hover:text-white transition-colors duration-300"
-                  >
-                    Documentation
-                  </a>
-                  <a
-                    href="#api"
-                    className="block text-white/70 hover:text-white transition-colors duration-300"
-                  >
-                    API
-                  </a>
-                </div>
-              </div>
-              <div className="flex flex-col items-center justify-center text-center">
-                <h4 className="font-bold text-white mb-4">Legal</h4>
-                <div className="space-y-2">
+                </li>
+                <li>
                   <Link
-                    to="/privacy"
-                    className="block text-white/70 hover:text-white transition-colors duration-300"
+                    to="/modules"
+                    className="text-white/70 hover:text-white transition-colors"
+                  >
+                    Modules
+                  </Link>
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-white font-semibold mb-4">Company</h3>
+              <ul className="space-y-2">
+                <li>
+                  <Link
+                    to="/legal/privacy"
+                    className="text-white/70 hover:text-white transition-colors"
                   >
                     Privacy Policy
                   </Link>
+                </li>
+                <li>
                   <Link
-                    to="/terms"
-                    className="block text-white/70 hover:text-white transition-colors duration-300"
+                    to="/legal/terms"
+                    className="text-white/70 hover:text-white transition-colors"
                   >
-                    Terms & Conditions
+                    Terms of Service
                   </Link>
-                </div>
-              </div>
+                </li>
+                <li>
+                  <a
+                    href="#"
+                    className="text-white/70 hover:text-white transition-colors"
+                  >
+                    Support
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="#"
+                    className="text-white/70 hover:text-white transition-colors"
+                  >
+                    Contact
+                  </a>
+                </li>
+              </ul>
             </div>
           </div>
-          <div className="border-t border-white/10 pt-8 text-center">
+          <div className="border-t border-white/10 mt-8 pt-8 text-center">
             <p className="text-white/50">
-              &copy; {new Date().getFullYear()} EDMS. All rights reserved.
+              &copy; {new Date().getFullYear()} ELRA ERP System. All rights
+              reserved.
             </p>
           </div>
         </div>

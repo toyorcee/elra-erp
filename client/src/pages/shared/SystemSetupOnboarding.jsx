@@ -20,7 +20,7 @@ import {
   HiCheck,
   HiX,
 } from "react-icons/hi";
-import EDMSLogo from "../../components/EDMSLogo";
+import ELRALogo from "../../components/ELRALogo";
 import { systemSetupAPI } from "../../services/api.js";
 import { toast } from "react-toastify";
 
@@ -527,7 +527,7 @@ const SystemSetupOnboarding = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
-              <EDMSLogo />
+              <ELRALogo />
               <div className="hidden md:block">
                 <h1 className="text-lg font-semibold text-white">
                   System Setup

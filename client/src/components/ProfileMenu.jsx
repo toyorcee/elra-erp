@@ -40,10 +40,15 @@ const ProfileMenu = () => {
     return "U";
   };
 
-  const getUserRole = () => {
-    if (user?.role?.level >= 110) return "Platform Administrator";
-    if (user?.role?.level >= 100) return "Super Administrator";
-    if (user?.role?.level >= 90) return "Administrator";
+  const getRoleTitle = () => {
+    if (!user?.role) return "User";
+
+    const roleLevel = user.role.level;
+    if (roleLevel >= 1000) return "Super Administrator";
+    if (roleLevel >= 700) return "Head of Department";
+    if (roleLevel >= 600) return "Manager";
+    if (roleLevel >= 300) return "Staff";
+
     return "User";
   };
 
@@ -95,7 +100,7 @@ const ProfileMenu = () => {
             <div className="text-sm font-medium">
               {user?.firstName ? `${user.firstName} ${user.lastName}` : "User"}
             </div>
-            <div className="text-xs text-white/80">{getUserRole()}</div>
+            <div className="text-xs text-white/80">{getRoleTitle()}</div>
           </div>
         </div>
 
@@ -220,7 +225,7 @@ const ProfileMenu = () => {
                     : "User"}
                 </div>
                 <div className="text-sm font-medium bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
-                  {getUserRole()}
+                  {getRoleTitle()}
                 </div>
                 <div className="text-xs text-gray-500 truncate">
                   {user?.email || "user@edms.com"}

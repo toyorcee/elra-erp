@@ -28,7 +28,7 @@ import {
 import DocumentScanning from "../../components/DocumentScanning";
 import EditDocumentModal from "../../components/EditDocumentModal";
 import { Link, useLocation } from "react-router-dom";
-import SkeletonLoader from "../../components/SkeletonLoader";
+
 import EmptyState from "../../components/EmptyState";
 import DocumentIcon from "../../components/DocumentIcon";
 import GradientSpinner from "../../components/common/GradientSpinner";

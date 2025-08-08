@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -12,9 +12,12 @@ import {
   HiShieldCheck,
   HiOfficeBuilding,
   HiUser,
+  HiKey,
+  HiCog,
+  HiChartBar,
 } from "react-icons/hi";
 import { useAuth } from "../../context/AuthContext";
-import EDMSLogo from "../../components/EDMSLogo";
+import ELRALogo from "../../components/ELRALogo";
 import { GradientSpinner } from "../../components/common";
 
 const Login = () => {
@@ -25,15 +28,6 @@ const Login = () => {
     useAuth();
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-
-  // Background images for the animated background
-  const backgroundImages = [
-    "/src/assets/login.jpg",
-    "/src/assets/signup.jpg",
-    "/src/assets/hero1.jpg",
-    "/src/assets/hero2.jpg",
-  ];
 
   // Animation variants
   const containerVariants = {
@@ -47,53 +41,41 @@ const Login = () => {
     },
   };
 
-  const cardVariants = {
-    hidden: { opacity: 0, y: 50, scale: 0.9 },
+  const slideInVariants = {
+    hidden: { x: -100, opacity: 0 },
+    visible: {
+      x: 0,
+      opacity: 1,
+      transition: {
+        type: "spring",
+        damping: 25,
+        stiffness: 300,
+      },
+    },
+  };
+
+  const fadeInVariants = {
+    hidden: { opacity: 0, y: 20 },
     visible: {
       opacity: 1,
       y: 0,
-      scale: 1,
-      transition: {
-        type: "spring",
-        damping: 25,
-        stiffness: 300,
-        duration: 0.6,
-      },
-    },
-  };
-
-  const slideVariants = {
-    hidden: { x: 300, opacity: 0 },
-    visible: {
-      x: 0,
-      opacity: 1,
-      transition: {
-        type: "spring",
-        damping: 25,
-        stiffness: 300,
-        duration: 0.6,
-      },
-    },
-  };
-
-  const inputVariants = {
-    hidden: { opacity: 0, x: -20 },
-    visible: {
-      opacity: 1,
-      x: 0,
       transition: {
         type: "spring",
         damping: 20,
         stiffness: 300,
-        duration: 0.5,
       },
     },
   };
 
-  // All useEffect hooks must be called before any conditional returns
   useEffect(() => {
     if (isAuthenticated && initialized) {
-      navigate("/app");
+      const redirectPath = localStorage.getItem("redirectAfterLogin");
+      if (redirectPath) {
+        localStorage.removeItem("redirectAfterLogin");
+        navigate(redirectPath);
+      } else {
+        navigate("/modules");
+      }
     }
   }, [isAuthenticated, initialized, navigate]);
 
@@ -101,23 +83,14 @@ const Login = () => {
     clearError();
   }, [clearError]);
 
-  // Scroll to top on component mount
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  // Auto-slide for background images
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentImageIndex((prev) => (prev + 1) % backgroundImages.length);
-    }, 4000); // Change image every 4 seconds
-    return () => clearInterval(timer);
-  }, [backgroundImages.length]);
-
   // Safety check - wait for auth to be initialized
   if (!initialized) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-teal-900 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
       </div>
     );
@@ -165,82 +138,191 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 relative overflow-hidden">
-      {/* Animated Background */}
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-teal-900 relative overflow-hidden">
+      {/* Animated Background Elements */}
       <div className="fixed inset-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900" />
-        {backgroundImages.map((image, index) => (
-          <div
-            key={index}
-            className={`absolute inset-0 transition-opacity duration-1000 ${
-              index === currentImageIndex ? "opacity-20" : "opacity-0"
-            }`}
+        {/* Gradient Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-purple-800 to-teal-900" />
+
+        {/* Animated Circles */}
+        <motion.div
+          className="absolute top-20 left-20 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl"
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.3, 0.6, 0.3],
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
+        <motion.div
+          className="absolute bottom-20 right-20 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl"
+          animate={{
+            scale: [1.2, 1, 1.2],
+            opacity: [0.4, 0.7, 0.4],
+          }}
+          transition={{
+            duration: 10,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
+
+        {/* Floating Particles */}
+        {Array.from({ length: 15 }).map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-1 h-1 bg-white/20 rounded-full"
             style={{
-              backgroundImage: `url(${image})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              backgroundRepeat: "no-repeat",
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+            }}
+            animate={{
+              y: [0, -30, 0],
+              opacity: [0.1, 0.4, 0.1],
+              scale: [1, 1.5, 1],
+            }}
+            transition={{
+              duration: 4 + Math.random() * 3,
+              repeat: Infinity,
+              delay: Math.random() * 2,
             }}
           />
         ))}
-        {/* Floating Elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          {Array.from({ length: 20 }).map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-2 h-2 bg-white/10 rounded-full"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-              }}
-              animate={{
-                y: [0, -30, 0],
-                opacity: [0.1, 0.3, 0.1],
-                scale: [1, 1.2, 1],
-              }}
-              transition={{
-                duration: 3 + Math.random() * 2,
-                repeat: Infinity,
-                delay: Math.random() * 2,
-              }}
-            />
-          ))}
-        </div>
       </div>
 
       {/* Main Content */}
-      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 pt-20">
-        {/* Centered Header - OUTSIDE flex containers */}
+      <div className="relative z-10 min-h-screen flex">
+        {/* Left Side - Brand & Info - Fixed */}
         <motion.div
-          className="text-center mb-8 sm:mb-12 w-full"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          className="hidden lg:flex lg:w-1/2 flex-col justify-center px-12 py-8 fixed left-0 top-0 h-full"
+          variants={slideInVariants}
+          initial="hidden"
+          animate="visible"
         >
-          <motion.div className="flex justify-center mb-6 sm:mb-8">
-            <EDMSLogo variant="light" className="h-12 sm:h-14" />
-          </motion.div>
-          <motion.h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-3 sm:mb-4">
-            Welcome Back
-          </motion.h1>
-          <motion.p className="text-white/70 text-sm sm:text-base">
-            Sign in to access your workspace and continue your work
-          </motion.p>
+          <div className="max-w-md mx-auto">
+            {/* Logo */}
+            <motion.div
+              className="mb-8"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <ELRALogo variant="light" size="lg" />
+            </motion.div>
+
+            {/* Main Heading */}
+            <motion.h1
+              className="text-5xl font-bold text-white mb-6 leading-tight"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              Welcome to{" "}
+              <span className="bg-gradient-to-r from-purple-400 to-teal-400 bg-clip-text text-transparent">
+                ELRA ERP
+              </span>
+            </motion.h1>
+
+            <motion.p
+              className="text-xl text-white/80 mb-12 leading-relaxed"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+            >
+              Your complete enterprise resource planning solution. Manage HR,
+              payroll, procurement, and more from one powerful platform.
+            </motion.p>
+
+            {/* Feature Cards */}
+            <div className="space-y-6">
+              {[
+                {
+                  icon: <HiShieldCheck className="w-6 h-6" />,
+                  title: "Enterprise Security",
+                  description: "Bank-level encryption and compliance",
+                  color: "from-purple-500/20 to-purple-600/20",
+                  iconColor: "text-purple-400",
+                },
+                {
+                  icon: <HiChartBar className="w-6 h-6" />,
+                  title: "Smart Analytics",
+                  description: "AI-powered insights and reporting",
+                  color: "from-teal-500/20 to-teal-600/20",
+                  iconColor: "text-teal-400",
+                },
+                {
+                  icon: <HiCog className="w-6 h-6" />,
+                  title: "Seamless Integration",
+                  description: "Connect all your business processes",
+                  color: "from-purple-500/20 to-teal-500/20",
+                  iconColor: "text-purple-400",
+                },
+              ].map((feature, index) => (
+                <motion.div
+                  key={index}
+                  className="flex items-center space-x-4 p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.5 + index * 0.1 }}
+                  whileHover={{
+                    scale: 1.02,
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                  }}
+                >
+                  <div
+                    className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center ${feature.iconColor}`}
+                  >
+                    {feature.icon}
+                  </div>
+                  <div>
+                    <h3 className="text-white font-semibold text-lg">
+                      {feature.title}
+                    </h3>
+                    <p className="text-white/70 text-sm">
+                      {feature.description}
+                    </p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
         </motion.div>
 
-        {/* Form and Features Container */}
+        {/* Right Side - Login Form - Scrollable */}
         <motion.div
-          className="w-full max-w-6xl flex flex-col lg:flex-row gap-8 lg:gap-12"
+          className="w-full lg:w-1/2 lg:ml-auto flex items-start justify-center px-6 py-8 min-h-screen"
           variants={containerVariants}
           initial="hidden"
           animate="visible"
         >
-          {/* Left Side - Form */}
-          <motion.div className="flex-1 flex items-center justify-center order-2 lg:order-1">
+          <motion.div
+            className="w-full max-w-md my-8"
+            variants={fadeInVariants}
+          >
+            {/* Mobile Logo */}
             <motion.div
-              className="w-full max-w-md bg-white/5 backdrop-blur-xl border border-white/20 rounded-3xl p-6 sm:p-8 shadow-2xl"
-              variants={cardVariants}
+              className="lg:hidden text-center mb-8"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
             >
+              <ELRALogo variant="light" size="md" className="mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-white">Welcome Back</h2>
+            </motion.div>
+
+            {/* Login Card */}
+            <motion.div
+              className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-8 shadow-2xl"
+              variants={fadeInVariants}
+            >
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-white mb-2">Sign In</h2>
+                <p className="text-white/70">Access your ELRA ERP workspace</p>
+              </div>
+
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Error Display */}
                 {error && (
@@ -254,16 +336,16 @@ const Login = () => {
                 )}
 
                 {/* Email Field */}
-                <motion.div variants={inputVariants}>
+                <motion.div variants={fadeInVariants}>
                   <label
                     htmlFor="email"
-                    className="block text-sm font-medium text-white/90 mb-2"
+                    className="block text-sm font-medium text-white/90 mb-3"
                   >
                     Email Address
                   </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <HiMail className="h-5 w-5 text-white/50" />
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <HiMail className="h-5 w-5 text-white/50 group-focus-within:text-purple-400 transition-colors" />
                     </div>
                     <input
                       type="email"
@@ -271,28 +353,28 @@ const Login = () => {
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
-                      className={`w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent backdrop-blur-sm transition-all duration-300 ${
+                      className={`w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400 backdrop-blur-sm transition-all duration-300 ${
                         errors.email ? "border-red-400/50" : ""
                       }`}
                       placeholder="Enter your email"
                     />
                   </div>
                   {errors.email && (
-                    <p className="mt-1 text-sm text-red-400">{errors.email}</p>
+                    <p className="mt-2 text-sm text-red-400">{errors.email}</p>
                   )}
                 </motion.div>
 
                 {/* Password Field */}
-                <motion.div variants={inputVariants}>
+                <motion.div variants={fadeInVariants}>
                   <label
                     htmlFor="password"
-                    className="block text-sm font-medium text-white/90 mb-2"
+                    className="block text-sm font-medium text-white/90 mb-3"
                   >
                     Password
                   </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <HiLockClosed className="h-5 w-5 text-white/50" />
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <HiLockClosed className="h-5 w-5 text-white/50 group-focus-within:text-purple-400 transition-colors" />
                     </div>
                     <input
                       type={showPassword ? "text" : "password"}
@@ -300,7 +382,7 @@ const Login = () => {
                       name="password"
                       value={formData.password}
                       onChange={handleChange}
-                      className={`w-full pl-10 pr-12 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent backdrop-blur-sm transition-all duration-300 ${
+                      className={`w-full pl-12 pr-12 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400 backdrop-blur-sm transition-all duration-300 ${
                         errors.password ? "border-red-400/50" : ""
                       }`}
                       placeholder="Enter your password"
@@ -308,7 +390,7 @@ const Login = () => {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center"
                     >
                       {showPassword ? (
                         <HiEyeOff className="h-5 w-5 text-white/50 hover:text-white/70 transition-colors" />
@@ -318,17 +400,17 @@ const Login = () => {
                     </button>
                   </div>
                   {errors.password && (
-                    <p className="mt-1 text-sm text-red-400">
+                    <p className="mt-2 text-sm text-red-400">
                       {errors.password}
                     </p>
                   )}
                 </motion.div>
 
                 {/* Forgot Password Link */}
-                <motion.div variants={inputVariants} className="text-right">
+                <motion.div variants={fadeInVariants} className="text-right">
                   <Link
                     to="/forgot-password"
-                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors duration-300"
+                    className="text-sm text-teal-400 hover:text-teal-300 transition-colors duration-300"
                   >
                     Forgot your password?
                   </Link>
@@ -338,8 +420,8 @@ const Login = () => {
                 <motion.button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-2"
-                  variants={inputVariants}
+                  className="w-full bg-gradient-to-r from-purple-600 to-teal-600 hover:from-purple-700 hover:to-teal-700 text-white py-4 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-2"
+                  variants={fadeInVariants}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -347,113 +429,49 @@ const Login = () => {
                     <GradientSpinner size="sm" variant="light" />
                   ) : (
                     <>
-                      <span>Sign In</span>
+                      <span>Sign In to ELRA</span>
                       <HiArrowRight className="w-5 h-5" />
                     </>
                   )}
                 </motion.button>
 
                 {/* Divider */}
-                <motion.div variants={inputVariants} className="relative">
+                <motion.div variants={fadeInVariants} className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-white/20" />
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-transparent text-white/50">
-                      Don't have an account?
+                    <span className="px-4 bg-transparent text-white/50">
+                      New to ELRA?
                     </span>
                   </div>
                 </motion.div>
 
                 {/* Register Link */}
-                <motion.div variants={inputVariants}>
+                <motion.div variants={fadeInVariants}>
                   <Link
                     to="/register"
-                    className="w-full bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 text-white py-3 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2"
+                    className="w-full bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 text-white py-4 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2"
                   >
                     <HiUser className="w-5 h-5" />
-                    <span>Create Account</span>
+                    <span>Create ELRA Account</span>
                   </Link>
                 </motion.div>
               </form>
             </motion.div>
-          </motion.div>
 
-          {/* Right Side - Features */}
-          <motion.div className="flex-1 flex items-center justify-center order-1 lg:order-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-2xl">
-              {/* Feature Card 1 */}
-              <motion.div
-                className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-6 hover:bg-white/10 transition-all duration-300 transform hover:scale-105"
-                variants={slideVariants}
-                whileHover={{ y: -5 }}
-              >
-                <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center mb-4">
-                  <HiShieldCheck className="w-6 h-6 text-blue-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-white mb-2">
-                  Secure Access
-                </h3>
-                <p className="text-white/70 text-sm">
-                  Enterprise-grade security with end-to-end encryption and
-                  multi-factor authentication
-                </p>
-              </motion.div>
-
-              {/* Feature Card 2 */}
-              <motion.div
-                className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-6 hover:bg-white/10 transition-all duration-300 transform hover:scale-105"
-                variants={slideVariants}
-                whileHover={{ y: -5 }}
-              >
-                <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center mb-4">
-                  <HiOfficeBuilding className="w-6 h-6 text-green-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-white mb-2">
-                  Team Collaboration
-                </h3>
-                <p className="text-white/70 text-sm">
-                  Real-time messaging, document sharing, and seamless workflow
-                  management
-                </p>
-              </motion.div>
-
-              {/* Feature Card 3 */}
-              <motion.div
-                className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-6 hover:bg-white/10 transition-all duration-300 transform hover:scale-105"
-                variants={slideVariants}
-                whileHover={{ y: -5 }}
-              >
-                <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center mb-4">
-                  <HiSparkles className="w-6 h-6 text-purple-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-white mb-2">
-                  Smart Automation
-                </h3>
-                <p className="text-white/70 text-sm">
-                  AI-powered document processing, automated workflows, and
-                  intelligent notifications
-                </p>
-              </motion.div>
-
-              {/* Feature Card 4 */}
-              <motion.div
-                className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-2xl p-6 hover:bg-white/10 transition-all duration-300 transform hover:scale-105"
-                variants={slideVariants}
-                whileHover={{ y: -5 }}
-              >
-                <div className="w-12 h-12 bg-cyan-500/20 rounded-xl flex items-center justify-center mb-4">
-                  <HiArrowRight className="w-6 h-6 text-cyan-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-white mb-2">
-                  Instant Access
-                </h3>
-                <p className="text-white/70 text-sm">
-                  Get back to work instantly with your personalized dashboard
-                  and recent documents
-                </p>
-              </motion.div>
-            </div>
+            {/* Footer */}
+            <motion.div
+              className="text-center mt-8"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.8 }}
+            >
+              <p className="text-white/50 text-sm">
+                © {new Date().getFullYear()} ELRA - Equipment Leasing
+                Registration Authority
+              </p>
+            </motion.div>
           </motion.div>
         </motion.div>
       </div>

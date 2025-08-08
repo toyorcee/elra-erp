@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../../context/AuthContext";
-import SkeletonLoader from "../../../components/SkeletonLoader";
+
 import {
   MdPerson,
   MdNotifications,
@@ -380,9 +380,9 @@ const Settings = () => {
         // Use React Query mutation
         uploadProfilePictureMutation(file, {
           onSuccess: (response) => {
-        console.log("✅ Profile picture upload response:", response);
-        setProfilePicture(response.data.user.avatar);
-        toast.success("Profile picture updated successfully!");
+            console.log("✅ Profile picture upload response:", response);
+            setProfilePicture(response.data.user.avatar);
+            toast.success("Profile picture updated successfully!");
           },
           onError: (error) => {
             console.error("❌ Profile picture upload error:", error);
@@ -1068,7 +1068,12 @@ const Settings = () => {
   if (loading) {
     return (
       <div className="w-full py-6">
-        <SkeletonLoader className="h-96" />
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading settings...</p>
+          </div>
+        </div>
       </div>
     );
   }

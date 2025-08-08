@@ -8,7 +8,12 @@ import {
   MdNotifications,
   MdPushPin,
 } from "react-icons/md";
-import { getNavigationForRole, getRoleTitle } from "../config/sidebarConfig";
+import {
+  getNavigationForRole,
+  getRoleInfo,
+  getNavigationBySection,
+  hasSectionAccess,
+} from "../config/sidebarConfig";
 import { useAuth } from "../context/AuthContext";
 
 const getImageUrl = (avatarPath) => {
@@ -74,8 +79,76 @@ const Sidebar = ({ onExpandedChange, onPinnedChange }) => {
   };
 
   const getUserRole = () => {
-    const roleTitle = getRoleTitle(user?.role?.level || 10);
-    return roleTitle;
+    const roleInfo = getRoleInfo(user?.role?.level || 10);
+    return roleInfo.title;
+  };
+
+  const getRoleStyling = () => {
+    const roleInfo = getRoleInfo(user?.role?.level || 10);
+    return {
+      color: roleInfo.color,
+      bgColor: roleInfo.bgColor,
+      borderColor: roleInfo.borderColor,
+    };
+  };
+
+  // Get navigation items for user's role
+  const navigationItems = getNavigationForRole(user?.role?.level || 10);
+
+  // Group navigation items by section
+  const sections = {
+    main: getNavigationBySection(user?.role?.level || 10, "main"),
+    erp: getNavigationBySection(user?.role?.level || 10, "erp"),
+    system: getNavigationBySection(user?.role?.level || 10, "system"),
+    documents: getNavigationBySection(user?.role?.level || 10, "documents"),
+    communication: getNavigationBySection(
+      user?.role?.level || 10,
+      "communication"
+    ),
+    reports: getNavigationBySection(user?.role?.level || 10, "reports"),
+  };
+
+  const roleStyling = getRoleStyling();
+
+  const renderNavItem = (item) => {
+    const IconComponent = HiIcons[item.icon];
+    const isActive = location.pathname === item.path;
+
+    return (
+      <Link
+        key={item.path}
+        to={item.path}
+        className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
+          isActive
+            ? "bg-blue-700 text-white shadow-lg"
+            : "text-blue-100 hover:bg-blue-700/50 hover:text-white"
+        }`}
+      >
+        <IconComponent className="mr-3 h-5 w-5 flex-shrink-0" />
+        <span className="truncate">{item.label}</span>
+        {item.badge && (
+          <span className="ml-auto inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-600 text-white">
+            {item.badge}
+          </span>
+        )}
+      </Link>
+    );
+  };
+
+  const renderSection = (sectionKey, sectionTitle, items) => {
+    if (!items || items.length === 0) return null;
+    if (!hasSectionAccess(user?.role?.level || 10, sectionKey)) return null;
+
+    return (
+      <div key={sectionKey} className="mb-6">
+        {isExpanded && (
+          <h3 className="px-3 text-xs font-semibold text-blue-300 uppercase tracking-wider mb-2">
+            {sectionTitle}
+          </h3>
+        )}
+        <div className="space-y-1">{items.map(renderNavItem)}</div>
+      </div>
+    );
   };
 
   return (
@@ -91,306 +164,91 @@ const Sidebar = ({ onExpandedChange, onPinnedChange }) => {
         overflow: "hidden",
       }}
     >
-      {/* Pin/Unpin Button - Moved to top and made white */}
+      {/* Pin/Unpin Button */}
       <div
         className={`absolute top-2 right-2 z-20 transition-all duration-200 ${
           isExpanded ? "opacity-100" : "opacity-0"
         }`}
       >
         <button
-          onClick={() => setPinned((prev) => !prev)}
-          className={`p-1.5 rounded-full transition-all duration-200 ${
-            pinned
-              ? "bg-green-500/20 text-green-400 rotate-45"
-              : "bg-white/20 text-white hover:bg-white/30"
-          }`}
-          title={pinned ? "Unpin sidebar" : "Pin sidebar"}
+          onClick={() => setPinned(!pinned)}
+          className="p-1 rounded-md text-blue-300 hover:text-white hover:bg-blue-700/50 transition-colors"
         >
-          <MdPushPin size={16} />
+          <MdPushPin
+            className={`h-4 w-4 transition-transform ${
+              pinned ? "rotate-45" : ""
+            }`}
+          />
         </button>
       </div>
 
-      {/* Navigation */}
-      <div
-        className={`flex-1 p-4 overflow-y-auto pt-12 transition-all duration-300 ${
-          isExpanded ? "custom-scrollbar" : "scrollbar-hide"
-        }`}
-        style={{
-          scrollbarWidth: isExpanded ? "thin" : "none",
-          msOverflowStyle: isExpanded ? "auto" : "none",
-        }}
-      >
-        <style>{`
-          .scrollbar-hide::-webkit-scrollbar {
-            display: none;
-          }
-
-          .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-          }
-
-          .custom-scrollbar::-webkit-scrollbar-track {
-            background: transparent;
-            margin: 4px 0;
-          }
-
-          .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: linear-gradient(180deg, #3b82f6 0%, #06b6d4 100%);
-            border-radius: 10px;
-            min-height: 40px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-          }
-
-          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: linear-gradient(180deg, #2563eb 0%, #0891b2 100%);
-            box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
-          }
-
-          .custom-scrollbar::-webkit-scrollbar-corner {
-            background: transparent;
-          }
-        `}</style>
-        <nav className="space-y-2">
-          {(() => {
-            const navigationItems = getNavigationForRole(
-              user?.role?.level || 10
-            );
-
-            return navigationItems;
-          })().map((item) => {
-            const Icon = HiIcons[item.icon] || HiIcons.HiOutlineDocumentText;
-            const isActive = location.pathname === item.path;
-
-            return (
-              <Link
-                key={item.label}
-                to={item.path}
-                className={`group flex items-center p-3 rounded-xl transition-all duration-300 relative ${
-                  isExpanded
-                    ? isActive
-                      ? "bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg"
-                      : "text-white/80 hover:bg-white/20 hover:text-white"
-                    : isActive
-                    ? "text-cyan-400"
-                    : "text-white/80 hover:text-white"
-                }`}
-                title={!isExpanded ? item.label : ""}
-              >
-                <div
-                  className={`flex items-center transition-all duration-300 ${
-                    isExpanded ? "space-x-3 w-full" : "justify-center w-full"
-                  }`}
-                >
-                  <div
-                    className={`p-2 rounded-lg transition-all duration-300 flex-shrink-0 ${
-                      isExpanded
-                        ? isActive
-                          ? "bg-white/20"
-                          : "bg-white/10 group-hover:bg-white/20"
-                        : "bg-transparent"
-                    }`}
-                  >
-                    <Icon size={20} />
-                  </div>
-                  {isExpanded && (
-                    <span
-                      className={`font-medium transition-all duration-300 ${
-                        isActive ? "text-white" : "text-white/90"
-                      }`}
-                    >
-                      {item.label}
-                    </span>
-                  )}
-                </div>
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
-
       {/* User Profile Section */}
-      <div className="relative p-4 border-t border-blue-700/50">
-        {isExpanded ? (
-          // Expanded Profile View
-          <div className="space-y-3">
-            {/* Profile Button */}
-            <button
-              onClick={() => setIsProfileOpen(!isProfileOpen)}
-              className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-white/20 transition-all duration-300 group"
-            >
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg overflow-hidden">
-                  {user?.avatar ? (
-                    <img
-                      src={getImageUrl(user.avatar)}
-                      alt="Profile"
-                      className="w-full h-full object-cover rounded-full"
-                      onError={(e) => {
-                        e.target.style.display = "none";
-                        e.target.nextSibling.style.display = "flex";
-                      }}
-                    />
-                  ) : null}
-                  <div
-                    className={`w-full h-full flex items-center justify-center ${
-                      user?.avatar ? "hidden" : ""
-                    }`}
-                  >
-                    {getUserInitial()}
-                  </div>
-                </div>
-                <div className="text-left">
-                  <div className="font-medium text-white text-sm">
-                    {user?.firstName
-                      ? `${user.firstName} ${user.lastName}`
-                      : "User"}
-                  </div>
-                  <div className="text-xs text-white/80">{getUserRole()}</div>
-                </div>
-              </div>
-
-              <div
-                className={`w-4 h-4 transition-transform duration-300 ${
-                  isProfileOpen ? "rotate-180" : ""
-                }`}
-              >
-                <svg
-                  className="w-4 h-4 text-white/90"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </div>
-            </button>
-
-            {/* Dropdown Menu */}
-            {isProfileOpen && (
-              <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/30 py-3">
-                {/* User Info Header */}
-                <div className="px-4 py-3 border-b border-gray-200/50">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg overflow-hidden">
-                      {user?.avatar ? (
-                        <img
-                          src={getImageUrl(user.avatar)}
-                          alt="Profile"
-                          className="w-full h-full object-cover rounded-full"
-                          onError={(e) => {
-                            e.target.style.display = "none";
-                            e.target.nextSibling.style.display = "flex";
-                          }}
-                        />
-                      ) : null}
-                      <div
-                        className={`w-full h-full flex items-center justify-center ${
-                          user?.avatar ? "hidden" : ""
-                        }`}
-                      >
-                        {getUserInitial()}
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-gray-900 text-sm truncate">
-                        {user?.firstName
-                          ? `${user.firstName} ${user.lastName}`
-                          : "User"}
-                      </div>
-                      <div className="text-xs font-medium text-blue-600">
-                        {getUserRole()}
-                      </div>
-                      <div className="text-xs text-gray-500 truncate">
-                        {user?.email || "user@edms.com"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Menu Items */}
-                <div className="py-2">
-                  <button
-                    onClick={() => {
-                      setIsProfileOpen(false);
-                      navigate("/dashboard/notifications");
-                    }}
-                    className="w-full flex items-center px-4 py-2 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group"
-                  >
-                    <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center mr-3 group-hover:bg-blue-200 transition-colors duration-200">
-                      <MdNotifications className="w-3 h-3 text-blue-600" />
-                    </div>
-                    <span>Notifications</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setIsProfileOpen(false);
-                      navigate("/dashboard/settings");
-                    }}
-                    className="w-full flex items-center px-4 py-2 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group"
-                  >
-                    <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center mr-3 group-hover:bg-blue-200 transition-colors duration-200">
-                      <MdSettings className="w-3 h-3 text-blue-600" />
-                    </div>
-                    <span>Settings</span>
-                  </button>
-
-                  {/* Divider */}
-                  <div className="border-t border-gray-200 my-2 mx-4"></div>
-
-                  {/* Sign Out Button */}
-                  <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-200 group"
-                  >
-                    <div className="w-6 h-6 bg-red-100 rounded-lg flex items-center justify-center mr-3 group-hover:bg-red-200 transition-colors duration-200">
-                      <MdLogout className="w-3 h-3 text-red-600" />
-                    </div>
-                    <span>Sign out</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          // Collapsed Profile View (Icon Only) - Improved styling
-          <div className="flex justify-center">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer overflow-hidden">
-              {user?.avatar ? (
-                <img
-                  src={getImageUrl(user.avatar)}
-                  alt="Profile"
-                  className="w-full h-full object-cover rounded-full"
-                  onError={(e) => {
-                    e.target.style.display = "none";
-                    e.target.nextSibling.style.display = "flex";
-                  }}
-                />
-              ) : null}
-              <div
-                className={`w-full h-full flex items-center justify-center ${
-                  user?.avatar ? "hidden" : ""
-                }`}
-              >
-                {getUserInitial()}
-              </div>
+      <div className="flex-shrink-0 p-4 border-b border-blue-700/50">
+        <div className="flex items-center">
+          <div className="flex-shrink-0">
+            <div className="h-8 w-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm">
+              {getUserInitial()}
             </div>
           </div>
-        )}
+          {isExpanded && (
+            <div className="ml-3 flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">
+                {user?.firstName} {user?.lastName}
+              </p>
+              <div className="flex items-center">
+                <span
+                  className={`text-xs px-2 py-1 rounded-full ${roleStyling.bgColor} ${roleStyling.color} ${roleStyling.borderColor} border`}
+                >
+                  {getUserRole()}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Click outside to close */}
-      {isProfileOpen && (
-        <div
-          className="fixed inset-0 z-[9998]"
-          onClick={() => setIsProfileOpen(false)}
-        />
-      )}
+      {/* Navigation */}
+      <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+        {renderSection("main", "Main", sections.main)}
+        {renderSection("erp", "ERP Modules", sections.erp)}
+        {renderSection("system", "System", sections.system)}
+        {renderSection("documents", "Documents", sections.documents)}
+        {renderSection(
+          "communication",
+          "Communication",
+          sections.communication
+        )}
+        {renderSection("reports", "Reports & Analytics", sections.reports)}
+      </nav>
+
+      {/* Bottom Actions */}
+      <div className="flex-shrink-0 p-4 border-t border-blue-700/50">
+        <div className="space-y-2">
+          <Link
+            to="/notifications"
+            className="group flex items-center px-3 py-2 text-sm font-medium text-blue-100 rounded-md hover:bg-blue-700/50 hover:text-white transition-colors"
+          >
+            <MdNotifications className="mr-3 h-5 w-5 flex-shrink-0" />
+            {isExpanded && <span className="truncate">Notifications</span>}
+          </Link>
+
+          <Link
+            to="/settings"
+            className="group flex items-center px-3 py-2 text-sm font-medium text-blue-100 rounded-md hover:bg-blue-700/50 hover:text-white transition-colors"
+          >
+            <MdSettings className="mr-3 h-5 w-5 flex-shrink-0" />
+            {isExpanded && <span className="truncate">Settings</span>}
+          </Link>
+
+          <button
+            onClick={handleLogout}
+            className="group w-full flex items-center px-3 py-2 text-sm font-medium text-blue-100 rounded-md hover:bg-red-600/50 hover:text-white transition-colors"
+          >
+            <MdLogout className="mr-3 h-5 w-5 flex-shrink-0" />
+            {isExpanded && <span className="truncate">Logout</span>}
+          </button>
+        </div>
+      </div>
     </aside>
   );
 };

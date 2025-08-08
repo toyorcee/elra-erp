@@ -22,16 +22,13 @@ import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
 import ApprovalLevels from "./pages/admin/ApprovalLevels";
 import WorkflowTemplates from "./pages/admin/WorkflowTemplates";
 import {
-  PlatformAdminDashboard,
-  IndustryInstances,
-  CreateIndustryInstance,
   CompanyList,
   CreateCompany,
   SubscriptionManagement,
   PricingManagement,
 } from "./pages/platform-admin";
+
 import LandingPage from "./pages/shared/LandingPage";
-import WelcomeOnboarding from "./pages/shared/WelcomeOnboarding";
 import SystemSetupOnboarding from "./pages/shared/SystemSetupOnboarding";
 import DashboardLayout from "./layouts/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -39,13 +36,16 @@ import RoleRedirect from "./components/common/RoleRedirect";
 import { SidebarProvider } from "./context/SidebarContext";
 import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
 import TermsConditions from "./pages/legal/TermsConditions";
+import ModuleSelector from "./components/ModuleSelector";
+import Wireframe from "./pages/Wireframe";
+import ERPFlowchart from "./pages/ERPFlowchart";
+import DynamicDashboard from "./components/DynamicDashboard";
 
 const AppRoutes = () => {
   return (
     <Routes>
       {/* Public routes */}
       <Route path="/" element={<LandingPage />} />
-      <Route path="/welcome" element={<WelcomeOnboarding />} />
       <Route path="/system-setup" element={<SystemSetupOnboarding />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -58,6 +58,12 @@ const AppRoutes = () => {
         path="/verify-email-success"
         element={<EmailVerificationSuccess />}
       />
+
+      {/* Wireframe route */}
+      <Route path="/wireframe" element={<Wireframe />} />
+
+      {/* ERP Flowchart route */}
+      <Route path="/erp-flowchart" element={<ERPFlowchart />} />
 
       {/* Legal pages */}
       <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -72,6 +78,9 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+
+      {/* Module Selector - Entry point for ERP modules */}
+      <Route path="/modules" element={<ModuleSelector />} />
 
       {/* All authenticated routes use DashboardLayout */}
       <Route
@@ -90,6 +99,9 @@ const AppRoutes = () => {
 
         <Route path="notifications" element={<Notifications />} />
         <Route path="settings" element={<UserSettings />} />
+
+        {/* Dynamic Module Dashboard */}
+        <Route path=":module" element={<DynamicDashboard />} />
       </Route>
 
       {/* Admin routes - also use DashboardLayout */}
@@ -118,28 +130,6 @@ const AppRoutes = () => {
         <Route path="notifications" element={<Notifications />} />
         <Route path="archive" element={<Documents />} />
         <Route path="audit" element={<AuditLogs />} />
-      </Route>
-
-      {/* Platform Admin routes - also use DashboardLayout */}
-      <Route
-        path="/platform-admin"
-        element={
-          <ProtectedRoute>
-            <SidebarProvider>
-              <DashboardLayout />
-            </SidebarProvider>
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<PlatformAdminDashboard />} />
-        <Route path="dashboard" element={<PlatformAdminDashboard />} />
-        <Route path="instances" element={<IndustryInstances />} />
-        <Route path="create-instance" element={<CreateIndustryInstance />} />
-        <Route path="companies" element={<CompanyList />} />
-        <Route path="create-company" element={<CreateCompany />} />
-        <Route path="subscriptions" element={<SubscriptionManagement />} />
-        <Route path="pricing" element={<PricingManagement />} />
-        <Route path="notifications" element={<Notifications />} />
       </Route>
 
       {/* Fallback redirects */}

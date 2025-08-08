@@ -7,6 +7,7 @@ const roleSchema = new mongoose.Schema(
       required: true,
       unique: true,
       enum: [
+        // Legacy roles (maintained for backward compatibility)
         "PLATFORM_ADMIN",
         "SUPER_ADMIN",
         "ADMIN",
@@ -18,6 +19,15 @@ const roleSchema = new mongoose.Schema(
         "EXTERNAL_USER",
         "GUEST",
         "READ_ONLY",
+        // New ERP roles
+        "COMPANY_ADMIN",
+        "HOD",
+        "HOD", // Head of Department
+        "HR_MANAGER",
+        "PAYROLL_MANAGER",
+        "PROCUREMENT_MANAGER",
+        "FINANCE_MANAGER",
+        "VIEWER",
       ],
     },
     level: {
@@ -25,7 +35,7 @@ const roleSchema = new mongoose.Schema(
       required: true,
       unique: true,
       min: 10,
-      max: 120,
+      max: 1000,
     },
     description: {
       type: String,
@@ -34,45 +44,6 @@ const roleSchema = new mongoose.Schema(
     permissions: [
       {
         type: String,
-        enum: [
-          // Document permissions
-          "document.upload",
-          "document.view",
-          "document.edit",
-          "document.delete",
-          "document.approve",
-          "document.reject",
-          "document.share",
-          "document.export",
-          "document.archive",
-
-          // User management permissions
-          "user.create",
-          "user.view",
-          "user.edit",
-          "user.delete",
-          "user.assign_role",
-          "user.view_permissions",
-
-          // Workflow permissions
-          "workflow.create",
-          "workflow.start",
-          "workflow.approve",
-          "workflow.reject",
-          "workflow.delegate",
-          "workflow.view",
-
-          // System permissions
-          "system.settings",
-          "system.reports",
-          "system.audit",
-          "system.backup",
-
-          "company.create",
-          "company.view",
-          "company.edit",
-          "company.delete",
-        ],
       },
     ],
     departmentAccess: [
@@ -86,6 +57,10 @@ const roleSchema = new mongoose.Schema(
           "Operations",
           "Marketing",
           "Sales",
+          "Procurement",
+          "Payroll",
+          "Accounts",
+          "Communication",
           "All",
         ],
       },
@@ -100,6 +75,52 @@ const roleSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // ERP-specific fields
+    autoApproval: {
+      type: Boolean,
+      default: false,
+      description: "Whether users with this role can be auto-approved",
+    },
+    canApproveDepartment: {
+      type: Boolean,
+      default: false,
+      description: "Whether this role can approve users in their department",
+    },
+    canManageManagers: {
+      type: Boolean,
+      default: false,
+      description: "Whether this role can manage MANAGER roles",
+    },
+    canManageHODs: {
+      type: Boolean,
+      default: false,
+      description: "Whether this role can manage HOD roles",
+    },
+    canManageStaff: {
+      type: Boolean,
+      default: false,
+      description: "Whether this role can manage STAFF roles",
+    },
+    moduleAccess: [
+      {
+        module: {
+          type: String,
+          enum: [
+            "HR",
+            "PAYROLL",
+            "PROCUREMENT",
+            "ACCOUNTS",
+            "COMMUNICATION",
+            "SYSTEM",
+            "DOCUMENTS",
+            "PROJECTS",
+            "INVENTORY",
+            "FINANCE",
+          ],
+        },
+        permissions: [String],
+      },
+    ],
     createdAt: {
       type: Date,
       default: Date.now,

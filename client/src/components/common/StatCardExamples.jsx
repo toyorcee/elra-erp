@@ -30,7 +30,7 @@ export const StatCardExamples = () => {
           <StatCard
             title="System Errors"
             value={5}
-            icon="HiOutlineExclamation"
+            icon="HiOutlineExclamationTriangle"
             variant="danger"
           />
         </StatCardGrid>
@@ -277,4 +277,4 @@ export const DashboardExamples = {
   ],
 };
 
-export default StatCardExamples; 
+export default StatCardExamples;

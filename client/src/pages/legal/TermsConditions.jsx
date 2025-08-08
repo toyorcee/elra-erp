@@ -9,7 +9,7 @@ import {
   HiMenu,
   HiX,
 } from "react-icons/hi";
-import EDMSLogo from "../../components/EDMSLogo";
+import ELRALogo from "../../components/ELRALogo";
 
 const TermsConditions = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -55,7 +55,7 @@ const TermsConditions = () => {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <Link to="/">
-                <EDMSLogo />
+                <ELRALogo />
               </Link>
             </div>
 

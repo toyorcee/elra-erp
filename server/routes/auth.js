@@ -12,6 +12,9 @@ import {
   joinCompany,
   verifyEmail,
   resendVerificationEmail,
+  getRegistrationRoles,
+  getRegistrationDepartments,
+  getUserModules,
 } from "../controllers/authController.js";
 import { protect } from "../middleware/auth.js";
 import { passwordResetLimiter } from "../middleware/rateLimit.js";
@@ -126,5 +129,12 @@ router.post(
   resendVerificationValidation,
   resendVerificationEmail
 );
+
+// Registration data endpoints
+router.get("/registration-roles", getRegistrationRoles);
+router.get("/registration-departments", getRegistrationDepartments);
+
+// User modules endpoint
+router.get("/user-modules", protect, getUserModules);
 
 export default router;

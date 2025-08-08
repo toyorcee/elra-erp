@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { MdMenu } from "react-icons/md";
 import Sidebar from "../components/Sidebar";
 import ProfileMenu from "../components/ProfileMenu";
-import EDMSLogo from "../components/EDMSLogo";
+import ELRALogo from "../components/ELRALogo";
 import NotificationBell from "../components/NotificationBell";
 import PasswordChangeModal from "../components/common/PasswordChangeModal";
 import { useAuth } from "../context/AuthContext";
@@ -24,32 +24,26 @@ const DashboardLayout = () => {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [sidebarPinned, setSidebarPinned] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const isSidebarActuallyExpanded = sidebarPinned ? true : sidebarExpanded;
 
   useEffect(() => {
-    if (user && user.role?.level >= 110) {
+    if (user && !loading) {
+      // Check if user is trying to access dashboard routes they shouldn't
       if (
-        location.pathname.startsWith("/dashboard") ||
-        location.pathname.startsWith("/admin")
+        user.role?.level < 300 &&
+        location.pathname.startsWith("/dashboard")
       ) {
         console.log(
-          "🚨 DashboardLayout: Platform Admin on /dashboard or /admin, redirecting to /platform-admin/dashboard"
+          "🚨 DashboardLayout: User doesn't have access to dashboard, redirecting to /"
         );
-        navigate("/platform-admin/dashboard");
-      }
-    } else if (user && user.role?.level >= 100) {
-      if (location.pathname.startsWith("/dashboard")) {
-        console.log(
-          "🚨 DashboardLayout: Super Admin on /dashboard, redirecting to /admin/dashboard"
-        );
-        navigate("/admin/dashboard");
+        navigate("/");
       }
     }
-  }, [user, location.pathname, navigate]);
+  }, [user, loading, location.pathname, navigate]);
 
   // Check for temporary password and show modal
   useEffect(() => {
@@ -89,7 +83,7 @@ const DashboardLayout = () => {
                   onClick={() => navigate("/dashboard")}
                   className="flex items-center space-x-3 focus:outline-none"
                 >
-                  <EDMSLogo variant="dark" className="text-xl" />
+                  <ELRALogo variant="dark" className="text-xl" />
                 </button>
               </div>
 

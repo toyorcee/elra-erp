@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useContext } from "react";
 import { toast } from "react-toastify";
 import { useAuth } from "../../context/AuthContext";
-import SkeletonLoader from "../../components/SkeletonLoader";
+
 import EmptyState from "../../components/EmptyState";
 import { StatCard, StatCardGrid } from "../../components/common";
 import { getDashboard } from "../../services/dashboard";
@@ -76,7 +76,7 @@ const Dashboard = () => {
           Recent Documents
         </h2>
         {loading ? (
-          <SkeletonLoader className="h-16 mb-2" />
+          <div className="h-16 mb-2 bg-gray-100 rounded animate-pulse"></div>
         ) : data && data.recentDocuments.length ? (
           <ul className="divide-y divide-blue-100 bg-white/70 rounded-xl shadow">
             {data.recentDocuments.map((doc) => (
@@ -104,7 +104,7 @@ const Dashboard = () => {
             Documents by Status
           </h3>
           {loading ? (
-            <SkeletonLoader className="h-20" />
+            <div className="h-20 bg-gray-100 rounded animate-pulse"></div>
           ) : data && data.documentsByStatus.length ? (
             <ul>
               {data.documentsByStatus.map((s) => (
@@ -126,7 +126,7 @@ const Dashboard = () => {
             Documents by Category
           </h3>
           {loading ? (
-            <SkeletonLoader className="h-20" />
+            <div className="h-20 bg-gray-100 rounded animate-pulse"></div>
           ) : data && data.documentsByCategory.length ? (
             <ul>
               {data.documentsByCategory.map((c) => (

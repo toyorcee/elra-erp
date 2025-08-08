@@ -1,220 +1,235 @@
-// Role-based sidebar navigation config for EDMS
-// Role Levels: PLATFORM_ADMIN(110), SUPER_ADMIN(100), ADMIN(90), MANAGER(80), SUPERVISOR(70), SENIOR_STAFF(60), STAFF(50), JUNIOR_STAFF(40), EXTERNAL_USER(30), GUEST(20), READ_ONLY(10)
+// Unified sidebar navigation config for ELRA ERP System
+// All roles and modules in one single configuration
 
 export const sidebarConfig = [
-  // ===== COMMON SECTIONS (All Users) =====
+  // ===== MAIN DASHBOARD =====
   {
     label: "Dashboard",
     icon: "HiOutlineHome",
     path: "/dashboard",
-    required: { minLevel: 10, maxLevel: 89 },
-    section: "common",
-  },
-  {
-    label: "Admin Dashboard",
-    icon: "HiOutlineHome",
-    path: "/admin/dashboard",
-    required: { minLevel: 90, maxLevel: 109 },
-    section: "common",
-  },
-  {
-    label: "Platform Dashboard",
-    icon: "HiOutlineHome",
-    path: "/platform-admin/dashboard",
-    required: { minLevel: 110 },
-    section: "common",
+    required: { minLevel: 300 },
+    section: "main",
   },
 
-  // ===== DOCUMENT MANAGEMENT =====
+  // ===== ERP MODULES =====
   {
-    label: "My Documents",
-    icon: "HiOutlineDocumentText",
-    path: "/admin/documents",
-    required: { minLevel: 50 },
-    section: "documents",
+    label: "HR Management",
+    icon: "HiOutlineUsers",
+    path: "/dashboard/hr",
+    required: { minLevel: 300 },
+    section: "erp",
+    badge: "HR",
+  },
+  {
+    label: "Payroll Management",
+    icon: "HiOutlineCurrencyDollar",
+    path: "/dashboard/payroll",
+    required: { minLevel: 300 },
+    section: "erp",
+    badge: "Payroll",
+  },
+  {
+    label: "Procurement",
+    icon: "HiOutlineShoppingCart",
+    path: "/dashboard/procurement",
+    required: { minLevel: 300 },
+    section: "erp",
+    badge: "Procurement",
+  },
+  {
+    label: "Accounting",
+    icon: "HiOutlineCalculator",
+    path: "/dashboard/accounts",
+    required: { minLevel: 300 },
+    section: "erp",
+    badge: "Accounts",
+  },
+  {
+    label: "Communication",
+    icon: "HiOutlineChat",
+    path: "/dashboard/communication",
+    required: { minLevel: 300 },
+    section: "erp",
+    badge: "Comm",
   },
 
-  // ===== WORKFLOW MANAGEMENT =====
-
-  // ===== USER MANAGEMENT (Admin Only) =====
+  // ===== SYSTEM MANAGEMENT =====
   {
     label: "User Management",
-    icon: "HiOutlineUsers",
+    icon: "HiOutlineUserGroup",
     path: "/admin/users",
-    required: { minLevel: 90 },
-    section: "admin",
-  },
-  {
-    label: "Department Management",
-    icon: "HiOutlineBuildingOffice2",
-    path: "/admin/departments",
-    required: { minLevel: 90 },
-    section: "admin",
+    required: { minLevel: 600 },
+    section: "system",
   },
   {
     label: "Role Management",
     icon: "HiOutlineShieldCheck",
     path: "/admin/roles",
-    required: { minLevel: 100 },
-    section: "admin",
+    required: { minLevel: 1000 },
+    section: "system",
   },
   {
-    label: "Approval Levels",
-    icon: "HiOutlineClipboardCheck",
-    path: "/admin/approval-levels",
-    required: { minLevel: 100 },
-    section: "admin",
+    label: "Department Management",
+    icon: "HiOutlineBuildingOffice2",
+    path: "/admin/departments",
+    required: { minLevel: 700 },
+    section: "system",
   },
   {
-    label: "Workflow Templates",
-    icon: "HiOutlineCog",
-    path: "/admin/workflow-templates",
-    required: { minLevel: 100 },
-    section: "admin",
-  },
-
-  // ===== PLATFORM MANAGEMENT (Platform Admin Only) =====
-  {
-    label: "Industry Instances",
+    label: "Company Settings",
     icon: "HiOutlineBuildingOffice",
-    path: "/platform-admin/instances",
-    required: { minLevel: 110 },
-    section: "platform",
+    path: "/admin/company",
+    required: { minLevel: 1000 },
+    section: "system",
   },
-  {
-    label: "Create Instance",
-    icon: "HiOutlinePlusCircle",
-    path: "/platform-admin/create-instance",
-    required: { minLevel: 110 },
-    section: "platform",
-  },
-  {
-    label: "Pricing Management",
-    icon: "HiOutlineCurrencyDollar",
-    path: "/platform-admin/pricing",
-    required: { minLevel: 110 },
-    section: "platform",
-  },
-  {
-    label: "Subscription Management",
-    icon: "HiOutlineCreditCard",
-    path: "/platform-admin/subscriptions",
-    required: { minLevel: 110 },
-    section: "platform",
-  },
-
-  // ===== SYSTEM MANAGEMENT (Super Admin Only) =====
   {
     label: "System Settings",
     icon: "HiOutlineCog6Tooth",
     path: "/admin/settings",
-    required: { minLevel: 100 },
+    required: { minLevel: 1000 },
     section: "system",
   },
   {
     label: "Audit Logs",
     icon: "HiOutlineClipboardDocument",
     path: "/admin/audit",
-    required: { minLevel: 100 },
+    required: { minLevel: 1000 },
     section: "system",
+  },
+  {
+    label: "Workflow Templates",
+    icon: "HiOutlineCog",
+    path: "/admin/workflow-templates",
+    required: { minLevel: 1000 },
+    section: "system",
+  },
+  {
+    label: "Approval Levels",
+    icon: "HiOutlineCheckCircle",
+    path: "/admin/approval-levels",
+    required: { minLevel: 1000 },
+    section: "system",
+  },
+
+  // ===== DOCUMENT MANAGEMENT =====
+  {
+    label: "Documents",
+    icon: "HiOutlineDocumentText",
+    path: "/documents",
+    required: { minLevel: 300 },
+    section: "documents",
+  },
+  {
+    label: "Workflows",
+    icon: "HiOutlineClipboardCheck",
+    path: "/workflows",
+    required: { minLevel: 300 },
+    section: "documents",
+  },
+  {
+    label: "Document Archive",
+    icon: "HiOutlineArchiveBox",
+    path: "/documents/archive",
+    required: { minLevel: 600 },
+    section: "documents",
   },
 
   // ===== COMMUNICATION =====
   {
     label: "Messages",
     icon: "HiOutlineChatBubbleLeftRight",
-    path: "/admin/messages",
-    required: { minLevel: 30 },
+    path: "/messages",
+    required: { minLevel: 300 },
     section: "communication",
   },
   {
     label: "Notifications",
     icon: "HiOutlineBell",
-    path: "/admin/notifications",
-    required: { minLevel: 30 },
+    path: "/notifications",
+    required: { minLevel: 300 },
     section: "communication",
+  },
+
+  // ===== REPORTS & ANALYTICS =====
+  {
+    label: "Reports",
+    icon: "HiOutlineChartBar",
+    path: "/reports",
+    required: { minLevel: 600 },
+    section: "reports",
+  },
+  {
+    label: "Analytics",
+    icon: "HiOutlineChartPie",
+    path: "/analytics",
+    required: { minLevel: 600 },
+    section: "reports",
+  },
+  {
+    label: "System Reports",
+    icon: "HiOutlineDocumentMagnifyingGlass",
+    path: "/admin/reports",
+    required: { minLevel: 700 },
+    section: "reports",
   },
 ];
 
-// Role-specific navigation sections
-export const roleSections = {
-  // PLATFORM_ADMIN (110) - Platform management
-  110: {
-    sections: ["common", "platform", "communication"],
-    title: "Platform Administrator",
-  },
-
-  // SUPER_ADMIN (100) - Full access
-  100: {
-    sections: [
-      "common",
-      "documents",
-      "workflow",
-      "admin",
-      "system",
-      "communication",
-    ],
+// Role-based access configuration - ACTUAL ROLES FROM DATABASE
+export const roleConfig = {
+  // SUPER_ADMIN (1000) - Full access to everything
+  1000: {
     title: "Super Administrator",
+    sections: [
+      "main",
+      "erp",
+      "system",
+      "documents",
+      "communication",
+      "reports",
+    ],
+    color: "text-red-600",
+    bgColor: "bg-red-50",
+    borderColor: "border-red-200",
   },
 
-  // ADMIN (90) - Administrative access
-  90: {
-    sections: ["common", "documents", "workflow", "admin", "communication"],
-    title: "Administrator",
+  // HOD (700) - Head of Department
+  700: {
+    title: "Head of Department",
+    sections: [
+      "main",
+      "erp",
+      "system",
+      "documents",
+      "communication",
+      "reports",
+    ],
+    color: "text-purple-600",
+    bgColor: "bg-purple-50",
+    borderColor: "border-purple-200",
   },
 
-  // MANAGER (80) - Department management
-  80: {
-    sections: ["common", "documents", "workflow", "communication"],
+  // MANAGER (600) - Manager
+  600: {
     title: "Manager",
+    sections: ["main", "erp", "documents", "communication", "reports"],
+    color: "text-blue-600",
+    bgColor: "bg-blue-50",
+    borderColor: "border-blue-200",
   },
 
-  // SUPERVISOR (70) - Document approval
-  70: {
-    sections: ["common", "documents", "workflow", "communication"],
-    title: "Supervisor",
-  },
-
-  // SENIOR_STAFF (60) - Senior staff
-  60: {
-    sections: ["common", "documents", "workflow", "communication"],
-    title: "Senior Staff",
-  },
-
-  // STAFF (50) - Regular staff
-  50: {
-    sections: ["common", "documents", "workflow", "communication"],
+  // STAFF (300) - Regular staff
+  300: {
     title: "Staff",
-  },
-
-  // JUNIOR_STAFF (40) - Junior staff
-  40: {
-    sections: ["common", "documents", "communication"],
-    title: "Junior Staff",
-  },
-
-  // EXTERNAL_USER (30) - External user
-  30: {
-    sections: ["common", "documents", "communication"],
-    title: "External User",
-  },
-
-  // GUEST (20) - Guest user
-  20: {
-    sections: ["common", "documents", "communication"],
-    title: "Guest",
-  },
-
-  // READ_ONLY (10) - Read-only access
-  10: {
-    sections: ["common", "documents", "communication"],
-    title: "Read Only",
+    sections: ["main", "erp", "documents", "communication"],
+    color: "text-gray-600",
+    bgColor: "bg-gray-50",
+    borderColor: "border-gray-200",
   },
 };
 
 // Helper function to get navigation items for a specific role level
 export const getNavigationForRole = (roleLevel) => {
-  const roleConfig = roleSections[roleLevel] || roleSections[10]; // Default to READ_ONLY
+  const roleConfig = roleConfig[roleLevel] || roleConfig[300]; // Default to STAFF
   const allowedSections = roleConfig.sections;
 
   return sidebarConfig.filter((item) => {
@@ -237,7 +252,36 @@ export const getNavigationForRole = (roleLevel) => {
   });
 };
 
+// Helper function to get role title and styling
+export const getRoleInfo = (roleLevel) => {
+  return roleConfig[roleLevel] || roleConfig[300];
+};
+
 // Helper function to get role title
 export const getRoleTitle = (roleLevel) => {
-  return roleSections[roleLevel]?.title || "User";
+  return roleConfig[roleLevel]?.title || "Staff";
+};
+
+// Helper function to get sections for a role
+export const getRoleSections = (roleLevel) => {
+  return (
+    roleConfig[roleLevel]?.sections || [
+      "main",
+      "erp",
+      "documents",
+      "communication",
+    ]
+  );
+};
+
+// Helper function to check if user has access to a specific section
+export const hasSectionAccess = (userRoleLevel, section) => {
+  const sections = getRoleSections(userRoleLevel);
+  return sections.includes(section);
+};
+
+// Helper function to get filtered navigation by section
+export const getNavigationBySection = (roleLevel, section) => {
+  const allNav = getNavigationForRole(roleLevel);
+  return allNav.filter((item) => item.section === section);
 };

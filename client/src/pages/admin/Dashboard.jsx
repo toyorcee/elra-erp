@@ -11,7 +11,7 @@ import {
 import { toast } from "react-toastify";
 import { getSystemOverview } from "../../services/superAdmin";
 import { Link } from "react-router-dom";
-import { StatsSkeleton, GridSkeleton } from "../../components/skeleton";
+
 import RecentActivities from "../../components/RecentActivities";
 
 const AdminDashboard = () => {
@@ -99,12 +99,12 @@ const AdminDashboard = () => {
   if (loading) {
     return (
       <div className="p-6">
-        <div className="mb-6">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-2"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading dashboard...</p>
+          </div>
         </div>
-        <StatsSkeleton items={4} className="mb-8" />
-        <GridSkeleton items={3} columns={3} />
       </div>
     );
   }

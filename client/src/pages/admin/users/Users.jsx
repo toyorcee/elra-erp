@@ -137,8 +137,7 @@ const Users = () => {
             !user.email?.includes("platformadmin") &&
             (user.status === "PENDING_REGISTRATION" ||
               user.status === "INVITED" ||
-              user.status === "ACTIVE" ||
-              user.role?.name !== "PLATFORM_ADMIN")
+              user.status === "ACTIVE")
         ) || [];
 
       console.log("🔍 Filtered users:", filteredUsers);

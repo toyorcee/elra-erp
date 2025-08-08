@@ -13,6 +13,98 @@ import {
 import WelcomeNotificationService from "../services/welcomeNotificationService.js";
 import Invitation from "../models/Invitation.js";
 
+// Helper function to notify HODs (Heads of Department)
+const notifyHODs = async (newUser, department) => {
+  try {
+    const hods = await User.find({
+      department: department._id,
+      role: {
+        $in: await Role.find({ canApproveDepartment: true }).select("_id"),
+      },
+    }).populate("role");
+
+    for (const hod of hods) {
+      await Notification.create({
+        recipient: hod._id,
+        type: "DEPARTMENT_APPROVAL_NEEDED",
+        title: "New User Needs HOD Approval",
+        message: `New user ${newUser.firstName} ${newUser.lastName} (${newUser.email}) has registered for ${newUser.role.name} role and needs your approval.`,
+        data: {
+          newUserId: newUser._id,
+          newUserEmail: newUser.email,
+          newUserName: `${newUser.firstName} ${newUser.lastName}`,
+          newUserRole: newUser.role.name,
+          departmentId: department._id,
+          departmentName: department.name,
+          registrationDate: newUser.createdAt,
+        },
+        isRead: false,
+        priority: "high",
+      });
+    }
+  } catch (error) {
+    console.error("Error notifying HODs:", error);
+  }
+};
+
+// Helper function to notify Super Admins
+const notifySuperAdmins = async (newUser) => {
+  try {
+    const superAdmins = await User.find({ isSuperadmin: true }).select("_id");
+
+    for (const superAdmin of superAdmins) {
+      await Notification.create({
+        recipient: superAdmin._id,
+        type: "SUPER_ADMIN_APPROVAL_NEEDED",
+        title: "New User Needs Super Admin Approval",
+        message: `New user ${newUser.firstName} ${newUser.lastName} (${newUser.email}) has registered for ${newUser.role.name} role and needs Super Admin approval.`,
+        data: {
+          newUserId: newUser._id,
+          newUserEmail: newUser.email,
+          newUserName: `${newUser.firstName} ${newUser.lastName}`,
+          newUserRole: newUser.role.name,
+          registrationDate: newUser.createdAt,
+        },
+        isRead: false,
+        priority: "high",
+      });
+    }
+  } catch (error) {
+    console.error("Error notifying Super Admins:", error);
+  }
+};
+
+// Helper function to get next steps based on approval status
+const getNextSteps = (approvalStatus, roleName) => {
+  switch (approvalStatus) {
+    case "ACTIVE":
+      return {
+        type: "EMAIL_VERIFICATION",
+        message:
+          "Please check your email to verify your account before logging in.",
+        actions: ["Check email", "Verify account", "Login"],
+      };
+    case "PENDING_DEPARTMENT_APPROVAL":
+      return {
+        type: "DEPARTMENT_APPROVAL",
+        message: `Your registration is pending approval from your department head for the ${roleName} role.`,
+        actions: ["Wait for approval", "Contact department head"],
+      };
+    case "PENDING_SUPER_ADMIN_APPROVAL":
+      return {
+        type: "SUPER_ADMIN_APPROVAL",
+        message: `Your registration is pending approval from Super Admin for the ${roleName} role.`,
+        actions: ["Wait for approval", "Contact Super Admin"],
+      };
+    default:
+      return {
+        type: "PENDING",
+        message: "Your registration is being processed.",
+        actions: ["Wait for processing"],
+      };
+  }
+};
+
 const generateAccessToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
     expiresIn: process.env.ACCESS_TOKEN_EXPIRE || "15m",
@@ -86,10 +178,13 @@ const clearTokenCookies = (res) => {
   res.clearCookie("refreshToken", { ...cookieOptions, maxAge: 0 });
 };
 
-// @desc    Register a new user
+// @desc    Register a new user with smart approval system
 // @route   POST /api/auth/register
 // @access  Public
 export const register = async (req, res) => {
+  console.log("🚀 [AUTH] Register endpoint called");
+  console.log("📝 [AUTH] Request body:", JSON.stringify(req.body, null, 2));
+  console.log("🔍 [AUTH] Request headers:", req.headers);
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -100,7 +195,15 @@ export const register = async (req, res) => {
       });
     }
 
-    const { username, email, password, firstName, lastName } = req.body;
+    const {
+      username,
+      email,
+      password,
+      firstName,
+      lastName,
+      desiredRole, // New field for role selection
+      departmentId, // New field for department selection
+    } = req.body;
 
     const normalizedEmail = email.toLowerCase().trim();
 
@@ -114,11 +217,15 @@ export const register = async (req, res) => {
 
     let userRole;
     let company;
-    let defaultDepartment;
+    let selectedDepartment;
+    let approvalStatus = "PENDING_REGISTRATION";
+    let approvalMessage = "";
 
     const existingSuperAdmin = await User.findOne({ isSuperadmin: true });
 
+    // Smart role assignment logic
     if (!existingSuperAdmin) {
+      // First user becomes SUPER_ADMIN
       userRole = await Role.findOne({ name: "SUPER_ADMIN" });
       if (!userRole) {
         return res.status(500).json({
@@ -126,8 +233,43 @@ export const register = async (req, res) => {
           message: "System configuration error. Please contact support.",
         });
       }
+      approvalStatus = "ACTIVE";
+      approvalMessage = "First user automatically becomes Super Admin";
     } else {
-      userRole = null;
+      // Determine role based on desiredRole or default to STAFF
+      const roleName = desiredRole || "STAFF";
+      userRole = await Role.findOne({ name: roleName });
+
+      if (!userRole) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid role: ${roleName}. Only STAFF and MANAGER roles are available for registration.`,
+        });
+      }
+
+      // Smart approval logic based on role
+      if (userRole.name === "STAFF" || userRole.name === "MANAGER") {
+        // Check if the selected department has a HOD (Head of Department)
+        const hod = await User.findOne({
+          department: selectedDepartment._id,
+          role: await Role.findOne({ name: "HOD" }).select("_id"),
+          isActive: true,
+        });
+
+        if (hod) {
+          // Department has a HOD - send for HOD approval
+          approvalStatus = "PENDING_DEPARTMENT_APPROVAL";
+          approvalMessage = `Pending approval from ${selectedDepartment.name} HOD`;
+        } else {
+          // No HOD - send for Super Admin approval
+          approvalStatus = "PENDING_SUPER_ADMIN_APPROVAL";
+          approvalMessage = `Pending Super Admin approval (no HOD assigned)`;
+        }
+      } else {
+        // Any other role needs Super Admin approval
+        approvalStatus = "PENDING_SUPER_ADMIN_APPROVAL";
+        approvalMessage = `Pending Super Admin approval for ${roleName} role`;
+      }
     }
 
     // Check if this is the first user (first superadmin)
@@ -148,7 +290,7 @@ export const register = async (req, res) => {
       });
 
       // Create default department
-      defaultDepartment = await Department.create({
+      selectedDepartment = await Department.create({
         name: "General",
         description: "Default department for all users",
         company: company._id,
@@ -159,16 +301,33 @@ export const register = async (req, res) => {
     } else {
       // Use existing company and department
       company = existingCompany;
-      defaultDepartment = await Department.findOne({ company: company._id });
-      if (!defaultDepartment) {
-        defaultDepartment = await Department.create({
-          name: "General",
-          description: "Default department for all users",
+
+      // Handle department selection
+      if (departmentId) {
+        // User specified a department
+        selectedDepartment = await Department.findOne({
+          _id: departmentId,
           company: company._id,
-          manager: null,
-          isActive: true,
-          createdBy: null,
         });
+        if (!selectedDepartment) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid department selected",
+          });
+        }
+      } else {
+        // Use default department
+        selectedDepartment = await Department.findOne({ company: company._id });
+        if (!selectedDepartment) {
+          selectedDepartment = await Department.create({
+            name: "General",
+            description: "Default department for all users",
+            company: company._id,
+            manager: null,
+            isActive: true,
+            createdBy: null,
+          });
+        }
       }
     }
 
@@ -185,13 +344,13 @@ export const register = async (req, res) => {
       password,
       firstName,
       lastName,
-      role: userRole?._id, // May be null for new users
+      role: userRole._id,
       company: company?._id,
-      department: defaultDepartment?._id,
+      department: selectedDepartment?._id,
       isSuperadmin: !existingSuperAdmin, // Only first user becomes superadmin
       isEmailVerified: false, // Email not verified yet
-      isActive: false, // Account not active until Super Admin approves
-      status: existingSuperAdmin ? "PENDING_REGISTRATION" : "ACTIVE", // New users are pending
+      isActive: approvalStatus === "ACTIVE", // Active based on approval status
+      status: approvalStatus, // Use smart approval status
       emailVerificationToken: activationToken,
       emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
     });
@@ -199,13 +358,13 @@ export const register = async (req, res) => {
     await user.save();
 
     // Update company and department with the created user as creator/manager
-    if (company && defaultDepartment) {
+    if (company && selectedDepartment) {
       await Company.findByIdAndUpdate(company._id, {
         createdBy: user._id,
         updatedBy: user._id,
       });
 
-      await Department.findByIdAndUpdate(defaultDepartment._id, {
+      await Department.findByIdAndUpdate(selectedDepartment._id, {
         manager: user._id,
         createdBy: user._id,
         updatedBy: user._id,
@@ -215,53 +374,59 @@ export const register = async (req, res) => {
     // Populate role, company, and department after saving
     await user.populate(["role", "company", "department"]);
 
-    // Send appropriate email based on user status
+    // Send appropriate email and notifications based on approval status
     try {
       const { sendAccountActivationEmail, sendPendingRegistrationEmail } =
         await import("../services/emailService.js");
 
-      if (existingSuperAdmin) {
-        // New user - send pending registration email
-        await sendPendingRegistrationEmail(
-          user.email,
-          user.firstName || user.username
-        );
-
-        // Send notification to all Super Admins
-        try {
-          const superAdmins = await User.find({ isSuperadmin: true }).select(
-            "_id"
-          );
-
-          for (const superAdmin of superAdmins) {
-            await Notification.create({
-              recipient: superAdmin._id,
-              type: "USER_REGISTRATION",
-              title: "New User Registration",
-              message: `New user ${user.firstName} ${user.lastName} (${user.email}) has registered and is waiting for approval.`,
-              data: {
-                newUserId: user._id,
-                newUserEmail: user.email,
-                newUserName: `${user.firstName} ${user.lastName}`,
-                registrationDate: user.createdAt,
-              },
-              isRead: false,
-              priority: "medium",
-            });
-          }
-        } catch (notificationError) {
-          console.error(
-            "Error sending Super Admin notification:",
-            notificationError
-          );
-        }
-      } else {
+      if (!existingSuperAdmin) {
         // First user (Super Admin) - send activation email
         await sendAccountActivationEmail(
           user.email,
           user.firstName || user.username,
           activationToken
         );
+      } else {
+        // Handle different approval scenarios
+        switch (approvalStatus) {
+          case "ACTIVE":
+            // Auto-approved user - send welcome email
+            await sendAccountActivationEmail(
+              user.email,
+              user.firstName || user.username,
+              activationToken
+            );
+            break;
+
+          case "PENDING_DEPARTMENT_APPROVAL":
+            // Send pending email to user
+            await sendPendingRegistrationEmail(
+              user.email,
+              user.firstName || user.username
+            );
+
+            // Notify HODs
+            await notifyHODs(user, selectedDepartment);
+            break;
+
+          case "PENDING_SUPER_ADMIN_APPROVAL":
+            // Send pending email to user
+            await sendPendingRegistrationEmail(
+              user.email,
+              user.firstName || user.username
+            );
+
+            // Notify Super Admins
+            await notifySuperAdmins(user);
+            break;
+
+          default:
+            // Fallback to pending registration email
+            await sendPendingRegistrationEmail(
+              user.email,
+              user.firstName || user.username
+            );
+        }
       }
     } catch (error) {
       console.error("Error sending email:", error);
@@ -292,13 +457,13 @@ export const register = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: existingSuperAdmin
-        ? "Account created successfully! Please wait for the Super Admin to approve your registration and send you an invitation code."
-        : "Account created successfully! Please check your email to activate your account before logging in.",
+      message: approvalMessage || "Account created successfully!",
       data: {
         user: userResponse,
         requiresEmailVerification: !existingSuperAdmin,
-        requiresSuperAdminApproval: existingSuperAdmin,
+        approvalStatus: approvalStatus,
+        approvalMessage: approvalMessage,
+        nextSteps: getNextSteps(approvalStatus, userRole.name),
       },
     });
   } catch (error) {
@@ -315,6 +480,9 @@ export const register = async (req, res) => {
 // @route   POST /api/auth/login
 // @access  Public
 export const login = async (req, res) => {
+  console.log("🚀 [AUTH] Login endpoint called");
+  console.log("📝 [AUTH] Request body:", JSON.stringify(req.body, null, 2));
+  console.log("🔍 [AUTH] Request headers:", req.headers);
   try {
     console.log("Login attempt:", req.body.identifier);
     // Check for validation errors
@@ -328,30 +496,50 @@ export const login = async (req, res) => {
     }
 
     const { identifier, password } = req.body;
+    console.log("🔍 [AUTH] Looking for user with identifier:", identifier);
 
     // Find user by email or username and include password
     let user = await User.findByEmailOrUsername(identifier)
       .select("+password")
       .populate("role");
 
+    console.log(
+      "🔍 [AUTH] User found with findByEmailOrUsername:",
+      user ? "YES" : "NO"
+    );
+
     // If not found, try without isActive filter for debugging
     if (!user) {
+      console.log("🔍 [AUTH] Trying alternative user lookup...");
       user = await User.findOne({
         $or: [{ email: identifier.toLowerCase() }, { username: identifier }],
       })
         .select("+password")
         .populate("role");
+      console.log("🔍 [AUTH] Alternative lookup result:", user ? "YES" : "NO");
     }
 
     if (!user) {
+      console.log("❌ [AUTH] User not found");
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
       });
     }
 
+    console.log("✅ [AUTH] User found:", {
+      id: user._id,
+      email: user.email,
+      username: user.username,
+      isActive: user.isActive,
+      isEmailVerified: user.isEmailVerified,
+      status: user.status,
+      role: user.role?.name,
+    });
+
     // Check if user is active
     if (!user.isActive) {
+      console.log("❌ [AUTH] User account is deactivated");
       return res.status(401).json({
         success: false,
         message: "Account is deactivated",
@@ -379,17 +567,21 @@ export const login = async (req, res) => {
     }
 
     // Check password
+    console.log("🔐 [AUTH] Verifying password...");
     const isPasswordCorrect = await user.correctPassword(
       password,
       user.password
     );
 
     if (!isPasswordCorrect) {
+      console.log("❌ [AUTH] Password verification failed");
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
       });
     }
+
+    console.log("✅ [AUTH] Password verified successfully");
 
     // Clean expired refresh tokens
     await user.cleanExpiredRefreshTokens();
@@ -441,6 +633,10 @@ export const login = async (req, res) => {
       passwordChangeRequired: user.passwordChangeRequired,
       temporaryPasswordExpiry: user.temporaryPasswordExpiry,
     };
+
+    console.log("🎉 [AUTH] Login successful for user:", user.email);
+    console.log("🎉 [AUTH] User role:", user.role?.name);
+    console.log("🎉 [AUTH] Sending success response...");
 
     res.status(200).json({
       success: true,
@@ -1090,6 +1286,84 @@ export const verifyEmail = async (req, res) => {
   }
 };
 
+// @desc    Get available roles for registration
+// @route   GET /api/auth/registration-roles
+// @access  Public
+export const getRegistrationRoles = async (req, res) => {
+  try {
+    console.log("🔍 [getRegistrationRoles] Fetching roles for registration...");
+
+    const roles = await Role.find({
+      isActive: true,
+      name: { $in: ["STAFF", "MANAGER"] },
+    })
+      .select("name level description autoApproval canApproveDepartment")
+      .sort({ level: -1 });
+
+    console.log("✅ [getRegistrationRoles] Found roles:", roles.length);
+    console.log(
+      "Roles:",
+      roles.map((r) => ({
+        name: r.name,
+        level: r.level,
+        autoApproval: r.autoApproval,
+      }))
+    );
+
+    res.status(200).json({
+      success: true,
+      data: roles,
+    });
+  } catch (error) {
+    console.error(
+      "❌ [getRegistrationRoles] Error fetching registration roles:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch roles",
+    });
+  }
+};
+
+// @desc    Get available departments for registration
+// @route   GET /api/auth/registration-departments
+// @access  Public
+export const getRegistrationDepartments = async (req, res) => {
+  try {
+    console.log(
+      "🔍 [getRegistrationDepartments] Fetching departments for registration..."
+    );
+
+    const departments = await Department.find({ isActive: true })
+      .select("name code description level")
+      .sort({ level: -1, name: 1 });
+
+    console.log(
+      "✅ [getRegistrationDepartments] Found departments:",
+      departments.length
+    );
+    console.log(
+      "Departments:",
+      departments.map((d) => ({ name: d.name, code: d.code }))
+    );
+
+    res.status(200).json({
+      success: true,
+      data: departments,
+    });
+  } catch (error) {
+    console.error(
+      "❌ [getRegistrationDepartments] Error fetching registration departments:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch departments",
+    });
+  }
+};
+
 // @desc    Resend verification email
 // @route   POST /api/auth/resend-verification
 // @access  Public
@@ -1161,6 +1435,74 @@ export const resendVerificationEmail = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Internal server error",
+    });
+  }
+};
+
+// @desc    Get available modules for user
+// @route   GET /api/auth/user-modules
+// @access  Private
+export const getUserModules = async (req, res) => {
+  try {
+    console.log("🔍 [getUserModules] Fetching modules for user...");
+
+    const user = await User.findById(req.user.id)
+      .populate("role")
+      .populate("department");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Get modules based on user's role and department
+    let availableModules = [];
+
+    if (user.role && user.role.moduleAccess) {
+      // Get module details for each accessible module
+      const Module = (await import("../models/Module.js")).default;
+
+      for (const moduleAccess of user.role.moduleAccess) {
+        const module = await Module.findOne({
+          code: moduleAccess.module,
+          isActive: true,
+        });
+
+        if (module) {
+          // Check if user's department has access to this module
+          if (
+            user.department &&
+            module.departmentAccess.includes(user.department._id)
+          ) {
+            availableModules.push({
+              ...module.toObject(),
+              permissions: moduleAccess.permissions,
+            });
+          }
+        }
+      }
+    }
+
+    // Sort modules by order
+    availableModules.sort((a, b) => a.order - b.order);
+
+    console.log("✅ [getUserModules] Found modules:", availableModules.length);
+    console.log(
+      "Modules:",
+      availableModules.map((m) => ({ name: m.name, code: m.code }))
+    );
+
+    res.status(200).json({
+      success: true,
+      data: availableModules,
+    });
+  } catch (error) {
+    console.error("❌ [getUserModules] Error fetching user modules:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch modules",
     });
   }
 };

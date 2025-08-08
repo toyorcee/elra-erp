@@ -1,6 +1,74 @@
 @import "tailwindcss";
 @import "./styles/brandColors.css";
 
+/* ELRA Brand Colors - Deep Purple & Teal Theme */
+:root {
+  /* Primary Brand Colors */
+  --elra-primary: #2d1b69; /* Deep Purple - Main brand, headers, primary buttons */
+  --elra-secondary: #00bfa6; /* Teal - Secondary actions, highlights */
+  --elra-accent: #ff6b35; /* Coral - CTAs, important actions, warnings */
+
+  /* Success/Status Colors */
+  --elra-success: #00bfa6; /* Teal success */
+  --elra-warning: #ffb74d; /* Amber warning */
+  --elra-error: #ff6b35; /* Coral error */
+  --elra-info: #64b5f6; /* Light blue info */
+
+  /* Text Colors */
+  --elra-text-primary: #1a1a1a; /* Dark gray - Main text, headings */
+  --elra-text-secondary: #666666; /* Medium gray - Secondary text, descriptions */
+  --elra-text-muted: #999999; /* Light gray - Muted text, placeholders */
+  --elra-text-white: #ffffff; /* White text on dark backgrounds */
+
+  /* Background Colors */
+  --elra-bg-primary: #ffffff; /* White - Main background */
+  --elra-bg-secondary: #f8f9fa; /* Light gray - Secondary background */
+  --elra-bg-tertiary: #f1f3f4; /* Lighter gray - Cards, sections */
+  --elra-bg-dark: #2d1b69; /* Deep purple - Dark sections */
+
+  /* Border Colors */
+  --elra-border-primary: #e0e0e0; /* Light gray - Main borders */
+  --elra-border-secondary: #d0d0d0; /* Medium gray - Secondary borders */
+  --elra-border-focus: #00bfa6; /* Teal - Focus states, active borders */
+  --elra-border-error: #ff6b35; /* Coral - Error borders */
+
+  /* Shadow Colors */
+  --elra-shadow-light: rgba(45, 27, 105, 0.1); /* Purple shadow */
+  --elra-shadow-medium: rgba(45, 27, 105, 0.15); /* Medium shadow */
+  --elra-shadow-heavy: rgba(45, 27, 105, 0.25); /* Heavy shadow */
+
+  /* Hover States */
+  --elra-hover-primary: #1f1347; /* Darker purple - Primary hover */
+  --elra-hover-secondary: #00a896; /* Darker teal - Secondary hover */
+  --elra-hover-accent: #e55a2b; /* Darker coral - Accent hover */
+}
+
+/* Custom Tailwind Colors for Module Selector */
+@layer utilities {
+  .bg-coral-50 {
+    background-color: #fef2f2;
+  }
+  .bg-coral-500 {
+    background-color: #ff6b35;
+  }
+  .bg-coral-600 {
+    background-color: #e55a2b;
+  }
+  .border-coral-200 {
+    border-color: #fecaca;
+  }
+  .from-coral-500 {
+    --tw-gradient-from: #ff6b35;
+  }
+  .to-coral-600 {
+    --tw-gradient-to: #e55a2b;
+  }
+
+  .shadow-3xl {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  }
+}
+
 /* Glassmorphism utility class */
 .glass-card {
   background: rgba(255, 255, 255, 0.1);
@@ -184,3 +252,28 @@ a:hover {
   background-size: 200% 100%;
   animation: shimmer 1.8s ease-in-out infinite;
 } */
+
+/* Custom Scrollbar Styles */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.5);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 85, 247, 0.7);
+}
+
+/* Firefox scrollbar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(168, 85, 247, 0.5) rgba(255, 255, 255, 0.1);
+}

@@ -1,11 +1,11 @@
 {
-  "name": "EDMS - Electronic Document Management System",
-  "short_name": "EDMS",
-  "description": "Secure, cloud-based document management for organizations across Nigeria and Africa",
+  "name": "ELRA - Enterprise Resource Planning System",
+  "short_name": "ELRA ERP",
+  "description": "Comprehensive ERP solution with HR, Payroll, Procurement, Accounting, and Communication modules",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#10b981",
-  "theme_color": "#10b981",
+  "background_color": "#667eea",
+  "theme_color": "#667eea",
   "orientation": "portrait-primary",
   "icons": [
     {

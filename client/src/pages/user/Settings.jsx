@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useProfile } from "../../hooks/useProfile";
-import SkeletonLoader from "../../components/SkeletonLoader";
+
 import {
   MdPerson,
   MdNotifications,
@@ -856,7 +856,12 @@ const Settings = () => {
   if (isUpdatingProfile) {
     return (
       <div className="w-full py-6">
-        <SkeletonLoader className="h-96" />
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading settings...</p>
+          </div>
+        </div>
       </div>
     );
   }

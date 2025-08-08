@@ -1,11 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
-<<<<<<< HEAD
-
-=======
-import { useLocation } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
->>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
 import {
   MdNotifications,
   MdNotificationsActive,
@@ -403,7 +397,6 @@ const Notifications = () => {
 
   if (loading) {
     return (
-<<<<<<< HEAD
       <div className="w-full max-w-4xl mx-auto py-6">
         <h1 className="text-2xl font-bold mb-6 text-blue-900 font-[Poppins]">
           Notifications
@@ -414,17 +407,6 @@ const Notifications = () => {
             <p className="text-gray-600">Loading notifications...</p>
           </div>
         </div>
-=======
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
-        >
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 text-lg">Loading notifications...</p>
-        </motion.div>
->>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
       </div>
     );
   }

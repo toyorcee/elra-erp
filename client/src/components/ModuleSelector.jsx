@@ -222,7 +222,6 @@ function ModuleSelector() {
   const [direction, setDirection] = React.useState(0);
   const [showModal, setShowModal] = React.useState(false);
   const [selectedModule, setSelectedModule] = React.useState(null);
-  const [spinningModule, setSpinningModule] = React.useState(null);
   const [userModules, setUserModules] = React.useState([]);
   const [loadingModules, setLoadingModules] = React.useState(false);
   const currentYear = new Date().getFullYear();
@@ -322,16 +321,6 @@ function ModuleSelector() {
       if (nextIndex >= modules.length) return 0;
       return nextIndex;
     });
-
-    // Trigger spin animation for the new centered module
-    const nextIndex =
-      (currentIndex + newDirection + modules.length) % modules.length;
-    setSpinningModule(modules[nextIndex]?.title);
-
-    // Stop spinning after animation completes
-    setTimeout(() => {
-      setSpinningModule(null);
-    }, 600);
   };
 
   const handleModuleClick = (module) => {
@@ -437,42 +426,6 @@ function ModuleSelector() {
             ? "Your accessible ERP modules"
             : "Choose an ERP module to get started"}
         </p>
-        {user && loadingModules && (
-          <div className="mt-4 flex items-center justify-center">
-            <div className="w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mr-3"></div>
-            <span className="text-purple-600 font-medium">
-              Loading your modules...
-            </span>
-          </div>
-        )}
-        {user && !loadingModules && userModules.length > 0 && (
-          <div className="mt-4">
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg px-4 py-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                    <span className="text-green-600 font-bold text-sm">
-                      {userModules.length}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-green-800">
-                      {userModules.length}/5 ERP modules available
-                    </p>
-                    <p className="text-xs text-green-600">
-                      Based on your {user?.role || "User"} role
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-green-600 font-medium">
-                    Ready to access
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Module Selector */}
@@ -527,13 +480,11 @@ function ModuleSelector() {
                   >
                     <div
                       className={`text-white text-4xl transition-all duration-300 ${
-                        offset === 0 ? "group-hover:animate-spin" : ""
+                        offset === 0 ? "animate-spin" : ""
                       }`}
                       style={{
                         animation:
-                          spinningModule === module.title && offset === 0
-                            ? "spin 0.6s ease-out"
-                            : "none",
+                          offset === 0 ? "spin 2s linear infinite" : "none",
                       }}
                     >
                       {getIconComponent(module.icon)}
@@ -565,73 +516,6 @@ function ModuleSelector() {
                   <p className="text-base text-gray-600 text-center mb-4 leading-relaxed">
                     {module.description}
                   </p>
-
-                  {/* Process Flow - Only show for centered module */}
-                  {offset === 0 && module.processFlow && (
-                    <div className="w-full mb-4">
-                      <h4 className="text-sm font-semibold text-gray-700 mb-2 text-center">
-                        Process Flow
-                      </h4>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="bg-purple-100 rounded p-2">
-                          <div className="font-semibold text-purple-700 mb-1">
-                            📝 Data Entry
-                          </div>
-                          <ul className="text-purple-600 space-y-1">
-                            {module.processFlow.dataEntry
-                              .slice(0, 2)
-                              .map((item, idx) => (
-                                <li key={idx} className="truncate">
-                                  • {item}
-                                </li>
-                              ))}
-                          </ul>
-                        </div>
-                        <div className="bg-blue-100 rounded p-2">
-                          <div className="font-semibold text-blue-700 mb-1">
-                            ⚙️ Processing
-                          </div>
-                          <ul className="text-blue-600 space-y-1">
-                            {module.processFlow.processing
-                              .slice(0, 2)
-                              .map((item, idx) => (
-                                <li key={idx} className="truncate">
-                                  • {item}
-                                </li>
-                              ))}
-                          </ul>
-                        </div>
-                        <div className="bg-green-100 rounded p-2">
-                          <div className="font-semibold text-green-700 mb-1">
-                            📊 Output
-                          </div>
-                          <ul className="text-green-600 space-y-1">
-                            {module.processFlow.output
-                              .slice(0, 2)
-                              .map((item, idx) => (
-                                <li key={idx} className="truncate">
-                                  • {item}
-                                </li>
-                              ))}
-                          </ul>
-                        </div>
-                        <div className="bg-orange-100 rounded p-2">
-                          <div className="font-semibold text-orange-700 mb-1">
-                            ✅ Approval
-                          </div>
-                          <ul className="text-orange-600 space-y-1">
-                            {module.processFlow.approval
-                              .slice(0, 2)
-                              .map((item, idx) => (
-                                <li key={idx} className="truncate">
-                                  • {item}
-                                </li>
-                              ))}
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
                   {user &&
                     module.permissions &&

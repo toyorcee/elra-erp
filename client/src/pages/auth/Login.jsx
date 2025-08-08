@@ -11,7 +11,10 @@ import {
   HiKey,
   HiCog,
   HiChartBar,
+  HiMail,
+  HiLockClosed,
 } from "react-icons/hi";
+import { MdVisibility, MdVisibilityOff } from "react-icons/md";
 import { useAuth } from "../../context/AuthContext";
 import ELRALogo from "../../components/ELRALogo";
 import { GradientSpinner } from "../../components/common";

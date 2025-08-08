@@ -514,12 +514,8 @@ export const login = async (req, res) => {
         $or: [{ email: identifier.toLowerCase() }, { username: identifier }],
       })
         .select("+password")
-<<<<<<< HEAD
         .populate("role");
       console.log("🔍 [AUTH] Alternative lookup result:", user ? "YES" : "NO");
-=======
-        .populate("role department");
->>>>>>> 6c7feb4fac477c4675022f11e738e492b13675b4
     }
 
     if (!user) {

@@ -31,7 +31,7 @@ const allModules = [
   {
     title: "Human Resources",
     description: "Employee management, recruitment, and HR workflows",
-    icon: <FaUsers className="w-full h-full" />,
+    icon: "FaUsers",
     path: "/dashboard/hr",
     isReady: true,
     color: "from-purple-500 to-purple-600",
@@ -39,36 +39,16 @@ const allModules = [
     borderColor: "border-purple-200",
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
     processFlow: {
-      dataEntry: [
-        "Employee profiles",
-        "Recruitment applications",
-        "Performance reviews",
-        "Training records",
-      ],
-      processing: [
-        "Candidate screening",
-        "Performance calculations",
-        "Training scheduling",
-        "Workflow automation",
-      ],
-      output: [
-        "Employee reports",
-        "Performance analytics",
-        "Training certificates",
-        "HR dashboards",
-      ],
-      approval: [
-        "Hiring decisions",
-        "Performance ratings",
-        "Training approvals",
-        "Policy changes",
-      ],
-    },
+      dataEntry: ["Employee profiles", "Recruitment applications", "Performance reviews", "Training records"],
+      processing: ["Candidate screening", "Performance calculations", "Training scheduling", "Workflow automation"],
+      output: ["Employee reports", "Performance analytics", "Training certificates", "HR dashboards"],
+      approval: ["Hiring decisions", "Performance ratings", "Training approvals", "Policy changes"]
+    }
   },
   {
     title: "Payroll Management",
     description: "Salary processing, benefits, and payroll reports",
-    icon: <FaMoneyCheckAlt className="w-full h-full" />,
+    icon: "FaMoneyCheckAlt",
     path: "/dashboard/payroll",
     isReady: true,
     color: "from-teal-500 to-teal-600",
@@ -76,36 +56,16 @@ const allModules = [
     borderColor: "border-teal-200",
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
     processFlow: {
-      dataEntry: [
-        "Time sheets",
-        "Salary information",
-        "Benefits data",
-        "Deduction records",
-      ],
-      processing: [
-        "Salary calculations",
-        "Tax computations",
-        "Benefit deductions",
-        "Overtime calculations",
-      ],
-      output: [
-        "Payroll reports",
-        "Salary payments",
-        "Tax filings",
-        "Benefit statements",
-      ],
-      approval: [
-        "Payroll approval",
-        "Benefit changes",
-        "Salary adjustments",
-        "Tax submissions",
-      ],
-    },
+      dataEntry: ["Time sheets", "Salary information", "Benefits data", "Deduction records"],
+      processing: ["Salary calculations", "Tax computations", "Benefit deductions", "Overtime calculations"],
+      output: ["Payroll reports", "Salary payments", "Tax filings", "Benefit statements"],
+      approval: ["Payroll approval", "Benefit changes", "Salary adjustments", "Tax submissions"]
+    }
   },
   {
     title: "Procurement",
     description: "Purchase orders, vendor management, and inventory",
-    icon: <FaShoppingCart className="w-full h-full" />,
+    icon: "FaShoppingCart",
     path: "/dashboard/procurement",
     isReady: true,
     color: "from-pink-500 to-pink-600",
@@ -113,36 +73,16 @@ const allModules = [
     borderColor: "border-pink-200",
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
     processFlow: {
-      dataEntry: [
-        "Purchase requests",
-        "Vendor information",
-        "Inventory needs",
-        "Contract terms",
-      ],
-      processing: [
-        "Vendor evaluation",
-        "Price comparisons",
-        "Inventory tracking",
-        "Order processing",
-      ],
-      output: [
-        "Purchase orders",
-        "Vendor reports",
-        "Inventory reports",
-        "Cost analysis",
-      ],
-      approval: [
-        "Purchase approvals",
-        "Vendor selection",
-        "Contract approvals",
-        "Payment authorizations",
-      ],
-    },
+      dataEntry: ["Purchase requests", "Vendor information", "Inventory needs", "Contract terms"],
+      processing: ["Vendor evaluation", "Price comparisons", "Inventory tracking", "Order processing"],
+      output: ["Purchase orders", "Vendor reports", "Inventory reports", "Cost analysis"],
+      approval: ["Purchase approvals", "Vendor selection", "Contract approvals", "Payment authorizations"]
+    }
   },
   {
     title: "Accounting",
     description: "Financial management, expenses, and reporting",
-    icon: <FaChartLine className="w-full h-full" />,
+    icon: "FaChartLine",
     path: "/dashboard/accounts",
     isReady: true,
     color: "from-blue-500 to-blue-600",
@@ -150,36 +90,16 @@ const allModules = [
     borderColor: "border-blue-200",
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
     processFlow: {
-      dataEntry: [
-        "Financial transactions",
-        "Expense records",
-        "Revenue data",
-        "Budget information",
-      ],
-      processing: [
-        "Journal entries",
-        "Account reconciliation",
-        "Budget calculations",
-        "Financial analysis",
-      ],
-      output: [
-        "Financial statements",
-        "Budget reports",
-        "Cash flow analysis",
-        "Audit trails",
-      ],
-      approval: [
-        "Financial approvals",
-        "Budget approvals",
-        "Expense approvals",
-        "Audit approvals",
-      ],
-    },
+      dataEntry: ["Financial transactions", "Expense records", "Revenue data", "Budget information"],
+      processing: ["Journal entries", "Account reconciliation", "Budget calculations", "Financial analysis"],
+      output: ["Financial statements", "Budget reports", "Cash flow analysis", "Audit trails"],
+      approval: ["Financial approvals", "Budget approvals", "Expense approvals", "Audit approvals"]
+    }
   },
   {
     title: "Communication",
     description: "Internal messaging, announcements, and collaboration",
-    icon: <FaComments className="w-full h-full" />,
+    icon: "FaComments",
     path: "/dashboard/communication",
     isReady: true,
     color: "from-indigo-500 to-indigo-600",
@@ -187,31 +107,11 @@ const allModules = [
     borderColor: "border-indigo-200",
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF", "VIEWER"],
     processFlow: {
-      dataEntry: [
-        "Messages & announcements",
-        "Meeting requests",
-        "File uploads",
-        "Collaboration data",
-      ],
-      processing: [
-        "Message routing",
-        "Notification generation",
-        "File processing",
-        "Thread management",
-      ],
-      output: [
-        "Delivered messages",
-        "Meeting schedules",
-        "Shared files",
-        "Communication logs",
-      ],
-      approval: [
-        "Message approvals",
-        "Announcement approvals",
-        "File sharing permissions",
-        "Meeting scheduling",
-      ],
-    },
+      dataEntry: ["Messages & announcements", "Meeting requests", "File uploads", "Collaboration data"],
+      processing: ["Message routing", "Notification generation", "File processing", "Thread management"],
+      output: ["Delivered messages", "Meeting schedules", "Shared files", "Communication logs"],
+      approval: ["Message approvals", "Announcement approvals", "File sharing permissions", "Meeting scheduling"]
+    }
   },
 ];
 

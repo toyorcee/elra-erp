@@ -22,6 +22,7 @@ import {
   FaSignInAlt,
   FaCompass,
   FaBoxes,
+  FaHeadset,
 } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
 import ELRALogo from "./ELRALogo";
@@ -213,6 +214,43 @@ const allModules = [
       ],
     },
   },
+  {
+    title: "Customer Care",
+    description: "Customer support, ticket management, and service requests",
+    icon: "FaHeadset",
+    path: "/dashboard/customer-care",
+    isReady: true,
+    color: "from-green-500 to-emerald-600",
+    bgColor: "bg-green-50",
+    borderColor: "border-green-200",
+    requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
+    processFlow: {
+      dataEntry: [
+        "Support tickets",
+        "Customer inquiries",
+        "Service requests",
+        "Feedback forms",
+      ],
+      processing: [
+        "Ticket routing",
+        "Issue resolution",
+        "Escalation handling",
+        "Response generation",
+      ],
+      output: [
+        "Resolved tickets",
+        "Customer satisfaction",
+        "Service reports",
+        "Knowledge base",
+      ],
+      approval: [
+        "Ticket assignments",
+        "Resolution approvals",
+        "Escalation approvals",
+        "Service level agreements",
+      ],
+    },
+  },
 ];
 
 function ModuleSelector() {
@@ -226,13 +264,16 @@ function ModuleSelector() {
   const [loadingModules, setLoadingModules] = React.useState(false);
   const currentYear = new Date().getFullYear();
 
-  // Fetch user modules when authenticated
+  // Fetch all modules (for everyone to see)
   React.useEffect(() => {
-    const fetchUserModules = async () => {
-      if (user) {
-        try {
-          setLoadingModules(true);
-          console.log("🔍 [ModuleSelector] Fetching user modules...");
+    console.log("🔍 [ModuleSelector] useEffect triggered, user:", user);
+    const fetchModules = async () => {
+      try {
+        setLoadingModules(true);
+        console.log("🔍 [ModuleSelector] Fetching all modules...");
+
+        if (user) {
+          // For authenticated users, fetch their specific modules
           const response = await userModulesAPI.getUserModules();
           const transformedModules = userModulesAPI.transformModules(
             response.data
@@ -242,20 +283,36 @@ function ModuleSelector() {
             "✅ [ModuleSelector] User modules loaded:",
             transformedModules.length
           );
-        } catch (error) {
-          console.error(
-            "❌ [ModuleSelector] Error fetching user modules:",
-            error
+          console.log(
+            "📦 [ModuleSelector] Transformed modules:",
+            transformedModules
           );
-          // Fallback to all modules if API fails
-          setUserModules(allModules);
-        } finally {
-          setLoadingModules(false);
+        } else {
+          // For unauthenticated users, fetch all available modules
+          const response = await userModulesAPI.getAllModules();
+          const transformedModules = userModulesAPI.transformModules(
+            response.data
+          );
+          setUserModules(transformedModules);
+          console.log(
+            "✅ [ModuleSelector] All modules loaded:",
+            transformedModules.length
+          );
+          console.log(
+            "📦 [ModuleSelector] Transformed modules:",
+            transformedModules
+          );
         }
+      } catch (error) {
+        console.error("❌ [ModuleSelector] Error fetching modules:", error);
+        // Fallback to all modules if API fails
+        setUserModules(allModules);
+      } finally {
+        setLoadingModules(false);
       }
     };
 
-    fetchUserModules();
+    fetchModules();
   }, [user]);
 
   const modules = React.useMemo(() => {
@@ -307,6 +364,7 @@ function ModuleSelector() {
       FaSignInAlt: FaSignInAlt,
       FaCompass: FaCompass,
       FaBoxes: FaBoxes,
+      FaHeadset: FaHeadset,
     };
 
     const IconComponent = iconMap[iconName] || FaCog;

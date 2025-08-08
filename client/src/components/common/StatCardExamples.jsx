@@ -1,5 +1,5 @@
 import React from "react";
-import { StatCard, StatCardGrid, AnimatedStatCard } from "./StatCard";
+import { StatCard, StatCardGrid, AnimatedStatCard } from "./index";
 
 // Example usage of StatCard components
 export const StatCardExamples = () => {

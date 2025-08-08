@@ -1,11 +1,23 @@
-// User Role Levels (for regular users, not Super Admin)
+// User Role Levels (aligned with actual database)
 export const USER_ROLE_LEVELS = {
-  MANAGER: 50,
-  SUPERVISOR: 40,
-  SENIOR_STAFF: 30,
-  STAFF: 20,
-  JUNIOR_STAFF: 15,
-  EXTERNAL_USER: 10,
+  SUPER_ADMIN: 1000,
+  HOD: 700,
+  MANAGER: 600,
+  STAFF: 300,
+  VIEWER: 100, // Missing in DB, needs to be added
+};
+
+// ERP Module Permissions (aligned with actual database)
+export const ERP_MODULES = {
+  HR: "hr",
+  PAYROLL: "payroll",
+  PROCUREMENT: "procurement",
+  FINANCE: "finance", // Actual module name in DB
+  COMMUNICATION: "communication",
+  DOCUMENTS: "documents", // Actual module in DB
+  PROJECTS: "projects", // Actual module in DB
+  INVENTORY: "inventory", // Actual module in DB
+  CUSTOMER_CARE: "customer_care", // Missing in DB, needs to be added
 };
 
 // Permission constants
@@ -30,6 +42,47 @@ export const PERMISSIONS = {
   WORKFLOW_DELEGATE: "workflow.delegate",
   WORKFLOW_VIEW: "workflow.view",
 
+  // HR Module permissions
+  HR_EMPLOYEE_CREATE: "hr.employee.create",
+  HR_EMPLOYEE_VIEW: "hr.employee.view",
+  HR_EMPLOYEE_EDIT: "hr.employee.edit",
+  HR_EMPLOYEE_DELETE: "hr.employee.delete",
+  HR_RECRUITMENT: "hr.recruitment",
+  HR_PERFORMANCE: "hr.performance",
+  HR_LEAVE_MANAGEMENT: "hr.leave.management",
+  HR_TRAINING: "hr.training",
+
+  // Payroll Module permissions
+  PAYROLL_CALCULATE: "payroll.calculate",
+  PAYROLL_VIEW: "payroll.view",
+  PAYROLL_APPROVE: "payroll.approve",
+  PAYROLL_PROCESS: "payroll.process",
+  PAYROLL_REPORTS: "payroll.reports",
+
+  // Procurement Module permissions
+  PROCUREMENT_CREATE: "procurement.create",
+  PROCUREMENT_VIEW: "procurement.view",
+  PROCUREMENT_APPROVE: "procurement.approve",
+  PROCUREMENT_PROCESS: "procurement.process",
+  PROCUREMENT_VENDOR: "procurement.vendor",
+
+  // Finance Module permissions (replaces ACCOUNTS)
+  FINANCE_BILLING: "finance.billing",
+  FINANCE_VIEW: "finance.view",
+  FINANCE_APPROVE: "finance.approve",
+  FINANCE_REPORTS: "finance.reports",
+
+  // Communication Module permissions
+  COMMUNICATION_SEND: "communication.send",
+  COMMUNICATION_VIEW: "communication.view",
+  COMMUNICATION_MANAGE: "communication.manage",
+
+  // Customer Care Module permissions
+  CUSTOMER_CARE_VIEW: "customer_care.view",
+  CUSTOMER_CARE_CREATE: "customer_care.create",
+  CUSTOMER_CARE_EDIT: "customer_care.edit",
+  CUSTOMER_CARE_RESOLVE: "customer_care.resolve",
+
   // User management permissions
   USER_CREATE: "user.create",
   USER_VIEW: "user.view",
@@ -50,18 +103,55 @@ export const hasPermission = (user, permission) => {
   return user?.role?.permissions?.includes(permission) || false;
 };
 
-// Role level checks helper functions (based on actual system levels)
+// Role level checks helper functions
+export const isSuperAdmin = (user) =>
+  user?.role?.level === USER_ROLE_LEVELS.SUPER_ADMIN;
+export const isHOD = (user) => user?.role?.level === USER_ROLE_LEVELS.HOD;
 export const isManager = (user) =>
   user?.role?.level === USER_ROLE_LEVELS.MANAGER;
-export const isSupervisor = (user) =>
-  user?.role?.level === USER_ROLE_LEVELS.SUPERVISOR;
-export const isSeniorStaff = (user) =>
-  user?.role?.level === USER_ROLE_LEVELS.SENIOR_STAFF;
 export const isStaff = (user) => user?.role?.level === USER_ROLE_LEVELS.STAFF;
-export const isJuniorStaff = (user) =>
-  user?.role?.level === USER_ROLE_LEVELS.JUNIOR_STAFF;
-export const isExternalUser = (user) =>
-  user?.role?.level === USER_ROLE_LEVELS.EXTERNAL_USER;
+export const isViewer = (user) => user?.role?.level === USER_ROLE_LEVELS.VIEWER;
+
+// Module access checks (aligned with actual DB structure)
+export const canAccessModule = (user, module) => {
+  const modulePermissions = {
+    [ERP_MODULES.HR]: [
+      PERMISSIONS.HR_EMPLOYEE_VIEW,
+      PERMISSIONS.HR_EMPLOYEE_CREATE,
+    ],
+    [ERP_MODULES.PAYROLL]: [
+      PERMISSIONS.PAYROLL_VIEW,
+      PERMISSIONS.PAYROLL_CALCULATE,
+    ],
+    [ERP_MODULES.PROCUREMENT]: [
+      PERMISSIONS.PROCUREMENT_VIEW,
+      PERMISSIONS.PROCUREMENT_CREATE,
+    ],
+    [ERP_MODULES.FINANCE]: [
+      PERMISSIONS.FINANCE_VIEW,
+      PERMISSIONS.FINANCE_BILLING,
+    ],
+    [ERP_MODULES.COMMUNICATION]: [
+      PERMISSIONS.COMMUNICATION_VIEW,
+      PERMISSIONS.COMMUNICATION_SEND,
+    ],
+    [ERP_MODULES.DOCUMENTS]: [
+      PERMISSIONS.DOCUMENT_VIEW,
+      PERMISSIONS.DOCUMENT_UPLOAD,
+    ],
+    [ERP_MODULES.PROJECTS]: ["projects.view", "projects.create"],
+    [ERP_MODULES.INVENTORY]: ["inventory.view", "inventory.create"],
+    [ERP_MODULES.CUSTOMER_CARE]: [
+      PERMISSIONS.CUSTOMER_CARE_VIEW,
+      PERMISSIONS.CUSTOMER_CARE_CREATE,
+    ],
+  };
+
+  const requiredPermissions = modulePermissions[module] || [];
+  return requiredPermissions.some((permission) =>
+    hasPermission(user, permission)
+  );
+};
 
 // Common permission checks
 export const canUploadDocuments = (user) =>
@@ -114,18 +204,35 @@ export const canViewReports = (user) =>
 export const canViewAudit = (user) =>
   hasPermission(user, PERMISSIONS.SYSTEM_AUDIT);
 
-// Role descriptions for UI (based on actual system descriptions)
+// Role descriptions for UI (updated for ERP system)
 export const ROLE_DESCRIPTIONS = {
+  [USER_ROLE_LEVELS.SUPER_ADMIN]:
+    "Full access to all ERP modules and system administration features",
+  [USER_ROLE_LEVELS.HOD]:
+    "Head of Department with HR management, limited procurement approval, and communication tools",
   [USER_ROLE_LEVELS.MANAGER]:
-    "Department manager with full document management, cross-department transfers, enhanced management features, scanning and upload capabilities",
-  [USER_ROLE_LEVELS.SUPERVISOR]:
-    "Department supervisor with full document management, limited cross-department transfers, scanning and upload capabilities",
-  [USER_ROLE_LEVELS.SENIOR_STAFF]:
-    "Ensures regulatory compliance, conducts document audits, scanning and upload capabilities",
+    "Department manager with approval workflows and department-specific module access",
   [USER_ROLE_LEVELS.STAFF]:
-    "Manages local operations, client interactions, document updates, scanning and upload capabilities",
-  [USER_ROLE_LEVELS.JUNIOR_STAFF]:
-    "Performs day-to-day tasks with document access (no scanning or upload capabilities)",
-  [USER_ROLE_LEVELS.EXTERNAL_USER]:
-    "Interacts with NAIC through secure portals for document submission or retrieval (no scanning or upload capabilities)",
+    "Staff member with basic module access and self-service features",
+  [USER_ROLE_LEVELS.VIEWER]: "Read-only access to reports and announcements",
+};
+
+// Module descriptions for UI
+export const MODULE_DESCRIPTIONS = {
+  [ERP_MODULES.HR]:
+    "Employee lifecycle management, recruitment, performance, and training",
+  [ERP_MODULES.PAYROLL]:
+    "Salary processing, deductions, tax management, and payroll reporting",
+  [ERP_MODULES.PROCUREMENT]:
+    "Purchase requests, vendor management, and contract handling",
+  [ERP_MODULES.FINANCE]: "Financial reporting, billing, and budget tracking",
+  [ERP_MODULES.COMMUNICATION]:
+    "Internal messaging, notifications, and collaboration tools",
+  [ERP_MODULES.DOCUMENTS]: "Document storage, sharing, and workflow management",
+  [ERP_MODULES.PROJECTS]:
+    "Project planning, task management, and progress tracking",
+  [ERP_MODULES.INVENTORY]:
+    "Stock management, asset tracking, and inventory control",
+  [ERP_MODULES.CUSTOMER_CARE]:
+    "Customer support, ticket management, and service requests",
 };

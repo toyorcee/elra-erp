@@ -116,6 +116,7 @@ const roleSchema = new mongoose.Schema(
             "PROJECTS",
             "INVENTORY",
             "FINANCE",
+            "CUSTOMER_CARE",
           ],
         },
         permissions: [String],

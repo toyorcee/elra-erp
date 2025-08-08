@@ -6,32 +6,27 @@ import ResetPassword from "./pages/auth/ResetPassword";
 import RetrieveCredentials from "./pages/auth/RetrieveCredentials";
 import EmailVerification from "./pages/auth/EmailVerification";
 import EmailVerificationSuccess from "./pages/auth/EmailVerificationSuccess";
-import { Dashboard, Documents, Upload } from "./pages/user";
-import DepartmentDocuments from "./pages/user/DepartmentDocuments";
-import DepartmentDashboard from "./pages/user/DepartmentDashboard";
-import Workflows from "./pages/user/Workflows";
-import DepartmentStaff from "./pages/user/DepartmentStaff";
-import Archive from "./pages/user/Archive";
+import { Dashboard, Documents } from "./pages/user";
 import Notifications from "./pages/shared/Notifications";
-import UserSettings from "./pages/user/Settings";
-import {
-  Dashboard as AdminDashboard,
-  Users,
-  Departments,
-  AuditLogs,
-  Settings as AdminSettings,
-  RoleManagement,
-} from "./pages/admin";
+// Admin imports commented out - admin folder deleted
+// import {
+//   Dashboard as AdminDashboard,
+//   Users,
+//   Departments,
+//   AuditLogs,
+//   Settings as AdminSettings,
+//   RoleManagement,
+// } from "./pages/admin";
 
-import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
-import ApprovalLevels from "./pages/admin/ApprovalLevels";
-import WorkflowTemplates from "./pages/admin/WorkflowTemplates";
-import {
-  CompanyList,
-  CreateCompany,
-  SubscriptionManagement,
-  PricingManagement,
-} from "./pages/platform-admin";
+// import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
+// import ApprovalLevels from "./pages/admin/ApprovalLevels";
+// import WorkflowTemplates from "./pages/admin/WorkflowTemplates";
+// import {
+//   CompanyList,
+//   CreateCompany,
+//   SubscriptionManagement,
+//   PricingManagement,
+// } from "./pages/platform-admin";
 
 import LandingPage from "./pages/shared/LandingPage";
 import SystemSetupOnboarding from "./pages/shared/SystemSetupOnboarding";
@@ -99,22 +94,16 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       >
-        <Route index element={<DepartmentDashboard />} />
-        <Route path="documents" element={<DepartmentDocuments />} />
-        <Route path="upload" element={<Upload />} />
-        <Route path="workflows" element={<Workflows />} />
-        <Route path="department/staff" element={<DepartmentStaff />} />
-        <Route path="archive" element={<Archive />} />
-
+        <Route index element={<Dashboard />} />
+        <Route path="documents" element={<Documents />} />
         <Route path="notifications" element={<Notifications />} />
-        <Route path="settings" element={<UserSettings />} />
 
-        {/* Dynamic Module Dashboard */}
-        <Route path=":module" element={<DynamicDashboard />} />
+        {/* Module routes - will be handled by individual module components */}
+        <Route path="modules/:module" element={<DynamicDashboard />} />
       </Route>
 
-      {/* Admin routes - also use DashboardLayout */}
-      <Route
+      {/* Admin routes - commented out - admin folder deleted */}
+      {/* <Route
         path="/admin"
         element={
           <ProtectedRoute>
@@ -141,7 +130,7 @@ const AppRoutes = () => {
         <Route path="notifications" element={<Notifications />} />
         <Route path="archive" element={<Documents />} />
         <Route path="audit" element={<AuditLogs />} />
-      </Route>
+      </Route> */}
 
       {/* Fallback redirects */}
       <Route path="*" element={<Navigate to="/" replace />} />

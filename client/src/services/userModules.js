@@ -12,18 +12,40 @@ export const userModulesAPI = {
   // Fetch available modules for the current user
   getUserModules: async () => {
     try {
-      console.log("🔍 Fetching user modules...");
+      console.log("🔍 [userModulesAPI] Fetching user modules...");
       const response = await api.get("/auth/user-modules");
-      console.log("✅ User modules fetched successfully:", response.data);
+      console.log(
+        "✅ [userModulesAPI] User modules fetched successfully:",
+        response.data
+      );
+      console.log("📦 [userModulesAPI] Raw modules data:", response.data.data);
       return response.data;
     } catch (error) {
-      console.error("❌ Error fetching user modules:", error);
+      console.error("❌ [userModulesAPI] Error fetching user modules:", error);
+      throw error;
+    }
+  },
+
+  // Fetch all available modules (for unauthenticated users)
+  getAllModules: async () => {
+    try {
+      console.log("🔍 [userModulesAPI] Fetching all modules...");
+      const response = await api.get("/auth/all-modules");
+      console.log(
+        "✅ [userModulesAPI] All modules fetched successfully:",
+        response.data
+      );
+      console.log("📦 [userModulesAPI] Raw modules data:", response.data.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ [userModulesAPI] Error fetching all modules:", error);
       throw error;
     }
   },
 
   // Transform backend modules to frontend format
   transformModules: (backendModules) => {
+    console.log("🔄 [userModulesAPI] Transforming modules:", backendModules);
     const iconMap = {
       CurrencyDollarIcon: "FaMoneyCheckAlt",
       ShoppingCartIcon: "FaShoppingCart",
@@ -33,6 +55,7 @@ export const userModulesAPI = {
       CubeIcon: "FaBoxes",
       UsersIcon: "FaUsers",
       ChartBarIcon: "FaChartBar",
+      CustomerServiceIcon: "FaHeadset",
     };
 
     const colorMap = {
@@ -62,7 +85,7 @@ export const userModulesAPI = {
       "#06B6D4": "border-cyan-200",
     };
 
-    return backendModules.map((module) => ({
+    const transformedModules = backendModules.map((module) => ({
       id: module._id,
       title: module.name,
       description: module.description,
@@ -76,5 +99,8 @@ export const userModulesAPI = {
       code: module.code,
       order: module.order,
     }));
+
+    console.log("✅ [userModulesAPI] Transformed modules:", transformedModules);
+    return transformedModules;
   },
 };

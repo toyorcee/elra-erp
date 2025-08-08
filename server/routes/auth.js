@@ -15,6 +15,7 @@ import {
   getRegistrationRoles,
   getRegistrationDepartments,
   getUserModules,
+  getAllModules,
 } from "../controllers/authController.js";
 import { protect } from "../middleware/auth.js";
 import { passwordResetLimiter } from "../middleware/rateLimit.js";
@@ -135,6 +136,7 @@ router.get("/registration-roles", getRegistrationRoles);
 router.get("/registration-departments", getRegistrationDepartments);
 
 // User modules endpoint
+router.get("/all-modules", getAllModules);
 router.get("/user-modules", protect, getUserModules);
 
 export default router;

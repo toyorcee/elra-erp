@@ -1472,6 +1472,36 @@ export const resendVerificationEmail = async (req, res) => {
   }
 };
 
+// @desc    Get all available modules (public)
+// @route   GET /api/auth/all-modules
+// @access  Public
+export const getAllModules = async (req, res) => {
+  try {
+    console.log("🔍 [getAllModules] Fetching all modules...");
+
+    // Get all active modules
+    const Module = (await import("../models/Module.js")).default;
+    const allModules = await Module.find({ isActive: true }).sort({ order: 1 });
+
+    console.log("✅ [getAllModules] Found modules:", allModules.length);
+    console.log(
+      "Modules:",
+      allModules.map((m) => ({ name: m.name, code: m.code }))
+    );
+
+    res.status(200).json({
+      success: true,
+      data: allModules,
+    });
+  } catch (error) {
+    console.error("❌ [getAllModules] Error fetching all modules:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch modules",
+    });
+  }
+};
+
 // @desc    Get available modules for user
 // @route   GET /api/auth/user-modules
 // @access  Private
@@ -1493,29 +1523,71 @@ export const getUserModules = async (req, res) => {
     // Get modules based on user's role and department
     let availableModules = [];
 
+    console.log("🔍 [getUserModules] User role:", user.role?.name);
+    console.log("🔍 [getUserModules] User department:", user.department?.name);
+    console.log(
+      "🔍 [getUserModules] User role moduleAccess:",
+      user.role?.moduleAccess
+    );
+
     if (user.role && user.role.moduleAccess) {
       // Get module details for each accessible module
       const Module = (await import("../models/Module.js")).default;
 
       for (const moduleAccess of user.role.moduleAccess) {
+        console.log(
+          `🔍 [getUserModules] Checking module: ${moduleAccess.module}`
+        );
+
         const module = await Module.findOne({
           code: moduleAccess.module,
           isActive: true,
         });
 
+        console.log(
+          `🔍 [getUserModules] Found module:`,
+          module
+            ? {
+                name: module.name,
+                code: module.code,
+                isActive: module.isActive,
+                departmentAccess: module.departmentAccess,
+              }
+            : "NOT FOUND"
+        );
+
         if (module) {
           // Check if user's department has access to this module
-          if (
-            user.department &&
-            module.departmentAccess.includes(user.department._id)
-          ) {
+          const hasDepartmentAccess =
+            !user.department ||
+            module.departmentAccess.length === 0 ||
+            module.departmentAccess.includes(user.department._id);
+
+          console.log(`🔍 [getUserModules] Department access check:`, {
+            userDepartment: user.department?._id,
+            moduleDepartments: module.departmentAccess,
+            hasAccess: hasDepartmentAccess,
+          });
+
+          if (hasDepartmentAccess) {
             availableModules.push({
               ...module.toObject(),
               permissions: moduleAccess.permissions,
             });
+            console.log(`✅ [getUserModules] Added module: ${module.name}`);
+          } else {
+            console.log(
+              `❌ [getUserModules] Department access denied for: ${module.name}`
+            );
           }
+        } else {
+          console.log(
+            `❌ [getUserModules] Module not found: ${moduleAccess.module}`
+          );
         }
       }
+    } else {
+      console.log("❌ [getUserModules] No role or moduleAccess found");
     }
 
     // Sort modules by order

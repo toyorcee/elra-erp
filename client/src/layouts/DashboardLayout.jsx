@@ -1,14 +1,15 @@
 import React, { useState, createContext, useContext, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { MdMenu, MdChat } from "react-icons/md";
+import { ChatBubbleLeftRightIcon } from "@heroicons/react/24/outline";
 import Sidebar from "../components/Sidebar";
 import ProfileMenu from "../components/ProfileMenu";
-import ELRALogo from "../components/ELRALogo";
 import NotificationBell from "../components/NotificationBell";
 import MessageDropdown from "../components/MessageDropdown";
 import PasswordChangeModal from "../components/common/PasswordChangeModal";
 import { useAuth } from "../context/AuthContext";
 import { useMessages } from "../hooks/useMessages";
+import { DynamicSidebarProvider } from "../context/DynamicSidebarContext";
+import elraLogo from "../assets/elraimage.jpg";
 
 const SidebarContext = createContext();
 
@@ -21,27 +22,36 @@ export const useSidebar = () => {
 };
 
 const DashboardLayout = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [sidebarExpanded, setSidebarExpanded] = useState(false);
-  const [sidebarPinned, setSidebarPinned] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showMessageDropdown, setShowMessageDropdown] = useState(false);
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { getTotalUnreadCount } = useMessages();
 
-  const isSidebarActuallyExpanded = sidebarPinned ? true : sidebarExpanded;
   const totalUnreadMessages = getTotalUnreadCount ? getTotalUnreadCount() : 0;
 
-  console.log("🔍 Message icon debug:", {
-    messagesHook: !!messagesHook,
-    getTotalUnreadCount: !!getTotalUnreadCount,
-    totalUnreadMessages,
-    showMessageDropdown,
-  });
+  // Check if user is on mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (mobile) {
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+      }
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   useEffect(() => {
     if (user && !loading) {
-      // Check if user is trying to access dashboard routes they shouldn't
       if (
         user.role?.level < 300 &&
         location.pathname.startsWith("/dashboard")
@@ -54,7 +64,6 @@ const DashboardLayout = () => {
     }
   }, [user, loading, location.pathname, navigate]);
 
-  // Check for temporary password and show modal
   useEffect(() => {
     if (user && (user.passwordChangeRequired || user.isTemporaryPassword)) {
       console.log(
@@ -64,36 +73,72 @@ const DashboardLayout = () => {
     }
   }, [user]);
 
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  const closeSidebar = () => {
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  };
+
   return (
     <SidebarContext.Provider
       value={{
-        sidebarExpanded,
-        setSidebarExpanded,
-        sidebarPinned,
-        setSidebarPinned,
-        isSidebarActuallyExpanded,
+        sidebarOpen,
+        toggleSidebar,
+        isMobile,
       }}
     >
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 via-cyan-800 to-purple-900">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-emerald-100/30">
         {/* Fixed Navbar */}
-        <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-white/20 shadow-lg">
+        <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-emerald-200/50 shadow-lg shadow-emerald-500/10">
           <div className="px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               {/* Left side */}
               <div className="flex items-center">
+                {/* Mobile hamburger menu */}
                 <button
-                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  className="lg:hidden p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors mr-3"
+                  onClick={toggleSidebar}
+                  className="lg:hidden p-2 rounded-xl text-blue-700 hover:bg-blue-50 transition-all duration-200 hover:scale-105 mr-4"
                 >
-                  <MdMenu size={24} />
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 6h16M4 12h16M4 18h16"
+                    />
+                  </svg>
                 </button>
 
-                <button
-                  onClick={() => navigate("/dashboard")}
-                  className="flex items-center space-x-3 focus:outline-none"
-                >
-                  <ELRALogo variant="dark" className="text-xl" />
-                </button>
+                {/* Spacer for desktop sidebar toggle */}
+                <div className="hidden lg:block w-12 mr-2"></div>
+
+                {/* ELRA Logo */}
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-2xl overflow-hidden shadow-lg mr-3 sm:mr-4">
+                  <img
+                    src={elraLogo}
+                    alt="ELRA"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+
+                {/* ELRA Text */}
+                <div className="flex flex-col">
+                  <span className="font-bold text-gray-900 text-base sm:text-lg">
+                    ELRA
+                  </span>
+                  <span className="text-xs text-blue-600 font-medium hidden sm:block">
+                    ERP SYSTEM
+                  </span>
+                </div>
               </div>
 
               {/* Right side */}
@@ -102,12 +147,14 @@ const DashboardLayout = () => {
                 <div className="relative">
                   <button
                     onClick={() => setShowMessageDropdown(!showMessageDropdown)}
-                    className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors relative cursor-pointer"
+                    className="p-2 rounded-xl text-blue-700 hover:bg-blue-50 transition-all duration-200 hover:scale-105 relative cursor-pointer"
                   >
-                    <MdChat size={24} />
+                    <ChatBubbleLeftRightIcon className="h-6 w-6" />
                     <span
-                      className={`absolute -top-1 -right-1 w-5 h-5 text-white text-xs rounded-full flex items-center justify-center font-bold ${
-                        totalUnreadMessages === 0 ? "bg-gray-400" : "bg-red-500"
+                      className={`absolute -top-1 -right-1 w-5 h-5 text-white text-xs rounded-full flex items-center justify-center font-bold transition-all duration-200 ${
+                        totalUnreadMessages === 0
+                          ? "bg-blue-400 scale-90"
+                          : "bg-red-500 scale-100 animate-pulse"
                       }`}
                     >
                       {totalUnreadMessages > 99 ? "99+" : totalUnreadMessages}
@@ -131,41 +178,33 @@ const DashboardLayout = () => {
 
         {/* Main Content Area */}
         <div className="flex flex-1 pt-16 min-h-screen">
-          {/* Sidebar */}
-          <div
-            className={`fixed top-16 left-0 z-40 transition-all duration-300 ease-in-out ${
-              isSidebarOpen
-                ? "translate-x-0"
-                : "-translate-x-full lg:translate-x-0"
-            }`}
-          >
+          <DynamicSidebarProvider>
+            {/* Sidebar */}
             <Sidebar
-              onExpandedChange={setSidebarExpanded}
-              onPinnedChange={setSidebarPinned}
+              isOpen={sidebarOpen}
+              onToggle={toggleSidebar}
+              isMobile={isMobile}
             />
-          </div>
+            {/* Content - Now responsive to sidebar state and mobile */}
+            <div
+              className={`flex-1 transition-all duration-300 ease-in-out ${
+                sidebarOpen ? "lg:ml-64" : "lg:ml-20"
+              } ${isMobile ? "ml-0" : ""}`}
+            >
+              {/* Mobile overlay */}
+              {isMobile && sidebarOpen && (
+                <div
+                  className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+                  onClick={toggleSidebar}
+                />
+              )}
 
-          {/* Content - Now responsive to sidebar state */}
-          <div
-            className={`flex-1 flex flex-col min-h-0 transition-all duration-300 ease-in-out ${
-              isSidebarActuallyExpanded ? "lg:ml-64" : "lg:ml-16"
-            }`}
-          >
-            <main className="flex-1 p-4 md:p-8 min-h-0 overflow-y-auto">
-              <div className="glass-card rounded-2xl p-6 md:p-8">
+              {/* Main content area */}
+              <div className="min-h-screen bg-gray-50">
                 <Outlet />
               </div>
-            </main>
-          </div>
-
-          {/* Mobile Overlay */}
-          {isSidebarOpen && (
-            <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
-              onClick={() => setIsSidebarOpen(false)}
-              style={{ top: "4rem" }}
-            />
-          )}
+            </div>
+          </DynamicSidebarProvider>
         </div>
       </div>
 

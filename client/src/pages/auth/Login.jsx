@@ -107,11 +107,11 @@ const Login = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.email) newErrors.email = "Email is required";
-    else if (!/\S+@\S+\.\S+/.test(formData.email))
+    if (!formData.email.trim()) newErrors.email = "Email is required";
+    else if (!/\S+@\S+\.\S+/.test(formData.email.trim()))
       newErrors.email = "Email is invalid";
-    if (!formData.password) newErrors.password = "Password is required";
-    else if (formData.password.length < 6)
+    if (!formData.password.trim()) newErrors.password = "Password is required";
+    else if (formData.password.trim().length < 6)
       newErrors.password = "Password must be at least 6 characters";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -123,8 +123,8 @@ const Login = () => {
 
     setLoading(true);
     const result = await login({
-      identifier: formData.email,
-      password: formData.password,
+      identifier: formData.email.trim(),
+      password: formData.password.trim(), // Trim whitespace to prevent leading/trailing spaces
     });
     setLoading(false);
 

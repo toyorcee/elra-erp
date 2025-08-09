@@ -39,7 +39,6 @@ import TermsConditions from "./pages/legal/TermsConditions";
 import ModuleSelector from "./components/ModuleSelector";
 import Wireframe from "./pages/Wireframe";
 import ERPFlowchart from "./pages/ERPFlowchart";
-import DynamicDashboard from "./components/DynamicDashboard";
 
 const AppRoutes = () => {
   return (
@@ -98,8 +97,8 @@ const AppRoutes = () => {
         <Route path="documents" element={<Documents />} />
         <Route path="notifications" element={<Notifications />} />
 
-        {/* Module routes - will be handled by individual module components */}
-        <Route path="modules/:module" element={<DynamicDashboard />} />
+        {/* Module routes - dynamic module dashboards */}
+        <Route path="modules/:module" element={<Dashboard />} />
       </Route>
 
       {/* Admin routes - commented out - admin folder deleted */}

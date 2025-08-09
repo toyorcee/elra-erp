@@ -90,7 +90,7 @@ export const userModulesAPI = {
       title: module.name,
       description: module.description,
       icon: iconMap[module.icon] || "FaCog",
-      path: `/${module.code.toLowerCase()}/dashboard`,
+      path: `/dashboard/modules/${module.code.toLowerCase()}`,
       isReady: true,
       color: colorMap[module.color] || "from-gray-500 to-gray-600",
       bgColor: bgColorMap[module.color] || "bg-gray-50",

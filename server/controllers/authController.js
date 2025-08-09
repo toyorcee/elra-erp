@@ -1557,13 +1557,17 @@ export const getUserModules = async (req, res) => {
         );
 
         if (module) {
-          // Check if user's department has access to this module
+          const isSuperAdmin = user.role?.name === "SUPER_ADMIN";
+
           const hasDepartmentAccess =
+            isSuperAdmin ||
             !user.department ||
             module.departmentAccess.length === 0 ||
             module.departmentAccess.includes(user.department._id);
 
           console.log(`🔍 [getUserModules] Department access check:`, {
+            userRole: user.role?.name,
+            isSuperAdmin,
             userDepartment: user.department?._id,
             moduleDepartments: module.departmentAccess,
             hasAccess: hasDepartmentAccess,

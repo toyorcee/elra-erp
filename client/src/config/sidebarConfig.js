@@ -15,7 +15,7 @@ export const sidebarConfig = [
   {
     label: "HR Management",
     icon: "HiOutlineUsers",
-    path: "/dashboard/hr",
+    path: "/dashboard/modules/hr",
     required: { minLevel: 300 },
     section: "erp",
     badge: "HR",
@@ -23,7 +23,7 @@ export const sidebarConfig = [
   {
     label: "Payroll Management",
     icon: "HiOutlineCurrencyDollar",
-    path: "/dashboard/payroll",
+    path: "/dashboard/modules/payroll",
     required: { minLevel: 300 },
     section: "erp",
     badge: "Payroll",
@@ -31,26 +31,50 @@ export const sidebarConfig = [
   {
     label: "Procurement",
     icon: "HiOutlineShoppingCart",
-    path: "/dashboard/procurement",
+    path: "/dashboard/modules/procurement",
     required: { minLevel: 300 },
     section: "erp",
     badge: "Procurement",
   },
   {
-    label: "Accounting",
+    label: "Finance",
     icon: "HiOutlineCalculator",
-    path: "/dashboard/accounts",
+    path: "/dashboard/modules/finance",
     required: { minLevel: 300 },
     section: "erp",
-    badge: "Accounts",
+    badge: "Finance",
   },
   {
     label: "Communication",
     icon: "HiOutlineChat",
-    path: "/dashboard/communication",
+    path: "/dashboard/modules/communication",
     required: { minLevel: 300 },
     section: "erp",
     badge: "Comm",
+  },
+  {
+    label: "Projects",
+    icon: "HiOutlineFolder",
+    path: "/dashboard/modules/projects",
+    required: { minLevel: 300 },
+    section: "erp",
+    badge: "Projects",
+  },
+  {
+    label: "Inventory",
+    icon: "HiOutlineCube",
+    path: "/dashboard/modules/inventory",
+    required: { minLevel: 300 },
+    section: "erp",
+    badge: "Inventory",
+  },
+  {
+    label: "Customer Care",
+    icon: "HiOutlineSupport",
+    path: "/dashboard/modules/customer-care",
+    required: { minLevel: 300 },
+    section: "erp",
+    badge: "Support",
   },
 
   // ===== SYSTEM MANAGEMENT =====
@@ -92,7 +116,7 @@ export const sidebarConfig = [
   },
   {
     label: "Audit Logs",
-    icon: "HiOutlineClipboardDocument",
+    icon: "HiOutlineDocumentText",
     path: "/admin/audit",
     required: { minLevel: 1000 },
     section: "system",
@@ -107,7 +131,7 @@ export const sidebarConfig = [
   },
   {
     label: "Approval Levels",
-    icon: "HiOutlineCheckCircle",
+    icon: "HiOutlineCheck",
     path: "/admin/approval-levels",
     required: { minLevel: 1000 },
     section: "system",
@@ -250,11 +274,20 @@ export const roleConfig = {
 };
 
 // Helper function to get navigation items for a specific role level
-export const getNavigationForRole = (roleLevel) => {
-  const roleConfig = roleConfig[roleLevel] || roleConfig[300]; // Default to STAFF
-  const allowedSections = roleConfig.sections;
+export const getNavigationForRole = (
+  roleLevel,
+  userDepartment = null,
+  userPermissions = []
+) => {
+  const userRoleConfig = roleConfig[roleLevel] || roleConfig[300];
+  const allowedSections = userRoleConfig.sections;
 
   return sidebarConfig.filter((item) => {
+    // SUPER_ADMIN (1000) has access to everything - bypass all restrictions
+    if (roleLevel === 1000) {
+      return true;
+    }
+
     // Check if user meets minimum level requirement
     if (item.required.minLevel && roleLevel < item.required.minLevel) {
       return false;
@@ -276,7 +309,7 @@ export const getNavigationForRole = (roleLevel) => {
         return item.departments.includes("all");
       }
 
-      if (roleConfig.canAccessAllDepartments) {
+      if (userRoleConfig.canAccessAllDepartments) {
         return false;
       }
 
@@ -324,6 +357,11 @@ export const getRoleSections = (roleLevel) => {
 
 // Helper function to check if user has access to a specific section
 export const hasSectionAccess = (userRoleLevel, section) => {
+  // SUPER_ADMIN (1000) has access to all sections
+  if (userRoleLevel === 1000) {
+    return true;
+  }
+
   const sections = getRoleSections(userRoleLevel);
   return sections.includes(section);
 };

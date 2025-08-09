@@ -382,6 +382,8 @@ function ModuleSelector() {
   };
 
   const handleModuleClick = (module) => {
+    console.log("🔍 [ModuleSelector] Module clicked:", module);
+
     if (!user) {
       // Store the intended destination and redirect to login
       localStorage.setItem("redirectAfterLogin", module.path);
@@ -389,10 +391,14 @@ function ModuleSelector() {
       return;
     }
 
-    // Check if user has access to this module
-    const hasAccess = module.requiredRoles.some(
-      (role) => user.roles?.includes(role) || user.role?.name === role
-    );
+    // For authenticated users, check if they have permissions for this module
+    const hasAccess = module.permissions && module.permissions.length > 0;
+
+    console.log("🔍 [ModuleSelector] Access check:", {
+      hasAccess,
+      permissions: module.permissions,
+      userRole: user.role?.name,
+    });
 
     if (!hasAccess) {
       setSelectedModule(module);
@@ -401,6 +407,7 @@ function ModuleSelector() {
     }
 
     // Navigate to the module dashboard
+    console.log("🚀 [ModuleSelector] Navigating to:", module.path);
     navigate(module.path);
   };
 

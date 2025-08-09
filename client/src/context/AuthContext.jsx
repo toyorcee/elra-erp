@@ -95,7 +95,13 @@ const authReducer = (state, action) => {
         roleLevel: action.payload.user?.role?.level,
         roleId: action.payload.user?.role?._id,
       });
-      return {
+      console.log("🔍 AuthContext: Previous state:", {
+        isAuthenticated: state.isAuthenticated,
+        user: state.user,
+        loading: state.loading,
+        initialized: state.initialized,
+      });
+      const newState = {
         ...state,
         user: action.payload.user,
         isAuthenticated: true,
@@ -103,6 +109,13 @@ const authReducer = (state, action) => {
         error: null,
         initialized: true,
       };
+      console.log("🔍 AuthContext: New state after LOGIN_SUCCESS:", {
+        isAuthenticated: newState.isAuthenticated,
+        user: newState.user,
+        loading: newState.loading,
+        initialized: newState.initialized,
+      });
+      return newState;
 
     case AUTH_ACTIONS.LOGIN_FAILURE:
       return {
@@ -295,10 +308,12 @@ export const AuthProvider = ({ children }) => {
         permissions: userData?.role?.permissions?.length || 0,
       });
 
+      console.log("🔍 AuthContext: About to dispatch LOGIN_SUCCESS with user:", userData);
       dispatch({
         type: AUTH_ACTIONS.LOGIN_SUCCESS,
         payload: { user: userData },
       });
+      console.log("🔍 AuthContext: LOGIN_SUCCESS dispatched, returning success");
       return { success: true };
     } catch (error) {
       const errorData = handleApiError(error);

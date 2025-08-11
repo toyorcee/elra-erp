@@ -29,9 +29,9 @@ const getInitialState = () => {
   return {
     user: null,
     isAuthenticated: false,
-    loading: true,
+    loading: false,
     error: null,
-    initialized: false,
+    initialized: true,
     subscriptionPlans: [],
   };
 };
@@ -261,9 +261,7 @@ export const AuthProvider = ({ children }) => {
       initialized: state.initialized,
     });
 
-    setTimeout(() => {
-      initializeAuth();
-    }, 100);
+    initializeAuth();
   }, [initializeAuth]);
 
   useEffect(() => {
@@ -308,12 +306,17 @@ export const AuthProvider = ({ children }) => {
         permissions: userData?.role?.permissions?.length || 0,
       });
 
-      console.log("🔍 AuthContext: About to dispatch LOGIN_SUCCESS with user:", userData);
+      console.log(
+        "🔍 AuthContext: About to dispatch LOGIN_SUCCESS with user:",
+        userData
+      );
       dispatch({
         type: AUTH_ACTIONS.LOGIN_SUCCESS,
         payload: { user: userData },
       });
-      console.log("🔍 AuthContext: LOGIN_SUCCESS dispatched, returning success");
+      console.log(
+        "🔍 AuthContext: LOGIN_SUCCESS dispatched, returning success"
+      );
       return { success: true };
     } catch (error) {
       const errorData = handleApiError(error);
@@ -347,6 +350,17 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error("Logout API error:", error);
     } finally {
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+
+      localStorage.removeItem("authState");
+      localStorage.removeItem("redirectAfterLogin");
+
+      sessionStorage.clear();
+
       setHasLoggedIn(false);
       dispatch({ type: AUTH_ACTIONS.LOGOUT });
     }

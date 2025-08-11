@@ -1,50 +1,24 @@
 import React from "react";
-import elraLogo from "../assets/elraimage.jpg";
+import elraLogo from "../assets/ELRA.png";
 
 const ELRALogo = ({ variant = "dark", className = "", size = "md" }) => {
   const sizeClasses = {
-    sm: "h-8 w-8",
-    md: "h-12 w-12",
-    lg: "h-16 w-16",
-    xl: "h-20 w-20",
+    sm: "h-8 w-12",
+    md: "h-12 w-16",
+    lg: "h-16 w-20",
+    xl: "h-20 w-24",
   };
-
-  const textSizes = {
-    sm: "text-lg",
-    md: "text-xl",
-    lg: "text-2xl",
-    xl: "text-3xl",
-  };
-
-  const isLight = variant === "light";
-  const textColor = isLight ? "text-white" : "text-gray-900";
-  const accentColor = isLight ? "text-emerald-300" : "text-emerald-600";
 
   return (
-    <div className={`flex items-center space-x-3 ${className}`}>
-      {/* Logo Icon */}
+    <div className={`flex items-center ${className}`}>
       <div
-        className={`relative ${sizeClasses[size]} rounded-2xl overflow-hidden shadow-lg`}
+        className={`relative ${sizeClasses[size]} flex items-center justify-center`}
       >
         <img
           src={elraLogo}
           alt="ELRA Logo"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
         />
-      </div>
-
-      {/* Text Logo */}
-      <div className="flex flex-col">
-        <div
-          className={`font-bold ${textSizes[size]} ${textColor} tracking-tight`}
-        >
-          <span className="bg-gradient-to-r from-emerald-600 to-emerald-800 bg-clip-text text-transparent">
-            ELRA
-          </span>
-        </div>
-        <div className={`text-xs ${accentColor} font-medium tracking-wider`}>
-          ERP SYSTEM
-        </div>
       </div>
     </div>
   );

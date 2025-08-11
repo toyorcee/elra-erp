@@ -55,7 +55,7 @@ const LogoutConfirmationModal = ({ isOpen, onClose, onConfirm, user }) => {
           }}
         >
           {/* Header */}
-          <div className="relative bg-gradient-to-r from-red-500 to-red-600 p-6 text-white">
+          <div className="relative bg-[var(--elra-primary)] p-6 text-white">
             <button
               onClick={onClose}
               className="absolute top-4 right-4 p-1 rounded-full hover:bg-white/20 transition-colors duration-200"
@@ -69,7 +69,7 @@ const LogoutConfirmationModal = ({ isOpen, onClose, onConfirm, user }) => {
               </div>
               <div>
                 <h2 className="text-xl font-bold">Sign Out</h2>
-                <p className="text-red-100 text-sm">Confirm your action</p>
+                <p className="text-white/80 text-sm">Confirm your action</p>
               </div>
             </div>
           </div>
@@ -77,8 +77,8 @@ const LogoutConfirmationModal = ({ isOpen, onClose, onConfirm, user }) => {
           {/* Content */}
           <div className="p-6">
             {/* User Info */}
-            <div className="flex items-center space-x-4 mb-6 p-4 bg-gray-50 rounded-xl">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+            <div className="flex items-center space-x-4 mb-6 p-4 bg-[var(--elra-secondary-3)] rounded-xl">
+              <div className="w-12 h-12 bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white font-bold text-lg">
                 {user?.avatar ? (
                   <img
                     src={user.avatar}
@@ -95,23 +95,25 @@ const LogoutConfirmationModal = ({ isOpen, onClose, onConfirm, user }) => {
                 </div>
               </div>
               <div>
-                <div className="font-semibold text-gray-900">
+                <div className="font-semibold text-[var(--elra-text-primary)]">
                   {getUserName()}
                 </div>
-                <div className="text-sm text-gray-500">{user?.email}</div>
+                <div className="text-sm text-[var(--elra-text-secondary)]">
+                  {user?.email}
+                </div>
               </div>
             </div>
 
             {/* Warning Message */}
-            <div className="flex items-start space-x-3 p-4 bg-amber-50 border border-amber-200 rounded-xl mb-6">
-              <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+            <div className="flex items-start space-x-3 p-4 bg-[var(--elra-secondary-3)] border border-[var(--elra-border-primary)] rounded-xl mb-6">
+              <div className="w-6 h-6 bg-[var(--elra-primary)] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                 <MdWarning size={14} className="text-white" />
               </div>
               <div>
-                <h3 className="font-semibold text-amber-800 mb-1">
+                <h3 className="font-semibold text-[var(--elra-text-primary)] mb-1">
                   Are you sure you want to sign out?
                 </h3>
-                <p className="text-sm text-amber-700">
+                <p className="text-sm text-[var(--elra-text-secondary)]">
                   You will be logged out of your account and redirected to the
                   login page. Any unsaved work will be lost.
                 </p>
@@ -122,13 +124,13 @@ const LogoutConfirmationModal = ({ isOpen, onClose, onConfirm, user }) => {
             <div className="flex space-x-3">
               <button
                 onClick={onClose}
-                className="flex-1 px-4 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium transition-all duration-200 hover:shadow-md"
+                className="flex-1 px-4 py-3 text-[var(--elra-text-primary)] bg-[var(--elra-secondary-3)] hover:bg-[var(--elra-secondary-2)] rounded-xl font-medium transition-all duration-200 hover:shadow-md"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirm}
-                className="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-medium transition-all duration-200 hover:shadow-lg flex items-center justify-center space-x-2"
+                className="flex-1 px-4 py-3 bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white rounded-xl font-medium transition-all duration-200 hover:shadow-lg flex items-center justify-center space-x-2"
               >
                 <MdLogout size={18} />
                 <span>Sign Out</span>

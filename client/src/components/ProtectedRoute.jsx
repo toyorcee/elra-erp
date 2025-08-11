@@ -8,7 +8,7 @@ const ProtectedRoute = ({ children, required }) => {
 
   if (!initialized || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-800 to-cyan-900">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900">
         <GradientSpinner
           size="xl"
           variant="secondary"
@@ -30,7 +30,6 @@ const ProtectedRoute = ({ children, required }) => {
       return <Navigate to="/unauthorized" />;
   }
 
-  // Redirect to landing page if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/" replace />;
   }

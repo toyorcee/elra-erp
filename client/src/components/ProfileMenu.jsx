@@ -72,7 +72,7 @@ const ProfileMenu = () => {
       {/* Desktop Profile Section */}
       <div className="hidden lg:flex items-center space-x-3">
         {/* User Info */}
-        <div className="flex items-center space-x-3 bg-blue-600 hover:bg-blue-700 rounded-xl px-3 py-2 border border-white/20 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-xl backdrop-blur-sm">
+        <div className="flex items-center space-x-3 bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] rounded-xl px-3 py-2 border border-white/20 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-xl backdrop-blur-sm">
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg bg-white/20 backdrop-blur-sm overflow-hidden border border-white/30">
             {user?.avatar ? (
               <img
@@ -104,7 +104,7 @@ const ProfileMenu = () => {
         {/* Sign Out Button */}
         <button
           onClick={handleLogoutClick}
-          className="p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
+          className="p-2 rounded-lg bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white transition-all duration-200 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
           title="Sign out"
         >
           <MdLogout
@@ -116,7 +116,7 @@ const ProfileMenu = () => {
         {/* Dropdown Toggle for Additional Options */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all duration-300 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
+          className="p-2 rounded-lg bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white transition-all duration-300 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
         >
           <div
             className={`w-4 h-4 transition-transform duration-300 ${
@@ -143,7 +143,7 @@ const ProfileMenu = () => {
       {/* Mobile Profile Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="lg:hidden flex items-center space-x-2 p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-all duration-300 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
+        className="lg:hidden flex items-center space-x-2 p-2 rounded-lg bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white transition-all duration-300 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
       >
         <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg lg:hidden overflow-hidden border border-white/30">
           {user?.avatar ? (
@@ -195,7 +195,7 @@ const ProfileMenu = () => {
           {/* User Info Header */}
           <div className="px-6 py-4 border-b border-gray-100">
             <div className="flex items-center space-x-4">
-              <div className="w-14 h-14 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg overflow-hidden border-2 border-white/30">
+              <div className="w-14 h-14 bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg overflow-hidden border-2 border-white/30">
                 {user?.avatar ? (
                   <img
                     src={getImageUrl(user.avatar)}
@@ -221,7 +221,7 @@ const ProfileMenu = () => {
                     ? `${user.firstName} ${user.lastName}`
                     : "User"}
                 </div>
-                <div className="text-sm font-medium bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
+                <div className="text-sm font-medium text-[var(--elra-primary)]">
                   {getRoleTitle()}
                 </div>
                 <div className="text-xs text-gray-500 truncate">
@@ -235,20 +235,20 @@ const ProfileMenu = () => {
           <div className="py-2">
             <button
               onClick={navigateToNotifications}
-              className="w-full flex items-center px-6 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group"
+              className="w-full flex items-center px-6 py-3 text-sm font-medium text-[var(--elra-text-primary)] hover:bg-[var(--elra-secondary-3)] hover:text-[var(--elra-primary)] transition-all duration-200 group"
             >
-              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3 group-hover:bg-blue-200 transition-colors duration-200">
-                <MdNotifications className="w-4 h-4 text-blue-600" />
+              <div className="w-8 h-8 bg-[var(--elra-secondary-3)] rounded-lg flex items-center justify-center mr-3 group-hover:bg-[var(--elra-secondary-2)] transition-colors duration-200">
+                <MdNotifications className="w-4 h-4 text-[var(--elra-primary)]" />
               </div>
               <span>Notifications</span>
             </button>
 
             <button
               onClick={navigateToSettings}
-              className="w-full flex items-center px-6 py-3 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group"
+              className="w-full flex items-center px-6 py-3 text-sm font-medium text-[var(--elra-text-primary)] hover:bg-[var(--elra-secondary-3)] hover:text-[var(--elra-primary)] transition-all duration-200 group"
             >
-              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3 group-hover:bg-blue-200 transition-colors duration-200">
-                <MdSettings className="w-4 h-4 text-blue-600" />
+              <div className="w-8 h-8 bg-[var(--elra-secondary-3)] rounded-lg flex items-center justify-center mr-3 group-hover:bg-[var(--elra-secondary-2)] transition-colors duration-200">
+                <MdSettings className="w-4 h-4 text-[var(--elra-primary)]" />
               </div>
               <span>Settings</span>
             </button>

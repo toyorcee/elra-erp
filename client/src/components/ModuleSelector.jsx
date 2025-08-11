@@ -27,6 +27,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import ELRALogo from "./ELRALogo";
 import { userModulesAPI } from "../services/userModules.js";
+import GradientSpinner from "./common/GradientSpinner";
 
 const allModules = [
   {
@@ -35,9 +36,6 @@ const allModules = [
     icon: "FaUsers",
     path: "/dashboard/hr",
     isReady: true,
-    color: "from-green-500 to-green-600",
-    bgColor: "bg-green-50",
-    borderColor: "border-green-200",
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
     processFlow: {
       dataEntry: [
@@ -72,9 +70,6 @@ const allModules = [
     icon: "FaMoneyCheckAlt",
     path: "/dashboard/payroll",
     isReady: true,
-    color: "from-emerald-500 to-emerald-600",
-    bgColor: "bg-emerald-50",
-    borderColor: "border-emerald-200",
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
     processFlow: {
       dataEntry: [
@@ -109,9 +104,6 @@ const allModules = [
     icon: "FaShoppingCart",
     path: "/dashboard/procurement",
     isReady: true,
-    color: "from-green-600 to-emerald-600",
-    bgColor: "bg-green-50",
-    borderColor: "border-green-200",
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
     processFlow: {
       dataEntry: [
@@ -146,9 +138,7 @@ const allModules = [
     icon: "FaChartLine",
     path: "/dashboard/accounts",
     isReady: true,
-    color: "from-emerald-600 to-green-600",
-    bgColor: "bg-emerald-50",
-    borderColor: "border-emerald-200",
+
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
     processFlow: {
       dataEntry: [
@@ -183,9 +173,7 @@ const allModules = [
     icon: "FaComments",
     path: "/dashboard/communication",
     isReady: true,
-    color: "from-green-500 to-emerald-500",
-    bgColor: "bg-green-50",
-    borderColor: "border-green-200",
+
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF", "VIEWER"],
     processFlow: {
       dataEntry: [
@@ -220,9 +208,7 @@ const allModules = [
     icon: "FaHeadset",
     path: "/dashboard/customer-care",
     isReady: true,
-    color: "from-green-500 to-emerald-600",
-    bgColor: "bg-green-50",
-    borderColor: "border-green-200",
+
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
     processFlow: {
       dataEntry: [
@@ -262,6 +248,7 @@ function ModuleSelector() {
   const [selectedModule, setSelectedModule] = React.useState(null);
   const [userModules, setUserModules] = React.useState([]);
   const [loadingModules, setLoadingModules] = React.useState(false);
+  const [isInitialLoad, setIsInitialLoad] = React.useState(true);
   const currentYear = new Date().getFullYear();
 
   // Fetch all modules (for everyone to see)
@@ -305,30 +292,50 @@ function ModuleSelector() {
         }
       } catch (error) {
         console.error("❌ [ModuleSelector] Error fetching modules:", error);
-        // Fallback to all modules if API fails
-        setUserModules(allModules);
+        if (!user) {
+          setUserModules(allModules);
+        } else {
+          console.warn(
+            "⚠️ [ModuleSelector] Failed to load user modules, showing error state"
+          );
+        }
       } finally {
         setLoadingModules(false);
+        setTimeout(() => {
+          setIsInitialLoad(false);
+        }, 200);
       }
     };
 
-    fetchModules();
-  }, [user]);
+    if (user !== undefined) {
+      fetchModules();
+    }
+  }, [user]); // Only depend on user, not on userModules to prevent infinite loops
 
-  const modules = React.useMemo(() => {
-    if (!user) {
-      // Show all modules for unauthenticated users
-      return allModules;
+  // Get accessible modules based on user role
+  const getAccessibleModules = () => {
+    // If we're still loading modules, return empty array to show loading state
+    if (loadingModules) {
+      return [];
     }
 
-    // Show user's accessible modules for authenticated users
-    if (userModules.length > 0) {
+    // If user is authenticated and modules are loaded, return user modules
+    if (user && userModules.length > 0) {
       return userModules;
     }
 
-    // Fallback to all modules while loading
+    // If user is authenticated but no modules loaded yet, return empty array
+    if (user && userModules.length === 0) {
+      return [];
+    }
+
+    // If no user (unauthenticated), return all modules
     return allModules;
-  }, [user, userModules]);
+  };
+
+  const modules = React.useMemo(() => {
+    return getAccessibleModules();
+  }, [user, userModules, loadingModules]);
 
   // Reset current index if it's out of bounds after filtering
   React.useEffect(() => {
@@ -391,20 +398,8 @@ function ModuleSelector() {
       return;
     }
 
-    // For authenticated users, check if they have permissions for this module
-    const hasAccess = module.permissions && module.permissions.length > 0;
-
-    console.log("🔍 [ModuleSelector] Access check:", {
-      hasAccess,
-      permissions: module.permissions,
-      userRole: user.role?.name,
-    });
-
-    if (!hasAccess) {
-      setSelectedModule(module);
-      setShowModal(true);
-      return;
-    }
+    // For authenticated users, they can access any module that's shown to them
+    // Navigate directly to the module dashboard
 
     // Navigate to the module dashboard
     console.log("🚀 [ModuleSelector] Navigating to:", module.path);
@@ -412,25 +407,8 @@ function ModuleSelector() {
   };
 
   const handleLogin = () => {
-    if (selectedModule) {
-      // Set redirect to dynamic dashboard
-      const moduleKey = selectedModule.title.toLowerCase().replace(/\s+/g, "");
-      let redirectPath = "/dashboard";
-      if (moduleKey.includes("humanresources")) {
-        redirectPath = "/dashboard/hr";
-      } else if (moduleKey.includes("payroll")) {
-        redirectPath = "/dashboard/payroll";
-      } else if (moduleKey.includes("procurement")) {
-        redirectPath = "/dashboard/procurement";
-      } else if (moduleKey.includes("accounting")) {
-        redirectPath = "/dashboard/accounts";
-      } else if (moduleKey.includes("communication")) {
-        redirectPath = "/dashboard/communication";
-      } else {
-        redirectPath = "/dashboard/" + moduleKey;
-      }
-      localStorage.setItem("redirectAfterLogin", redirectPath);
-    }
+    // Always redirect to modules page first after login
+    localStorage.setItem("redirectAfterLogin", "/modules");
     setShowModal(false);
     navigate("/login");
   };
@@ -458,6 +436,25 @@ function ModuleSelector() {
     }),
   };
 
+  // Show loading state when fetching modules
+  if (loadingModules) {
+    return (
+      <div className="h-screen w-full bg-white flex flex-col items-center justify-center">
+        <GradientSpinner
+          size="xl"
+          title="ELRA System"
+          text={
+            user
+              ? "Loading your personalized modules..."
+              : "Loading available modules..."
+          }
+          showText={true}
+        />
+      </div>
+    );
+  }
+
+  // Only show "no modules" when we're not loading and actually have no modules
   if (modules.length === 0) {
     return (
       <div className="h-screen w-full bg-gradient-to-br from-green-50 to-emerald-50 flex flex-col items-center justify-center">
@@ -468,33 +465,66 @@ function ModuleSelector() {
           <p className="text-gray-600 mb-8">
             Contact your administrator to get access to modules.
           </p>
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          >
-            Back to Dashboard
-          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-full bg-gradient-to-br from-green-50 via-white to-emerald-50 flex flex-col items-center justify-center overflow-hidden">
+    <div className="h-screen w-full bg-white flex flex-col items-center justify-center overflow-hidden">
       {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-gray-800 mb-2">
+      <div className="text-center mb-8 relative">
+        <h1 className="text-4xl font-bold text-[var(--elra-primary)] mb-2">
           ELRA ERP System
         </h1>
-        <p className="text-lg text-gray-600">
+        <p className="text-lg text-[var(--elra-text-secondary)]">
           {user
             ? "Your accessible ERP modules"
             : "Choose an ERP module to get started"}
         </p>
       </div>
 
+      {/* Error State for Authenticated Users */}
+      {user &&
+        !loadingModules &&
+        userModules.length === 0 &&
+        !isInitialLoad && (
+          <div className="flex flex-col items-center justify-center mb-8">
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
+              <div className="text-red-600 mb-4">
+                <svg
+                  className="w-16 h-16 mx-auto"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-red-800 mb-2">
+                Unable to Load Modules
+              </h3>
+              <p className="text-red-600 mb-4">
+                We couldn't load your personalized modules at this time. This
+                might be due to a temporary connection issue.
+              </p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        )}
+
       {/* Module Selector */}
-      <div className="relative w-full max-w-6xl flex items-center justify-center">
+      <div className="relative w-full max-w-6xl flex items-center justify-center opacity-100 transition-opacity duration-500">
         <button
           onClick={() => navigateSlide(-1)}
           className="absolute left-4 z-30 p-4 rounded-full bg-white shadow-lg hover:shadow-xl transition-shadow border border-gray-200"
@@ -539,9 +569,9 @@ function ModuleSelector() {
                 >
                   {/* Icon Container */}
                   <div
-                    className={`w-32 h-32 mb-6 rounded-full ${module.bgColor} 
+                    className="w-32 h-32 mb-6 rounded-full bg-[var(--elra-primary)] 
                     flex items-center justify-center border-4 border-white shadow-lg
-                    bg-gradient-to-br ${module.color} group-hover:scale-110 transition-transform duration-300 relative`}
+                    group-hover:scale-110 transition-transform duration-300 relative"
                   >
                     <div
                       className={`text-white text-4xl transition-all duration-300 ${
@@ -557,9 +587,9 @@ function ModuleSelector() {
 
                     {/* Animated Module Count Badge - Only for centered module */}
                     {offset === 0 && (
-                      <div className="absolute -top-2 -right-2 w-8 h-8 bg-white rounded-full border-2 border-green-200 shadow-lg flex items-center justify-center">
+                      <div className="absolute -top-2 -right-2 w-8 h-8 bg-white rounded-full border-2 border-[var(--elra-primary)] shadow-lg flex items-center justify-center">
                         <motion.span
-                          className="text-green-600 font-bold text-sm"
+                          className="text-[var(--elra-primary)] font-bold text-sm"
                           initial={{ scale: 0, rotate: -180 }}
                           animate={{ scale: 1, rotate: 0 }}
                           transition={{
@@ -575,35 +605,15 @@ function ModuleSelector() {
                   </div>
 
                   {/* Module Info */}
-                  <h2 className="text-2xl font-bold text-gray-800 mb-3 text-center">
+                  <h2 className="text-2xl font-bold text-[var(--elra-text-primary)] mb-3 text-center">
                     {module.title}
                   </h2>
-                  <p className="text-base text-gray-600 text-center mb-4 leading-relaxed">
+                  <p className="text-base text-[var(--elra-text-secondary)] text-center mb-4 leading-relaxed">
                     {module.description}
                   </p>
 
-                  {user &&
-                    module.permissions &&
-                    module.permissions.length > 0 && (
-                      <div className="flex flex-wrap justify-center gap-1 mb-6">
-                        {module.permissions.map((permission, idx) => (
-                          <span
-                            key={idx}
-                            className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full"
-                          >
-                            {permission}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
                   {/* Action Button */}
-                  <button
-                    className={`w-full max-w-[200px] py-4 rounded-xl
-                    bg-gradient-to-r ${module.color} text-white text-base font-semibold 
-                    hover:shadow-lg transform hover:scale-105 transition-all duration-200
-                    border-2 border-white shadow-lg`}
-                  >
+                  <button className="w-full max-w-[200px] py-4 rounded-xl bg-[var(--elra-primary)] text-white text-base font-semibold hover:bg-[var(--elra-primary-dark)] hover:shadow-lg transform hover:scale-105 transition-all duration-200 border-2 border-white shadow-lg">
                     {module.isReady ? "Enter Module" : "Coming Soon"}
                   </button>
                 </motion.div>
@@ -614,9 +624,9 @@ function ModuleSelector() {
 
         <button
           onClick={() => navigateSlide(1)}
-          className="absolute right-4 z-30 p-4 rounded-full bg-white shadow-lg hover:shadow-xl transition-shadow border border-gray-200"
+          className="absolute right-4 z-30 p-4 rounded-full bg-white shadow-lg hover:shadow-xl transition-shadow border border-[var(--elra-border-primary)]"
         >
-          <ChevronRightIcon className="h-6 w-6 text-green-600" />
+          <ChevronRightIcon className="h-6 w-6 text-[var(--elra-primary)]" />
         </button>
       </div>
 
@@ -628,8 +638,8 @@ function ModuleSelector() {
             onClick={() => setCurrentIndex(index)}
             className={`w-4 h-4 rounded-full transition-all duration-300 border-2 ${
               index === currentIndex
-                ? "bg-green-600 border-green-600 scale-110 shadow-lg"
-                : "bg-white border-gray-300 hover:border-green-400 hover:scale-105"
+                ? "bg-[var(--elra-primary)] border-[var(--elra-primary)] scale-110 shadow-lg"
+                : "bg-white border-[var(--elra-border-primary)] hover:border-[var(--elra-primary)] hover:scale-105"
             }`}
           />
         ))}
@@ -637,14 +647,14 @@ function ModuleSelector() {
 
       {/* Footer */}
       <footer className="absolute bottom-8 text-center w-full">
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mx-8 shadow-lg border border-green-100">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mx-8 shadow-lg border border-[var(--elra-border-primary)]">
           <div className="flex items-center justify-center mb-2">
             <ELRALogo variant="dark" size="sm" />
           </div>
-          <div className="text-sm text-gray-600 font-medium">
+          <div className="text-sm text-[var(--elra-text-secondary)] font-medium">
             ELRA ERP System • Version 2.0
           </div>
-          <div className="text-xs text-gray-400 mt-1">
+          <div className="text-xs text-[var(--elra-text-muted)] mt-1">
             Powered by Century Information Systems • © {currentYear}
           </div>
         </div>

@@ -4,8 +4,8 @@ import "./index.css";
 import App from "./App.jsx";
 import { AuthProvider } from "./context/AuthContext";
 import { SocketProvider } from "./context/SocketContext";
+import GradientSpinner from "./components/common/GradientSpinner";
 
-// Create a client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -15,12 +15,27 @@ const queryClient = new QueryClient({
   },
 });
 
-createRoot(document.getElementById("root")).render(
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <SocketProvider>
-        <App />
-      </SocketProvider>
-    </AuthProvider>
-  </QueryClientProvider>
+const root = createRoot(document.getElementById("root"));
+
+root.render(
+  <div className="min-h-screen bg-[var(--elra-bg-light)] flex items-center justify-center">
+    <GradientSpinner
+      size="lg"
+      title="ELRA Enterprise Resource Planning System"
+      text="Initializing..."
+      showText={true}
+    />
+  </div>
 );
+
+setTimeout(() => {
+  root.render(
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <SocketProvider>
+          <App />
+        </SocketProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+}, 2000);

@@ -14,7 +14,7 @@ export default function StatCard({
   const variants = {
     primary: {
       gradient: "from-blue-500 via-cyan-500 to-purple-500",
-      bg: "bg-blue-50",
+      bg: "bg-emerald-50",
       text: "text-blue-600",
       shadow: "shadow-blue-100",
     },

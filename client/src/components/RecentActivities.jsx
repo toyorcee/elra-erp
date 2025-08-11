@@ -45,9 +45,9 @@ const RecentActivities = ({
   const activityTypes = {
     document: {
       icon: HiDocumentText,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50",
-      borderColor: "border-blue-200",
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50",
+      borderColor: "border-emerald-200",
     },
     user: {
       icon: HiUser,
@@ -91,8 +91,8 @@ const RecentActivities = ({
     },
     USER_CREATED: {
       icon: HiUserPlus,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100",
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-100",
       label: "User Created",
     },
     USER_UPDATED: {
@@ -121,8 +121,8 @@ const RecentActivities = ({
     },
     INVITATION_CREATED: {
       icon: HiEnvelope,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100",
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-100",
       label: "Invitation Sent",
     },
     INVITATION_RESENT: {
@@ -151,8 +151,8 @@ const RecentActivities = ({
     },
     DOCUMENT_DOWNLOADED: {
       icon: HiArrowDownTray,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100",
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-100",
       label: "Document Downloaded",
     },
     DOCUMENT_DELETED: {

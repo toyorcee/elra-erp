@@ -1,46 +1,37 @@
 @import "tailwindcss";
 @import "./styles/brandColors.css";
 
-/* ELRA Brand Colors - Green & White Theme */
+/* ELRA Brand Colors - Clean & Simple Theme */
 :root {
   /* Primary Brand Colors */
-  --elra-primary: #059669; /* Green - Main brand, headers, primary buttons */
-  --elra-secondary: #ffffff; /* White - Secondary actions, highlights */
-  --elra-accent: #10b981; /* Light Green - CTAs, important actions, warnings */
+  --elra-primary: #0D6449; /* Main brand color */
+  --elra-primary-dark: #0d6449; /* Login button color */
+  --elra-bg-light: #f7f7fa; /* Light background */
 
-  /* Success/Status Colors */
-  --elra-success: #059669; /* Green success */
-  --elra-warning: #f59e0b; /* Amber warning */
-  --elra-error: #ef4444; /* Red error */
-  --elra-info: #3b82f6; /* Blue info */
+  /* Secondary Colors */
+  --elra-secondary-1: #598566;
+  --elra-secondary-2: #91ad9a;
+  --elra-secondary-3: #e7ebea;
 
   /* Text Colors */
-  --elra-text-primary: #1a1a1a; /* Dark gray - Main text, headings */
-  --elra-text-secondary: #666666; /* Medium gray - Secondary text, descriptions */
-  --elra-text-muted: #999999; /* Light gray - Muted text, placeholders */
-  --elra-text-white: #ffffff; /* White text on dark backgrounds */
+  --elra-text-primary: #1a1a1a; /* Main text */
+  --elra-text-secondary: #666666; /* Secondary text */
+  --elra-text-muted: #999999; /* Muted text */
+  --elra-text-white: #ffffff; /* White text */
 
   /* Background Colors */
-  --elra-bg-primary: #ffffff; /* White - Main background */
-  --elra-bg-secondary: #f8f9fa; /* Light gray - Secondary background */
-  --elra-bg-tertiary: #f1f3f4; /* Lighter gray - Cards, sections */
-  --elra-bg-dark: #059669; /* Green - Dark sections */
+  --elra-bg-primary: #ffffff; /* White background */
+  --elra-bg-secondary: #f7f7fa; /* Light gray background */
 
   /* Border Colors */
-  --elra-border-primary: #e0e0e0; /* Light gray - Main borders */
-  --elra-border-secondary: #d0d0d0; /* Medium gray - Secondary borders */
-  --elra-border-focus: #059669; /* Green - Focus states, active borders */
-  --elra-border-error: #ef4444; /* Red - Error borders */
+  --elra-border-primary: #e7ebea; /* Light border */
+  --elra-border-secondary: #91ad9a; /* Medium border */
+  --elra-border-focus: #0c6247; /* Focus border */
+  --elra-border-error: #ef4444; /* Error border */
 
   /* Shadow Colors */
-  --elra-shadow-light: rgba(5, 150, 105, 0.1); /* Green shadow */
-  --elra-shadow-medium: rgba(5, 150, 105, 0.15); /* Medium shadow */
-  --elra-shadow-heavy: rgba(5, 150, 105, 0.25); /* Heavy shadow */
-
-  /* Hover States */
-  --elra-hover-primary: #047857; /* Darker green - Primary hover */
-  --elra-hover-secondary: #f8fafc; /* Light gray - Secondary hover */
-  --elra-hover-accent: #059669; /* Darker green - Accent hover */
+  --elra-shadow-light: rgba(12, 98, 71, 0.1);
+  --elra-shadow-medium: rgba(12, 98, 71, 0.15);
 }
 
 /* Custom Tailwind Colors for Module Selector */
@@ -252,6 +243,17 @@ a:hover {
   background-size: 200% 100%;
   animation: shimmer 1.8s ease-in-out infinite;
 } */
+
+/* Custom Loading Animation */
+@keyframes scale {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
 
 /* Custom Scrollbar Styles */
 .custom-scrollbar::-webkit-scrollbar {

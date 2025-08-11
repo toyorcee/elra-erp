@@ -188,7 +188,7 @@ const NotificationBell = ({ className = "" }) => {
       {/* Notification Bell Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+        className="relative p-2.5 rounded-xl bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
         title="Notifications"
       >
         {unreadCount > 0 ? (
@@ -243,7 +243,9 @@ const NotificationBell = ({ className = "" }) => {
                     key={notification._id}
                     className={`p-4 hover:bg-gray-50 transition-colors duration-200 border-l-4 cursor-pointer ${getPriorityColor(
                       notification.data?.priority || "medium"
-                    )} ${!notification.isRead ? "bg-blue-50" : ""}`}
+                    )} ${
+                      !notification.isRead ? "bg-[var(--elra-secondary-3)]" : ""
+                    }`}
                     onClick={() => handleNotificationClick(notification)}
                   >
                     <div className="flex items-start space-x-3">
@@ -260,7 +262,7 @@ const NotificationBell = ({ className = "" }) => {
                               {formatTimestamp(notification.createdAt)}
                             </span>
                             {!notification.isRead && (
-                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              <div className="w-2 h-2 bg-[var(--elra-primary)] rounded-full"></div>
                             )}
                           </div>
                         </div>

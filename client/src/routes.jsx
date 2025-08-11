@@ -28,7 +28,6 @@ import Notifications from "./pages/shared/Notifications";
 //   PricingManagement,
 // } from "./pages/platform-admin";
 
-import LandingPage from "./pages/shared/LandingPage";
 import SystemSetupOnboarding from "./pages/shared/SystemSetupOnboarding";
 import DashboardLayout from "./layouts/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -44,9 +43,9 @@ const AppRoutes = () => {
   return (
     <Routes>
       {/* Public routes */}
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/system-setup" element={<SystemSetupOnboarding />} />
+      <Route path="/" element={<Login />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/system-setup" element={<SystemSetupOnboarding />} />
       {/* Register route disabled for internal ministry system */}
       {/* <Route path="/register" element={<Register />} /> */}
       <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -80,7 +79,14 @@ const AppRoutes = () => {
       />
 
       {/* Module Selector - Entry point for ERP modules */}
-      <Route path="/modules" element={<ModuleSelector />} />
+      <Route
+        path="/modules"
+        element={
+          <ProtectedRoute>
+            <ModuleSelector />
+          </ProtectedRoute>
+        }
+      />
 
       {/* All authenticated routes use DashboardLayout */}
       <Route

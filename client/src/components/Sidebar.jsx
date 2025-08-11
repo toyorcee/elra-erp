@@ -75,19 +75,19 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
       width: 4px;
     }
     .sidebar-scroll::-webkit-scrollbar-track {
-      background: rgba(59, 130, 246, 0.05);
+      background: var(--elra-secondary-3);
       border-radius: 2px;
     }
     .sidebar-scroll::-webkit-scrollbar-thumb {
-      background: rgba(59, 130, 246, 0.3);
+      background: var(--elra-primary);
       border-radius: 2px;
       min-height: 30px;
     }
     .sidebar-scroll::-webkit-scrollbar-thumb:hover {
-      background: rgba(59, 130, 246, 0.5);
+      background: var(--elra-primary-dark);
     }
     .sidebar-scroll::-webkit-scrollbar-thumb:active {
-      background: rgba(59, 130, 246, 0.6);
+      background: var(--elra-primary-dark);
     }
   `;
 
@@ -98,6 +98,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     isModuleView,
     getCurrentModuleInfo,
     returnToMainDashboard,
+    startModuleLoading,
   } = useDynamicSidebar();
 
   // Ensure we get the correct role level
@@ -154,9 +155,48 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
   };
 
   const isActive = (path) => {
-    return (
-      location.pathname === path || location.pathname.startsWith(path + "/")
-    );
+    // Exact match takes priority
+    if (location.pathname === path) {
+      return true;
+    }
+
+    // For module paths, only highlight the most specific match
+    if (path.startsWith("/dashboard/modules/")) {
+      return location.pathname.startsWith(path);
+    }
+
+    // For main dashboard, only highlight if we're not in a specific module
+    if (path === "/dashboard") {
+      return (
+        location.pathname === "/dashboard" ||
+        (location.pathname.startsWith("/dashboard") &&
+          !location.pathname.startsWith("/dashboard/modules/"))
+      );
+    }
+
+    // For other paths, use exact prefix matching
+    return location.pathname.startsWith(path + "/");
+  };
+
+  // Get the most specific active item for visual feedback
+  const getMostSpecificActiveItem = () => {
+    const currentPath = location.pathname;
+
+    // Check for exact matches first
+    if (currentPath === "/dashboard") return "/dashboard";
+
+    // Check for module paths
+    if (currentPath.startsWith("/dashboard/modules/")) {
+      const modulePath = currentPath.split("/").slice(0, 4).join("/");
+      return modulePath;
+    }
+
+    // Check for other dashboard paths
+    if (currentPath.startsWith("/dashboard/")) {
+      return currentPath;
+    }
+
+    return currentPath;
   };
 
   const getIconComponent = (iconName) => {
@@ -221,17 +261,37 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     const IconComponent = getIconComponent(item.icon);
     const isItemActive = isActive(item.path);
     const isPinned = pinnedItems.includes(item.label);
+    const isMostSpecific = getMostSpecificActiveItem() === item.path;
+
+    const handleClick = () => {
+      if (item.path.includes("/modules/") && !isItemActive) {
+        startModuleLoading();
+      }
+    };
 
     return (
       <div key={item.path} className="relative">
         <Link
           to={item.path}
-          className={`group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-300 ${
+          onClick={handleClick}
+          className={`group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-300 relative ${
             isItemActive
-              ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25"
-              : "text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:text-blue-700"
+              ? isMostSpecific
+                ? "bg-[var(--elra-primary)] text-white shadow-lg"
+                : "bg-[var(--elra-primary)] text-white shadow-lg"
+              : "text-[var(--elra-text-primary)] hover:bg-[var(--elra-secondary-3)] hover:text-[var(--elra-primary)]"
           } ${!shouldShowExpanded && "justify-center"}`}
         >
+          {/* Active indicator */}
+          {isItemActive && (
+            <div
+              className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl ${
+                isMostSpecific
+                  ? "bg-[var(--elra-primary)]"
+                  : "bg-[var(--elra-secondary-2)]"
+              }`}
+            />
+          )}
           <div className="relative">
             <IconComponent
               className={`h-5 w-5 ${
@@ -242,7 +302,16 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
           {shouldShowExpanded && (
             <>
               <span className="ml-3 flex-1">{item.label}</span>
-              {isPinned && <MapPinIcon className="h-4 w-4 text-blue-600" />}
+              <div className="flex items-center space-x-2">
+                {isMostSpecific && (
+                  <span className="px-2 py-1 text-xs font-bold bg-[var(--elra-secondary-3)] text-[var(--elra-primary)] rounded-full">
+                    Active
+                  </span>
+                )}
+                {isPinned && (
+                  <MapPinIcon className="h-4 w-4 text-[var(--elra-primary)]" />
+                )}
+              </div>
             </>
           )}
         </Link>
@@ -251,8 +320,8 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             onClick={() => togglePin(item.label)}
             className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-md transition-all duration-200 ${
               isPinned
-                ? "text-blue-600 bg-blue-100"
-                : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                ? "text-[var(--elra-primary)] bg-[var(--elra-secondary-3)]"
+                : "text-gray-400 hover:text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)]"
             }`}
           >
             <MapPinIcon className={`h-4 w-4 ${isPinned ? "rotate-45" : ""}`} />
@@ -266,11 +335,24 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     if (!items || items.length === 0) return null;
     if (!hasSectionAccess(userRoleLevel, sectionKey)) return null;
 
+    // Check if this section contains the active item
+    const hasActiveItem = items.some((item) => isActive(item.path));
+    const mostSpecificActive = getMostSpecificActiveItem();
+
     return (
       <div key={sectionKey} className="mb-6">
         {shouldShowExpanded && (
-          <h3 className="px-4 text-xs font-bold text-blue-600 uppercase tracking-wider mb-3 bg-gradient-to-r from-blue-50 to-blue-100 py-2 rounded-lg">
+          <h3
+            className={`px-4 text-xs font-bold uppercase tracking-wider mb-3 py-2 rounded-lg transition-all duration-200 ${
+              hasActiveItem
+                ? "text-[var(--elra-text-primary)] bg-[var(--elra-secondary-3)] border-l-4 border-[var(--elra-primary)]"
+                : "text-[var(--elra-primary)] bg-[var(--elra-secondary-3)]"
+            }`}
+          >
             {sectionTitle}
+            {hasActiveItem && (
+              <span className="ml-2 text-[var(--elra-primary)]">●</span>
+            )}
           </h3>
         )}
         <div className="space-y-2">{items.map(renderNavItem)}</div>
@@ -303,8 +385,8 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
 
       {/* Sidebar */}
       <div
-        className={`fixed top-0 left-0 h-full bg-white/95 backdrop-blur-xl border-r border-blue-200/50 z-50 transition-all duration-500 ease-out ${
-          shouldShowExpanded ? "w-72" : "w-20"
+        className={`fixed top-0 left-0 h-full bg-white/95 backdrop-blur-xl border-r border-[var(--elra-border-primary)] z-50 transition-all duration-500 ease-out ${
+          shouldShowExpanded ? "w-64" : "w-16"
         } ${
           isMobile
             ? isOpen
@@ -313,40 +395,27 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             : ""
         } ${
           !isOpen && !isMobile ? "lg:translate-x-0" : ""
-        } shadow-2xl shadow-blue-500/10 overflow-hidden`}
+        } shadow-2xl shadow-[var(--elra-primary)]/10 overflow-hidden`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
         {/* Header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-blue-200/50 bg-gradient-to-r from-blue-50/50 to-white">
+        <div className="flex items-center justify-between h-16 px-4 border-b border-[var(--elra-border-primary)] bg-[var(--elra-bg-light)]">
           {/* Section Title when expanded or hovered */}
           {shouldShowExpanded && (
             <div className="flex items-center">
-              {isModuleView && currentModule ? (
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={returnToMainDashboard}
-                    className="p-1 rounded-lg text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all duration-200"
-                    title="Back to main dashboard"
-                  >
-                    <ArrowTrendingUpIcon className="h-4 w-4" />
-                  </button>
-                  <span className="font-bold text-blue-600 text-lg">
-                    {getCurrentModuleInfo()?.label || currentModule || "Module"}
-                  </span>
-                </div>
-              ) : (
-                <span className="font-bold text-blue-600 text-lg">
-                  Navigation
-                </span>
-              )}
+              <span className="font-bold text-[var(--elra-primary)] text-lg">
+                {isModuleView && currentModule
+                  ? getCurrentModuleInfo()?.label || currentModule
+                  : "Dashboard"}
+              </span>
             </div>
           )}
 
           {/* Only show hamburger on mobile */}
           <button
             onClick={onToggle}
-            className="p-2 rounded-xl text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all duration-200 hover:scale-110 lg:hidden"
+            className="p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] hover:bg-[var(--elra-secondary-3)] transition-all duration-200 hover:scale-110 lg:hidden"
           >
             {isOpen ? (
               <XMarkIcon className="h-5 w-5" />
@@ -358,7 +427,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
           {/* Desktop toggle button */}
           <button
             onClick={onToggle}
-            className="hidden lg:block p-2 rounded-xl text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all duration-200 hover:scale-110"
+            className="hidden lg:block p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] hover:bg-[var(--elra-secondary-3)] transition-all duration-200 hover:scale-110"
           >
             {shouldShowExpanded ? (
               <XMarkIcon className="h-5 w-5" />
@@ -369,10 +438,10 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
         </div>
 
         {/* User Profile */}
-        <div className="px-4 py-4 border-b border-blue-200/50 bg-gradient-to-r from-blue-50/30 to-white">
+        <div className="px-4 py-4 border-b border-[var(--elra-border-primary)] bg-[var(--elra-secondary-3)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <div className="w-12 h-12 bg-[var(--elra-primary)] rounded-2xl flex items-center justify-center shadow-lg">
                 <span className="text-white font-bold text-lg">
                   {user?.firstName?.charAt(0) || user?.name?.charAt(0) || "U"}
                 </span>
@@ -382,7 +451,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                   <p className="text-sm font-semibold text-gray-900 truncate">
                     {user?.firstName} {user?.lastName}
                   </p>
-                  <p className="text-xs text-blue-600 font-medium">
+                  <p className="text-xs text-[var(--elra-primary)] font-medium">
                     {typeof roleInfo?.title === "string"
                       ? roleInfo.title
                       : "Staff"}
@@ -397,8 +466,8 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                 onClick={toggleSidebarPin}
                 className={`p-2 rounded-xl transition-all duration-200 hover:scale-110 ${
                   isPinned
-                    ? "text-blue-600 bg-blue-100"
-                    : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                    ? "text-[var(--elra-primary)] bg-[var(--elra-secondary-3)]"
+                    : "text-gray-400 hover:text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)]"
                 }`}
                 title={isPinned ? "Unpin sidebar" : "Pin sidebar"}
               >
@@ -418,66 +487,77 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             overflowY: shouldShowExpanded ? "auto" : "hidden",
           }}
         >
-          {/* Render module-specific navigation when in module view */}
-          {isModuleView && currentModule ? (
-            <div className="space-y-6">
-              {moduleSidebarItems.map((section, sectionIndex) => (
-                <div key={sectionIndex} className="mb-6">
-                  {shouldShowExpanded && (
-                    <h3 className="px-4 text-xs font-bold text-blue-600 uppercase tracking-wider mb-3 bg-gradient-to-r from-blue-50 to-blue-100 py-2 rounded-lg">
-                      {section.title}
-                    </h3>
-                  )}
-                  <div className="space-y-2">
-                    {section.items.map((item, itemIndex) => {
-                      const IconComponent = getIconComponent(item.icon);
-                      const isItemActive = isActive(item.path);
+          {/* Always render main dashboard navigation */}
+          {renderSection("main", "Main", sections.main)}
+          {renderSection("erp", "ERP Modules", sections.erp)}
+          {renderSection("system", "System", sections.system)}
+          {renderSection("documents", "Documents", sections.documents)}
+          {renderSection(
+            "communication",
+            "Communication",
+            sections.communication
+          )}
+          {renderSection("reports", "Reports & Analytics", sections.reports)}
 
-                      return (
-                        <div key={itemIndex} className="relative">
-                          <Link
-                            to={item.path}
-                            className={`group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-300 ${
-                              isItemActive
-                                ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25"
-                                : "text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:text-blue-700"
-                            } ${!shouldShowExpanded && "justify-center"}`}
-                          >
-                            <div className="relative">
-                              <IconComponent
-                                className={`h-5 w-5 ${
-                                  !shouldShowExpanded && "mx-auto"
-                                } transition-transform duration-200 group-hover:scale-110`}
-                              />
-                            </div>
-                            {shouldShowExpanded && (
-                              <span className="ml-3 flex-1">{item.label}</span>
-                            )}
-                          </Link>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
+          {/* Render module-specific navigation when in module view */}
+          {isModuleView && currentModule && (
             <>
-              {/* Render main dashboard navigation */}
-              {renderSection("main", "Main", sections.main)}
-              {renderSection("erp", "ERP Modules", sections.erp)}
-              {renderSection("system", "System", sections.system)}
-              {renderSection("documents", "Documents", sections.documents)}
-              {renderSection(
-                "communication",
-                "Communication",
-                sections.communication
+              {/* Divider */}
+              <div className="my-6 border-t border-[var(--elra-border-primary)]"></div>
+
+              {/* Module Header */}
+              {shouldShowExpanded && (
+                <div className="mb-4">
+                  <h3 className="px-4 text-xs font-bold text-[var(--elra-primary)] uppercase tracking-wider mb-3 bg-gradient-to-r from-[var(--elra-secondary-3)] to-[var(--elra-secondary-2)] py-2 rounded-lg">
+                    Module Features
+                  </h3>
+                </div>
               )}
-              {renderSection(
-                "reports",
-                "Reports & Analytics",
-                sections.reports
-              )}
+
+              {/* Module-specific items */}
+              <div className="space-y-6">
+                {moduleSidebarItems.map((section, sectionIndex) => (
+                  <div key={sectionIndex} className="mb-6">
+                    {shouldShowExpanded && (
+                      <h3 className="px-4 text-xs font-bold text-[var(--elra-primary)] uppercase tracking-wider mb-3 bg-gradient-to-r from-[var(--elra-secondary-3)] to-[var(--elra-secondary-2)] py-2 rounded-lg">
+                        {section.title}
+                      </h3>
+                    )}
+                    <div className="space-y-2">
+                      {section.items.map((item, itemIndex) => {
+                        const IconComponent = getIconComponent(item.icon);
+                        const isItemActive = isActive(item.path);
+
+                        return (
+                          <div key={itemIndex} className="relative">
+                            <Link
+                              to={item.path}
+                              className={`group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-300 ${
+                                isItemActive
+                                  ? "bg-[var(--elra-primary)] text-white shadow-lg"
+                                  : "text-[var(--elra-text-primary)] hover:bg-[var(--elra-secondary-3)] hover:text-[var(--elra-primary)]"
+                              } ${!shouldShowExpanded && "justify-center"}`}
+                            >
+                              <div className="relative">
+                                <IconComponent
+                                  className={`h-5 w-5 ${
+                                    !shouldShowExpanded && "mx-auto"
+                                  } transition-transform duration-200 group-hover:scale-110`}
+                                />
+                              </div>
+                              {shouldShowExpanded && (
+                                <span className="ml-3 flex-1">
+                                  {item.label}
+                                </span>
+                              )}
+                            </Link>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </>
           )}
 
@@ -485,7 +565,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
           {pinnedItems.length > 0 && (
             <div className="mb-6">
               {shouldShowExpanded && (
-                <h3 className="px-4 text-xs font-bold text-blue-600 uppercase tracking-wider mb-3 bg-gradient-to-r from-blue-50 to-blue-100 py-2 rounded-lg">
+                <h3 className="px-4 text-xs font-bold text-[var(--elra-primary)] uppercase tracking-wider mb-3 bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-secondary-2)] py-2 rounded-lg">
                   Pinned
                 </h3>
               )}
@@ -500,11 +580,11 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
         </div>
 
         {/* Footer */}
-        <div className="flex-shrink-0 p-4 border-t border-blue-200/50 bg-gradient-to-r from-white to-blue-50/30">
+        <div className="flex-shrink-0 p-4 border-t border-[var(--elra-border-primary)] bg-[var(--elra-secondary-3)]">
           <div className="space-y-3">
             <button
               onClick={() => navigate("/dashboard/settings")}
-              className={`w-full flex items-center px-4 py-3 text-sm font-medium text-gray-700 rounded-xl hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:text-blue-700 transition-all duration-200 hover:scale-105 ${
+              className={`w-full flex items-center px-4 py-3 text-sm font-medium text-gray-700 rounded-xl hover:bg-gradient-to-r hover:from-emerald-50 hover:to-emerald-100 hover:text-emerald-700 transition-all duration-200 hover:scale-105 ${
                 !shouldShowExpanded && "justify-center"
               }`}
             >
@@ -514,7 +594,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
 
             <button
               onClick={handleLogout}
-              className={`w-full flex items-center px-4 py-3 text-sm font-medium text-red-600 rounded-xl hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 hover:text-red-700 transition-all duration-200 hover:scale-105 ${
+              className={`w-full flex items-center px-4 py-3 text-sm font-medium text-red-600 rounded-xl hover:bg-red-50 hover:text-red-700 transition-all duration-200 hover:scale-105 ${
                 !shouldShowExpanded && "justify-center"
               }`}
             >

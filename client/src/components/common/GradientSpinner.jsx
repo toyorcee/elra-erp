@@ -1,159 +1,66 @@
 import React from "react";
+import elraImage from "../../assets/ELRA.png";
 
 const GradientSpinner = ({
   size = "md",
   className = "",
-  variant = "primary",
   text = "",
   showText = false,
+  title = "ELRA Enterprise Resource Planning System",
 }) => {
   const sizeClasses = {
-    sm: "w-6 h-6",
-    md: "w-8 h-8",
-    lg: "w-12 h-12",
-    xl: "w-16 h-16",
-  };
-
-  const variantClasses = {
-    primary: "from-green-500 via-emerald-500 to-green-600",
-    secondary: "from-emerald-500 via-green-500 to-emerald-600",
-    success: "from-green-500 via-emerald-500 to-teal-600",
-    warning: "from-yellow-500 via-orange-500 to-red-600",
-    error: "from-red-500 via-pink-500 to-rose-600",
-    purple: "from-purple-400 via-purple-500 to-purple-600",
-    teal: "from-teal-400 via-teal-500 to-teal-600",
-    light: "from-white via-gray-100 to-gray-200",
-    "white-green": "from-white via-green-100 to-green-200",
+    sm: "w-16 h-16",
+    md: "w-24 h-24",
+    lg: "w-32 h-32",
+    xl: "w-40 h-40",
   };
 
   const textSizeClasses = {
-    sm: "text-xs",
-    md: "text-sm",
-    lg: "text-base",
-    xl: "text-lg",
+    sm: "text-sm",
+    md: "text-base",
+    lg: "text-lg",
+    xl: "text-xl",
   };
 
-  const isLight = variant === "light";
+  const titleSizeClasses = {
+    sm: "text-lg",
+    md: "text-xl",
+    lg: "text-2xl",
+    xl: "text-3xl",
+  };
 
   return (
     <div
-      className={`flex flex-col items-center justify-center gap-3 ${className}`}
+      className={`flex flex-col items-center justify-center gap-4 ${className}`}
     >
-      <div className={`relative ${sizeClasses[size]}`}>
-        {/* Outer rotating ring with gradient */}
-        <div
-          className={`absolute inset-0 rounded-full border-2 border-transparent bg-gradient-to-r ${variantClasses[variant]} animate-spin`}
+      <div className="flex items-center justify-center">
+        <img
+          src={elraImage}
+          alt="ELRA Loading"
+          className={`${sizeClasses[size]} object-contain`}
           style={{
-            background: `conic-gradient(from 0deg, transparent, ${getGradientColors(
-              variant
-            )}, transparent)`,
-            mask: "radial-gradient(circle at center, transparent 70%, black 71%)",
-            WebkitMask:
-              "radial-gradient(circle at center, transparent 70%, black 71%)",
+            animation: "scale 1.5s ease-in-out infinite",
           }}
-        ></div>
-
-        {/* Inner pulsing ring */}
-        <div
-          className={`absolute inset-1 rounded-full border border-transparent bg-gradient-to-r ${variantClasses[variant]} opacity-30 animate-pulse`}
-          style={{
-            background: `conic-gradient(from 180deg, transparent, ${getGradientColors(
-              variant
-            )}, transparent)`,
-            mask: "radial-gradient(circle at center, transparent 60%, black 61%)",
-            WebkitMask:
-              "radial-gradient(circle at center, transparent 60%, black 61%)",
-          }}
-        ></div>
-
-        {/* Center circle with subtle gradient */}
-        <div
-          className={`absolute inset-2 rounded-full bg-gradient-to-br ${
-            isLight
-              ? "from-white/20 to-white/10 border border-white/30"
-              : "from-white/10 to-transparent border border-white/20"
-          } shadow-sm backdrop-blur-sm`}
-        ></div>
-
-        {/* Animated center dot */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div
-            className={`w-1 h-1 rounded-full bg-gradient-to-r ${variantClasses[variant]} animate-pulse`}
-            style={{
-              animationDuration: "1.5s",
-              animationTimingFunction: "ease-in-out",
-            }}
-          ></div>
-        </div>
-
-        {/* Outer glow effect */}
-        <div
-          className={`absolute -inset-1 rounded-full bg-gradient-to-r ${variantClasses[variant]} opacity-20 blur-md animate-pulse`}
-          style={{
-            animationDuration: "2s",
-            animationTimingFunction: "ease-in-out",
-          }}
-        ></div>
-
-        {/* Additional sparkle effect */}
-        <div className="absolute inset-0">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className={`absolute w-0.5 h-0.5 rounded-full bg-gradient-to-r ${variantClasses[variant]} animate-ping`}
-              style={{
-                left: `${25 + i * 25}%`,
-                top: `${25 + i * 25}%`,
-                animationDelay: `${i * 0.3}s`,
-                animationDuration: "1.5s",
-              }}
-            ></div>
-          ))}
-        </div>
+        />
       </div>
 
+      {title && (
+        <h2
+          className={`font-bold text-[var(--elra-primary)] ${titleSizeClasses[size]}`}
+        >
+          {title}
+        </h2>
+      )}
+
       {showText && text && (
-        <div className="text-center">
-          <p
-            className={`${textSizeClasses[size]} ${
-              isLight ? "text-gray-800" : "text-white"
-            } font-medium tracking-wide`}
-          >
-            {text}
-          </p>
-          {/* Animated dots for loading effect */}
-          <div className="flex justify-center gap-1 mt-1">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div
-                key={i}
-                className={`w-1 h-1 rounded-full bg-gradient-to-r ${variantClasses[variant]} animate-bounce`}
-                style={{
-                  animationDelay: `${i * 150}ms`,
-                  animationDuration: "1s",
-                }}
-              ></div>
-            ))}
-          </div>
-        </div>
+        <p
+          className={`text-[var(--elra-text-secondary)] ${textSizeClasses[size]} text-center`}
+        >
+          {text}
+        </p>
       )}
     </div>
   );
-};
-
-// Helper function to get gradient colors for conic gradient
-const getGradientColors = (variant) => {
-  const colors = {
-    primary: "#10b981, #059669, #16a34a",
-    secondary: "#059669, #10b981, #16a34a",
-    success: "#10b981, #059669, #14b8a6",
-    warning: "#f59e0b, #d97706, #ef4444",
-    error: "#ef4444, #dc2626, #f43f5e",
-    purple: "#a78bfa, #8b5cf6, #7c3aed",
-    teal: "#5eead4, #14b8a6, #0d9488",
-    light: "#ffffff, #f3f4f6, #e5e7eb",
-    "white-green": "#ffffff, #dcfce7, #bbf7d0",
-  };
-  return colors[variant] || colors.primary;
 };
 
 export default GradientSpinner;

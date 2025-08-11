@@ -9,7 +9,7 @@ import PasswordChangeModal from "../components/common/PasswordChangeModal";
 import { useAuth } from "../context/AuthContext";
 import { useMessages } from "../hooks/useMessages";
 import { DynamicSidebarProvider } from "../context/DynamicSidebarContext";
-import elraLogo from "../assets/elraimage.jpg";
+import ELRALogo from "../components/ELRALogo";
 
 const SidebarContext = createContext();
 
@@ -83,6 +83,15 @@ const DashboardLayout = () => {
     }
   };
 
+  // Handle logo click - navigate to modules page for logged-in users
+  const handleLogoClick = () => {
+    if (user && !loading) {
+      navigate("/modules");
+    } else {
+      navigate("/");
+    }
+  };
+
   return (
     <SidebarContext.Provider
       value={{
@@ -91,9 +100,9 @@ const DashboardLayout = () => {
         isMobile,
       }}
     >
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-emerald-100/30">
+      <div className="min-h-screen bg-[var(--elra-bg-light)]">
         {/* Fixed Navbar */}
-        <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-emerald-200/50 shadow-lg shadow-emerald-500/10">
+        <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-[var(--elra-border-primary)] shadow-lg shadow-[var(--elra-primary)]/10">
           <div className="px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               {/* Left side */}
@@ -101,7 +110,7 @@ const DashboardLayout = () => {
                 {/* Mobile hamburger menu */}
                 <button
                   onClick={toggleSidebar}
-                  className="lg:hidden p-2 rounded-xl text-blue-700 hover:bg-blue-50 transition-all duration-200 hover:scale-105 mr-4"
+                  className="lg:hidden p-2 rounded-xl text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] transition-all duration-200 hover:scale-105 mr-4"
                 >
                   <svg
                     className="w-6 h-6"
@@ -121,23 +130,13 @@ const DashboardLayout = () => {
                 {/* Spacer for desktop sidebar toggle */}
                 <div className="hidden lg:block w-12 mr-2"></div>
 
-                {/* ELRA Logo */}
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-2xl overflow-hidden shadow-lg mr-3 sm:mr-4">
-                  <img
-                    src={elraLogo}
-                    alt="ELRA"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-
-                {/* ELRA Text */}
-                <div className="flex flex-col">
-                  <span className="font-bold text-gray-900 text-base sm:text-lg">
-                    ELRA
-                  </span>
-                  <span className="text-xs text-blue-600 font-medium hidden sm:block">
-                    ERP SYSTEM
-                  </span>
+                {/* ELRA Logo - Now clickable */}
+                <div
+                  className="cursor-pointer hover:scale-105 transition-transform duration-200"
+                  onClick={handleLogoClick}
+                  title={user && !loading ? "Go to Modules" : "Go to Home"}
+                >
+                  <ELRALogo variant="dark" size="sm" />
                 </div>
               </div>
 
@@ -147,13 +146,13 @@ const DashboardLayout = () => {
                 <div className="relative">
                   <button
                     onClick={() => setShowMessageDropdown(!showMessageDropdown)}
-                    className="p-2 rounded-xl text-blue-700 hover:bg-blue-50 transition-all duration-200 hover:scale-105 relative cursor-pointer"
+                    className="p-2 rounded-xl text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] transition-all duration-200 hover:scale-105 relative cursor-pointer"
                   >
                     <ChatBubbleLeftRightIcon className="h-6 w-6" />
                     <span
                       className={`absolute -top-1 -right-1 w-5 h-5 text-white text-xs rounded-full flex items-center justify-center font-bold transition-all duration-200 ${
                         totalUnreadMessages === 0
-                          ? "bg-blue-400 scale-90"
+                          ? "bg-[var(--elra-primary)] scale-90"
                           : "bg-red-500 scale-100 animate-pulse"
                       }`}
                     >
@@ -188,7 +187,7 @@ const DashboardLayout = () => {
             {/* Content - Now responsive to sidebar state and mobile */}
             <div
               className={`flex-1 transition-all duration-300 ease-in-out ${
-                sidebarOpen ? "lg:ml-64" : "lg:ml-20"
+                sidebarOpen ? "lg:ml-64" : "lg:ml-16"
               } ${isMobile ? "ml-0" : ""}`}
             >
               {/* Mobile overlay */}

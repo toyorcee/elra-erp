@@ -76,6 +76,14 @@ export const sidebarConfig = [
     section: "erp",
     badge: "Support",
   },
+  {
+    label: "Document Management",
+    icon: "HiOutlineDocumentText",
+    path: "/dashboard/modules/documents",
+    required: { minLevel: 300 },
+    section: "erp",
+    badge: "Docs",
+  },
 
   // ===== SYSTEM MANAGEMENT =====
   {

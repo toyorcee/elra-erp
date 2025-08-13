@@ -7,7 +7,6 @@ class AuditService {
   static async logDocumentAction(userId, action, documentId, details = {}) {
     try {
       const auditData = {
-        company: details.company, // Add company for data isolation
         userId,
         action,
         resourceType: "DOCUMENT",
@@ -41,7 +40,6 @@ class AuditService {
   static async logUserAction(userId, action, targetUserId, details = {}) {
     try {
       const auditData = {
-        company: details.company, // Add company for data isolation
         userId,
         action,
         resourceType: "USER",
@@ -71,7 +69,6 @@ class AuditService {
   static async logSystemAction(userId, action, details = {}) {
     try {
       const auditData = {
-        company: details.company, // Add company for data isolation
         userId,
         action,
         resourceType: "SYSTEM",
@@ -93,12 +90,45 @@ class AuditService {
   }
 
   /**
+   * Log salary grade-related actions
+   */
+  static async logSalaryGradeAction(
+    userId,
+    action,
+    salaryGradeId,
+    details = {}
+  ) {
+    try {
+      const auditData = {
+        userId,
+        action,
+        resourceType: "SALARY_GRADE",
+        resourceId: salaryGradeId,
+        resourceModel: "SalaryGrade",
+        details: {
+          ...details,
+          gradeName: details.gradeName,
+          gradeLevel: details.gradeLevel,
+          salaryRange: details.salaryRange,
+          description: details.description,
+        },
+        ipAddress: details.ipAddress,
+        userAgent: details.userAgent,
+        riskLevel: this.calculateRiskLevel(action, details),
+      };
+
+      return await AuditLog.log(auditData);
+    } catch (error) {
+      console.error("Error logging salary grade action:", error);
+    }
+  }
+
+  /**
    * Log authentication-related actions
    */
   static async logAuthAction(userId, action, details = {}) {
     try {
       const auditData = {
-        company: details.company, // Add company for data isolation
         userId,
         action,
         resourceType: "AUTH",
@@ -156,10 +186,9 @@ class AuditService {
    */
   static async getRecentActivity(options = {}) {
     try {
-      const { limit = 10, companyFilter = {}, department } = options;
+      const { limit = 10, department } = options;
       return await AuditLog.getRecentActivity({
         limit,
-        companyFilter,
         department,
       });
     } catch (error) {
@@ -171,13 +200,9 @@ class AuditService {
   /**
    * Get audit trail for a specific document
    */
-  static async getDocumentAuditTrail(documentId, companyFilter = {}) {
+  static async getDocumentAuditTrail(documentId) {
     try {
-      return await AuditLog.getAuditTrail(
-        "DOCUMENT",
-        documentId,
-        companyFilter
-      );
+      return await AuditLog.getAuditTrail("DOCUMENT", documentId);
     } catch (error) {
       console.error("Error getting document audit trail:", error);
       return [];
@@ -199,7 +224,7 @@ class AuditService {
   /**
    * Get activity statistics for admin dashboard
    */
-  static async getActivityStats({ days = 30, company } = {}) {
+  static async getActivityStats({ days = 30 } = {}) {
     try {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
@@ -208,11 +233,6 @@ class AuditService {
         timestamp: { $gte: startDate },
         isDeleted: false,
       };
-
-      // Add company filter if provided
-      if (company) {
-        matchStage.company = company;
-      }
 
       const stats = await AuditLog.aggregate([
         {

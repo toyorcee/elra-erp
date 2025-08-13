@@ -11,7 +11,7 @@ const createTransporter = () => {
   });
 };
 
-// Beautiful email template with brand colors
+// Simple email template with ELRA brand colors
 const createEmailTemplate = (
   title,
   content,
@@ -19,6 +19,12 @@ const createEmailTemplate = (
   actionUrl,
   footerText
 ) => {
+  const currentDate = new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
   return `
     <!DOCTYPE html>
     <html lang="en">
@@ -36,7 +42,7 @@ const createEmailTemplate = (
             body {
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 line-height: 1.6;
-                background: linear-gradient(135deg, #1e40af 0%, #3b82f6 25%, #6366f1 50%, #8b5cf6 75%, #a855f7 100%);
+                background: #ffffff;
                 min-height: 100vh;
                 padding: 20px;
             }
@@ -44,203 +50,107 @@ const createEmailTemplate = (
             .email-container {
                 max-width: 600px;
                 margin: 0 auto;
-                background: rgba(255, 255, 255, 0.95);
-                backdrop-filter: blur(20px);
-                border-radius: 16px;
+                background: #ffffff;
+                border-radius: 8px;
                 overflow: hidden;
-                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-                border: 1px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+                border: 1px solid #e5e7eb;
             }
             
             .header {
-                background: linear-gradient(135deg, #1e40af 0%, #3b82f6 25%, #6366f1 50%, #8b5cf6 75%, #a855f7 100%);
-                padding: 40px 30px;
+                background: #0d6449;
+                padding: 30px 20px;
                 text-align: center;
                 color: white;
-                position: relative;
-            }
-            
-            .header::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: 
-                    radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.4) 0%, transparent 50%),
-                    radial-gradient(circle at 80% 20%, rgba(147, 51, 234, 0.4) 0%, transparent 50%),
-                    radial-gradient(circle at 40% 40%, rgba(6, 182, 212, 0.3) 0%, transparent 50%),
-                    radial-gradient(circle at 60% 60%, rgba(16, 185, 129, 0.2) 0%, transparent 50%);
-                animation: float 8s ease-in-out infinite;
-            }
-            
-            @keyframes float {
-                0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
-                25% { transform: translateY(-8px) rotate(0.5deg) scale(1.02); }
-                50% { transform: translateY(-15px) rotate(1deg) scale(1.05); }
-                75% { transform: translateY(-8px) rotate(0.5deg) scale(1.02); }
             }
             
             .logo {
-                font-size: 32px;
-                font-weight: 700;
-                margin-bottom: 8px;
-                position: relative;
-                z-index: 1;
-                letter-spacing: -0.5px;
-                color: white;
-                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                margin-bottom: 20px;
             }
             
-            .subtitle {
-                font-size: 16px;
-                opacity: 0.9;
-                position: relative;
-                z-index: 1;
-                font-weight: 300;
-                letter-spacing: 0.5px;
+            .logo svg {
+                height: 80px;
+                width: auto;
+                max-width: 300px;
             }
             
             .content {
                 padding: 40px 30px;
-                background: rgba(15, 23, 42, 0.8);
-                color: white;
+                background: #ffffff;
+                color: #000000;
             }
             
             .title {
-                font-size: 28px;
+                font-size: 24px;
                 font-weight: 700;
-                color: white;
+                color: #0d6449;
                 margin-bottom: 20px;
                 text-align: center;
-                letter-spacing: -0.5px;
             }
             
             .message {
                 font-size: 16px;
-                color: rgba(255, 255, 255, 0.9);
-                margin-bottom: 24px;
+                color: #000000;
+                margin-bottom: 30px;
                 line-height: 1.6;
-                text-align: center;
             }
             
             .message strong {
-                color: white;
+                color: #0d6449;
                 font-weight: 600;
             }
             
             .action-button {
                 display: inline-block;
-                background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+                background: #0d6449;
                 color: white;
                 text-decoration: none;
-                padding: 16px 32px;
-                border-radius: 12px;
+                padding: 14px 28px;
+                border-radius: 6px;
                 font-weight: 600;
                 font-size: 16px;
                 text-align: center;
-                transition: all 0.3s ease;
-                box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.4);
-                position: relative;
-                overflow: hidden;
-            }
-            
-            .action-button::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: -100%;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-                transition: left 0.5s;
-            }
-            
-            .action-button:hover::before {
-                left: 100%;
-            }
-            
-            .action-button:hover {
-                transform: translateY(-2px);
-                box-shadow: 
-                    0 20px 40px -10px rgba(255, 215, 0, 0.6),
-                    0 0 0 1px rgba(255, 255, 255, 0.3);
+                margin: 20px 0;
             }
             
             .footer {
-                background: rgba(15, 23, 42, 0.9);
-                padding: 24px 30px;
+                background: #f9fafb;
+                padding: 20px 30px;
                 text-align: center;
-                color: white;
+                color: #6b7280;
                 font-size: 14px;
-                border-top: 1px solid rgba(59, 130, 246, 0.3);
+                border-top: 1px solid #e5e7eb;
             }
             
             .footer-text {
                 font-weight: 600;
-                color: white;
+                color: #0d6449;
                 margin-bottom: 8px;
             }
             
-            .footer-subtitle {
+            .footer-date {
                 font-size: 12px;
-                opacity: 0.8;
-                color: rgba(255, 255, 255, 0.8);
-            }
-            
-            .floating-elements {
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                pointer-events: none;
-                overflow: hidden;
-            }
-            
-            .floating-element {
-                position: absolute;
-                width: 4px;
-                height: 4px;
-                background: rgba(255, 255, 255, 0.3);
-                border-radius: 50%;
-                animation: float-particle 4s ease-in-out infinite;
-            }
-            
-            .floating-element:nth-child(1) { top: 20%; left: 10%; animation-delay: 0s; }
-            .floating-element:nth-child(2) { top: 60%; left: 80%; animation-delay: 1s; }
-            .floating-element:nth-child(3) { top: 40%; left: 20%; animation-delay: 2s; }
-            .floating-element:nth-child(4) { top: 80%; left: 70%; animation-delay: 3s; }
-            
-            @keyframes float-particle {
-                0%, 100% { transform: translateY(0px) scale(1) rotate(0deg); opacity: 0.3; }
-                25% { transform: translateY(-10px) scale(1.1) rotate(90deg); opacity: 0.6; }
-                50% { transform: translateY(-25px) scale(1.3) rotate(180deg); opacity: 0.9; }
-                75% { transform: translateY(-10px) scale(1.1) rotate(270deg); opacity: 0.6; }
+                color: #9ca3af;
             }
             
             @media (max-width: 600px) {
                 body { padding: 10px; }
-                .email-container { border-radius: 16px; }
-                .header { padding: 40px 20px; }
-                .content { padding: 40px 20px; }
-                .title { font-size: 24px; }
-                .action-button { padding: 16px 32px; font-size: 15px; }
+                .email-container { border-radius: 6px; }
+                .header { padding: 20px 15px; }
+                .content { padding: 30px 20px; }
+                .title { font-size: 20px; }
+                .action-button { padding: 12px 24px; font-size: 15px; }
             }
         </style>
     </head>
     <body>
         <div class="email-container">
             <div class="header">
-                <div class="floating-elements">
-                    <div class="floating-element"></div>
-                    <div class="floating-element"></div>
-                    <div class="floating-element"></div>
-                    <div class="floating-element"></div>
+                <div class="logo">
+                    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="304" height="166" viewBox="0 0 304 166">
+                        <image xlink:href="data:image/png;base64,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" x="0" y="0" width="304" height="166"/>
+                    </svg>
                 </div>
-                <div class="logo">EDMS</div>
-                <div class="subtitle">Electronic Document Management System</div>
             </div>
             
             <div class="content">
@@ -249,16 +159,22 @@ const createEmailTemplate = (
                     ${content}
                 </div>
                 
+                ${
+                  actionText && actionUrl
+                    ? `
                 <div style="text-align: center;">
                     <a href="${actionUrl}" class="action-button">
                         ${actionText}
                     </a>
                 </div>
+                `
+                    : ""
+                }
             </div>
             
             <div class="footer">
                 <div class="footer-text">${footerText}</div>
-                <div class="footer-subtitle">Powered by EDMS - Secure Document Management</div>
+                <div class="footer-date">${currentDate}</div>
             </div>
         </div>
     </body>
@@ -273,10 +189,10 @@ export const sendPasswordResetEmail = async (email, resetToken, userName) => {
     const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
 
     const htmlContent = createEmailTemplate(
-      "Reset Your EDMS Password",
+      "Reset Your ELRA Password",
       `
         <p>Hello <strong>${userName}</strong>,</p>
-        <p>🔐 We received a request to reset your EDMS account password.</p>
+                  <p>🔐 We received a request to reset your ELRA account password.</p>
         <p>Click the button below to create a new secure password. This link will expire in 1 hour for your security.</p>
         <p>If you didn't request this password reset, please ignore this email and your password will remain unchanged.</p>
       `,
@@ -288,7 +204,7 @@ export const sendPasswordResetEmail = async (email, resetToken, userName) => {
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: email,
-      subject: "EDMS - Password Reset Request",
+      subject: "ELRA - Password Reset Request",
       html: htmlContent,
     };
 
@@ -313,22 +229,22 @@ export const sendWelcomeEmail = async (email, userName) => {
     const loginUrl = `${process.env.CLIENT_URL}/login`;
 
     const htmlContent = createEmailTemplate(
-      "Welcome to EDMS!",
+      "Welcome to ELRA!",
       `
         <p>Hello <strong>${userName}</strong>,</p>
-        <p>🎉 Congratulations! Your EDMS account has been successfully activated.</p>
-        <p>You now have full access to our comprehensive document management platform with advanced features like workflow automation, team collaboration, and secure file storage.</p>
-        <p>Ready to transform your document management experience? Click the button below to get started!</p>
+        <p>🎉 Congratulations! Your ELRA account has been successfully activated.</p>
+        <p>You now have full access to our comprehensive Enterprise Resource Planning (ERP) platform with advanced features including HR management, payroll processing, procurement, finance, inventory management, and secure document workflows.</p>
+        <p>Ready to transform your business operations? Click the button below to get started!</p>
       `,
-      "Login to EDMS",
+      "Login to ELRA",
       loginUrl,
-      "Welcome to the EDMS family"
+      "Welcome to the ELRA family"
     );
 
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: email,
-      subject: "Welcome to EDMS - Your Account is Ready!",
+      subject: "Welcome to ELRA - Your Account is Ready!",
       html: htmlContent,
     };
 
@@ -354,12 +270,12 @@ export const sendAccountActivationEmail = async (
     const activationUrl = `${process.env.CLIENT_URL}/verify-email-success?token=${activationToken}`;
 
     const htmlContent = createEmailTemplate(
-      "Activate Your EDMS Account",
+      "Activate Your ELRA Account",
       `
         <p>Hello <strong>${userName}</strong>,</p>
-        <p>🎉 Welcome to EDMS! We're excited to have you join our secure document management platform.</p>
-        <p>To complete your account setup and unlock all the powerful features, please click the button below to activate your account.</p>
-        <p>Once activated, you'll have full access to document management, workflow automation, and team collaboration tools.</p>
+        <p>🎉 Welcome to ELRA! We're excited to have you join our comprehensive Enterprise Resource Planning (ERP) platform.</p>
+        <p>To complete your account setup and unlock all the powerful business management features, please click the button below to activate your account.</p>
+        <p>Once activated, you'll have full access to HR management, payroll processing, procurement, finance, inventory management, and secure document workflows.</p>
       `,
       "Activate Account",
       activationUrl,
@@ -369,7 +285,7 @@ export const sendAccountActivationEmail = async (
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: email,
-      subject: "EDMS - Activate Your Account",
+      subject: "ELRA - Activate Your Account",
       html: htmlContent,
     };
 
@@ -392,11 +308,11 @@ export const sendPasswordChangeSuccessEmail = async (email, userName) => {
       "Password Changed Successfully",
       `
         <p>Hello <strong>${userName}</strong>,</p>
-        <p>✅ Your EDMS account password has been successfully updated.</p>
+        <p>✅ Your ELRA account password has been successfully updated.</p>
         <p>You can now log in to your account with your new secure password.</p>
         <p>If you did not make this change, please contact your system administrator immediately for security assistance.</p>
       `,
-      "Login to EDMS",
+      "Login to ELRA",
       loginUrl,
       "Your password has been updated"
     );
@@ -404,7 +320,7 @@ export const sendPasswordChangeSuccessEmail = async (email, userName) => {
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: email,
-      subject: "EDMS - Password Changed Successfully",
+      subject: "ELRA - Password Changed Successfully",
       html: htmlContent,
     };
 
@@ -456,31 +372,31 @@ export const sendIndustryInstanceInvitation = async (
     const credentialsUrl = `${process.env.CLIENT_URL}/retrieve-credentials`;
 
     const htmlContent = createEmailTemplate(
-      `Welcome to ${companyName} - EDMS Platform`,
+      `Welcome to ${companyName} - ELRA Platform`,
       `
         <p>Hello <strong>${userName}</strong>,</p>
-        <p>🎉 Welcome to the <strong>${companyName}</strong> EDMS platform!</p>
+        <p>🎉 Welcome to the <strong>${companyName}</strong> ELRA platform!</p>
         <p>Your account has been created as a <strong>Super Administrator</strong> for the ${industryType.replace(
           "_",
           " "
-        )} system with full control over document management and workflows.</p>
+        )} system with full control over all ERP modules including HR, payroll, procurement, finance, and document workflows.</p>
         
         <p>🔐 <strong>Your Login Credentials:</strong></p>
         <p><strong>Email:</strong> ${email}</p>
         <p><strong>Temporary Password:</strong> ${tempPassword}</p>
         
         <p>⚠️ <strong>Security Note:</strong> Please change your password immediately after your first login to ensure account security.</p>
-        <p>You can now access the platform and start configuring your document management system!</p>
+        <p>You can now access the platform and start configuring your ERP system!</p>
       `,
-      "Login to EDMS",
+      "Login to ELRA",
       loginUrl,
-      `Welcome to ${companyName} - Your EDMS platform is ready!`
+      `Welcome to ${companyName} - Your ELRA platform is ready!`
     );
 
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: email,
-      subject: `Welcome to ${companyName} - EDMS Platform Access`,
+      subject: `Welcome to ${companyName} - ELRA Platform Access`,
       html: htmlContent,
     };
 
@@ -501,51 +417,48 @@ export const sendInvitationEmail = async (
   email,
   userName,
   invitationCode,
-  companyName
+  companyName,
+  roleName = "STAFF",
+  departmentName = "General"
 ) => {
   try {
     const transporter = createTransporter();
     const joinUrl = `${process.env.CLIENT_URL}/welcome?code=${invitationCode}`;
 
     const htmlContent = createEmailTemplate(
-      `You're Invited to Join ${companyName} - EDMS Platform`,
+      `You're Invited to Join ${companyName}`,
       `
-        <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%); border-radius: 16px; padding: 20px; margin-bottom: 20px; border: 1px solid rgba(59, 130, 246, 0.1);">
-            <p style="margin: 0 0 12px 0; font-size: 18px; color: #ffffff;">Hello <strong style="color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">${userName}</strong>,</p>
-            <p style="margin: 0 0 12px 0; font-size: 16px; color: #ffffff;">🎉 You've been invited to join the <strong style="color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">${companyName}</strong> document management system!</p>
-            <p style="margin: 0; font-size: 14px; color: #ffffff;">Your administrator has created an account for you to access our secure internal document management platform.</p>
+        <p>Hello <strong>${userName}</strong>,</p>
+        <p>You've been invited to join <strong>${companyName}</strong>'s Enterprise Resource Planning (ERP) system.</p>
+        
+        <div style="background: #f0fdf4; border: 1px solid #d1fae5; border-radius: 8px; padding: 16px; margin: 20px 0;">
+            <p style="margin: 0 0 8px 0; color: #0d6449;"><strong>Your Role:</strong> ${roleName}</p>
+            <p style="margin: 0; color: #0d6449;"><strong>Department:</strong> ${departmentName}</p>
         </div>
         
-        <p>🔑 <strong>Your Invitation Code:</strong></p>
-        <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 50%, #475569 75%, #64748b 100%); padding: 20px; border-radius: 16px; margin: 20px 0; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);">
-            <p style="font-size: 28px; font-weight: bold; letter-spacing: 4px; text-align: center; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin: 0; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);">${invitationCode}</p>
+        <p><strong>Your Invitation Code:</strong></p>
+        <div style="background: #0d6449; color: white; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+            <p style="font-size: 24px; font-weight: bold; letter-spacing: 2px; margin: 0;">${invitationCode}</p>
         </div>
         
-        <p>📋 <strong>How to Join:</strong></p>
+        <p><strong>How to Join:</strong></p>
         <ol style="margin: 15px 0; padding-left: 20px;">
-          <li style="margin: 8px 0; padding: 8px 12px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); border-radius: 8px; border-left: 3px solid #3b82f6;">Click the "Join Company" button below (your invitation code will be automatically filled)</li>
-          <li style="margin: 8px 0; padding: 8px 12px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); border-radius: 8px; border-left: 3px solid #8b5cf6;">Complete your account setup</li>
-          <li style="margin: 8px 0; padding: 8px 12px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); border-radius: 8px; border-left: 3px solid #06b6d4;">Start accessing your documents and workflows</li>
+          <li style="margin: 8px 0;">Click the "Join Company" button below</li>
+          <li style="margin: 8px 0;">Complete your account setup</li>
+          <li style="margin: 8px 0;">Start accessing your documents and workflows</li>
         </ol>
         
-        <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(34, 197, 94, 0.1) 100%); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 16px; margin: 20px 0;">
-            <p style="margin: 0; color: #ffffff; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">💡 <strong>Alternative:</strong> You can also manually enter your invitation code: <strong style="color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">${invitationCode}</strong></p>
-        </div>
-        
-        <div style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 16px; margin: 20px 0;">
-            <p style="margin: 0; color: #ffffff; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">⏰ <strong>Important:</strong> This invitation code expires in 3 days. Please complete your registration before then.</p>
-        </div>
-        <p>If you have any questions, please contact your system administrator.</p>
+        <p style="color: #6b7280; font-size: 14px;">This invitation code expires in 7 days. If you have any questions, please contact your system administrator.</p>
       `,
       "Join Company",
       joinUrl,
-      `You're invited to join ${companyName} - EDMS Platform`
+      `You're invited to join ${companyName} - ELRA Platform`
     );
 
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: email,
-      subject: `You're Invited to Join ${companyName} - EDMS Platform`,
+      subject: `You're Invited to Join ${companyName} - ELRA Platform`,
       html: htmlContent,
     };
 
@@ -573,10 +486,10 @@ export const sendSubscriptionEmail = async (
     const loginUrl = `${process.env.CLIENT_URL}/login`;
 
     const htmlContent = createEmailTemplate(
-      "🎉 Your EDMS Subscription is Active!",
+      "🎉 Your ELRA Subscription is Active!",
       `
         <p>Hello <strong>${companyName}</strong> Team,</p>
-        <p>🎊 <strong>Congratulations!</strong> Your EDMS subscription has been successfully activated!</p>
+        <p>🎊 <strong>Congratulations!</strong> Your ELRA subscription has been successfully activated!</p>
         
         <p>📋 <strong>Subscription Details:</strong></p>
         <p><strong>Plan:</strong> ${planName}</p>
@@ -584,23 +497,24 @@ export const sendSubscriptionEmail = async (
         
         <p>🚀 <strong>What's Next?</strong></p>
         <ul style="margin: 15px 0; padding-left: 20px;">
-          <li>Set up your approval workflows</li>
+          <li>Set up your HR and payroll modules</li>
+          <li>Configure procurement and inventory management</li>
+          <li>Set up approval workflows and document management</li>
           <li>Create departments and user roles</li>
-          <li>Upload your first documents</li>
-          <li>Configure your system settings</li>
+          <li>Configure your ERP system settings</li>
         </ul>
         
-        <p>Your platform is now ready for use! Need help getting started? Our support team is here to assist you!</p>
+        <p>Your ERP platform is now ready for use! Need help getting started? Our support team is here to assist you!</p>
       `,
-      "Access Your EDMS Platform",
+      "Access Your ELRA Platform",
       loginUrl,
-      "Welcome to the EDMS family - Your subscription is active!"
+      "Welcome to the ELRA family - Your subscription is active!"
     );
 
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: email,
-      subject: "🎉 Your EDMS Subscription is Now Active!",
+      subject: "🎉 Your ELRA Subscription is Now Active!",
       html: htmlContent,
     };
 
@@ -631,7 +545,7 @@ export const sendPlatformAdminNewSubscriptionEmail = async (
         <p>Hello <strong>Platform Admin</strong>,</p>
         <p>🎊 <strong>Great news!</strong> A new ${
           subscriptionData.isCompany ? "company" : "user"
-        } has subscribed to EDMS!</p>
+        } has subscribed to ELRA!</p>
         
         <p>📋 <strong>New Subscription Details:</strong></p>
         <p><strong>${
@@ -661,7 +575,7 @@ export const sendPlatformAdminNewSubscriptionEmail = async (
       `,
       "View Dashboard",
       dashboardUrl,
-      "New subscription alert - EDMS Platform"
+      "New subscription alert - ELRA Platform"
     );
 
     const mailOptions = {
@@ -727,13 +641,13 @@ export const sendPlatformAdminRenewalEmail = async (
       `,
       "View Dashboard",
       dashboardUrl,
-      "Subscription renewal alert - EDMS Platform"
+      "Subscription renewal alert - ELRA Platform"
     );
 
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: platformAdminEmail,
-      subject: `🔄 EDMS Subscription Renewed - ${
+      subject: `🔄 ELRA Subscription Renewed - ${
         subscriptionData.companyName || subscriptionData.userName
       }`,
       html: htmlContent,
@@ -795,13 +709,13 @@ export const sendPlatformAdminCancellationEmail = async (
       `,
       "View Dashboard",
       dashboardUrl,
-      "Subscription cancellation alert - EDMS Platform"
+      "Subscription cancellation alert - ELRA Platform"
     );
 
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: platformAdminEmail,
-      subject: `⚠️ EDMS Subscription Cancelled - ${
+      subject: `⚠️ ELRA Subscription Cancelled - ${
         subscriptionData.companyName || subscriptionData.userName
       }`,
       html: htmlContent,
@@ -866,13 +780,13 @@ export const sendPlatformAdminPaymentFailureEmail = async (
       `,
       "View Dashboard",
       dashboardUrl,
-      "Payment failure alert - EDMS Platform"
+      "Payment failure alert - ELRA Platform"
     );
 
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: platformAdminEmail,
-      subject: `❌ EDMS Payment Failed - ${
+      subject: `❌ ELRA Payment Failed - ${
         subscriptionData.companyName || subscriptionData.userName
       }`,
       html: htmlContent,
@@ -906,7 +820,7 @@ export const sendUserRenewalEmail = async (
       "🔄 Your Subscription Has Been Renewed!",
       `
         <p>Hello <strong>${userName}</strong>,</p>
-        <p>✅ <strong>Great news!</strong> Your EDMS subscription has been successfully renewed!</p>
+        <p>✅ <strong>Great news!</strong> Your ELRA subscription has been successfully renewed!</p>
         
         <p>📋 <strong>Renewal Confirmation:</strong></p>
         <p><strong>Plan:</strong> ${subscriptionData.planName}</p>
@@ -915,18 +829,18 @@ export const sendUserRenewalEmail = async (
         <p><strong>Next Billing:</strong> ${subscriptionData.nextBillingDate}</p>
         <p><strong>Transaction ID:</strong> ${subscriptionData.transactionId}</p>
         
-        <p>🚀 <strong>Your EDMS platform continues to be fully active!</strong></p>
+        <p>🚀 <strong>Your ELRA platform continues to be fully active!</strong></p>
         <p>📊 <strong>What's Next:</strong> Continue using all your features and enjoy uninterrupted service.</p>
       `,
       "Access Your Dashboard",
       dashboardUrl,
-      "Subscription renewed successfully - EDMS Platform"
+      "Subscription renewed successfully - ELRA Platform"
     );
 
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: userEmail,
-      subject: "🔄 Your EDMS Subscription Has Been Renewed!",
+      subject: "🔄 Your ELRA Subscription Has Been Renewed!",
       html: htmlContent,
     };
 
@@ -956,7 +870,7 @@ export const sendUserCancellationEmail = async (
       "⚠️ Your Subscription Has Been Cancelled",
       `
         <p>Hello <strong>${userName}</strong>,</p>
-        <p>⚠️ <strong>Important Notice:</strong> Your EDMS subscription has been cancelled.</p>
+        <p>⚠️ <strong>Important Notice:</strong> Your ELRA subscription has been cancelled.</p>
         
         <p>📋 <strong>Cancellation Details:</strong></p>
         <p><strong>Plan:</strong> ${subscriptionData.planName}</p>
@@ -975,13 +889,13 @@ export const sendUserCancellationEmail = async (
       `,
       "Contact Support",
       `${process.env.CLIENT_URL}/support`,
-      "Subscription cancelled - EDMS Platform"
+      "Subscription cancelled - ELRA Platform"
     );
 
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: userEmail,
-      subject: "⚠️ Your EDMS Subscription Has Been Cancelled",
+      subject: "⚠️ Your ELRA Subscription Has Been Cancelled",
       html: htmlContent,
     };
 
@@ -1033,13 +947,13 @@ export const sendUserPaymentFailureEmail = async (
       `,
       "Update Payment Method",
       dashboardUrl,
-      "Payment failed - Action required - EDMS Platform"
+      "Payment failed - Action required - ELRA Platform"
     );
 
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: userEmail,
-      subject: "❌ Payment Failed - Action Required - EDMS",
+      subject: "❌ Payment Failed - Action Required - ELRA",
       html: htmlContent,
     };
 
@@ -1059,13 +973,19 @@ export const sendUserPaymentFailureEmail = async (
 export const sendPendingRegistrationEmail = async (email, firstName) => {
   try {
     const transporter = createTransporter();
+    const currentDate = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
     const htmlContent = `
       <!DOCTYPE html>
       <html lang="en">
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Registration Received - EDMS</title>
+        <title>Registration Received - ELRA</title>
         <style>
           * {
             margin: 0;
@@ -1076,7 +996,7 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
           body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.6;
-            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 25%, #6366f1 50%, #8b5cf6 75%, #a855f7 100%);
+            background: #f7f7fa;
             min-height: 100vh;
             padding: 20px;
           }
@@ -1084,16 +1004,15 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
           .email-container {
             max-width: 600px;
             margin: 0 auto;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
+            background: #ffffff;
             border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+            border: 1px solid #e7ebea;
           }
           
           .header {
-            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 25%, #6366f1 50%, #8b5cf6 75%, #a855f7 100%);
+            background: linear-gradient(135deg, #0D6449 0%, #059669 50%, #10b981 100%);
             padding: 40px 30px;
             text-align: center;
             color: white;
@@ -1101,6 +1020,19 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
           }
           
           .logo {
+            margin-bottom: 16px;
+            position: relative;
+            z-index: 1;
+          }
+          
+          .logo img {
+            height: 60px;
+            width: auto;
+            max-width: 200px;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+          }
+          
+          .logo-text {
             font-size: 32px;
             font-weight: 700;
             margin-bottom: 8px;
@@ -1110,16 +1042,24 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
           }
           
           .subtitle {
-            font-size: 14px;
+            font-size: 16px;
             opacity: 0.9;
             font-weight: 400;
+            margin-bottom: 8px;
+          }
+          
+          .subtitle-secondary {
+            font-size: 14px;
+            opacity: 0.8;
+            font-weight: 300;
+            letter-spacing: 0.3px;
           }
           
           .content {
             padding: 40px 30px;
             text-align: center;
-            background: rgba(15, 23, 42, 0.8);
-            color: white;
+            background: #ffffff;
+            color: #1a1a1a;
           }
           
           .status-icon {
@@ -1139,36 +1079,35 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
           .title {
             font-size: 28px;
             font-weight: 700;
-            color: white;
+            color: #0D6449;
             margin-bottom: 16px;
             letter-spacing: -0.5px;
           }
           
           .message {
             font-size: 16px;
-            color: rgba(255, 255, 255, 0.9);
+            color: #1a1a1a;
             line-height: 1.6;
             margin-bottom: 24px;
           }
           
           .message strong {
-            color: white;
+            color: #0D6449;
             font-weight: 600;
           }
           
           .info-card {
-            background: rgba(30, 58, 138, 0.3);
-            border: 1px solid rgba(59, 130, 246, 0.3);
+            background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+            border: 1px solid #d1fae5;
             border-radius: 12px;
             padding: 24px;
             margin: 24px 0;
             text-align: left;
-            backdrop-filter: blur(10px);
           }
           
           .info-title {
             font-weight: 600;
-            color: white;
+            color: #0D6449;
             font-size: 18px;
             margin-bottom: 12px;
             display: flex;
@@ -1177,13 +1116,13 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
           }
           
           .info-list {
-            color: white;
+            color: #1a1a1a;
             font-size: 15px;
             line-height: 1.6;
           }
           
           .info-list li {
-            color: white;
+            color: #1a1a1a;
           }
           
           .info-list br {
@@ -1191,31 +1130,70 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
           }
           
           .footer {
-            background: rgba(15, 23, 42, 0.9);
+            background: #f7f7fa;
             padding: 24px 30px;
             text-align: center;
-            border-top: 1px solid rgba(59, 130, 246, 0.3);
-            color: white;
+            border-top: 1px solid #e7ebea;
+            color: #666666;
           }
           
           .footer-text {
-            color: rgba(255, 255, 255, 0.8);
+            color: #0D6449;
             font-size: 14px;
+            margin-bottom: 8px;
+            font-weight: 600;
+          }
+          
+          .footer-subtitle {
+            color: #999999;
+            font-size: 12px;
             margin-bottom: 8px;
           }
           
-          .footer-logo {
+          .footer-date {
+            color: #999999;
+            font-size: 11px;
+            font-style: italic;
+          }
+          
+          .company-info {
+            background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+            border: 1px solid #d1fae5;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 20px 0;
+            text-align: center;
+          }
+          
+          .company-name {
+            font-weight: 700;
+            color: #0D6449;
             font-size: 18px;
-            font-weight: 600;
-            color: white;
+            margin-bottom: 4px;
+          }
+          
+          .company-tagline {
+            color: #059669;
+            font-size: 14px;
+            font-style: italic;
+          }
+          
+          .company-tagline-secondary {
+            color: #10b981;
+            font-size: 12px;
+            font-style: italic;
+            margin-top: 4px;
           }
         </style>
       </head>
       <body>
         <div class="email-container">
           <div class="header">
-            <div class="logo">EDMS</div>
-            <div class="subtitle">Electronic Document Management System</div>
+            <div class="logo">
+              <img src="${process.env.CLIENT_URL}/elra-logo.png" alt="ELRA Logo" />
+            </div>
+            <div class="logo-text">ELRA</div>
+            <div class="subtitle">Enterprise Resource Planning System</div>
           </div>
           
           <div class="content">
@@ -1223,8 +1201,8 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
             <h1 class="title">Registration Received!</h1>
             <p class="message">
               Hello <strong>${firstName}</strong>,<br><br>
-              Thank you for registering with EDMS! 🎉<br><br>
-              Your registration has been received and is currently under review by our Super Administrator.
+              Thank you for registering with ELRA! 🎉<br><br>
+              Your registration has been received and is currently under review by our Super Administrator for access to our comprehensive ERP platform.
             </p>
             
             <div class="info-card">
@@ -1236,18 +1214,25 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
                 1. Super Admin will review your registration<br>
                 2. You'll receive an invitation email with a special code<br>
                 3. Use the code to complete your account setup<br>
-                4. Start using EDMS! 🚀
+                4. Start using ELRA ERP! 🚀
               </div>
             </div>
             
             <p class="message">
               We'll notify you as soon as your account is ready. Thank you for your patience!
             </p>
+            
+            <div class="company-info">
+              <div class="company-name">Century Info Systems</div>
+              <div class="company-tagline">Empowering Digital Transformation</div>
+              <div class="company-tagline-secondary">Enterprise Resource Planning Solutions</div>
+            </div>
           </div>
           
           <div class="footer">
-            <p class="footer-text">Thank you for choosing EDMS</p>
-            <div class="footer-logo">EDMS</div>
+            <p class="footer-text">Thank you for choosing ELRA</p>
+            <p class="footer-subtitle">Powered by ELRA - Enterprise Resource Planning</p>
+            <p class="footer-date">${currentDate}</p>
           </div>
         </div>
       </body>
@@ -1257,7 +1242,7 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: email,
-      subject: "Registration Received - EDMS",
+      subject: "Registration Received - ELRA",
       html: htmlContent,
     };
 

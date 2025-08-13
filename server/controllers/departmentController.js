@@ -8,6 +8,15 @@ import Document from "../models/Document.js";
 // @access  Private (Super Admin only)
 export const createDepartment = async (req, res) => {
   try {
+    // Check if user has permission to create departments (Super Admin only)
+    if (req.user.role.level < 1000) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Super admin privileges required to create departments.",
+      });
+    }
+
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -123,17 +132,32 @@ export const createDepartment = async (req, res) => {
 // @access  Private (Admin+)
 export const getAllDepartments = async (req, res) => {
   try {
+    const currentUser = req.user;
     const { search, status = "active", includeInactive = false } = req.query;
+
+    // Check if user has permission to view departments (Manager+ can view departments)
+    if (currentUser.role.level < 600) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Manager level required to view departments.",
+      });
+    }
 
     const query = {};
 
-    // Filter by status
-    if (status === "active") {
+    // For super admins, show all departments including inactive ones
+    if (currentUser.role.level >= 1000) {
+      // Super admin can see all departments
+      if (status === "active") {
+        query.isActive = true;
+      } else if (status === "inactive") {
+        query.isActive = false;
+      } else if (includeInactive === "true") {
+        // Include both active and inactive
+      }
+    } else {
+      // For regular users, only show active departments
       query.isActive = true;
-    } else if (status === "inactive") {
-      query.isActive = false;
-    } else if (includeInactive === "true") {
-      // Include both active and inactive
     }
 
     // Search functionality
@@ -157,162 +181,6 @@ export const getAllDepartments = async (req, res) => {
     });
   } catch (error) {
     console.error("Get departments error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
-    });
-  }
-};
-
-// @desc    Bulk delete all departments (except External)
-// @route   DELETE /api/departments/bulk-delete
-// @access  Private (Super Admin only)
-export const bulkDeleteDepartments = async (req, res) => {
-  try {
-    // Check if user is super admin
-    if (req.user.role.level < 100) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Super admin privileges required.",
-      });
-    }
-
-    // Get all departments except External
-    const departmentsToDelete = await Department.find({
-      code: { $ne: "EXT" },
-    });
-
-    if (departmentsToDelete.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "No departments found to delete",
-      });
-    }
-
-    // Check if any departments have users or documents
-    const departmentIds = departmentsToDelete.map((dept) => dept._id);
-
-    const userCount = await User.countDocuments({
-      department: { $in: departmentIds },
-    });
-
-    const documentCount = await Document.countDocuments({
-      department: { $in: departmentIds },
-    });
-
-    if (userCount > 0 || documentCount > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `Cannot delete departments. Found ${userCount} users and ${documentCount} documents associated with these departments. Please reassign users and documents first.`,
-      });
-    }
-
-    // Delete departments
-    const deleteResult = await Department.deleteMany({
-      code: { $ne: "EXT" },
-    });
-
-    res.status(200).json({
-      success: true,
-      message: `Successfully deleted ${deleteResult.deletedCount} departments`,
-      data: {
-        deletedCount: deleteResult.deletedCount,
-        deletedDepartments: departmentsToDelete.map((dept) => ({
-          id: dept._id,
-          name: dept.name,
-          code: dept.code,
-        })),
-      },
-    });
-  } catch (error) {
-    console.error("Bulk delete departments error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined,
-    });
-  }
-};
-
-// @desc    Bulk create departments
-// @route   POST /api/departments/bulk-create
-// @access  Private (Super Admin only)
-export const bulkCreateDepartments = async (req, res) => {
-  try {
-    // Check if user is super admin
-    if (req.user.role.level < 100) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Super admin privileges required.",
-      });
-    }
-
-    const { departments } = req.body;
-
-    if (!Array.isArray(departments) || departments.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Departments array is required and must not be empty",
-      });
-    }
-
-    const createdDepartments = [];
-    const errors = [];
-
-    for (const deptData of departments) {
-      try {
-        // Check if department already exists
-        const existingDept = await Department.findOne({
-          $or: [
-            { name: deptData.name },
-            { code: deptData.code?.toUpperCase() },
-          ],
-        });
-
-        if (existingDept) {
-          errors.push({
-            department: deptData.name,
-            error: "Department with this name or code already exists",
-          });
-          continue;
-        }
-
-        // Create department
-        const department = new Department({
-          name: deptData.name,
-          code: deptData.code?.toUpperCase(),
-          description: deptData.description || "",
-          level: deptData.level || 50,
-          color: deptData.color || "#3B82F6",
-          createdBy: req.user.id,
-        });
-
-        await department.save();
-        createdDepartments.push(department);
-      } catch (error) {
-        errors.push({
-          department: deptData.name,
-          error: error.message,
-        });
-      }
-    }
-
-    res.status(201).json({
-      success: true,
-      message: `Successfully created ${createdDepartments.length} departments`,
-      data: {
-        createdCount: createdDepartments.length,
-        createdDepartments: createdDepartments.map((dept) => ({
-          id: dept._id,
-          name: dept.name,
-          code: dept.code,
-        })),
-        errors: errors.length > 0 ? errors : undefined,
-      },
-    });
-  } catch (error) {
-    console.error("Bulk create departments error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -526,6 +394,162 @@ export const deleteDepartment = async (req, res) => {
     });
   } catch (error) {
     console.error("Delete department error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
+// @desc    Bulk delete all departments (except External)
+// @route   DELETE /api/departments/bulk-delete
+// @access  Private (Super Admin only)
+export const bulkDeleteDepartments = async (req, res) => {
+  try {
+    // Check if user is super admin
+    if (req.user.role.level < 1000) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Super admin privileges required.",
+      });
+    }
+
+    // Get all departments except External
+    const departmentsToDelete = await Department.find({
+      code: { $ne: "EXT" },
+    });
+
+    if (departmentsToDelete.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No departments found to delete",
+      });
+    }
+
+    // Check if any departments have users or documents
+    const departmentIds = departmentsToDelete.map((dept) => dept._id);
+
+    const userCount = await User.countDocuments({
+      department: { $in: departmentIds },
+    });
+
+    const documentCount = await Document.countDocuments({
+      department: { $in: departmentIds },
+    });
+
+    if (userCount > 0 || documentCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete departments. Found ${userCount} users and ${documentCount} documents associated with these departments. Please reassign users and documents first.`,
+      });
+    }
+
+    // Delete departments
+    const deleteResult = await Department.deleteMany({
+      code: { $ne: "EXT" },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully deleted ${deleteResult.deletedCount} departments`,
+      data: {
+        deletedCount: deleteResult.deletedCount,
+        deletedDepartments: departmentsToDelete.map((dept) => ({
+          id: dept._id,
+          name: dept.name,
+          code: dept.code,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error("Bulk delete departments error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
+// @desc    Bulk create departments
+// @route   POST /api/departments/bulk-create
+// @access  Private (Super Admin only)
+export const bulkCreateDepartments = async (req, res) => {
+  try {
+    // Check if user is super admin
+    if (req.user.role.level < 1000) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Super admin privileges required.",
+      });
+    }
+
+    const { departments } = req.body;
+
+    if (!Array.isArray(departments) || departments.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Departments array is required and must not be empty",
+      });
+    }
+
+    const createdDepartments = [];
+    const errors = [];
+
+    for (const deptData of departments) {
+      try {
+        // Check if department already exists
+        const existingDept = await Department.findOne({
+          $or: [
+            { name: deptData.name },
+            { code: deptData.code?.toUpperCase() },
+          ],
+        });
+
+        if (existingDept) {
+          errors.push({
+            department: deptData.name,
+            error: "Department with this name or code already exists",
+          });
+          continue;
+        }
+
+        // Create department
+        const department = new Department({
+          name: deptData.name,
+          code: deptData.code?.toUpperCase(),
+          description: deptData.description || "",
+          level: deptData.level || 50,
+          color: deptData.color || "#3B82F6",
+          createdBy: req.user.id,
+        });
+
+        await department.save();
+        createdDepartments.push(department);
+      } catch (error) {
+        errors.push({
+          department: deptData.name,
+          error: error.message,
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `Successfully created ${createdDepartments.length} departments`,
+      data: {
+        createdCount: createdDepartments.length,
+        createdDepartments: createdDepartments.map((dept) => ({
+          id: dept._id,
+          name: dept.name,
+          code: dept.code,
+        })),
+        errors: errors.length > 0 ? errors : undefined,
+      },
+    });
+  } catch (error) {
+    console.error("Bulk create departments error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",

@@ -2,13 +2,6 @@ import mongoose from "mongoose";
 
 const auditLogSchema = new mongoose.Schema(
   {
-    // Company for data isolation
-    company: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Company",
-      required: true,
-    },
-
     // User who performed the action
     userId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -62,6 +55,11 @@ const auditLogSchema = new mongoose.Schema(
         "DEPARTMENT_DELETED",
         "SYSTEM_MAINTENANCE",
 
+        // Salary Grade actions
+        "SALARY_GRADE_CREATED",
+        "SALARY_GRADE_UPDATED",
+        "SALARY_GRADE_DELETED",
+
         // Security actions
         "LOGIN_ATTEMPT",
         "PERMISSION_DENIED",
@@ -74,7 +72,14 @@ const auditLogSchema = new mongoose.Schema(
     resourceType: {
       type: String,
       required: true,
-      enum: ["DOCUMENT", "USER", "DEPARTMENT", "SYSTEM", "AUTH"],
+      enum: [
+        "DOCUMENT",
+        "USER",
+        "DEPARTMENT",
+        "SYSTEM",
+        "AUTH",
+        "SALARY_GRADE",
+      ],
     },
 
     resourceId: {
@@ -84,7 +89,7 @@ const auditLogSchema = new mongoose.Schema(
 
     resourceModel: {
       type: String,
-      enum: ["Document", "User", "Department", "SystemSettings"],
+      enum: ["Document", "User", "Department", "SystemSettings", "SalaryGrade"],
     },
 
     // Resource details for quick access (denormalized)
@@ -233,10 +238,9 @@ auditLogSchema.statics.getRecentActivity = async function (options = {}) {
     endDate,
     riskLevel,
     department,
-    companyFilter = {},
   } = options;
 
-  const query = { isDeleted: false, ...companyFilter };
+  const query = { isDeleted: false };
 
   if (userId) query.userId = userId;
   if (resourceType) query.resourceType = resourceType;
@@ -276,14 +280,12 @@ auditLogSchema.statics.getRecentActivity = async function (options = {}) {
 // Method to get audit trail for a specific resource
 auditLogSchema.statics.getAuditTrail = async function (
   resourceType,
-  resourceId,
-  companyFilter = {}
+  resourceId
 ) {
   return this.find({
     resourceType,
     resourceId,
     isDeleted: false,
-    ...companyFilter,
   })
     .sort({ timestamp: -1 })
     .populate("userId", "firstName lastName email role");

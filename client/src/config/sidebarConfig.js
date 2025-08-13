@@ -87,27 +87,6 @@ export const sidebarConfig = [
 
   // ===== SYSTEM MANAGEMENT =====
   {
-    label: "User Management",
-    icon: "HiOutlineUserGroup",
-    path: "/admin/users",
-    required: { minLevel: 600 },
-    section: "system",
-  },
-  {
-    label: "Role Management",
-    icon: "HiOutlineShieldCheck",
-    path: "/admin/roles",
-    required: { minLevel: 1000 },
-    section: "system",
-  },
-  {
-    label: "Department Management",
-    icon: "HiOutlineBuildingOffice2",
-    path: "/admin/departments",
-    required: { minLevel: 700 },
-    section: "system",
-  },
-  {
     label: "Company Settings",
     icon: "HiOutlineBuildingOffice",
     path: "/admin/company",

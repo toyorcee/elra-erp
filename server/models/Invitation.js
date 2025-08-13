@@ -11,14 +11,11 @@ const invitationSchema = new mongoose.Schema(
       default: () => crypto.randomBytes(8).toString("hex").toUpperCase(),
     },
 
-    // Company this invitation belongs to
     company: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Company",
-      required: true,
     },
 
-    // Department assignment
     department: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Department",
@@ -56,11 +53,90 @@ const invitationSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // Enhanced fields for onboarding
+    jobTitle: {
+      type: String,
+      trim: true,
+    },
+
+    salaryGrade: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SalaryGrade",
+    },
+
+    phone: {
+      type: String,
+      trim: true,
+    },
+
+    employeeId: {
+      type: String,
+      trim: true,
+    },
+
+    // Bulk processing fields
+    batchId: {
+      type: String,
+      trim: true,
+    },
+
+    batchName: {
+      type: String,
+      trim: true,
+    },
+
+    csvRowNumber: {
+      type: Number,
+    },
+
     // Invitation status
     status: {
       type: String,
-      enum: ["active", "used", "expired", "cancelled"],
+      enum: [
+        "active",
+        "used",
+        "expired",
+        "cancelled",
+        "sent",
+        "failed",
+        "pending_approval",
+      ],
       default: "active",
+    },
+
+    // Approval workflow fields
+    requiresApproval: {
+      type: Boolean,
+      default: false,
+    },
+
+    approvalLevel: {
+      type: Number,
+      default: 0,
+    },
+
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+
+    approvedAt: {
+      type: Date,
+    },
+
+    // Email tracking
+    emailSent: {
+      type: Boolean,
+      default: false,
+    },
+
+    emailSentAt: {
+      type: Date,
+    },
+
+    emailError: {
+      type: String,
+      trim: true,
     },
 
     // Expiration
@@ -80,6 +156,16 @@ const invitationSchema = new mongoose.Schema(
       type: Date,
     },
 
+    // Onboarding completion tracking
+    onboardingCompleted: {
+      type: Boolean,
+      default: false,
+    },
+
+    onboardingCompletedAt: {
+      type: Date,
+    },
+
     // Created by (superadmin)
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -92,19 +178,29 @@ const invitationSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+
+    // For pending users
+    isPendingUser: {
+      type: Boolean,
+      default: false,
+    },
+
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
   },
   {
     timestamps: true,
   }
 );
 
-// Index for efficient queries
 invitationSchema.index({ code: 1 });
-invitationSchema.index({ company: 1, status: 1 });
+invitationSchema.index({ status: 1 });
 invitationSchema.index({ email: 1, status: 1 });
+invitationSchema.index({ batchId: 1 });
 invitationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-// Pre-save middleware to check expiration
 invitationSchema.pre("save", function (next) {
   if (this.isModified("expiresAt") && this.expiresAt < new Date()) {
     this.status = "expired";
@@ -117,6 +213,45 @@ invitationSchema.statics.generateCode = function () {
   return crypto.randomBytes(8).toString("hex").toUpperCase();
 };
 
+// Static method to generate batch ID
+invitationSchema.statics.generateBatchId = function () {
+  return `BATCH_${Date.now()}_${crypto
+    .randomBytes(4)
+    .toString("hex")
+    .toUpperCase()}`;
+};
+
+// Static method to generate sequential batch number
+invitationSchema.statics.generateSequentialBatchNumber = async function () {
+  try {
+    const lastInvitation = await this.findOne({
+      batchId: { $exists: true, $ne: null },
+    }).sort({ batchId: -1 });
+
+    let nextNumber = 1;
+
+    if (lastInvitation && lastInvitation.batchId) {
+      const match = lastInvitation.batchId.match(/BATCH_(\d+)$/);
+      if (match) {
+        nextNumber = parseInt(match[1]) + 1;
+      } else {
+        const timestampMatch = lastInvitation.batchId.match(/BATCH_(\d+)_/);
+        if (timestampMatch) {
+          nextNumber = 1;
+        }
+      }
+    }
+
+    return `BATCH_${nextNumber.toString().padStart(3, "0")}`;
+  } catch (error) {
+    console.error("Error generating sequential batch number:", error);
+    return `BATCH_${Date.now()}_${crypto
+      .randomBytes(4)
+      .toString("hex")
+      .toUpperCase()}`;
+  }
+};
+
 // Instance method to check if invitation is valid
 invitationSchema.methods.isValid = function () {
   return this.status === "active" && this.expiresAt > new Date();
@@ -127,6 +262,29 @@ invitationSchema.methods.markAsUsed = function (userId) {
   this.status = "used";
   this.usedBy = userId;
   this.usedAt = new Date();
+  return this.save();
+};
+
+// Instance method to mark email as sent
+invitationSchema.methods.markEmailSent = function () {
+  this.emailSent = true;
+  this.emailSentAt = new Date();
+  this.status = "sent";
+  return this.save();
+};
+
+// Instance method to mark email as failed
+invitationSchema.methods.markEmailFailed = function (error) {
+  this.emailSent = false;
+  this.emailError = error;
+  this.status = "failed";
+  return this.save();
+};
+
+// Instance method to mark onboarding as completed
+invitationSchema.methods.markOnboardingCompleted = function () {
+  this.onboardingCompleted = true;
+  this.onboardingCompletedAt = new Date();
   return this.save();
 };
 

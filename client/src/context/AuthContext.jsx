@@ -7,31 +7,13 @@ import {
 } from "react";
 import { authAPI, handleApiError, setHasLoggedIn } from "../services/api";
 
-// Get initial state from localStorage if available
 const getInitialState = () => {
-  try {
-    const savedAuth = localStorage.getItem("authState");
-    if (savedAuth) {
-      const parsed = JSON.parse(savedAuth);
-      return {
-        user: parsed.user,
-        isAuthenticated: !!parsed.user,
-        loading: false,
-        error: null,
-        initialized: true,
-        subscriptionPlans: [],
-      };
-    }
-  } catch (error) {
-    console.log("Failed to parse saved auth state:", error);
-  }
-
   return {
     user: null,
     isAuthenticated: false,
-    loading: false,
+    loading: true, // Start with loading true to prevent flash of login page
     error: null,
-    initialized: true,
+    initialized: false, // Start with initialized false to trigger auth check
     subscriptionPlans: [],
   };
 };
@@ -356,7 +338,6 @@ export const AuthProvider = ({ children }) => {
           .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
       });
 
-      localStorage.removeItem("authState");
       localStorage.removeItem("redirectAfterLogin");
 
       sessionStorage.clear();

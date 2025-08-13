@@ -191,6 +191,24 @@ const RecentActivities = ({
       bgColor: "bg-yellow-100",
       label: "System Maintenance",
     },
+    SALARY_GRADE_CREATED: {
+      icon: HiDocumentText,
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-100",
+      label: "Salary Grade Created",
+    },
+    SALARY_GRADE_UPDATED: {
+      icon: HiPencil,
+      color: "text-yellow-600",
+      bgColor: "bg-yellow-100",
+      label: "Salary Grade Updated",
+    },
+    SALARY_GRADE_DELETED: {
+      icon: HiTrash,
+      color: "text-red-600",
+      bgColor: "bg-red-100",
+      label: "Salary Grade Deleted",
+    },
   };
 
   useEffect(() => {

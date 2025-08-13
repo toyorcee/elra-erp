@@ -7,6 +7,7 @@ const GradientSpinner = ({
   text = "",
   showText = false,
   title = "ELRA Enterprise Resource Planning System",
+  variant = "default",
 }) => {
   const sizeClasses = {
     sm: "w-16 h-16",
@@ -29,9 +30,16 @@ const GradientSpinner = ({
     xl: "text-3xl",
   };
 
+  // Ensure white background regardless of variant
+  const containerClasses = `GradientSpinner flex flex-col items-center justify-center gap-4 bg-white ${className}`;
+
   return (
     <div
-      className={`flex flex-col items-center justify-center gap-4 ${className}`}
+      className={containerClasses}
+      style={{
+        backgroundColor: "white !important",
+        background: "white !important",
+      }}
     >
       <div className="flex items-center justify-center">
         <img

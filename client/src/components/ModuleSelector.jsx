@@ -301,35 +301,28 @@ function ModuleSelector() {
         }
       } finally {
         setLoadingModules(false);
-        setTimeout(() => {
-          setIsInitialLoad(false);
-        }, 200);
+        setIsInitialLoad(false);
       }
     };
 
     if (user !== undefined) {
       fetchModules();
     }
-  }, [user]); // Only depend on user, not on userModules to prevent infinite loops
+  }, [user]); 
 
-  // Get accessible modules based on user role
   const getAccessibleModules = () => {
-    // If we're still loading modules, return empty array to show loading state
     if (loadingModules) {
       return [];
     }
 
-    // If user is authenticated and modules are loaded, return user modules
     if (user && userModules.length > 0) {
       return userModules;
     }
 
-    // If user is authenticated but no modules loaded yet, return empty array
     if (user && userModules.length === 0) {
       return [];
     }
 
-    // If no user (unauthenticated), return all modules
     return allModules;
   };
 
@@ -441,13 +434,9 @@ function ModuleSelector() {
     return (
       <div className="h-screen w-full bg-white flex flex-col items-center justify-center">
         <GradientSpinner
-          size="xl"
+          size="lg"
           title="ELRA System"
-          text={
-            user
-              ? "Loading your personalized modules..."
-              : "Loading available modules..."
-          }
+          text="Loading modules..."
           showText={true}
         />
       </div>
@@ -457,7 +446,7 @@ function ModuleSelector() {
   // Only show "no modules" when we're not loading and actually have no modules
   if (modules.length === 0) {
     return (
-      <div className="h-screen w-full bg-gradient-to-br from-green-50 to-emerald-50 flex flex-col items-center justify-center">
+      <div className="h-screen w-full bg-white flex flex-col items-center justify-center">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-800 mb-4">
             No Modules Available

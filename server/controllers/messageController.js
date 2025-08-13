@@ -510,7 +510,7 @@ export const getAvailableUsers = async (req, res) => {
     // Get users based on approval hierarchy from database
     let users;
 
-    if (userWithDetails.role?.level >= 100) {
+    if (userWithDetails.role?.level >= 1000) {
       // Super Admin and Platform Admin can message anyone in the company
       users = await User.find(query)
         .select(

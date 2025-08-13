@@ -5,11 +5,13 @@ import Role from "../models/Role.js";
 
 const router = express.Router();
 
-// Get all roles (only users with role level 100+ can access)
+// Get all roles (Manager+ can access)
 router.get("/", protect, async (req, res) => {
-  // Check if user has permission
-  if (!hasPermission(req.user, "user.assign_role")) {
-    return res.status(403).json({ success: false, message: "Access denied" });
+  if (req.user.role.level < 600) {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Manager level required.",
+    });
   }
   try {
     const roles = await Role.find().sort({ level: -1 });
@@ -20,8 +22,12 @@ router.get("/", protect, async (req, res) => {
 });
 
 router.post("/", protect, async (req, res) => {
-  if (!hasPermission(req.user, "user.assign_role")) {
-    return res.status(403).json({ success: false, message: "Access denied" });
+  // Check if user has sufficient role level (Manager = 600, HOD = 700, Super Admin = 1000)
+  if (req.user.role.level < 600) {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Manager level required.",
+    });
   }
   try {
     const {
@@ -65,11 +71,14 @@ router.post("/", protect, async (req, res) => {
   }
 });
 
-// Update role (only users with role level 100+ can update)
+// Update role (Manager+ can update)
 router.put("/:id", protect, async (req, res) => {
-  // Check if user has permission
-  if (!hasPermission(req.user, "user.assign_role")) {
-    return res.status(403).json({ success: false, message: "Access denied" });
+  // Check if user has sufficient role level (Manager = 600, HOD = 700, Super Admin = 1000)
+  if (req.user.role.level < 600) {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Manager level required.",
+    });
   }
   try {
     const {
@@ -133,11 +142,14 @@ router.put("/:id", protect, async (req, res) => {
   }
 });
 
-// Delete role (only users with role level 100+ can delete)
+// Delete role (Manager+ can delete)
 router.delete("/:id", protect, async (req, res) => {
-  // Check if user has permission
-  if (!hasPermission(req.user, "user.assign_role")) {
-    return res.status(403).json({ success: false, message: "Access denied" });
+  // Check if user has sufficient role level (Manager = 600, HOD = 700, Super Admin = 1000)
+  if (req.user.role.level < 600) {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Manager level required.",
+    });
   }
   try {
     const roleId = req.params.id;
@@ -175,8 +187,12 @@ router.delete("/:id", protect, async (req, res) => {
 
 // Get role by ID
 router.get("/:id", protect, async (req, res) => {
-  if (!hasPermission(req.user, "user.assign_role")) {
-    return res.status(403).json({ success: false, message: "Access denied" });
+  // Check if user has sufficient role level (Manager = 600, HOD = 700, Super Admin = 1000)
+  if (req.user.role.level < 600) {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Manager level required.",
+    });
   }
   try {
     const role = await Role.findById(req.params.id);

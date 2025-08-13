@@ -8,11 +8,11 @@ const ProtectedRoute = ({ children, required }) => {
 
   if (!initialized || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900">
+      <div className="min-h-screen flex items-center justify-center bg-white">
         <GradientSpinner
-          size="xl"
-          variant="secondary"
-          text="Initializing your dashboard..."
+          size="lg"
+          title="ELRA System"
+          text="Loading..."
           showText={true}
         />
       </div>

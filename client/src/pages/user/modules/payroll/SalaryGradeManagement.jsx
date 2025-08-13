@@ -1,0 +1,1396 @@
+import React, { useState, useEffect } from "react";
+import {
+  CurrencyDollarIcon,
+  PlusIcon,
+  PencilIcon,
+  TrashIcon,
+  CalculatorIcon,
+} from "@heroicons/react/24/outline";
+import { toast } from "react-toastify";
+import { userModulesAPI } from "../../../../services/userModules.js";
+import {
+  formatNumberWithCommas,
+  parseFormattedNumber,
+  formatCurrency,
+  formatNumber,
+  isNumberField,
+} from "../../../../utils/formatters.js";
+
+const SalaryGradeManagement = () => {
+  const [salaryGrades, setSalaryGrades] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingGrade, setEditingGrade] = useState(null);
+  const [activeTab, setActiveTab] = useState("grades");
+  const [selectedGrade, setSelectedGrade] = useState("");
+  const [selectedStep, setSelectedStep] = useState("Step 1");
+  const [dropdownGrades, setDropdownGrades] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [showOnlyWithSteps, setShowOnlyWithSteps] = useState(false);
+  const [formData, setFormData] = useState({
+    grade: "",
+    name: "",
+    minGrossSalary: "",
+    maxGrossSalary: "",
+    description: "",
+    selectedRole: "",
+    allowances: {
+      housing: 0,
+      transport: 0,
+      meal: 0,
+      other: 0,
+    },
+    customAllowances: [],
+    steps: [{ step: "Step 1", increment: "", yearsOfService: "" }],
+    enableSteps: false,
+    enableCustomAllowances: false,
+  });
+
+  useEffect(() => {
+    fetchSalaryGrades();
+    fetchDropdownGrades();
+    fetchRoles();
+  }, []);
+
+  const fetchDropdownGrades = async () => {
+    try {
+      const response =
+        await userModulesAPI.salaryGrades.getSalaryGradesForDropdown();
+      if (response.success) {
+        setDropdownGrades(response.data);
+      }
+    } catch (error) {
+      console.error("Error fetching dropdown grades:", error);
+    }
+  };
+
+  const fetchRoles = async () => {
+    try {
+      const response = await userModulesAPI.roles.getAllRoles();
+      if (response.success) {
+        setRoles(response.data);
+      }
+    } catch (error) {
+      console.error("Error fetching roles:", error);
+    }
+  };
+
+  const fetchSalaryGrades = async () => {
+    setLoading(true);
+    try {
+      const response = await userModulesAPI.salaryGrades.getAllSalaryGrades();
+      console.log("🔍 [SALARY_GRADES] Response:", response);
+      if (response.success) {
+        setSalaryGrades(response.data);
+      } else {
+        toast.error("Failed to fetch salary grades");
+      }
+    } catch (error) {
+      console.error("Error fetching salary grades:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to fetch salary grades"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+
+    const formattedValue = isNumberField(name)
+      ? formatNumberWithCommas(value)
+      : value;
+
+    if (name.includes(".")) {
+      const [parent, child] = name.split(".");
+      setFormData((prev) => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent],
+          [child]: formattedValue,
+        },
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: formattedValue,
+      }));
+    }
+  };
+
+  const handleStepChange = (index, field, value) => {
+    const updatedSteps = [...formData.steps];
+    updatedSteps[index] = { ...updatedSteps[index], [field]: value };
+    setFormData((prev) => ({ ...prev, steps: updatedSteps }));
+  };
+
+  const handleCustomAllowanceChange = (index, field, value) => {
+    const updatedAllowances = [...formData.customAllowances];
+
+    // Apply number formatting for amount field
+    const formattedValue =
+      field === "amount" ? formatNumberWithCommas(value) : value;
+
+    updatedAllowances[index] = {
+      ...updatedAllowances[index],
+      [field]: formattedValue,
+    };
+    setFormData((prev) => ({ ...prev, customAllowances: updatedAllowances }));
+  };
+
+  const addCustomAllowance = () => {
+    setFormData((prev) => ({
+      ...prev,
+      customAllowances: [...prev.customAllowances, { name: "", amount: "" }],
+    }));
+  };
+
+  const removeCustomAllowance = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      customAllowances: prev.customAllowances.filter((_, i) => i !== index),
+    }));
+  };
+
+  const addStep = () => {
+    const nextStepNumber = formData.steps.length + 1;
+    setFormData((prev) => ({
+      ...prev,
+      steps: [
+        ...prev.steps,
+        {
+          step: `Step ${nextStepNumber}`,
+          increment: "",
+          yearsOfService: "",
+        },
+      ],
+    }));
+  };
+
+  const removeStep = (index) => {
+    if (formData.steps.length > 1) {
+      setFormData((prev) => ({
+        ...prev,
+        steps: prev.steps.filter((_, i) => i !== index),
+      }));
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      // Auto-generate grade name if not provided or if creating new
+      if (!editingGrade || !formData.grade) {
+        const existingGrades =
+          await userModulesAPI.salaryGrades.getAllSalaryGrades();
+        const lastGrade =
+          existingGrades.data && existingGrades.data.length > 0
+            ? existingGrades.data[existingGrades.data.length - 1]
+            : null;
+
+        if (lastGrade) {
+          const lastGradeNumber = parseInt(lastGrade.grade.split(" ")[1]) || 0;
+          formData.grade = `Grade ${lastGradeNumber + 1}`;
+        } else {
+          formData.grade = "Grade 1";
+        }
+      }
+
+      // Prepare the data
+      const salaryGradeData = {
+        ...formData,
+        minGrossSalary: parseFormattedNumber(formData.minGrossSalary),
+        maxGrossSalary: parseFormattedNumber(formData.maxGrossSalary),
+        allowances: {
+          housing: parseFormattedNumber(formData.allowances.housing),
+          transport: parseFormattedNumber(formData.allowances.transport),
+          meal: parseFormattedNumber(formData.allowances.meal),
+          other: parseFormattedNumber(formData.allowances.other),
+        },
+        customAllowances: formData.customAllowances.map((allowance) => ({
+          ...allowance,
+          amount: parseFormattedNumber(allowance.amount),
+        })),
+        steps: formData.enableSteps
+          ? formData.steps.map((step) => ({
+              ...step,
+              increment: parseFormattedNumber(step.increment || ""),
+              yearsOfService: parseFormattedNumber(step.yearsOfService || ""),
+            }))
+          : [],
+      };
+
+      if (editingGrade) {
+        // Update existing grade
+        const response = await userModulesAPI.salaryGrades.updateSalaryGrade(
+          editingGrade._id,
+          salaryGradeData
+        );
+        if (response.success) {
+          toast.success("Salary grade updated successfully!");
+          // Close modal first
+          setShowModal(false);
+          setEditingGrade(null);
+          // Then refresh the list and dropdown
+          await fetchSalaryGrades();
+          await fetchDropdownGrades();
+          // Reset form last
+          resetForm();
+        } else {
+          toast.error(response.message || "Failed to update salary grade");
+        }
+      } else {
+        const response = await userModulesAPI.salaryGrades.createSalaryGrade(
+          salaryGradeData
+        );
+        if (response.success) {
+          toast.success("Salary grade created successfully!");
+          // Close modal first
+          setShowModal(false);
+          setEditingGrade(null);
+          // Then refresh the list and dropdown
+          await fetchSalaryGrades();
+          await fetchDropdownGrades();
+          // Reset form last
+          resetForm();
+        } else {
+          toast.error(response.message || "Failed to create salary grade");
+        }
+      }
+    } catch (error) {
+      console.error("Error saving salary grade:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to save salary grade"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (grade) => {
+    // Prepare form data first
+    const editFormData = {
+      grade: grade.grade,
+      name: grade.name,
+      minGrossSalary: formatNumberWithCommas(grade.minGrossSalary.toString()),
+      maxGrossSalary: formatNumberWithCommas(grade.maxGrossSalary.toString()),
+      description: grade.description,
+      selectedRole:
+        grade.roleMappings && grade.roleMappings.length > 0
+          ? grade.roleMappings[0].role._id || grade.roleMappings[0].role
+          : "",
+      allowances: {
+        housing: formatNumberWithCommas(grade.allowances.housing.toString()),
+        transport: formatNumberWithCommas(
+          grade.allowances.transport.toString()
+        ),
+        meal: formatNumberWithCommas(grade.allowances.meal.toString()),
+        other: formatNumberWithCommas(grade.allowances.other.toString()),
+      },
+      customAllowances: grade.customAllowances
+        ? grade.customAllowances.map((allowance) => ({
+            ...allowance,
+            amount: allowance.amount
+              ? formatNumberWithCommas(allowance.amount.toString())
+              : "",
+          }))
+        : [],
+      steps:
+        grade.steps && grade.steps.length > 0
+          ? grade.steps
+              .filter((step) => step.increment > 0 || step.yearsOfService > 0)
+              .map((step) => ({
+                ...step,
+                increment: step.increment ? step.increment.toString() : "",
+                yearsOfService: step.yearsOfService
+                  ? step.yearsOfService.toString()
+                  : "",
+              }))
+          : [{ step: "Step 1", increment: "", yearsOfService: "" }],
+      enableSteps:
+        grade.steps &&
+        grade.steps.some(
+          (step) => step.increment > 0 || step.yearsOfService > 0
+        ),
+      enableCustomAllowances:
+        grade.customAllowances && grade.customAllowances.length > 0,
+    };
+
+    setEditingGrade(grade);
+    setFormData(editFormData);
+    setShowModal(true);
+  };
+
+  const handleDelete = async (gradeId, gradeName) => {
+    setDeleteTarget({ id: gradeId, name: gradeName });
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    setLoading(true);
+    try {
+      const response = await userModulesAPI.salaryGrades.deleteSalaryGrade(
+        deleteTarget.id
+      );
+      if (response.success) {
+        toast.success(
+          `Salary grade "${deleteTarget.name}" deleted successfully!`
+        );
+        await fetchSalaryGrades();
+        await fetchDropdownGrades();
+        setShowDeleteModal(false);
+        setDeleteTarget(null);
+      } else {
+        toast.error(response.message || "Failed to delete salary grade");
+      }
+    } catch (error) {
+      console.error("Error deleting salary grade:", error);
+      if (error.response?.data?.message?.includes("assigned to users")) {
+        toast.error(
+          "Cannot delete salary grade. It is currently assigned to users."
+        );
+      } else {
+        toast.error(
+          error.response?.data?.message || "Failed to delete salary grade"
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetForm = async () => {
+    // Auto-generate the next grade number
+    let nextGrade = "Grade 1";
+    if (salaryGrades.length > 0) {
+      const lastGrade = salaryGrades[salaryGrades.length - 1];
+      const lastGradeNumber = parseInt(lastGrade.grade.split(" ")[1]) || 0;
+      nextGrade = `Grade ${lastGradeNumber + 1}`;
+    }
+
+    setFormData({
+      grade: nextGrade,
+      name: "",
+      minGrossSalary: "",
+      maxGrossSalary: "",
+      description: "",
+      selectedRole: "",
+      allowances: {
+        housing: "",
+        transport: "",
+        meal: "",
+        other: "",
+      },
+      customAllowances: [],
+      steps: [{ step: "Step 1", increment: "", yearsOfService: "" }],
+      enableSteps: false,
+      enableCustomAllowances: false,
+    });
+  };
+
+  const calculateTotalCompensation = (grade, step = "Step 1") => {
+    const stepData =
+      step === "Base" ? null : grade.steps.find((s) => s.step === step);
+    const baseSalary = grade.minGrossSalary;
+    const increment = stepData ? (baseSalary * stepData.increment) / 100 : 0;
+    const adjustedSalary = baseSalary + increment;
+
+    const customAllowancesTotal = grade.customAllowances
+      ? grade.customAllowances.reduce(
+          (sum, allowance) => sum + allowance.amount,
+          0
+        )
+      : 0;
+
+    return {
+      baseSalary: adjustedSalary,
+      housing: grade.allowances.housing,
+      transport: grade.allowances.transport,
+      meal: grade.allowances.meal,
+      other: grade.allowances.other,
+      customAllowances: grade.customAllowances || [],
+      customAllowancesTotal,
+      total:
+        adjustedSalary +
+        grade.allowances.housing +
+        grade.allowances.transport +
+        grade.allowances.meal +
+        grade.allowances.other +
+        customAllowancesTotal,
+    };
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--elra-primary)]"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full max-w-7xl mx-auto py-8 px-4">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-[var(--elra-text-primary)] mb-2">
+              Salary Grade Management
+            </h1>
+            <p className="text-[var(--elra-text-secondary)]">
+              Manage salary grades, compensation structure, and allowances
+            </p>
+          </div>
+          <button
+            onClick={async () => {
+              await resetForm();
+              setShowModal(true);
+              setEditingGrade(null);
+            }}
+            className="flex items-center px-6 py-3 bg-[var(--elra-primary)] text-white rounded-xl hover:bg-[var(--elra-primary-dark)] transition-all duration-300 shadow-lg hover:shadow-xl cursor-pointer"
+          >
+            <PlusIcon className="h-5 w-5 mr-2" />
+            Add Salary Grade
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="mb-6">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab("grades")}
+              className={`py-2 px-1 border-b-2 font-medium text-sm transition-all duration-300 cursor-pointer ${
+                activeTab === "grades"
+                  ? "border-[var(--elra-primary)] text-[var(--elra-primary)]"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              <CurrencyDollarIcon className="h-5 w-5 inline mr-2" />
+              Salary Grades
+            </button>
+            <button
+              onClick={() => setActiveTab("calculator")}
+              className={`py-2 px-1 border-b-2 font-medium text-sm transition-all duration-300 cursor-pointer ${
+                activeTab === "calculator"
+                  ? "border-[var(--elra-primary)] text-[var(--elra-primary)]"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              <CalculatorIcon className="h-5 w-5 inline mr-2" />
+              Salary Calculator
+            </button>
+          </nav>
+        </div>
+      </div>
+
+      {/* Salary Grades Tab */}
+      {activeTab === "grades" && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          {/* Filter Controls */}
+          <div className="p-4 border-b border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={showOnlyWithSteps}
+                    onChange={(e) => setShowOnlyWithSteps(e.target.checked)}
+                    className="h-4 w-4 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] border-gray-300 rounded"
+                  />
+                  <span className="ml-2 text-sm font-medium text-gray-700">
+                    Show only grades with steps
+                  </span>
+                </label>
+              </div>
+              <div className="text-sm text-gray-500">
+                {
+                  salaryGrades.filter(
+                    (grade) =>
+                      !showOnlyWithSteps ||
+                      (grade.steps && grade.steps.length > 0)
+                  ).length
+                }{" "}
+                of {salaryGrades.length} grades
+              </div>
+            </div>
+          </div>
+          {salaryGrades.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="mx-auto h-24 w-24 text-gray-300 mb-4">
+                <CurrencyDollarIcon className="h-full w-full" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                No salary grades found
+              </h3>
+              <p className="text-gray-500 mb-6">
+                Get started by creating your first salary grade to define your
+                compensation structure.
+              </p>
+              <button
+                onClick={async () => {
+                  await resetForm();
+                  setShowModal(true);
+                }}
+                className="inline-flex items-center px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors duration-200 cursor-pointer"
+              >
+                <PlusIcon className="h-4 w-4 mr-2" />
+                Create First Salary Grade
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Grade
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Description
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Salary Range
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Allowances
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Mapped Roles
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {salaryGrades
+                    .filter(
+                      (grade) =>
+                        !showOnlyWithSteps ||
+                        (grade.steps && grade.steps.length > 0)
+                    )
+                    .map((grade) => (
+                      <tr
+                        key={grade._id}
+                        className="hover:bg-gray-50 transition-colors duration-200"
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="h-10 w-10 rounded-full bg-[var(--elra-secondary-3)] flex items-center justify-center">
+                              <span className="text-sm font-semibold text-[var(--elra-primary)]">
+                                {grade.grade.split(" ")[1]}
+                              </span>
+                            </div>
+                            <div className="ml-3">
+                              <div className="text-sm font-semibold text-gray-900">
+                                {grade.grade}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {grade.name}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
+                          <div className="break-words leading-relaxed">
+                            {grade.description}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <div className="font-medium">
+                            {formatCurrency(grade.minGrossSalary)}
+                          </div>
+                          <div className="text-gray-500">
+                            to {formatCurrency(grade.maxGrossSalary)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          <div className="space-y-1">
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Housing:</span>
+                              <span>
+                                {formatCurrency(grade.allowances.housing)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Transport:</span>
+                              <span>
+                                {formatCurrency(grade.allowances.transport)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-500">Meal:</span>
+                              <span>
+                                {formatCurrency(grade.allowances.meal)}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          <div className="space-y-1">
+                            {grade.roleMappings &&
+                            grade.roleMappings.length > 0 ? (
+                              grade.roleMappings.map((mapping, index) => (
+                                <div key={index} className="flex items-center">
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-green-800">
+                                    {(
+                                      mapping.role?.name || "Unknown Role"
+                                    ).replace(/_/g, " ")}
+                                  </span>
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-gray-400 text-xs">
+                                No roles mapped
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              grade.isActive
+                                ? "bg-green-100 text-green-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            {grade.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex items-center justify-end space-x-2">
+                            <button
+                              onClick={() => handleEdit(grade)}
+                              className="text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-colors duration-200 cursor-pointer"
+                            >
+                              <PencilIcon className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleDelete(grade._id, grade.grade)
+                              }
+                              className="text-red-600 hover:text-red-800 transition-colors duration-200 cursor-pointer"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Salary Calculator Tab */}
+      {activeTab === "calculator" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Calculator Form */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Salary Calculator
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Grade
+                </label>
+                <select
+                  value={selectedGrade}
+                  onChange={(e) => setSelectedGrade(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent cursor-pointer"
+                >
+                  <option value="">Select a grade</option>
+                  {salaryGrades.map((grade) => (
+                    <option key={grade._id} value={grade._id}>
+                      {grade.grade}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Step
+                </label>
+                <select
+                  value={selectedStep}
+                  onChange={(e) => setSelectedStep(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent cursor-pointer"
+                  disabled={!selectedGrade}
+                >
+                  <option value="">Select a step</option>
+                  {selectedGrade &&
+                    (() => {
+                      const grade = salaryGrades.find(
+                        (g) => g._id === selectedGrade
+                      );
+                      const validSteps =
+                        grade?.steps?.filter(
+                          (step) =>
+                            step.increment > 0 || step.yearsOfService > 0
+                        ) || [];
+
+                      // Always show base salary option first
+                      const options = [
+                        <option key="Base" value="Base">
+                          Base Salary Only (Min:{" "}
+                          {formatCurrency(grade.minGrossSalary)})
+                        </option>,
+                      ];
+
+                      // Add step options if they exist
+                      if (validSteps.length > 0) {
+                        validSteps.forEach((step) => {
+                          options.push(
+                            <option key={step.step} value={step.step}>
+                              {step.step} ({step.yearsOfService} years,{" "}
+                              {step.increment}% increment)
+                            </option>
+                          );
+                        });
+                      }
+
+                      return options;
+                    })()}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Calculator Results */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              Compensation Breakdown
+            </h2>
+            {selectedGrade && selectedStep ? (
+              <div className="space-y-3">
+                {(() => {
+                  const grade = salaryGrades.find(
+                    (g) => g._id === selectedGrade
+                  );
+                  const stepData =
+                    selectedStep === "Base"
+                      ? null
+                      : grade?.steps?.find((s) => s.step === selectedStep);
+                  const compensation = calculateTotalCompensation(
+                    grade,
+                    selectedStep
+                  );
+                  return (
+                    <>
+                      <div className="flex justify-between py-2 border-b border-gray-100">
+                        <span className="text-gray-600">Base Salary:</span>
+                        <span className="font-semibold">
+                          {formatCurrency(grade.minGrossSalary)}
+                        </span>
+                      </div>
+                      {stepData && (
+                        <div className="flex justify-between py-2 border-b border-gray-100">
+                          <span className="text-gray-600">
+                            Step Increment ({stepData.increment}%):
+                          </span>
+                          <span className="font-semibold text-green-600">
+                            +
+                            {formatCurrency(
+                              compensation.baseSalary - grade.minGrossSalary
+                            )}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between py-2 border-b border-gray-100 bg-gray-50 px-2">
+                        <span className="text-gray-700 font-medium">
+                          Adjusted Base Salary:
+                        </span>
+                        <span className="font-semibold text-blue-600">
+                          {formatCurrency(compensation.baseSalary)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-gray-100">
+                        <span className="text-gray-600">
+                          Housing Allowance:
+                        </span>
+                        <span className="font-semibold">
+                          {formatCurrency(compensation.housing)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-gray-100">
+                        <span className="text-gray-600">
+                          Transport Allowance:
+                        </span>
+                        <span className="font-semibold">
+                          {formatCurrency(compensation.transport)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-gray-100">
+                        <span className="text-gray-600">Meal Allowance:</span>
+                        <span className="font-semibold">
+                          {formatCurrency(compensation.meal)}
+                        </span>
+                      </div>
+                      {compensation.other > 0 && (
+                        <div className="flex justify-between py-2 border-b border-gray-100">
+                          <span className="text-gray-600">
+                            Other Allowances:
+                          </span>
+                          <span className="font-semibold">
+                            {formatCurrency(compensation.other)}
+                          </span>
+                        </div>
+                      )}
+                      {compensation.customAllowances &&
+                        compensation.customAllowances.length > 0 && (
+                          <>
+                            {compensation.customAllowances.map(
+                              (allowance, index) => (
+                                <div
+                                  key={index}
+                                  className="flex justify-between py-2 border-b border-gray-100"
+                                >
+                                  <span className="text-gray-600">
+                                    {allowance.name}:
+                                  </span>
+                                  <span className="font-semibold">
+                                    {formatCurrency(allowance.amount)}
+                                  </span>
+                                </div>
+                              )
+                            )}
+                          </>
+                        )}
+                      <div className="flex justify-between py-3 border-t-2 border-[var(--elra-primary)]">
+                        <span className="text-lg font-semibold text-[var(--elra-primary)]">
+                          Total:
+                        </span>
+                        <span className="text-lg font-bold text-[var(--elra-primary)]">
+                          {formatCurrency(compensation.total)}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <CalculatorIcon className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>Select a grade and step to see the compensation breakdown</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-white bg-opacity-95 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto border border-gray-200">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900">
+                {editingGrade ? "Edit Salary Grade" : "Add New Salary Grade"}
+              </h2>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              {loading && (
+                <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-xl">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--elra-primary)]"></div>
+                </div>
+              )}
+              {/* Basic Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Grade Level *
+                  </label>
+                  <input
+                    type="text"
+                    name="grade"
+                    value={formData.grade}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                    placeholder="Auto-generated level"
+                    readOnly
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Grade level will be automatically generated by the system
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Grade Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                    placeholder="e.g., Executive Level"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enter a descriptive name for this grade
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description *
+                </label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  rows={3}
+                  maxLength={500}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent resize-none"
+                  placeholder="Brief description of this salary grade"
+                  required
+                />
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>Maximum 500 characters</span>
+                  <span>{formData.description.length}/500</span>
+                </div>
+              </div>
+
+              {/* Salary Range */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Minimum Gross Salary *
+                  </label>
+                  <input
+                    type="text"
+                    name="minGrossSalary"
+                    value={formData.minGrossSalary}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                    placeholder="30000"
+                    required
+                    inputMode="numeric"
+                    pattern="[0-9,]*"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Maximum Gross Salary *
+                  </label>
+                  <input
+                    type="text"
+                    name="maxGrossSalary"
+                    value={formData.maxGrossSalary}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                    placeholder="45000"
+                    required
+                    inputMode="numeric"
+                    pattern="[0-9,]*"
+                  />
+                </div>
+              </div>
+
+              {/* Allowances */}
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                  Allowances
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Housing Allowance
+                    </label>
+                    <input
+                      type="text"
+                      name="allowances.housing"
+                      value={formData.allowances.housing}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                      placeholder="15000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Transport Allowance
+                    </label>
+                    <input
+                      type="text"
+                      name="allowances.transport"
+                      value={formData.allowances.transport}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                      placeholder="10000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Meal Allowance
+                    </label>
+                    <input
+                      type="text"
+                      name="allowances.meal"
+                      value={formData.allowances.meal}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                      placeholder="8000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Other Allowances
+                    </label>
+                    <input
+                      type="text"
+                      name="allowances.other"
+                      value={formData.allowances.other}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+
+                {/* Custom Allowances Checkbox */}
+                <div className="flex items-center mt-6 mb-4">
+                  <input
+                    type="checkbox"
+                    id="enableCustomAllowances"
+                    name="enableCustomAllowances"
+                    checked={formData.enableCustomAllowances}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        enableCustomAllowances: e.target.checked,
+                      }))
+                    }
+                    className="h-4 w-4 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] border-gray-300 rounded"
+                  />
+                  <label
+                    htmlFor="enableCustomAllowances"
+                    className="ml-2 text-lg font-medium text-gray-900"
+                  >
+                    Add Custom Allowances
+                  </label>
+                </div>
+
+                {/* Custom Allowances Section */}
+                {formData.enableCustomAllowances && (
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600">
+                      Add custom allowances with specific names and amounts.
+                    </p>
+                    {formData.customAllowances.map((allowance, index) => (
+                      <div
+                        key={index}
+                        className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg"
+                      >
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Allowance Name
+                          </label>
+                          <input
+                            type="text"
+                            value={allowance.name}
+                            onChange={(e) =>
+                              handleCustomAllowanceChange(
+                                index,
+                                "name",
+                                e.target.value
+                              )
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                            placeholder="e.g., Entertainment"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Amount
+                          </label>
+                          <input
+                            type="text"
+                            value={allowance.amount}
+                            onChange={(e) =>
+                              handleCustomAllowanceChange(
+                                index,
+                                "amount",
+                                e.target.value
+                              )
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                            placeholder="5000"
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <button
+                            type="button"
+                            onClick={() => removeCustomAllowance(index)}
+                            className="px-3 py-2 text-red-600 hover:text-red-800 transition-colors duration-200 cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={addCustomAllowance}
+                      className="px-4 py-2 text-[var(--elra-primary)] border border-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary)] hover:text-white transition-colors duration-200 cursor-pointer"
+                    >
+                      + Add Custom Allowance
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Steps */}
+              <div>
+                <div className="flex items-center mb-4">
+                  <input
+                    type="checkbox"
+                    id="enableSteps"
+                    name="enableSteps"
+                    checked={formData.enableSteps}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        enableSteps: e.target.checked,
+                      }))
+                    }
+                    className="h-4 w-4 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] border-gray-300 rounded"
+                  />
+                  <label
+                    htmlFor="enableSteps"
+                    className="ml-2 text-lg font-medium text-gray-900"
+                  >
+                    Enable Salary Steps (Optional)
+                  </label>
+                </div>
+
+                {formData.enableSteps && (
+                  <>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Define salary progression based on years of service. Each
+                      step represents a percentage increment on the base salary.
+                    </p>
+                    <div className="space-y-4">
+                      {formData.steps.map((step, index) => (
+                        <div
+                          key={index}
+                          className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg"
+                        >
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Step
+                            </label>
+                            <input
+                              type="text"
+                              value={step.step}
+                              onChange={(e) =>
+                                handleStepChange(index, "step", e.target.value)
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Increment (%)
+                            </label>
+                            <input
+                              type="text"
+                              value={step.increment}
+                              onChange={(e) =>
+                                handleStepChange(
+                                  index,
+                                  "increment",
+                                  e.target.value
+                                )
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                              placeholder="0"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Years of Service
+                            </label>
+                            <input
+                              type="text"
+                              value={step.yearsOfService}
+                              onChange={(e) =>
+                                handleStepChange(
+                                  index,
+                                  "yearsOfService",
+                                  e.target.value
+                                )
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                              placeholder="0"
+                            />
+                          </div>
+                          <div className="flex items-end">
+                            {formData.steps.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeStep(index)}
+                                className="px-3 py-2 text-red-600 hover:text-red-800 transition-colors duration-200 cursor-pointer"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addStep}
+                      className="px-4 py-2 text-[var(--elra-primary)] border border-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary)] hover:text-white transition-colors duration-200 cursor-pointer"
+                    >
+                      + Add New Step
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Role Mapping */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Choose Role *
+                </label>
+                <select
+                  value={formData.selectedRole}
+                  onChange={(e) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      selectedRole: e.target.value,
+                    }));
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent [&>option]:text-gray-900 [&>option]:bg-white cursor-pointer"
+                  required
+                >
+                  <option value="">Choose role</option>
+                  {roles.map((role) => (
+                    <option key={role._id} value={role._id}>
+                      {role.name.replace(/_/g, " ")}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Select a role to map to this salary grade. One role per salary
+                  grade.
+                </p>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModal(false);
+                    setEditingGrade(null);
+                    resetForm();
+                  }}
+                  disabled={loading}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-6 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors duration-200 disabled:opacity-50 flex items-center cursor-pointer"
+                >
+                  {loading && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  )}
+                  {loading
+                    ? "Saving..."
+                    : editingGrade
+                    ? "Update Grade"
+                    : "Create Grade"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-white bg-opacity-95 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center justify-center mb-4">
+                <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
+                  <svg
+                    className="h-8 w-8 text-green-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+                Delete Salary Grade
+              </h3>
+              <p className="text-gray-600 text-center mb-6">
+                Are you sure you want to delete{" "}
+                <span className="font-semibold text-gray-900">
+                  "{deleteTarget?.name}"
+                </span>
+                ?
+                <br />
+                <span className="text-sm text-red-600">
+                  This action cannot be undone and will affect any users
+                  assigned to this salary grade.
+                </span>
+              </p>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setDeleteTarget(null);
+                  }}
+                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors duration-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={loading}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 disabled:opacity-50 flex items-center justify-center cursor-pointer"
+                >
+                  {loading && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  )}
+                  {loading ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SalaryGradeManagement;

@@ -21,9 +21,6 @@ export const getRecentActivity = asyncHandler(async (req, res) => {
     department,
   } = req.query;
 
-  // Add company filter for data isolation
-  const companyFilter = req.user.company ? { company: req.user.company } : {};
-
   const options = {
     limit: parseInt(limit),
     userId,
@@ -33,7 +30,6 @@ export const getRecentActivity = asyncHandler(async (req, res) => {
     endDate,
     riskLevel,
     department,
-    companyFilter, // Add company filter to options
   };
 
   const activity = await AuditService.getRecentActivity(options);
@@ -51,13 +47,7 @@ export const getRecentActivity = asyncHandler(async (req, res) => {
 export const getDocumentAuditTrail = asyncHandler(async (req, res) => {
   const { documentId } = req.params;
 
-  // Add company filter for data isolation
-  const companyFilter = req.user.company ? { company: req.user.company } : {};
-
-  const auditTrail = await AuditService.getDocumentAuditTrail(
-    documentId,
-    companyFilter
-  );
+  const auditTrail = await AuditService.getDocumentAuditTrail(documentId);
 
   res.json({
     success: true,
@@ -91,12 +81,8 @@ export const getUserActivitySummary = asyncHandler(async (req, res) => {
 export const getActivityStats = asyncHandler(async (req, res) => {
   const { days = 30 } = req.query;
 
-  // Add company filter for data isolation
-  const company = req.user.company;
-
   const stats = await AuditService.getActivityStats({
     days: parseInt(days),
-    company,
   });
 
   res.json({
@@ -237,21 +223,18 @@ export const getAuditDashboard = asyncHandler(async (req, res) => {
   const highRiskActivities = await AuditService.getRecentActivity({
     riskLevel: "HIGH",
     limit: 10,
-    companyFilter: req.user.company ? { company: req.user.company } : {},
   });
 
   // Get recent document activities
   const documentActivities = await AuditService.getRecentActivity({
     resourceType: "DOCUMENT",
     limit: 10,
-    companyFilter: req.user.company ? { company: req.user.company } : {},
   });
 
   // Get recent user activities
   const userActivities = await AuditService.getRecentActivity({
     resourceType: "USER",
     limit: 10,
-    companyFilter: req.user.company ? { company: req.user.company } : {},
   });
 
   const dashboardData = {

@@ -45,25 +45,25 @@ router.use(protect);
 // Get active departments (for dropdowns) - All authenticated users
 router.get("/active", getActiveDepartments);
 
-// Get department statistics - Admin+
-router.get("/:id/stats", checkRole(80), getDepartmentStats);
+// Get department statistics - Manager+
+router.get("/:id/stats", checkRole(600), getDepartmentStats);
 
-// Get department hierarchy - Admin+
-router.get("/:id/hierarchy", checkRole(80), getDepartmentHierarchy);
+// Get department hierarchy - Manager+
+router.get("/:id/hierarchy", checkRole(600), getDepartmentHierarchy);
 
-// Get department users - Admin+
-router.get("/:id/users", checkRole(80), getDepartmentUsers);
+// Get department users - Manager+
+router.get("/:id/users", checkRole(600), getDepartmentUsers);
 
-// Get department by ID - Admin+
-router.get("/:id", checkRole(80), getDepartmentById);
+// Get department by ID - Manager+
+router.get("/:id", checkRole(600), getDepartmentById);
 
-router.get("/", checkRole(80), getAllDepartments);
+router.get("/", checkRole(600), getAllDepartments);
 
 // Super Admin only routes
 router.post("/", createDepartment);
-router.put("/:id", checkRole(100), validateDepartment, updateDepartment);
-router.delete("/:id", checkRole(100), deleteDepartment);
-router.delete("/bulk-delete", checkRole(100), bulkDeleteDepartments);
-router.post("/bulk-create", checkRole(100), bulkCreateDepartments);
+router.put("/:id", checkRole(1000), validateDepartment, updateDepartment);
+router.delete("/:id", checkRole(1000), deleteDepartment);
+router.delete("/bulk-delete", checkRole(1000), bulkDeleteDepartments);
+router.post("/bulk-create", checkRole(1000), bulkCreateDepartments);
 
 export default router;

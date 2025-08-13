@@ -1,10 +1,11 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
 @import "tailwindcss";
 @import "./styles/brandColors.css";
 
 /* ELRA Brand Colors - Clean & Simple Theme */
 :root {
   /* Primary Brand Colors */
-  --elra-primary: #0D6449; /* Main brand color */
+  --elra-primary: #0d6449; /* Main brand color */
   --elra-primary-dark: #0d6449; /* Login button color */
   --elra-bg-light: #f7f7fa; /* Light background */
 
@@ -34,32 +35,6 @@
   --elra-shadow-medium: rgba(12, 98, 71, 0.15);
 }
 
-/* Custom Tailwind Colors for Module Selector */
-@layer utilities {
-  .bg-coral-50 {
-    background-color: #fef2f2;
-  }
-  .bg-coral-500 {
-    background-color: #ff6b35;
-  }
-  .bg-coral-600 {
-    background-color: #e55a2b;
-  }
-  .border-coral-200 {
-    border-color: #fecaca;
-  }
-  .from-coral-500 {
-    --tw-gradient-from: #ff6b35;
-  }
-  .to-coral-600 {
-    --tw-gradient-to: #e55a2b;
-  }
-
-  .shadow-3xl {
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  }
-}
-
 /* Glassmorphism utility class */
 .glass-card {
   background: rgba(255, 255, 255, 0.1);
@@ -68,34 +43,90 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
 }
-/* @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@700;800&display=swap"); */
+
+/* Global font family */
+* {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    "Oxygen", "Ubuntu", "Cantarell", sans-serif;
+}
 
 body {
   height: 100vh;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    "Oxygen", "Ubuntu", "Cantarell", sans-serif;
 }
 
 /* Global select dropdown styling */
 select option {
-  background-color: #1f2937 !important;
-  color: #ffffff !important;
+  background-color: transparent !important;
+  color: #000000 !important;
   padding: 8px 12px;
+  font-weight: 450px !important;
 }
 
 select option:hover {
-  background-color: #374151 !important;
+  background-color: #f3f4f6 !important;
 }
 
 select option:checked {
-  background-color: #3b82f6 !important; /* bg-blue-500 */
+  background-color: #f3f4f6 !important;
+  color: #000000 !important;
+  font-weight: normal !important;
 }
 
 /* Ensure select dropdowns are visible */
 select:focus option:checked {
-  background-color: #3b82f6 !important;
+  background-color: #f3f4f6 !important;
+  color: #000000 !important;
+  font-weight: normal !important;
 }
 
 select:focus option:hover {
-  background-color: #374151 !important;
+  background-color: #f3f4f6 !important;
+}
+
+/* Empty state animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.empty-state {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.empty-state-icon {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Force white background for GradientSpinner */
+.GradientSpinner,
+[class*="GradientSpinner"] {
+  background-color: white !important;
+  background: white !important;
+}
+
+/* Ensure any container with GradientSpinner has white background */
+div:has(.GradientSpinner),
+div:has([class*="GradientSpinner"]) {
+  background-color: white !important;
+  background: white !important;
 }
 
 /* :root {

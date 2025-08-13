@@ -1,7 +1,6 @@
 import React, { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import GradientSpinner from "./GradientSpinner";
 
 const RoleRedirect = () => {
   const { user, loading, initialized } = useAuth();
@@ -23,21 +22,8 @@ const RoleRedirect = () => {
     }
   }, [user, loading, initialized, navigate, location.pathname]);
 
-  if (!initialized || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-cyan-800 to-purple-900">
-        <GradientSpinner
-          size="xl"
-          variant="secondary"
-          text="Loading your dashboard..."
-          showText={true}
-        />
-      </div>
-    );
-  }
-
-  if (!user) {
-    navigate("/");
+  // Don't show loading spinner here - let ProtectedRoute handle it
+  if (!initialized || loading || !user) {
     return null;
   }
 

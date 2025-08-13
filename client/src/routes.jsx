@@ -7,6 +7,11 @@ import RetrieveCredentials from "./pages/auth/RetrieveCredentials";
 import EmailVerification from "./pages/auth/EmailVerification";
 import EmailVerificationSuccess from "./pages/auth/EmailVerificationSuccess";
 import { Dashboard, Documents } from "./pages/user";
+import HRInvitations from "./pages/user/modules/hr/HRInvitations";
+import HRDepartments from "./pages/user/modules/hr/HRDepartments";
+import HRRoles from "./pages/user/modules/hr/HRRoles";
+import HRUsers from "./pages/user/modules/hr/HRUsers";
+import SalaryGradeManagement from "./pages/user/modules/payroll/SalaryGradeManagement";
 import Notifications from "./pages/shared/Notifications";
 // Admin imports commented out - admin folder deleted
 // import {
@@ -105,6 +110,16 @@ const AppRoutes = () => {
 
         {/* Module routes - dynamic module dashboards */}
         <Route path="modules/:module" element={<Dashboard />} />
+
+        {/* HR Module specific sub-routes */}
+        <Route path="modules/hr/users" element={<HRUsers />} />
+        <Route path="modules/hr/departments" element={<HRDepartments />} />
+        <Route path="modules/hr/roles" element={<HRRoles />} />
+        <Route path="modules/hr/onboarding" element={<HRInvitations />} />
+        <Route
+          path="modules/payroll/salary-grades"
+          element={<SalaryGradeManagement />}
+        />
       </Route>
 
       {/* Admin routes - commented out - admin folder deleted */}

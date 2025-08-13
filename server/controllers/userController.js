@@ -21,18 +21,18 @@ export const getAllUsers = async (req, res) => {
   try {
     const currentUser = req.user;
 
-    // Check if user has permission to view users
-    if (!hasPermission(currentUser, "user.view")) {
+    // Check if user has permission to view users (Manager+ can view users)
+    if (currentUser.role.level < 600) {
       return res.status(403).json({
         success: false,
-        message: "You do not have permission to view users",
+        message: "Access denied. Manager level required to view users.",
       });
     }
 
     let query = {};
 
     // For super admins, show all users including pending, invited, and active users
-    if (currentUser.role.level >= 90) {
+    if (currentUser.role.level >= 1000) {
       query.$or = [
         { isActive: true },
         { status: "PENDING_REGISTRATION" },
@@ -56,7 +56,6 @@ export const getAllUsers = async (req, res) => {
 
     // Filter out platform admin users after population
     // Include users with no role (pending registration) and users with non-platform-admin roles
-    // Filter users: include SUPER_ADMIN, regular users, and pending users; exclude PLATFORM_ADMIN
     const filteredUsers = users.filter((user) => {
       // If user has no role (pending registration), include them
       if (!user.role) return true;

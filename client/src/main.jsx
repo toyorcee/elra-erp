@@ -18,7 +18,7 @@ const queryClient = new QueryClient({
 const root = createRoot(document.getElementById("root"));
 
 root.render(
-  <div className="min-h-screen bg-[var(--elra-bg-light)] flex items-center justify-center">
+  <div className="min-h-screen bg-white flex items-center justify-center">
     <GradientSpinner
       size="lg"
       title="ELRA Enterprise Resource Planning System"

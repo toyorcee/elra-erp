@@ -56,6 +56,14 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    jobTitle: {
+      type: String,
+      trim: true,
+    },
+    salaryGrade: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SalaryGrade",
+    },
     employeeId: {
       type: String,
       unique: true,

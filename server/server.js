@@ -44,8 +44,10 @@ import auditRoutes from "./routes/audit.js";
 import subscriptionRoutes from "./routes/subscriptions.js";
 import transactionRoutes from "./routes/transactions.js";
 import invitationRoutes from "./routes/invitations.js";
+import userRegistrationRoutes from "./routes/userRegistration.js";
 import systemSetupRoutes from "./routes/systemSetup.js";
 import scanningRoutes from "./routes/scanning.js";
+import salaryGradeRoutes from "./routes/salaryGrades.js";
 
 const isValidObjectId = (id) => {
   return (
@@ -216,8 +218,10 @@ app.use("/api/workflow-templates", workflowTemplateRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use("/api/invitations", invitationRoutes);
+app.use("/api/user-registration", userRegistrationRoutes);
 app.use("/api/system-setup", systemSetupRoutes);
 app.use("/api/scanning", scanningRoutes);
+app.use("/api/salary-grades", salaryGradeRoutes);
 
 // Create Socket.IO server before starting HTTP server
 const io = new SocketIOServer(httpServer, {

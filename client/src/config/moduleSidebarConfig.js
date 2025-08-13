@@ -47,17 +47,10 @@ export const moduleSidebarConfig = {
         ],
       },
       {
-        title: "Recruitment & Invitations",
+        title: "Recruitment & Onboarding",
         collapsible: true,
         defaultExpanded: false,
         items: [
-          {
-            label: "Bulk Invitations",
-            icon: "UsersIcon",
-            path: "/dashboard/modules/hr/invitations/bulk",
-            required: { minLevel: 600 },
-            description: "Invite multiple employees at once",
-          },
           {
             label: "Position Requests",
             icon: "BriefcaseIcon",
@@ -66,11 +59,11 @@ export const moduleSidebarConfig = {
             description: "Manage internal position requests",
           },
           {
-            label: "Invitation Management",
-            icon: "EnvelopeIcon",
-            path: "/dashboard/modules/hr/invitations",
+            label: "Employee Onboarding",
+            icon: "UserPlusIcon",
+            path: "/dashboard/modules/hr/onboarding",
             required: { minLevel: 600 },
-            description: "Track and manage sent invitations",
+            description: "Onboard existing and new employees",
           },
         ],
       },
@@ -150,6 +143,27 @@ export const moduleSidebarConfig = {
         defaultExpanded: false,
         items: [
           {
+            label: "User Management",
+            icon: "UserGroupIcon",
+            path: "/dashboard/modules/hr/users",
+            required: { minLevel: 600 },
+            description: "View and manage all users across departments",
+          },
+          {
+            label: "Department Management",
+            icon: "BuildingOfficeIcon",
+            path: "/dashboard/modules/hr/departments",
+            required: { minLevel: 600 },
+            description: "Manage company departments and structure",
+          },
+          {
+            label: "Role Management",
+            icon: "ShieldCheckIcon",
+            path: "/dashboard/modules/hr/roles",
+            required: { minLevel: 600 },
+            description: "Manage user roles and permissions",
+          },
+          {
             label: "HR Reports",
             icon: "ChartBarIcon",
             path: "/dashboard/modules/hr/reports",
@@ -194,6 +208,13 @@ export const moduleSidebarConfig = {
       {
         title: "Payroll Processing",
         items: [
+          {
+            label: "Salary Grade Management",
+            icon: "CurrencyDollarIcon",
+            path: "/dashboard/modules/payroll/salary-grades",
+            required: { minLevel: 600 },
+            description: "Manage salary grades and compensation structure",
+          },
           {
             label: "Salary Processing",
             icon: "CalculatorIcon",

@@ -8,6 +8,13 @@ import {
   cancelInvitation,
   getInvitationStats,
   verifyInvitationCode,
+  getSalaryGrades,
+  createBulkInvitations,
+  getBatchInvitations,
+  searchBatches,
+  createBulkInvitationsFromCSV,
+  approveBulkInvitations,
+  getPendingApprovalInvitations,
 } from "../controllers/invitationController.js";
 import { protect, authorize } from "../middleware/auth.js";
 
@@ -53,6 +60,15 @@ const createInvitationValidation = [
 router.post("/", createInvitationValidation, createInvitation);
 router.get("/", getInvitations);
 router.get("/stats", getInvitationStats);
+
+router.get("/salary-grades", getSalaryGrades);
+router.post("/bulk-create", createBulkInvitations);
+router.post("/bulk-csv", createBulkInvitationsFromCSV);
+router.get("/pending-approval", getPendingApprovalInvitations);
+router.post("/batch/:batchId/approve", approveBulkInvitations);
+router.get("/batch/:batchId", getBatchInvitations);
+router.get("/search-batches", searchBatches);
+
 router.get("/:id", getInvitation);
 router.post("/:id/resend", resendInvitation);
 router.delete("/:id", cancelInvitation);

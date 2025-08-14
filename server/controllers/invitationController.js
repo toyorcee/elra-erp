@@ -5,12 +5,13 @@ import Department from "../models/Department.js";
 import { sendInvitationEmail } from "../services/emailService.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import AuditService from "../services/auditService.js";
+import NotificationService from "../services/notificationService.js";
 
-// Simple email validation utility
+const notificationService = new NotificationService();
+
 const validateEmails = (emails) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  // Handle both string and array inputs
   let emailList;
   if (Array.isArray(emails)) {
     emailList = emails.map((email) => email.trim()).filter((email) => email);
@@ -275,7 +276,6 @@ export const createInvitation = asyncHandler(async (req, res) => {
     invitation.email,
     `${invitation.firstName} ${invitation.lastName}`,
     invitation.code,
-    "ELRA",
     role.name,
     department.name
   );
@@ -290,6 +290,29 @@ export const createInvitation = asyncHandler(async (req, res) => {
     console.error(
       "❌ [INVITATION] Failed to send invitation email:",
       emailResult.error
+    );
+  }
+
+  // Send in-app notification to the creator
+  try {
+    await notificationService.createNotification({
+      recipient: currentUser._id,
+      type: "INVITATION_CREATED",
+      title: "Invitation Created Successfully",
+      message: `Invitation sent to ${invitation.email} for ${role.name} role in ${department.name}`,
+      priority: "medium",
+      data: {
+        invitationId: invitation._id,
+        recipientEmail: invitation.email,
+        role: role.name,
+        department: department.name,
+      },
+    });
+    console.log("✅ [INVITATION] In-app notification sent to creator");
+  } catch (notificationError) {
+    console.error(
+      "❌ [INVITATION] Failed to send in-app notification:",
+      notificationError
     );
   }
 
@@ -671,38 +694,26 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
     });
   }
 
-  const { emails, salaryGrade, departmentId, roleId, batchName } = req.body;
+  const { emails, departmentId, roleId, batchName } = req.body;
 
   console.log("📝 [BULK_INVITATION] Parsed bulk invitation data:", {
     emailCount: emails ? emails.length : 0,
-    salaryGrade,
     departmentId,
     roleId,
     batchName,
   });
 
-  if (!emails || !salaryGrade || !departmentId || !roleId) {
+  if (!emails || !departmentId || !roleId) {
     console.log("❌ [BULK_INVITATION] Missing required fields:", {
       hasEmails: !!emails,
-      hasSalaryGrade: !!salaryGrade,
       hasDepartmentId: !!departmentId,
       hasRoleId: !!roleId,
     });
     return res.status(400).json({
       success: false,
-      message: "Emails, salary grade, department, and role are required",
+      message: "Emails, department, and role are required",
     });
   }
-
-  // Validate salary grade
-  if (!SALARY_GRADES.includes(salaryGrade)) {
-    console.log("❌ [BULK_INVITATION] Invalid salary grade:", salaryGrade);
-    return res.status(400).json({
-      success: false,
-      message: "Invalid salary grade",
-    });
-  }
-  console.log("✅ [BULK_INVITATION] Salary grade validated:", salaryGrade);
 
   // Validate and process emails
   console.log("📧 [BULK_INVITATION] Processing emails...");
@@ -735,7 +746,7 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
     });
   }
 
-  // Get department and role
+  // Validate department
   console.log("🏢 [BULK_INVITATION] Validating department...");
   const department = await Department.findById(departmentId);
 
@@ -834,7 +845,6 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
         email: email,
         firstName: firstName,
         lastName: lastName,
-        salaryGrade: salaryGrade,
         department: department._id,
         role: role._id,
         createdBy: currentUser._id,
@@ -854,7 +864,6 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
         invitation.email,
         `${invitation.firstName} ${invitation.lastName}`,
         invitation.code,
-        "ELRA",
         role.name,
         department.name
       );
@@ -890,7 +899,8 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
         {
           email: email,
           batchId: batchId,
-          salaryGrade: salaryGrade,
+          department: department.name,
+          role: role.name,
           ipAddress: req.ip,
           userAgent: req.get("User-Agent"),
         }
@@ -921,6 +931,33 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
   });
 
   console.log("🎉 [BULK_INVITATION] Bulk invitation creation completed");
+
+  try {
+    await notificationService.createNotification({
+      recipient: currentUser._id,
+      type: "BULK_INVITATION_CREATED",
+      title: "Bulk Invitations Created Successfully",
+      message: `Successfully created ${successfulInvitations} invitations in batch ${batchId}. ${successfulEmails} emails sent, ${failedEmails} failed.`,
+      priority: "medium",
+      data: {
+        batchId: batchId,
+        batchName: batchNameFinal,
+        totalEmails: validEmails.length,
+        successfulInvitations: successfulInvitations,
+        failedInvitations: errors.length,
+        emailsSent: successfulEmails,
+        emailsFailed: failedEmails,
+        department: department.name,
+        role: role.name,
+      },
+    });
+    console.log("✅ [BULK_INVITATION] In-app notification sent to creator");
+  } catch (notificationError) {
+    console.error(
+      "❌ [BULK_INVITATION] Failed to send in-app notification:",
+      notificationError
+    );
+  }
 
   res.status(201).json({
     success: true,
@@ -1004,7 +1041,6 @@ export const getBatchInvitations = asyncHandler(async (req, res) => {
         expiresAt: inv.expiresAt,
         department: inv.department?.name,
         role: inv.role?.name,
-        salaryGrade: inv.salaryGrade,
       })),
     },
   });
@@ -1015,7 +1051,7 @@ export const getBatchInvitations = asyncHandler(async (req, res) => {
 // @access  Private (Super Admin)
 export const searchBatches = asyncHandler(async (req, res) => {
   const currentUser = req.user;
-  const { query, page = 1, limit = 10 } = req.query;
+  const { query, type = "batch", page = 1, limit = 10 } = req.query;
 
   // Check if user is super admin
   if (currentUser.role.level < 100) {
@@ -1032,87 +1068,164 @@ export const searchBatches = asyncHandler(async (req, res) => {
     });
   }
 
-  // Build search filter
-  const filter = {
-    batchId: { $exists: true, $ne: null },
-    $or: [
-      { batchId: { $regex: query, $options: "i" } },
-      { batchName: { $regex: query, $options: "i" } },
-    ],
-  };
+  // Build search filter based on type
+  let filter = {};
+
+  if (type === "batch") {
+    // Original batch search logic
+    filter = {
+      batchId: { $exists: true, $ne: null },
+      $or: [
+        { batchId: { $regex: query, $options: "i" } },
+        { batchName: { $regex: query, $options: "i" } },
+      ],
+    };
+  } else {
+    // For other search types, search individual invitations
+    switch (type) {
+      case "email":
+        filter.email = { $regex: query, $options: "i" };
+        break;
+      case "code":
+        filter.code = { $regex: query, $options: "i" };
+        break;
+      case "department":
+        // First find departments matching the query
+        const departments = await Department.find({
+          name: { $regex: query, $options: "i" },
+        });
+        const departmentIds = departments.map((d) => d._id);
+        filter.department = { $in: departmentIds };
+        break;
+      case "role":
+        // First find roles matching the query
+        const roles = await Role.find({
+          name: { $regex: query, $options: "i" },
+        });
+        const roleIds = roles.map((r) => r._id);
+        filter.role = { $in: roleIds };
+        break;
+      default:
+        // Search across multiple fields
+        filter.$or = [
+          { email: { $regex: query, $options: "i" } },
+          { code: { $regex: query, $options: "i" } },
+          { firstName: { $regex: query, $options: "i" } },
+          { lastName: { $regex: query, $options: "i" } },
+        ];
+    }
+  }
 
   // Pagination
   const skip = (page - 1) * limit;
 
-  // Get unique batches with their statistics
-  const batches = await Invitation.aggregate([
-    { $match: filter },
-    {
-      $group: {
-        _id: "$batchId",
-        batchName: { $first: "$batchName" },
-        totalInvitations: { $sum: 1 },
-        activeInvitations: {
-          $sum: { $cond: [{ $eq: ["$status", "active"] }, 1, 0] },
+  if (type === "batch") {
+    // Original batch search logic
+    const batches = await Invitation.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: "$batchId",
+          batchName: { $first: "$batchName" },
+          totalInvitations: { $sum: 1 },
+          activeInvitations: {
+            $sum: { $cond: [{ $eq: ["$status", "active"] }, 1, 0] },
+          },
+          sentInvitations: {
+            $sum: { $cond: [{ $eq: ["$status", "sent"] }, 1, 0] },
+          },
+          usedInvitations: {
+            $sum: { $cond: [{ $eq: ["$status", "used"] }, 1, 0] },
+          },
+          expiredInvitations: {
+            $sum: { $cond: [{ $eq: ["$status", "expired"] }, 1, 0] },
+          },
+          failedInvitations: {
+            $sum: { $cond: [{ $eq: ["$status", "failed"] }, 1, 0] },
+          },
+          createdAt: { $first: "$createdAt" },
+          department: { $first: "$department" },
+          role: { $first: "$role" },
         },
-        sentInvitations: {
-          $sum: { $cond: [{ $eq: ["$status", "sent"] }, 1, 0] },
-        },
-        usedInvitations: {
-          $sum: { $cond: [{ $eq: ["$status", "used"] }, 1, 0] },
-        },
-        expiredInvitations: {
-          $sum: { $cond: [{ $eq: ["$status", "expired"] }, 1, 0] },
-        },
-        failedInvitations: {
-          $sum: { $cond: [{ $eq: ["$status", "failed"] }, 1, 0] },
-        },
-        createdAt: { $first: "$createdAt" },
-        department: { $first: "$department" },
-        role: { $first: "$role" },
-        salaryGrade: { $first: "$salaryGrade" },
       },
-    },
-    { $sort: { createdAt: -1 } },
-    { $skip: skip },
-    { $limit: parseInt(limit) },
-  ]);
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: parseInt(limit) },
+    ]);
 
-  // Get total count for pagination
-  const totalBatches = await Invitation.aggregate([
-    { $match: filter },
-    { $group: { _id: "$batchId" } },
-    { $count: "total" },
-  ]);
+    // Get total count for pagination
+    const totalBatches = await Invitation.aggregate([
+      { $match: filter },
+      { $group: { _id: "$batchId" } },
+      { $count: "total" },
+    ]);
 
-  const total = totalBatches.length > 0 ? totalBatches[0].total : 0;
+    const total = totalBatches.length > 0 ? totalBatches[0].total : 0;
 
-  // Populate department and role names
-  const populatedBatches = await Promise.all(
-    batches.map(async (batch) => {
-      const department = await Department.findById(batch.department);
-      const role = await Role.findById(batch.role);
+    // Populate department and role names
+    const populatedBatches = await Promise.all(
+      batches.map(async (batch) => {
+        const department = await Department.findById(batch.department);
+        const role = await Role.findById(batch.role);
 
-      return {
-        ...batch,
-        department: department ? department.name : "Unknown",
-        role: role ? role.name : "Unknown",
-      };
-    })
-  );
+        return {
+          ...batch,
+          department: department ? department.name : "Unknown",
+          role: role ? role.name : "Unknown",
+        };
+      })
+    );
 
-  res.json({
-    success: true,
-    data: {
-      batches: populatedBatches,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit),
+    res.json({
+      success: true,
+      data: {
+        batches: populatedBatches,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit),
+        },
       },
-    },
-  });
+    });
+  } else {
+    // Individual invitation search
+    const invitations = await Invitation.find(filter)
+      .populate("department", "name")
+      .populate("role", "name")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Invitation.countDocuments(filter);
+
+    res.json({
+      success: true,
+      data: {
+        invitations: invitations.map((inv) => ({
+          _id: inv._id,
+          email: inv.email,
+          firstName: inv.firstName,
+          lastName: inv.lastName,
+          code: inv.code,
+          status: inv.status,
+          emailSent: inv.emailSent,
+          emailSentAt: inv.emailSentAt,
+          createdAt: inv.createdAt,
+          batchId: inv.batchId,
+          batchName: inv.batchName,
+          department: inv.department,
+          role: inv.role,
+        })),
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      },
+    });
+  }
 });
 
 // @desc    Create bulk invitations from CSV with detailed employee data
@@ -1164,7 +1277,6 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
     "lastName",
     "department",
     "role",
-    "salaryGrade",
   ];
   const missingFields = requiredFields.filter(
     (field) => !csvData[0] || !csvData[0].hasOwnProperty(field)
@@ -1184,7 +1296,6 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
         "lastName",
         "department",
         "role",
-        "salaryGrade",
         "jobTitle",
         "phone",
         "employeeId",
@@ -1272,14 +1383,6 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
         continue;
       }
 
-      // Validate salary grade
-      if (!SALARY_GRADES.includes(row.salaryGrade)) {
-        const errorMsg = `Row ${rowNumber}: Invalid salary grade "${row.salaryGrade}"`;
-        console.log(`❌ [CSV_BULK_INVITATION] ${errorMsg}`);
-        errors.push(errorMsg);
-        continue;
-      }
-
       // Determine invitation status based on approval requirements and role level
       let invitationStatus = "active";
       if (requiresApproval || role.level >= 80) {
@@ -1297,7 +1400,6 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
         lastName: row.lastName,
         position: row.jobTitle || row.position || "",
         jobTitle: row.jobTitle || "",
-        salaryGrade: row.salaryGrade,
         phone: row.phone || "",
         employeeId: row.employeeId || "",
         department: department._id,
@@ -1331,7 +1433,6 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
           invitation.email,
           `${invitation.firstName} ${invitation.lastName}`,
           invitation.code,
-          "ELRA",
           role.name,
           department.name
         );
@@ -1362,7 +1463,6 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
         {
           email: row.email,
           batchId: batchId,
-          salaryGrade: row.salaryGrade,
           department: department.name,
           role: role.name,
           status: invitationStatus,
@@ -1414,6 +1514,33 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
   console.log(
     "🎉 [CSV_BULK_INVITATION] CSV bulk invitation creation completed"
   );
+
+  // Send in-app notification to the creator
+  try {
+    await notificationService.createNotification({
+      recipient: currentUser._id,
+      type: "BULK_INVITATION_CREATED",
+      title: "CSV Bulk Invitations Created Successfully",
+      message: `Successfully processed ${successfulInvitations} invitations from CSV. ${pendingApproval} pending approval, ${autoApproved} auto-approved.`,
+      priority: "medium",
+      data: {
+        batchId: batchId,
+        batchName: batchNameFinal,
+        totalRows: csvData.length,
+        successfulInvitations: successfulInvitations,
+        pendingApproval: pendingApproval,
+        autoApproved: autoApproved,
+        errors: errors.length,
+        requiresApproval: requiresApproval,
+      },
+    });
+    console.log("✅ [CSV_BULK_INVITATION] In-app notification sent to creator");
+  } catch (notificationError) {
+    console.error(
+      "❌ [CSV_BULK_INVITATION] Failed to send in-app notification:",
+      notificationError
+    );
+  }
 
   res.status(201).json({
     success: true,
@@ -1613,6 +1740,51 @@ export const approveBulkInvitations = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Get next batch number
+// @route   GET /api/invitations/next-batch-number
+// @access  Private (Super Admin)
+export const getNextBatchNumber = asyncHandler(async (req, res) => {
+  console.log("🚀 [NEXT_BATCH] Getting next batch number...");
+
+  const currentUser = req.user;
+  console.log("👤 [NEXT_BATCH] Current user:", {
+    id: currentUser._id,
+    email: currentUser.email,
+    roleLevel: currentUser.role?.level,
+    roleName: currentUser.role?.name,
+  });
+
+  // Check if user is super admin
+  if (currentUser.role.level < 1000) {
+    console.log("❌ [NEXT_BATCH] Permission denied - not super admin");
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Super admin privileges required.",
+    });
+  }
+
+  try {
+    const nextBatchNumber = await Invitation.generateSequentialBatchNumber();
+    console.log(
+      "✅ [NEXT_BATCH] Generated next batch number:",
+      nextBatchNumber
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        nextBatchNumber,
+      },
+    });
+  } catch (error) {
+    console.error("❌ [NEXT_BATCH] Error generating batch number:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate next batch number",
+    });
+  }
+});
+
 // @desc    Get pending CSV bulk invitations for approval
 // @route   GET /api/invitations/pending-approval
 // @access  Private (Super Admin)
@@ -1691,4 +1863,262 @@ export const getPendingApprovalInvitations = asyncHandler(async (req, res) => {
       },
     },
   });
+});
+
+// @desc    Retry failed emails for a batch
+// @route   POST /api/invitations/batch/:batchId/retry-emails
+// @access  Private (Super Admin)
+export const retryFailedEmails = asyncHandler(async (req, res) => {
+  console.log("🔄 [RETRY_EMAILS] Starting email retry for batch...");
+
+  const currentUser = req.user;
+  const { batchId } = req.params;
+
+  console.log("👤 [RETRY_EMAILS] Current user:", {
+    id: currentUser._id,
+    email: currentUser.email,
+    roleLevel: currentUser.role?.level,
+  });
+
+  // Check if user is super admin
+  if (currentUser.role.level < 1000) {
+    console.log("❌ [RETRY_EMAILS] Permission denied - not super admin");
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Super admin privileges required.",
+    });
+  }
+
+  // Find all invitations in the batch that failed to send emails
+  const failedInvitations = await Invitation.find({
+    batchId: batchId,
+    emailSent: false,
+    status: { $in: ["active", "sent"] },
+  }).populate("department role");
+
+  if (failedInvitations.length === 0) {
+    console.log("ℹ️ [RETRY_EMAILS] No failed emails found for batch:", batchId);
+    return res.status(200).json({
+      success: true,
+      message: "No failed emails found to retry",
+      data: {
+        batchId: batchId,
+        statistics: {
+          totalFailed: 0,
+          emailsSent: 0,
+          emailsFailed: 0,
+        },
+      },
+    });
+  }
+
+  console.log(
+    `📧 [RETRY_EMAILS] Found ${failedInvitations.length} failed emails to retry`
+  );
+
+  const emailResults = [];
+  const errors = [];
+
+  for (let i = 0; i < failedInvitations.length; i++) {
+    const invitation = failedInvitations[i];
+    console.log(
+      `📧 [RETRY_EMAILS] Retrying email ${i + 1}/${failedInvitations.length}: ${
+        invitation.email
+      }`
+    );
+
+    try {
+      // Send invitation email
+      const emailResult = await sendInvitationEmail(
+        invitation.email,
+        `${invitation.firstName} ${invitation.lastName}`,
+        invitation.code,
+        "ELRA",
+        invitation.role?.name || "User",
+        invitation.department?.name || "Department"
+      );
+
+      if (emailResult.success) {
+        await invitation.markEmailSent();
+        emailResults.push({
+          email: invitation.email,
+          status: "sent",
+          messageId: emailResult.messageId,
+        });
+        console.log(
+          `✅ [RETRY_EMAILS] Email sent successfully to ${invitation.email}`
+        );
+      } else {
+        await invitation.markEmailFailed(emailResult.error);
+        emailResults.push({
+          email: invitation.email,
+          status: "failed",
+          error: emailResult.error,
+        });
+        console.log(
+          `❌ [RETRY_EMAILS] Email failed for ${invitation.email}:`,
+          emailResult.error
+        );
+      }
+    } catch (error) {
+      const errorMsg = `Error retrying email for ${invitation.email}: ${error.message}`;
+      console.log(`❌ [RETRY_EMAILS] ${errorMsg}`);
+      errors.push(errorMsg);
+      emailResults.push({
+        email: invitation.email,
+        status: "failed",
+        error: error.message,
+      });
+    }
+  }
+
+  // Calculate statistics
+  const emailsSent = emailResults.filter((r) => r.status === "sent").length;
+  const emailsFailed = emailResults.filter((r) => r.status === "failed").length;
+
+  console.log("📊 [RETRY_EMAILS] Retry statistics:", {
+    totalFailed: failedInvitations.length,
+    emailsSent,
+    emailsFailed,
+    batchId,
+  });
+
+  console.log("🎉 [RETRY_EMAILS] Email retry completed");
+
+  res.status(200).json({
+    success: true,
+    message: `Email retry completed for batch ${batchId}`,
+    data: {
+      batchId: batchId,
+      statistics: {
+        totalFailed: failedInvitations.length,
+        emailsSent: emailsSent,
+        emailsFailed: emailsFailed,
+      },
+      emailResults: emailResults,
+      errors: errors,
+    },
+  });
+});
+
+// @desc    Retry failed email for a single invitation
+// @route   POST /api/invitations/:invitationId/retry-email
+// @access  Private (Super Admin)
+export const retrySingleEmail = asyncHandler(async (req, res) => {
+  console.log("🔄 [RETRY_SINGLE_EMAIL] Starting single email retry...");
+
+  const currentUser = req.user;
+  const { invitationId } = req.params;
+
+  console.log("👤 [RETRY_SINGLE_EMAIL] Current user:", {
+    id: currentUser._id,
+    email: currentUser.email,
+    roleLevel: currentUser.role?.level,
+  });
+
+  // Check if user is super admin
+  if (currentUser.role.level < 1000) {
+    console.log("❌ [RETRY_SINGLE_EMAIL] Permission denied - not super admin");
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Super admin privileges required.",
+    });
+  }
+
+  // Find the invitation
+  const invitation = await Invitation.findById(invitationId).populate(
+    "department role"
+  );
+
+  if (!invitation) {
+    console.log("❌ [RETRY_SINGLE_EMAIL] Invitation not found:", invitationId);
+    return res.status(404).json({
+      success: false,
+      message: "Invitation not found",
+    });
+  }
+
+  console.log(
+    `📧 [RETRY_SINGLE_EMAIL] Retrying email for invitation: ${invitation.email}`
+  );
+
+  try {
+    // Send invitation email
+    const emailResult = await sendInvitationEmail(
+      invitation.email,
+      `${invitation.firstName} ${invitation.lastName}`,
+      invitation.code,
+      "ELRA",
+      invitation.role?.name || "User",
+      invitation.department?.name || "Department"
+    );
+
+    if (emailResult.success) {
+      await invitation.markEmailSent();
+      console.log(
+        `✅ [RETRY_SINGLE_EMAIL] Email sent successfully to ${invitation.email}`
+      );
+
+      res.status(200).json({
+        success: true,
+        message: `Email sent successfully to ${invitation.email}`,
+        data: {
+          invitation: {
+            id: invitation._id,
+            email: invitation.email,
+            firstName: invitation.firstName,
+            lastName: invitation.lastName,
+            status: invitation.status,
+            emailSent: true,
+            emailSentAt: invitation.emailSentAt,
+          },
+          emailResult: {
+            status: "sent",
+            messageId: emailResult.messageId,
+          },
+        },
+      });
+    } else {
+      await invitation.markEmailFailed(emailResult.error);
+      console.log(
+        `❌ [RETRY_SINGLE_EMAIL] Email failed for ${invitation.email}:`,
+        emailResult.error
+      );
+
+      res.status(400).json({
+        success: false,
+        message: `Failed to send email to ${invitation.email}`,
+        data: {
+          invitation: {
+            id: invitation._id,
+            email: invitation.email,
+            status: invitation.status,
+            emailSent: false,
+            emailError: emailResult.error,
+          },
+          emailResult: {
+            status: "failed",
+            error: emailResult.error,
+          },
+        },
+      });
+    }
+  } catch (error) {
+    const errorMsg = `Error retrying email for ${invitation.email}: ${error.message}`;
+    console.log(`❌ [RETRY_SINGLE_EMAIL] ${errorMsg}`);
+
+    res.status(500).json({
+      success: false,
+      message: errorMsg,
+      data: {
+        invitation: {
+          id: invitation._id,
+          email: invitation.email,
+          status: invitation.status,
+          emailSent: false,
+          emailError: error.message,
+        },
+      },
+    });
+  }
 });

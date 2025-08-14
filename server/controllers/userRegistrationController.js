@@ -52,7 +52,16 @@ export const registerFromInvitation = asyncHandler(async (req, res) => {
     code: invitationCode.toUpperCase(),
     status: "active",
     expiresAt: { $gt: new Date() },
-  }).populate("company department role");
+  }).populate("department role");
+
+  console.log("🔍 Found invitation:", {
+    id: invitation?._id,
+    code: invitation?.code,
+    email: invitation?.email,
+    status: invitation?.status,
+    role: invitation?.role?._id,
+    department: invitation?.department?._id,
+  });
 
   if (!invitation) {
     return res.status(400).json({
@@ -74,7 +83,9 @@ export const registerFromInvitation = asyncHandler(async (req, res) => {
   const username = invitation.email.split("@")[0];
 
   // Create user with invitation data
-  const user = await User.create({
+  let user;
+
+  const userData = {
     username: username,
     firstName: firstName,
     lastName: lastName,
@@ -87,16 +98,61 @@ export const registerFromInvitation = asyncHandler(async (req, res) => {
     jobTitle: invitation.jobTitle,
     salaryGrade: invitation.salaryGrade,
     employeeId: invitation.employeeId,
-    company: invitation.company._id,
     status: "ACTIVE",
-    isEmailVerified: true, // Since they came through invitation
+    isEmailVerified: true,
+  };
+
+  console.log("👤 Creating user with data:", {
+    username: userData.username,
+    email: userData.email,
+    firstName: userData.firstName,
+    lastName: userData.lastName,
+    role: userData.role,
+    department: userData.department,
   });
 
+  try {
+    user = await User.create(userData);
+
+    console.log("✅ User created successfully:", {
+      userId: user._id,
+      email: user.email,
+      username: user.username,
+    });
+  } catch (error) {
+    console.error("❌ Error creating user:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create user account. Please try again.",
+      error: error.message,
+    });
+  }
+
+  // Verify user was created
+  if (!user || !user._id) {
+    console.error("❌ User creation failed - no user object returned");
+    return res.status(500).json({
+      success: false,
+      message: "Failed to create user account. Please try again.",
+    });
+  }
+
   // Mark invitation as used
-  invitation.status = "used";
-  invitation.usedBy = user._id;
-  invitation.usedAt = new Date();
-  await invitation.save();
+  try {
+    invitation.status = "used";
+    invitation.usedBy = user._id;
+    invitation.usedAt = new Date();
+    await invitation.save();
+
+    console.log("✅ Invitation marked as used:", {
+      invitationId: invitation._id,
+      usedBy: user._id,
+      usedAt: invitation.usedAt,
+    });
+  } catch (error) {
+    console.error("❌ Error marking invitation as used:", error);
+    // Continue anyway since user was created successfully
+  }
 
   // Log audit
   await AuditService.logUserAction(
@@ -161,7 +217,7 @@ export const getInvitationDetails = asyncHandler(async (req, res) => {
     code: code.toUpperCase(),
     status: "active",
     expiresAt: { $gt: new Date() },
-  }).populate("company department role");
+  }).populate("department role");
 
   if (!invitation) {
     return res.status(400).json({
@@ -196,10 +252,6 @@ export const getInvitationDetails = asyncHandler(async (req, res) => {
           description: invitation.department.description,
         },
         salaryGrade: invitation.salaryGrade,
-        company: {
-          name: invitation.company.name,
-          description: invitation.company.description,
-        },
         expiresAt: invitation.expiresAt,
       },
     },
@@ -224,7 +276,7 @@ export const validateInvitationCode = asyncHandler(async (req, res) => {
     code: code.toUpperCase(),
     status: "active",
     expiresAt: { $gt: new Date() },
-  }).populate("company department role");
+  }).populate("department role");
 
   if (!invitation) {
     return res.status(400).json({
@@ -250,7 +302,6 @@ export const validateInvitationCode = asyncHandler(async (req, res) => {
       role: invitation.role.name,
       department: invitation.department.name,
       salaryGrade: invitation.salaryGrade,
-      company: invitation.company.name,
       expiresAt: invitation.expiresAt,
       invitationDetails: {
         firstName: invitation.firstName,

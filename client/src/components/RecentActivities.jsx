@@ -19,7 +19,7 @@ import {
   HiArrowLeftOnRectangle,
   HiArrowRightOnRectangle,
   HiKey,
-  HiBuildingOffice,
+  HiOfficeBuilding,
   HiEnvelope,
   HiArrowDownTray,
   HiShare,
@@ -114,7 +114,7 @@ const RecentActivities = ({
       label: "Role Changed",
     },
     USER_DEPARTMENT_CHANGED: {
-      icon: HiBuildingOffice,
+      icon: HiOfficeBuilding,
       color: "text-indigo-600",
       bgColor: "bg-indigo-100",
       label: "Department Changed",

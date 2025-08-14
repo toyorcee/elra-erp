@@ -47,12 +47,11 @@ const Dashboard = () => {
   const { module } = useParams();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Get user role level
   const getUserRoleLevel = () => {
     if (!user) return 0;
 
-    // Handle both string role and object role
     const roleValue = user.role?.name || user.role;
 
     switch (roleValue) {
@@ -189,6 +188,15 @@ const Dashboard = () => {
     }
   }, [authLoading, user]);
 
+  // Update current time every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
   // Add keyboard shortcuts for navigation
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -234,7 +242,7 @@ const Dashboard = () => {
         } border-2 rounded-2xl p-6`}
         onClick={handleModuleClick}
       >
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center mb-4">
           <div
             className={`p-3 rounded-xl ${
               isActive ? "bg-white/20" : `${module.bgColor} ${module.color}`
@@ -243,27 +251,6 @@ const Dashboard = () => {
             <IconComponent
               className={`h-8 w-8 ${isActive ? "text-white" : ""}`}
             />
-          </div>
-          <div
-            className={`text-xs font-semibold px-3 py-1 rounded-full ${
-              isActive
-                ? "bg-white/20 text-white"
-                : `${module.bgColor} ${module.color}`
-            }`}
-          >
-            {isActive
-              ? "ACTIVE"
-              : module.minLevel === 1000
-              ? "SUPER ADMIN"
-              : module.minLevel === 800
-              ? "ADMIN"
-              : module.minLevel === 600
-              ? "MANAGER+"
-              : module.minLevel === 400
-              ? "SUPERVISOR+"
-              : module.minLevel === 300
-              ? "USER+"
-              : "GUEST+"}
           </div>
         </div>
 
@@ -815,17 +802,42 @@ const Dashboard = () => {
       <div className="space-y-8">
         {/* Welcome Section */}
         <div className="bg-[var(--elra-primary)] rounded-2xl p-8 text-white shadow-xl">
-          <div className="flex items-center space-x-4 mb-6">
-            <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-              <HomeIcon className="h-8 w-8" />
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                <HomeIcon className="h-8 w-8" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">
+                  Welcome back, {user?.firstName || "User"}!
+                </h1>
+                <p className="text-white/80 text-lg">
+                  Access your ERP modules and manage your business operations
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold">
-                Welcome back, {user?.firstName || "User"}!
-              </h1>
-              <p className="text-white/80 text-lg">
-                Access your ERP modules and manage your business operations
-              </p>
+
+            {/* Date and Time */}
+            <div className="text-right">
+              <div className="flex items-center space-x-2 mb-1">
+                <ClockIcon className="h-5 w-5 text-white/80" />
+                <span className="text-lg font-semibold">
+                  {currentTime.toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                    hour12: true,
+                  })}
+                </span>
+              </div>
+              <div className="text-white/80 text-sm">
+                {currentTime.toLocaleDateString("en-US", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </div>
             </div>
           </div>
 
@@ -838,80 +850,13 @@ const Dashboard = () => {
             </div>
             <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
               <div className="text-2xl font-bold">
-                {user?.role?.name || "USER"}
+                {(user?.role?.name || "USER").replace(/_/g, " ")}
               </div>
               <div className="text-white/80 text-sm">Your Role</div>
             </div>
             <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
               <div className="text-2xl font-bold">{roleLevel}</div>
               <div className="text-white/80 text-sm">Access Level</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-[var(--elra-text-secondary)]">
-                  Total Users
-                </p>
-                <p className="text-2xl font-bold text-[var(--elra-text-primary)]">
-                  1,234
-                </p>
-              </div>
-              <div className="p-3 bg-[var(--elra-secondary-3)] rounded-xl">
-                <UsersIcon className="h-6 w-6 text-[var(--elra-primary)]" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-[var(--elra-text-secondary)]">
-                  Active Projects
-                </p>
-                <p className="text-2xl font-bold text-[var(--elra-text-primary)]">
-                  56
-                </p>
-              </div>
-              <div className="p-3 bg-[var(--elra-secondary-3)] rounded-xl">
-                <FolderIcon className="h-6 w-6 text-[var(--elra-primary)]" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-[var(--elra-text-secondary)]">
-                  Revenue
-                </p>
-                <p className="text-2xl font-bold text-[var(--elra-text-primary)]">
-                  $89.4K
-                </p>
-              </div>
-              <div className="p-3 bg-[var(--elra-secondary-3)] rounded-xl">
-                <CurrencyDollarIcon className="h-6 w-6 text-[var(--elra-primary)]" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-[var(--elra-text-secondary)]">
-                  Tasks
-                </p>
-                <p className="text-2xl font-bold text-[var(--elra-text-primary)]">
-                  234
-                </p>
-              </div>
-              <div className="p-3 bg-[var(--elra-secondary-3)] rounded-xl">
-                <ClipboardDocumentListIcon className="h-6 w-6 text-[var(--elra-primary)]" />
-              </div>
             </div>
           </div>
         </div>
@@ -929,19 +874,6 @@ const Dashboard = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {accessibleModules.map(renderModuleCard)}
-          </div>
-
-          {/* Quick Access to All Modules */}
-          <div className="mt-6 pt-6 border-t border-gray-100">
-            <div className="text-center">
-              <button
-                onClick={() => (window.location.href = "/modules")}
-                className="inline-flex items-center space-x-2 px-6 py-3 bg-[var(--elra-secondary-3)] text-[var(--elra-primary)] rounded-xl hover:bg-[var(--elra-secondary-2)] transition-colors font-medium"
-              >
-                <CubeIcon className="h-5 w-5" />
-                <span>View All Modules</span>
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -1022,64 +954,11 @@ const Dashboard = () => {
     );
   }
 
-  // Floating Action Button for Module Navigation
-  const renderFloatingActionButton = () => {
-    if (!isModuleView || !currentModule) return null;
-
-    const currentModuleData = accessibleModules.find((m) => m.key === module);
-
-    return (
-      <div className="fixed bottom-6 right-6 z-50">
-        <div className="flex flex-col space-y-3">
-          {/* Quick Module Switcher */}
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 text-center">
-              Quick Access
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => (window.location.href = "/dashboard")}
-                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-xs font-medium text-gray-700"
-              >
-                Dashboard
-              </button>
-              <button
-                onClick={() => (window.location.href = "/modules")}
-                className="p-2 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors text-xs font-medium text-emerald-700"
-              >
-                All Modules
-              </button>
-            </div>
-          </div>
-
-          {/* Current Module Info */}
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 p-4">
-            <div className="text-center">
-              <div
-                className={`w-12 h-12 mx-auto mb-2 rounded-full ${
-                  currentModuleData?.bgColor || "bg-gray-100"
-                } flex items-center justify-center`}
-              >
-                {currentModuleData?.icon && (
-                  <currentModuleData.icon className="h-6 w-6 text-gray-600" />
-                )}
-              </div>
-              <p className="text-xs font-medium text-gray-700">
-                {currentModuleData?.label || "Module"}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {renderDashboardContent()}
       </div>
-      {renderFloatingActionButton()}
 
       {isModuleLoading && (
         <div className="fixed inset-0 bg-[var(--elra-bg-light)] flex items-center justify-center z-50">

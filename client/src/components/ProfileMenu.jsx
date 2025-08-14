@@ -51,20 +51,12 @@ const ProfileMenu = () => {
 
   const navigateToSettings = () => {
     setIsOpen(false);
-    if (user?.role?.level >= 100) {
-      navigate("/admin/settings");
-    } else {
-      navigate("/dashboard/settings");
-    }
+    navigate("/dashboard/settings");
   };
 
   const navigateToNotifications = () => {
     setIsOpen(false);
-    if (user?.role?.level >= 100) {
-      navigate("/admin/notifications");
-    } else {
-      navigate("/dashboard/notifications");
-    }
+    navigate("/dashboard/notifications");
   };
 
   return (

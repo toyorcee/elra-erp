@@ -1,6 +1,7 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Login, Unauthorized } from "./pages/auth";
+import Welcome from "./pages/auth/Welcome";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
 import RetrieveCredentials from "./pages/auth/RetrieveCredentials";
@@ -13,6 +14,7 @@ import HRRoles from "./pages/user/modules/hr/HRRoles";
 import HRUsers from "./pages/user/modules/hr/HRUsers";
 import SalaryGradeManagement from "./pages/user/modules/payroll/SalaryGradeManagement";
 import Notifications from "./pages/shared/Notifications";
+import Settings from "./pages/shared/Settings";
 // Admin imports commented out - admin folder deleted
 // import {
 //   Dashboard as AdminDashboard,
@@ -50,6 +52,7 @@ const AppRoutes = () => {
       {/* Public routes */}
       <Route path="/" element={<Login />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/welcome" element={<Welcome />} />
       <Route path="/system-setup" element={<SystemSetupOnboarding />} />
       {/* Register route disabled for internal ministry system */}
       {/* <Route path="/register" element={<Register />} /> */}
@@ -107,6 +110,7 @@ const AppRoutes = () => {
         <Route index element={<Dashboard />} />
         <Route path="documents" element={<Documents />} />
         <Route path="notifications" element={<Notifications />} />
+        <Route path="settings" element={<Settings />} />
 
         {/* Module routes - dynamic module dashboards */}
         <Route path="modules/:module" element={<Dashboard />} />

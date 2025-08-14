@@ -42,6 +42,47 @@ export const userModulesAPI = {
       }
     },
 
+    getNextBatchNumber: async () => {
+      try {
+        const response = await api.get("/invitations/next-batch-number");
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [invitationsAPI] Error fetching next batch number:",
+          error
+        );
+        throw error;
+      }
+    },
+    retryFailedEmails: async (batchId) => {
+      try {
+        const response = await api.post(
+          `/invitations/batch/${batchId}/retry-emails`
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [invitationsAPI] Error retrying failed emails:",
+          error
+        );
+        throw error;
+      }
+    },
+    retrySingleEmail: async (invitationId) => {
+      try {
+        const response = await api.post(
+          `/invitations/${invitationId}/retry-email`
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [invitationsAPI] Error retrying single email:",
+          error
+        );
+        throw error;
+      }
+    },
+
     // Create bulk invitations
     createBulkInvitations: async (invitationData) => {
       try {
@@ -120,11 +161,10 @@ export const userModulesAPI = {
       }
     },
 
-    // Search batches
-    searchBatches: async (query, page = 1, limit = 10) => {
+    searchBatches: async (query, page = 1, limit = 10, type = "batch") => {
       try {
         const response = await api.get("/invitations/search-batches", {
-          params: { query, page, limit },
+          params: { query, page, limit, type },
         });
         return response.data;
       } catch (error) {

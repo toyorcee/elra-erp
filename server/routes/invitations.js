@@ -15,18 +15,18 @@ import {
   createBulkInvitationsFromCSV,
   approveBulkInvitations,
   getPendingApprovalInvitations,
+  getNextBatchNumber,
+  retryFailedEmails,
+  retrySingleEmail,
 } from "../controllers/invitationController.js";
 import { protect, authorize } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// Public route for verifying invitation codes (no authentication required)
 router.post("/verify", verifyInvitationCode);
 
-// All other routes require authentication
 router.use(protect);
 
-// Validation middleware
 const createInvitationValidation = [
   body("email")
     .isEmail()
@@ -62,6 +62,9 @@ router.get("/", getInvitations);
 router.get("/stats", getInvitationStats);
 
 router.get("/salary-grades", getSalaryGrades);
+router.get("/next-batch-number", getNextBatchNumber);
+router.post("/batch/:batchId/retry-emails", retryFailedEmails);
+router.post("/:invitationId/retry-email", retrySingleEmail);
 router.post("/bulk-create", createBulkInvitations);
 router.post("/bulk-csv", createBulkInvitationsFromCSV);
 router.get("/pending-approval", getPendingApprovalInvitations);

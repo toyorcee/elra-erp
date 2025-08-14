@@ -23,7 +23,7 @@ const NotificationBell = ({ className = "" }) => {
   } = useQuery({
     queryKey: ["unreadNotifications"],
     queryFn: notificationService.getUnreadCount,
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 30000,
   });
 
   const unreadCount = unreadData?.data?.count || 0;
@@ -45,7 +45,6 @@ const NotificationBell = ({ className = "" }) => {
     }
   }, [notificationsData]);
 
-  // Handle click outside to close dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -57,7 +56,6 @@ const NotificationBell = ({ className = "" }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Handle real-time notifications (Socket.IO)
   useEffect(() => {
     if (!socket || !isConnected) return;
 
@@ -66,7 +64,6 @@ const NotificationBell = ({ className = "" }) => {
       setNotifications((prev) => [notification, ...prev]);
       refetchUnread();
 
-      // Show toast notification
       toast.info(notification.message, {
         position: "top-right",
         autoClose: 5000,
@@ -77,7 +74,6 @@ const NotificationBell = ({ className = "" }) => {
       });
     };
 
-    // Listen for real-time notifications
     socket.on("newNotification", handleNewNotification);
 
     return () => {
@@ -87,14 +83,20 @@ const NotificationBell = ({ className = "" }) => {
 
   const handleMarkAsRead = async (notificationId) => {
     try {
-      await notificationService.markAsRead(notificationId);
-      setNotifications((prev) =>
-        prev.map((notif) =>
-          notif._id === notificationId ? { ...notif, isRead: true } : notif
-        )
-      );
-      refetchUnread();
+      const response = await notificationService.markAsRead(notificationId);
+      if (response.success) {
+        setNotifications((prev) =>
+          prev.map((notif) =>
+            notif._id === notificationId ? { ...notif, read: true } : notif
+          )
+        );
+        refetchUnread();
+        refetchNotifications();
+      } else {
+        throw new Error(response.message || "Failed to mark as read");
+      }
     } catch (error) {
+      console.error("Error marking as read:", error);
       toast.error("Failed to mark notification as read");
     }
   };
@@ -102,13 +104,19 @@ const NotificationBell = ({ className = "" }) => {
   const handleMarkAllAsRead = async () => {
     try {
       setLoading(true);
-      await notificationService.markAllAsRead();
-      setNotifications((prev) =>
-        prev.map((notif) => ({ ...notif, isRead: true }))
-      );
-      refetchUnread();
-      toast.success("All notifications marked as read");
+      const response = await notificationService.markAllAsRead();
+      if (response.success) {
+        setNotifications((prev) =>
+          prev.map((notif) => ({ ...notif, read: true }))
+        );
+        refetchUnread();
+        refetchNotifications();
+        toast.success("All notifications marked as read");
+      } else {
+        throw new Error(response.message || "Failed to mark all as read");
+      }
     } catch (error) {
+      console.error("Error marking all as read:", error);
       toast.error("Failed to mark all notifications as read");
     } finally {
       setLoading(false);
@@ -130,7 +138,6 @@ const NotificationBell = ({ className = "" }) => {
 
   const handleNotificationClick = (notification) => {
     setIsOpen(false);
-    // Navigate to notifications page with the specific notification selected
     navigate("/dashboard/notifications", {
       state: { selectedNotificationId: notification._id },
     });
@@ -185,7 +192,6 @@ const NotificationBell = ({ className = "" }) => {
 
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
-      {/* Notification Bell Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="relative p-2.5 rounded-xl bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
@@ -197,7 +203,6 @@ const NotificationBell = ({ className = "" }) => {
           <MdNotifications className="w-5 h-5" />
         )}
 
-        {/* Unread Badge */}
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-lg border-2 border-white">
             {unreadCount > 99 ? "99+" : unreadCount}
@@ -205,10 +210,8 @@ const NotificationBell = ({ className = "" }) => {
         )}
       </button>
 
-      {/* Dropdown */}
       {isOpen && (
         <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-hidden">
-          {/* Header */}
           <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-gray-900">
@@ -226,7 +229,6 @@ const NotificationBell = ({ className = "" }) => {
             </div>
           </div>
 
-          {/* Notifications List */}
           <div className="max-h-80 overflow-y-auto">
             {notificationsLoading ? (
               <div className="p-4 text-center text-gray-500">
@@ -270,7 +272,7 @@ const NotificationBell = ({ className = "" }) => {
                           {notification.message}
                         </p>
                         <div className="flex items-center space-x-2 mt-2">
-                          {!notification.isRead && (
+                          {!notification.read && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -299,13 +301,11 @@ const NotificationBell = ({ className = "" }) => {
             )}
           </div>
 
-          {/* Footer */}
           {notifications.length > 0 && (
             <div className="px-4 py-2 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={() => {
                   setIsOpen(false);
-                  // Navigate to full notifications page
                   navigate("/dashboard/notifications");
                 }}
                 className="text-xs text-blue-600 hover:text-blue-800 font-medium w-full text-center"

@@ -59,11 +59,6 @@ const invitationSchema = new mongoose.Schema(
       trim: true,
     },
 
-    salaryGrade: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "SalaryGrade",
-    },
-
     phone: {
       type: String,
       trim: true,
@@ -231,21 +226,21 @@ invitationSchema.statics.generateSequentialBatchNumber = async function () {
     let nextNumber = 1;
 
     if (lastInvitation && lastInvitation.batchId) {
-      const match = lastInvitation.batchId.match(/BATCH_(\d+)$/);
+      const match = lastInvitation.batchId.match(/BATCH(\d+)$/);
       if (match) {
         nextNumber = parseInt(match[1]) + 1;
       } else {
-        const timestampMatch = lastInvitation.batchId.match(/BATCH_(\d+)_/);
+        const timestampMatch = lastInvitation.batchId.match(/BATCH(\d+)_/);
         if (timestampMatch) {
           nextNumber = 1;
         }
       }
     }
 
-    return `BATCH_${nextNumber.toString().padStart(3, "0")}`;
+    return `BATCH${nextNumber.toString().padStart(3, "0")}`;
   } catch (error) {
     console.error("Error generating sequential batch number:", error);
-    return `BATCH_${Date.now()}_${crypto
+    return `BATCH${Date.now()}_${crypto
       .randomBytes(4)
       .toString("hex")
       .toUpperCase()}`;
@@ -269,7 +264,6 @@ invitationSchema.methods.markAsUsed = function (userId) {
 invitationSchema.methods.markEmailSent = function () {
   this.emailSent = true;
   this.emailSentAt = new Date();
-  this.status = "sent";
   return this.save();
 };
 
@@ -277,7 +271,6 @@ invitationSchema.methods.markEmailSent = function () {
 invitationSchema.methods.markEmailFailed = function (error) {
   this.emailSent = false;
   this.emailError = error;
-  this.status = "failed";
   return this.save();
 };
 

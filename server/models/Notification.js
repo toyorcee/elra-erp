@@ -30,6 +30,8 @@ const notificationSchema = new mongoose.Schema(
         "DOCUMENT_UPLOAD_PERMISSION",
         "USER_REGISTRATION",
         "MESSAGE_RECEIVED",
+        "INVITATION_CREATED",
+        "BULK_INVITATION_CREATED",
       ],
       required: true,
     },

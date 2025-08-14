@@ -11,7 +11,6 @@ const createTransporter = () => {
   });
 };
 
-// Simple email template with ELRA brand colors
 const createEmailTemplate = (
   title,
   content,
@@ -19,11 +18,7 @@ const createEmailTemplate = (
   actionUrl,
   footerText
 ) => {
-  const currentDate = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const currentYear = new Date().getFullYear();
 
   return `
     <!DOCTYPE html>
@@ -45,6 +40,7 @@ const createEmailTemplate = (
                 background: #ffffff;
                 min-height: 100vh;
                 padding: 20px;
+                color: #000000;
             }
             
             .email-container {
@@ -64,14 +60,34 @@ const createEmailTemplate = (
                 color: white;
             }
             
-            .logo {
+            .logo-container {
                 margin-bottom: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 15px;
             }
             
-            .logo svg {
-                height: 80px;
+            .logo-image {
+                height: 60px;
                 width: auto;
-                max-width: 300px;
+                max-width: 200px;
+            }
+            
+            .logo-text {
+                font-size: 48px;
+                font-weight: 800;
+                letter-spacing: -2px;
+                color: white;
+                margin: 0;
+            }
+            
+            .logo-subtitle {
+                font-size: 16px;
+                font-weight: 500;
+                color: white;
+                letter-spacing: 0.5px;
+                margin-top: 8px;
             }
             
             .content {
@@ -81,18 +97,18 @@ const createEmailTemplate = (
             }
             
             .title {
-                font-size: 24px;
+                font-size: 28px;
                 font-weight: 700;
                 color: #0d6449;
-                margin-bottom: 20px;
+                margin-bottom: 24px;
                 text-align: center;
             }
             
             .message {
                 font-size: 16px;
                 color: #000000;
-                margin-bottom: 30px;
-                line-height: 1.6;
+                margin-bottom: 32px;
+                line-height: 1.7;
             }
             
             .message strong {
@@ -100,24 +116,53 @@ const createEmailTemplate = (
                 font-weight: 600;
             }
             
+            .info-box {
+                background: #ffffff;
+                border: 2px solid #0d6449;
+                border-radius: 8px;
+                padding: 24px;
+                margin: 24px 0;
+            }
+            
+            .info-title {
+                font-weight: 600;
+                color: #0d6449;
+                font-size: 18px;
+                margin-bottom: 16px;
+            }
+            
+            .info-item {
+                margin-bottom: 8px;
+                font-size: 15px;
+                color: #000000;
+            }
+            
+            .info-item strong {
+                color: #0d6449;
+                font-weight: 600;
+                min-width: 100px;
+            }
+            
             .action-button {
                 display: inline-block;
                 background: #0d6449;
-                color: white;
+                color: white !important;
                 text-decoration: none;
-                padding: 14px 28px;
-                border-radius: 6px;
+                padding: 16px 32px;
+                border-radius: 8px;
                 font-weight: 600;
                 font-size: 16px;
                 text-align: center;
-                margin: 20px 0;
+                margin: 24px 0;
+                border: none;
+                cursor: pointer;
             }
             
             .footer {
-                background: #f9fafb;
-                padding: 20px 30px;
+                background: #ffffff;
+                padding: 24px 30px;
                 text-align: center;
-                color: #6b7280;
+                color: #000000;
                 font-size: 14px;
                 border-top: 1px solid #e5e7eb;
             }
@@ -130,7 +175,29 @@ const createEmailTemplate = (
             
             .footer-date {
                 font-size: 12px;
-                color: #9ca3af;
+                color: #000000;
+            }
+            
+            .brand-section {
+                background: #ffffff;
+                border: 2px solid #0d6449;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 24px 0;
+                text-align: center;
+            }
+            
+            .brand-name {
+                font-weight: 700;
+                color: #0d6449;
+                font-size: 20px;
+                margin-bottom: 4px;
+            }
+            
+            .brand-tagline {
+                color: #000000;
+                font-size: 14px;
+                font-style: italic;
             }
             
             @media (max-width: 600px) {
@@ -138,19 +205,22 @@ const createEmailTemplate = (
                 .email-container { border-radius: 6px; }
                 .header { padding: 20px 15px; }
                 .content { padding: 30px 20px; }
-                .title { font-size: 20px; }
-                .action-button { padding: 12px 24px; font-size: 15px; }
+                .title { font-size: 24px; }
+                .action-button { padding: 14px 28px; font-size: 15px; }
+                .logo-text { font-size: 36px; }
             }
         </style>
     </head>
     <body>
         <div class="email-container">
             <div class="header">
-                <div class="logo">
-                    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="304" height="166" viewBox="0 0 304 166">
-                        <image xlink:href="data:image/png;base64,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" x="0" y="0" width="304" height="166"/>
-                    </svg>
+                <div class="logo-container">
+                    <img src="${
+                      process.env.CLIENT_URL
+                    }/src/assets/ELRA.png" alt="ELRA Logo" class="logo-image" />
+                    <div class="logo-text">ELRA</div>
                 </div>
+                <div class="logo-subtitle">Enterprise Resource Planning</div>
             </div>
             
             <div class="content">
@@ -170,11 +240,16 @@ const createEmailTemplate = (
                 `
                     : ""
                 }
+                
+                <div class="brand-section">
+                    <div class="brand-name">Century Info Systems</div>
+                    <div class="brand-tagline">Empowering Digital Transformation</div>
+                </div>
             </div>
             
             <div class="footer">
                 <div class="footer-text">${footerText}</div>
-                <div class="footer-date">${currentDate}</div>
+                <div class="footer-date">${currentYear}</div>
             </div>
         </div>
     </body>
@@ -417,7 +492,6 @@ export const sendInvitationEmail = async (
   email,
   userName,
   invitationCode,
-  companyName,
   roleName = "STAFF",
   departmentName = "General"
 ) => {
@@ -426,39 +500,44 @@ export const sendInvitationEmail = async (
     const joinUrl = `${process.env.CLIENT_URL}/welcome?code=${invitationCode}`;
 
     const htmlContent = createEmailTemplate(
-      `You're Invited to Join ${companyName}`,
+      `You're Invited to Join ELRA`,
       `
         <p>Hello <strong>${userName}</strong>,</p>
-        <p>You've been invited to join <strong>${companyName}</strong>'s Enterprise Resource Planning (ERP) system.</p>
+        <p>You've been invited to join ELRA's Enterprise Resource Planning (ERP) system.</p>
         
-        <div style="background: #f0fdf4; border: 1px solid #d1fae5; border-radius: 8px; padding: 16px; margin: 20px 0;">
-            <p style="margin: 0 0 8px 0; color: #0d6449;"><strong>Your Role:</strong> ${roleName}</p>
-            <p style="margin: 0; color: #0d6449;"><strong>Department:</strong> ${departmentName}</p>
+        <div class="info-box">
+            <div class="info-title">📋 Your Assignment Details</div>
+            <div class="info-item">
+                <strong>Role:</strong> ${roleName}
+            </div>
+            <div class="info-item">
+                <strong>Department:</strong> ${departmentName}
+            </div>
         </div>
         
         <p><strong>Your Invitation Code:</strong></p>
-        <div style="background: #0d6449; color: white; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
-            <p style="font-size: 24px; font-weight: bold; letter-spacing: 2px; margin: 0;">${invitationCode}</p>
+        <div style="background: #0d6449; color: white; padding: 24px; border-radius: 8px; margin: 24px 0; text-align: center;">
+            <p style="font-size: 28px; font-weight: bold; letter-spacing: 3px; margin: 0;">${invitationCode}</p>
         </div>
         
         <p><strong>How to Join:</strong></p>
-        <ol style="margin: 15px 0; padding-left: 20px;">
-          <li style="margin: 8px 0;">Click the "Join Company" button below</li>
-          <li style="margin: 8px 0;">Complete your account setup</li>
-          <li style="margin: 8px 0;">Start accessing your documents and workflows</li>
+        <ol style="margin: 20px 0; padding-left: 24px; line-height: 1.8;">
+          <li style="margin: 12px 0;">Click the "Join ELRA" button below</li>
+          <li style="margin: 12px 0;">Complete your account setup with your details</li>
+          <li style="margin: 12px 0;">Start accessing your documents and workflows</li>
         </ol>
         
-        <p style="color: #6b7280; font-size: 14px;">This invitation code expires in 7 days. If you have any questions, please contact your system administrator.</p>
+        <p style="color: #6b7280; font-size: 14px; font-style: italic; margin-top: 24px;">This invitation code expires in 7 days. If you have any questions, please contact your system administrator.</p>
       `,
-      "Join Company",
+      "Join ELRA",
       joinUrl,
-      `You're invited to join ${companyName} - ELRA Platform`
+      `You're invited to join ELRA Platform`
     );
 
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: email,
-      subject: `You're Invited to Join ${companyName} - ELRA Platform`,
+      subject: `You're Invited to Join ELRA Platform`,
       html: htmlContent,
     };
 

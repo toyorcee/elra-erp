@@ -326,7 +326,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             </>
           )}
         </Link>
-        {shouldShowExpanded && (
+        {shouldShowExpanded && item.section !== "erp" && (
           <button
             onClick={() => togglePin(item.label)}
             className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-md transition-all duration-200 cursor-pointer ${
@@ -431,18 +431,30 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             </div>
           )}
 
-          {/* Pin Button */}
-          <button
-            onClick={toggleSidebarPin}
-            className={`p-2 rounded-xl transition-all duration-200 hover:scale-110 cursor-pointer ${
-              isPinned
-                ? "text-[var(--elra-primary)]"
-                : "text-gray-400 hover:text-[var(--elra-primary)]"
-            }`}
-            title={isPinned ? "Unpin sidebar" : "Pin sidebar"}
-          >
-            <MapPinIcon className={`h-5 w-5 ${isPinned ? "rotate-45" : ""}`} />
-          </button>
+          {/* Show hamburger when collapsed, pin when expanded */}
+          {shouldShowExpanded ? (
+            <button
+              onClick={toggleSidebarPin}
+              className={`p-2 rounded-xl transition-all duration-200 hover:scale-110 cursor-pointer ${
+                isPinned
+                  ? "text-[var(--elra-primary)]"
+                  : "text-gray-400 hover:text-[var(--elra-primary)]"
+              }`}
+              title={isPinned ? "Unpin sidebar" : "Pin sidebar"}
+            >
+              <MapPinIcon
+                className={`h-5 w-5 ${isPinned ? "rotate-45" : ""}`}
+              />
+            </button>
+          ) : (
+            <button
+              onClick={onToggle}
+              className="p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer"
+              title="Expand sidebar"
+            >
+              <Bars3Icon className="h-5 w-5" />
+            </button>
+          )}
 
           {/* Only show hamburger on mobile */}
           <button
@@ -456,25 +468,33 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             )}
           </button>
 
-          {/* Desktop toggle button */}
-          <button
-            onClick={onToggle}
-            className="hidden lg:block p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer"
-          >
-            {shouldShowExpanded ? (
+          {/* Desktop toggle button - only show when expanded */}
+          {shouldShowExpanded && (
+            <button
+              onClick={onToggle}
+              className="hidden lg:block p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer"
+            >
               <XMarkIcon className="h-5 w-5" />
-            ) : (
-              <Bars3Icon className="h-5 w-5" />
-            )}
-          </button>
+            </button>
+          )}
         </div>
 
         {/* User Profile */}
         <div className="px-4 py-4 border-b border-[var(--elra-border-primary)] bg-[var(--elra-secondary-3)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <div className="w-12 h-12 bg-[var(--elra-primary)] rounded-2xl flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-lg">
+              <div
+                className={`${
+                  shouldShowExpanded ? "w-12 h-12" : "w-10 h-10"
+                } bg-[var(--elra-primary)] rounded-2xl flex items-center justify-center shadow-lg ${
+                  !shouldShowExpanded ? "mx-auto" : ""
+                }`}
+              >
+                <span
+                  className={`text-white font-bold ${
+                    shouldShowExpanded ? "text-lg" : "text-base"
+                  }`}
+                >
                   {user?.firstName?.charAt(0) || user?.name?.charAt(0) || "U"}
                 </span>
               </div>
@@ -576,7 +596,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                                   <div key={itemIndex} className="relative">
                                     <Link
                                       to={item.path}
-                                      className={`group flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-300 cursor-pointer ${
+                                      className={`group flex items-center px-4 py-2 text-xs font-medium rounded-lg transition-all duration-300 cursor-pointer ${
                                         isItemActive
                                           ? "text-[var(--elra-primary)] font-semibold"
                                           : "text-[var(--elra-text-primary)] hover:text-[var(--elra-primary)]"

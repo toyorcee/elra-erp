@@ -1,2 +1,2 @@
-export { default as LeaveRequests } from './LeaveRequests';
-export { default as AttendanceTracking } from './AttendanceTracking';
+export { default as LeaveManagement } from "./LeaveManagement";
+export { default as LeaveCalendar } from "./LeaveCalendar";

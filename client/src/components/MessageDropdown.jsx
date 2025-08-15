@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContext";
 import { useMessages } from "../hooks/useMessages";
+import { useMessageContext } from "../context/MessageContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChatBubbleLeftRightIcon,
@@ -13,12 +14,13 @@ import {
   EllipsisVerticalIcon,
   TrashIcon,
   ChevronDownIcon,
+  ArrowLeftIcon,
 } from "@heroicons/react/24/outline";
 import { formatMessageTime } from "../types/messageTypes";
 import messageService from "../services/messageService";
+import defaultAvatar from "../assets/defaulticon.jpg";
 
 const MessageDropdown = ({ isOpen, onClose }) => {
-  // CSS to prevent large icon overlays
   const overlayStyles = `
     .message-dropdown svg {
       max-width: 24px !important;
@@ -31,6 +33,7 @@ const MessageDropdown = ({ isOpen, onClose }) => {
 
   const { user } = useAuth();
   const { isConnected } = useSocket();
+  const { selectedUser, closeMessageDropdown } = useMessageContext();
 
   const {
     conversations,
@@ -61,6 +64,48 @@ const MessageDropdown = ({ isOpen, onClose }) => {
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+
+  // Image utility functions
+  const getDefaultAvatar = () => {
+    return defaultAvatar;
+  };
+
+  const getImageUrl = (avatarPath) => {
+    if (!avatarPath) return getDefaultAvatar();
+    if (avatarPath.startsWith("http")) return avatarPath;
+
+    const baseUrl = (
+      import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+    ).replace("/api", "");
+    return `${baseUrl}${avatarPath}`;
+  };
+
+  const getAvatarDisplay = (user) => {
+    if (user.avatar) {
+      return (
+        <img
+          src={getImageUrl(user.avatar)}
+          alt={`${user.firstName} ${user.lastName}`}
+          className="w-full h-full rounded-full object-cover"
+          onError={(e) => {
+            e.target.src = getDefaultAvatar();
+          }}
+        />
+      );
+    }
+    return (
+      <div className="w-full h-full bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white font-bold text-sm">
+        {getInitials(user)}
+      </div>
+    );
+  };
+
+  // Handle selectedUser from context
+  useEffect(() => {
+    if (selectedUser && isOpen) {
+      handleStartNewConversation(selectedUser);
+    }
+  }, [selectedUser, isOpen]);
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -199,55 +244,33 @@ const MessageDropdown = ({ isOpen, onClose }) => {
       .filter((user) => {
         const displayName = getDisplayName(user)?.toLowerCase() || "";
         const email = user.email?.toLowerCase() || "";
-        const department = user.department?.name?.toLowerCase() || "";
-        const role = user.role?.name?.toLowerCase() || "";
-
         return (
           displayName.includes(searchTerm.toLowerCase()) ||
-          email.includes(searchTerm.toLowerCase()) ||
-          department.includes(searchTerm.toLowerCase()) ||
-          role.includes(searchTerm.toLowerCase())
+          email.includes(searchTerm.toLowerCase())
         );
       })
       .slice(0, 10);
-
     return result;
   };
 
-  const filteredAvailableUsers = getFilteredAvailableUsers();
-
-  // Initial load
-  useEffect(() => {
-    loadConversations();
-  }, [loadConversations]);
-
-  // Load available users when dropdown opens
+  // Load conversations and available users on mount
   useEffect(() => {
     if (isOpen) {
+      loadConversations();
       getAvailableUsers();
     }
-  }, [isOpen, getAvailableUsers]);
+  }, [isOpen, loadConversations, getAvailableUsers]);
 
-  // Load available users when search term changes
-  useEffect(() => {
-    if (isOpen) {
-      getAvailableUsers();
-    }
-  }, [searchTerm, isOpen, getAvailableUsers]);
-
-  // Scroll to bottom when messages change
+  // Scroll to bottom when new messages arrive
   useEffect(() => {
     scrollToBottom();
   }, [messages, selectedConversation]);
 
-  // Cleanup typing timeout
-  useEffect(() => {
-    return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-    };
-  }, []);
+  // Handle close
+  const handleClose = () => {
+    closeMessageDropdown();
+    onClose();
+  };
 
   if (!isOpen) return null;
 
@@ -264,7 +287,7 @@ const MessageDropdown = ({ isOpen, onClose }) => {
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/20 backdrop-blur-sm"
-            onClick={onClose}
+            onClick={handleClose}
           />
 
           {/* Message Panel */}
@@ -272,31 +295,33 @@ const MessageDropdown = ({ isOpen, onClose }) => {
             initial={{ x: 400 }}
             animate={{ x: 0 }}
             exit={{ x: 400 }}
-            className="relative w-full max-w-md h-[calc(100vh-4rem)] bg-white rounded-l-2xl shadow-2xl border border-gray-200 overflow-hidden message-dropdown"
+            className="relative w-full max-w-md h-[calc(100vh-4rem)] bg-white rounded-l-2xl shadow-2xl border border-[var(--elra-border-primary)] overflow-hidden message-dropdown"
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-cyan-50">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--elra-border-primary)] bg-gradient-to-r from-[var(--elra-secondary-3)] to-white">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white">
+                <div className="p-2 rounded-lg bg-[var(--elra-primary)] text-white">
                   <ChatBubbleLeftRightIcon className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">Messages</h3>
+                  <h3 className="font-semibold text-[var(--elra-text-primary)]">
+                    Messages
+                  </h3>
                   <div className="flex items-center gap-2">
                     <div
                       className={`w-2 h-2 rounded-full ${
                         isConnected ? "bg-green-500" : "bg-red-500"
                       }`}
                     ></div>
-                    <span className="text-xs text-gray-600">
+                    <span className="text-xs text-[var(--elra-text-secondary)]">
                       {isConnected ? "Connected" : "Disconnected"}
                     </span>
                   </div>
                 </div>
               </div>
               <button
-                onClick={onClose}
-                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                onClick={handleClose}
+                className="p-2 text-[var(--elra-text-muted)] hover:text-[var(--elra-text-primary)] transition-colors"
               >
                 <XMarkIcon className="h-5 w-5" />
               </button>
@@ -306,119 +331,62 @@ const MessageDropdown = ({ isOpen, onClose }) => {
               /* Conversations List */
               <div className="flex flex-col h-full">
                 {/* Search */}
-                <div className="p-4 border-b border-gray-200">
+                <div className="p-4 border-b border-[var(--elra-border-primary)]">
                   <div className="relative">
-                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-[var(--elra-text-muted)]" />
                     <input
                       type="text"
+                      placeholder="Search users to start a conversation..."
                       value={searchTerm}
-                      onChange={(e) => {
-                        setSearchTerm(e.target.value);
-                      }}
-                      placeholder="Search conversations and users..."
-                      className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-border-focus)] text-sm bg-white"
                     />
+                    {searchTerm && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <button
+                          onClick={() => setSearchTerm("")}
+                          className="text-[var(--elra-text-muted)] hover:text-[var(--elra-text-primary)] transition-colors"
+                        >
+                          <XMarkIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
+                  {searchTerm && (
+                    <p className="text-xs text-[var(--elra-text-secondary)] mt-2">
+                      Searching for users matching "{searchTerm}"...
+                    </p>
+                  )}
                 </div>
 
                 {/* Conversations */}
                 <div className="flex-1 overflow-y-auto">
                   {isLoading ? (
-                    <div className="p-8 text-center">
-                      <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                      <p className="text-gray-600 text-sm">
-                        Loading conversations...
-                      </p>
+                    <div className="flex items-center justify-center h-32">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--elra-primary)]"></div>
                     </div>
-                  ) : filteredConversations.length === 0 ? (
-                    <div className="p-4">
-                      <div className="text-center mb-4">
-                        <div className="text-gray-400 text-3xl mb-2">💬</div>
-                        <p className="text-gray-600 text-sm mb-4">
-                          No conversations found
-                        </p>
-                        <p className="text-gray-500 text-xs">
-                          Start a new conversation with someone:
-                        </p>
+                  ) : filteredConversations.length > 0 ? (
+                    <div className="space-y-1">
+                      {/* Start New Conversation Button */}
+                      <div className="p-3 border-b border-[var(--elra-border-primary)]">
+                        <button
+                          onClick={() => setSearchTerm("")}
+                          className="w-full flex items-center justify-center gap-2 p-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors font-medium text-sm"
+                        >
+                          <ChatBubbleLeftRightIcon className="h-4 w-4" />
+                          Start New Conversation
+                        </button>
                       </div>
 
-                      {/* Available Users */}
-                      {isLoadingUsers ? (
-                        <div className="space-y-2">
-                          <div className="p-4 text-center">
-                            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                            <p className="text-gray-600 text-sm">
-                              Loading users...
-                            </p>
-                          </div>
-                        </div>
-                      ) : filteredAvailableUsers.length > 0 ? (
-                        <div className="space-y-2">
-                          {filteredAvailableUsers.map((user) => (
-                            <div
-                              key={user._id}
-                              onClick={() => handleStartNewConversation(user)}
-                              className="p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="relative">
-                                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-sm">
-                                    {getInitials(user)}
-                                  </div>
-                                  <div
-                                    className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
-                                      onlineUsers.has(user._id)
-                                        ? "bg-green-500"
-                                        : "bg-gray-400"
-                                    }`}
-                                  ></div>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="font-medium text-gray-900 truncate text-sm">
-                                    {getDisplayName(user)}
-                                  </h4>
-                                  <p className="text-xs text-gray-600 truncate">
-                                    {user.email}
-                                  </p>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-xs text-gray-500">
-                                      {user.department?.name}
-                                    </span>
-                                    <span className="text-xs text-gray-400">
-                                      {user.role?.name}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="text-xs text-gray-400">
-                                  <ChatBubbleLeftRightIcon className="h-4 w-4" />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="p-4 text-center">
-                          <div className="text-gray-400 text-2xl mb-2">👥</div>
-                          <p className="text-gray-600 text-sm mb-2">
-                            No users found
-                          </p>
-                          <p className="text-gray-500 text-xs">
-                            Try adjusting your search terms
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    filteredConversations.map((conversation) => (
-                      <div
-                        key={conversation._id._id}
-                        onClick={() => handleConversationSelect(conversation)}
-                        className="p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
+                      {filteredConversations.map((conversation) => (
+                        <div
+                          key={conversation._id._id}
+                          onClick={() => handleConversationSelect(conversation)}
+                          className="flex items-center gap-3 p-4 hover:bg-[var(--elra-secondary-3)] cursor-pointer transition-colors border-b border-[var(--elra-border-primary)]"
+                        >
                           <div className="relative">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-sm">
-                              {getInitials(conversation._id)}
+                            <div className="w-10 h-10 rounded-full overflow-hidden">
+                              {getAvatarDisplay(conversation._id)}
                             </div>
                             <div
                               className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
@@ -430,35 +398,108 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
-                              <h4 className="font-medium text-gray-900 truncate text-sm">
+                              <h4 className="font-medium text-[var(--elra-text-primary)] text-sm truncate">
                                 {getDisplayName(conversation._id)}
                               </h4>
-                              <span className="text-xs text-gray-500">
-                                {conversation.lastMessage?.createdAt
-                                  ? formatMessageTime(
-                                      conversation.lastMessage.createdAt
-                                    )
-                                  : ""}
-                              </span>
-                            </div>
-                            <p className="text-xs text-gray-600 truncate">
-                              {conversation.lastMessage?.content ||
-                                "No messages yet"}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-xs text-gray-500">
-                                {formatUserStatus(conversation._id)}
-                              </span>
                               {unreadCounts[conversation._id._id] > 0 && (
-                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-500 text-white">
+                                <span className="bg-[var(--elra-primary)] text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
                                   {unreadCounts[conversation._id._id]}
                                 </span>
                               )}
                             </div>
+                            <p className="text-xs text-[var(--elra-text-secondary)] truncate">
+                              {conversation.lastMessage?.content ||
+                                "No messages yet"}
+                            </p>
                           </div>
                         </div>
+                      ))}
+                    </div>
+                  ) : (
+                    /* Empty State */
+                    <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                      <div className="w-16 h-16 bg-[var(--elra-secondary-3)] rounded-full flex items-center justify-center mb-4">
+                        <ChatBubbleLeftRightIcon className="h-8 w-8 text-[var(--elra-text-muted)]" />
                       </div>
-                    ))
+                      <h3 className="text-lg font-medium text-[var(--elra-text-primary)] mb-2">
+                        No conversations found
+                      </h3>
+                      <p className="text-[var(--elra-text-secondary)] mb-6">
+                        Start a new conversation with someone:
+                      </p>
+
+                      {/* Available Users */}
+                      <div className="w-full space-y-2">
+                        {isLoadingUsers ? (
+                          <div className="flex items-center justify-center py-4">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--elra-primary)]"></div>
+                          </div>
+                        ) : getFilteredAvailableUsers().length > 0 ? (
+                          <>
+                            <div className="text-sm font-medium text-[var(--elra-text-primary)] mb-3 text-left">
+                              Available Users:
+                            </div>
+                            {getFilteredAvailableUsers().map((user) => (
+                              <div
+                                key={user._id}
+                                onClick={() => handleStartNewConversation(user)}
+                                className="flex items-center gap-3 p-3 bg-[var(--elra-secondary-3)] rounded-lg cursor-pointer transition-colors border border-[var(--elra-border-primary)] hover:border-[var(--elra-primary)] hover:shadow-sm"
+                              >
+                                <div className="relative">
+                                  <div className="w-8 h-8 rounded-full overflow-hidden">
+                                    {getAvatarDisplay(user)}
+                                  </div>
+                                  <div
+                                    className={`absolute -bottom-1 -right-1 w-2 h-2 rounded-full border border-white ${
+                                      onlineUsers.has(user._id)
+                                        ? "bg-green-500"
+                                        : "bg-gray-400"
+                                    }`}
+                                  ></div>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-medium text-[var(--elra-text-primary)] text-sm truncate">
+                                    {getDisplayName(user)}
+                                  </h4>
+                                  <p className="text-xs text-[var(--elra-text-secondary)] truncate">
+                                    {user.email}
+                                  </p>
+                                  <p className="text-xs text-[var(--elra-text-muted)] truncate">
+                                    {user.department?.name} {user.role?.name}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <ChatBubbleLeftRightIcon className="h-4 w-4 text-[var(--elra-primary)]" />
+                                  <span className="text-xs text-[var(--elra-primary)] font-medium">
+                                    Message
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                            <div className="mt-12 p-3 bg-[var(--elra-primary)] rounded-lg">
+                              <p className="text-xs text-white">
+                                💡 <strong>Tip:</strong> Click on any user above
+                                to start a conversation, or use the search bar
+                                to find specific users.
+                              </p>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center">
+                            <p className="text-sm text-[var(--elra-text-secondary)] mb-4">
+                              No users available to chat with
+                            </p>
+                            <div className="p-3 bg-[var(--elra-secondary-3)] rounded-lg">
+                              <p className="text-xs text-[var(--elra-text-secondary)]">
+                                Try searching for users in the search bar above,
+                                or check back later when more users are
+                                available.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -466,17 +507,17 @@ const MessageDropdown = ({ isOpen, onClose }) => {
               /* Chat Interface */
               <div className="flex flex-col h-full">
                 {/* Chat Header */}
-                <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-cyan-50">
+                <div className="flex items-center justify-between p-4 border-b border-[var(--elra-border-primary)] bg-gradient-to-r from-[var(--elra-secondary-3)] to-white">
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => setShowChat(false)}
-                      className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="p-1 text-[var(--elra-text-muted)] hover:text-[var(--elra-text-primary)] transition-colors cursor-pointer"
                     >
-                      <ChevronDownIcon className="h-5 w-5" />
+                      <ArrowLeftIcon className="h-5 w-5" />
                     </button>
                     <div className="relative">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-sm">
-                        {getInitials(selectedConversation._id)}
+                      <div className="w-8 h-8 rounded-full overflow-hidden">
+                        {getAvatarDisplay(selectedConversation._id)}
                       </div>
                       <div
                         className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
@@ -487,109 +528,89 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                       ></div>
                     </div>
                     <div>
-                      <h4 className="font-medium text-gray-900 text-sm">
+                      <h4 className="font-medium text-[var(--elra-text-primary)] text-sm">
                         {getDisplayName(selectedConversation._id)}
                       </h4>
-                      <p className="text-xs text-gray-600">
+                      <p className="text-xs text-[var(--elra-text-secondary)]">
                         {formatUserStatus(selectedConversation._id)}
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4">
-                  {getMessagesForUser(selectedConversation._id._id).map(
-                    (message) => {
-                      const currentUserId = user?._id || user?.id;
-                      const isMessageFromCurrentUser =
-                        message.sender._id === currentUserId;
-                      const isOwnMessage = isMessageFromCurrentUser;
+                {/* Messages Area */}
+                <div className="flex-1 overflow-y-auto p-4 bg-[var(--elra-bg-light)]">
+                  {getMessagesForUser(selectedConversation._id._id).length >
+                  0 ? (
+                    <div className="space-y-4">
+                      {getMessagesForUser(selectedConversation._id._id).map(
+                        (message) => {
+                          const isOwnMessage =
+                            message.sender._id === (user._id || user.id);
 
-                      return (
-                        <div
-                          key={message._id}
-                          className={`flex ${
-                            isOwnMessage ? "justify-end" : "justify-start"
-                          } mb-3`}
-                        >
-                          <div
-                            className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
-                              isOwnMessage
-                                ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white"
-                                : "bg-gray-100 text-gray-900"
-                            }`}
-                          >
-                            <p className="text-sm">{message.content}</p>
+                          return (
                             <div
-                              className={`flex items-center justify-between mt-1 text-xs ${
-                                isOwnMessage ? "text-blue-100" : "text-gray-500"
+                              key={message._id}
+                              className={`flex ${
+                                isOwnMessage ? "justify-end" : "justify-start"
                               }`}
                             >
-                              <span>
-                                {formatMessageTime(message.createdAt)}
-                              </span>
-                              {isOwnMessage && (
-                                <div className="flex items-center gap-1 ml-2">
-                                  {message.status === "sending" && (
-                                    <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin"></div>
-                                  )}
-                                  {message.status === "sent" && (
-                                    <CheckIcon className="h-3 w-3" />
-                                  )}
-                                  {message.status === "delivered" && (
-                                    <div className="flex">
-                                      <CheckIcon className="h-3 w-3" />
-                                      <CheckIcon className="h-3 w-3 -ml-1" />
-                                    </div>
-                                  )}
-                                  {message.status === "read" && (
+                              <div
+                                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                                  isOwnMessage
+                                    ? "bg-[var(--elra-primary)] text-white"
+                                    : "bg-white text-[var(--elra-text-primary)] border border-[var(--elra-border-primary)]"
+                                }`}
+                              >
+                                <p className="text-sm">{message.content}</p>
+                                <div
+                                  className={`flex items-center justify-between mt-1 text-xs ${
+                                    isOwnMessage
+                                      ? "text-[var(--elra-secondary-3)]"
+                                      : "text-[var(--elra-text-secondary)]"
+                                  }`}
+                                >
+                                  <span>
+                                    {formatMessageTime(message.createdAt)}
+                                  </span>
+                                  {isOwnMessage && (
                                     <div className="flex items-center gap-1">
-                                      <span className="text-xs">read</span>
-                                      <div className="flex">
+                                      {message.status === "sent" && (
                                         <CheckIcon className="h-3 w-3" />
-                                        <CheckIcon className="h-3 w-3 -ml-1" />
-                                      </div>
+                                      )}
+                                      {message.status === "delivered" && (
+                                        <CheckCircleIcon className="h-3 w-3" />
+                                      )}
+                                      {message.status === "read" && (
+                                        <CheckCircleIcon className="h-3 w-3 text-[var(--elra-secondary-3)]" />
+                                      )}
                                     </div>
                                   )}
                                 </div>
-                              )}
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      );
-                    }
-                  )}
-
-                  {/* Typing indicator */}
-                  {typingUsers.has(selectedConversation._id._id) && (
-                    <div className="flex justify-start mb-3">
-                      <div className="bg-gray-100 text-gray-900 px-3 py-2 rounded-lg">
-                        <div className="flex items-center gap-1">
-                          <div className="flex space-x-1">
-                            <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
-                            <div
-                              className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"
-                              style={{ animationDelay: "0.1s" }}
-                            ></div>
-                            <div
-                              className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"
-                              style={{ animationDelay: "0.2s" }}
-                            ></div>
-                          </div>
-                          <span className="text-xs text-gray-500 ml-2">
-                            typing...
-                          </span>
-                        </div>
+                          );
+                        }
+                      )}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-center">
+                      <div className="w-16 h-16 bg-[var(--elra-secondary-3)] rounded-full flex items-center justify-center mb-4">
+                        <ChatBubbleLeftRightIcon className="h-8 w-8 text-[var(--elra-text-muted)]" />
                       </div>
+                      <h3 className="text-lg font-medium text-[var(--elra-text-primary)] mb-2">
+                        Start the conversation!
+                      </h3>
+                      <p className="text-[var(--elra-text-secondary)]">
+                        Send your first message to{" "}
+                        {getDisplayName(selectedConversation._id)}
+                      </p>
                     </div>
                   )}
-
-                  <div ref={messagesEndRef} />
                 </div>
 
-                {/* Message Input */}
-                <div className="p-4 border-t border-gray-200">
+                <div className="p-4 border-t border-[var(--elra-border-primary)] bg-white">
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
@@ -602,55 +623,43 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                       onKeyPress={(e) =>
                         e.key === "Enter" && handleSendMessage()
                       }
-                      placeholder="Type your message..."
-                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      placeholder={`Type your message to ${getDisplayName(
+                        selectedConversation._id
+                      )}...`}
+                      className="flex-1 px-3 py-2 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-border-focus)] text-sm bg-white"
+                      autoFocus
                     />
                     <button
                       onClick={handleSendMessage}
                       disabled={!messageText.trim()}
-                      className="p-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                     >
                       <PaperAirplaneIcon className="h-4 w-4" />
+                      <span className="text-xs font-medium">Send</span>
                     </button>
                   </div>
 
                   {/* Conversation Suggestions */}
                   {showSuggestions && conversationSuggestions.length > 0 && (
-                    <div className="mt-2 border border-gray-200 rounded-lg bg-white shadow-lg max-h-48 overflow-y-auto">
-                      {conversationSuggestions.map((suggestion) => (
-                        <div
-                          key={suggestion._id._id}
-                          onClick={() => {
-                            handleConversationSelect(suggestion);
-                            setMessageText("");
-                            setShowSuggestions(false);
-                          }}
-                          className="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="relative">
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold text-sm">
-                                {getInitials(suggestion._id)}
-                              </div>
-                              <div
-                                className={`absolute -bottom-1 -right-1 w-2 h-2 rounded-full border border-white ${
-                                  onlineUsers.has(suggestion._id._id)
-                                    ? "bg-green-500"
-                                    : "bg-gray-400"
-                                }`}
-                              ></div>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-gray-900 text-sm truncate">
-                                {getDisplayName(suggestion._id)}
-                              </h4>
-                              <p className="text-xs text-gray-500 truncate">
-                                {suggestion._id.email}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                    <div className="mt-2 p-2 bg-[var(--elra-secondary-3)] rounded-lg">
+                      <p className="text-xs text-[var(--elra-text-secondary)] mb-2">
+                        Quick reply suggestions:
+                      </p>
+                      <div className="space-y-1">
+                        {conversationSuggestions.map((suggestion) => (
+                          <button
+                            key={suggestion._id._id}
+                            onClick={() => {
+                              setMessageText(suggestion.lastMessage.content);
+                              setShowSuggestions(false);
+                            }}
+                            className="block w-full text-left text-xs text-[var(--elra-text-secondary)] hover:text-[var(--elra-text-primary)] p-1 rounded hover:bg-[var(--elra-secondary-2)] hover:bg-opacity-20"
+                          >
+                            {getDisplayName(suggestion._id)}:{" "}
+                            {suggestion.lastMessage.content}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

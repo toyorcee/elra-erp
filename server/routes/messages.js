@@ -8,6 +8,7 @@ import {
   getOnlineUsers,
   updateLastSeen,
   getUnreadCount,
+  getUnreadMessages,
   deleteMessage,
   updateTypingStatus,
   getAvailableUsers,
@@ -41,6 +42,9 @@ router.patch("/last-seen", updateLastSeen);
 
 // Get unread message count
 router.get("/unread-count", getUnreadCount);
+
+// Get unread messages
+router.get("/unread", getUnreadMessages);
 
 // Delete a message
 router.delete("/:id", deleteMessage);

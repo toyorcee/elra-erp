@@ -54,8 +54,6 @@ export const getAllUsers = async (req, res) => {
       .populate("supervisor", "name email")
       .select("-password");
 
-    // Filter out platform admin users after population
-    // Include users with no role (pending registration) and users with non-platform-admin roles
     const filteredUsers = users.filter((user) => {
       // If user has no role (pending registration), include them
       if (!user.role) return true;
@@ -670,6 +668,119 @@ export const getAssignmentGuidanceForUser = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to get assignment guidance",
+    });
+  }
+};
+
+// Get onboarded members (successfully registered users)
+export const getOnboardedMembers = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const { page = 1, limit = 10, filter = "all", search = "" } = req.query;
+
+    if (currentUser.role.level < 600) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Manager level required to view onboarded members.",
+      });
+    }
+
+    console.log(
+      "🔍 [ONBOARDED_MEMBERS] Fetching onboarded members with params:",
+      {
+        page,
+        limit,
+        filter,
+        search,
+        currentUser: {
+          id: currentUser._id,
+          email: currentUser.email,
+          roleLevel: currentUser.role.level,
+          roleName: currentUser.role.name,
+        },
+      }
+    );
+
+    // Build query for onboarded members (users who have completed registration)
+    let query = {
+      // Only show users who have completed registration (not pending or invited)
+      status: { $in: ["ACTIVE", "REGISTERED"] },
+      // Exclude platform admin users
+      email: { $not: /platformadmin/i },
+    };
+
+    // Apply role-based filtering
+    if (currentUser.role.level >= 1000) {
+      // Super Admin can see all onboarded members
+      // No additional department filter needed
+    } else if (currentUser.role.level >= 700) {
+      // HOD can see members in their department
+      query.department = currentUser.department;
+    } else {
+      // Manager can see members in their department
+      query.department = currentUser.department;
+    }
+
+    // Apply status filter
+    if (filter === "active") {
+      query.isActive = true;
+    } else if (filter === "inactive") {
+      query.isActive = false;
+    }
+
+    // Apply search filter
+    if (search) {
+      query.$or = [
+        { firstName: { $regex: search, $options: "i" } },
+        { lastName: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+        { employeeId: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const total = await User.countDocuments(query);
+    const pages = Math.ceil(total / parseInt(limit));
+
+    const members = await User.find(query)
+      .populate("role", "name level description")
+      .populate("department", "name description")
+      .select("-password +avatar")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    console.log("✅ [ONBOARDED_MEMBERS] Found members:", {
+      count: members.length,
+      total,
+      pages,
+      page: parseInt(page),
+      limit: parseInt(limit),
+    });
+
+    res.json({
+      success: true,
+      data: {
+        members,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages,
+        },
+      },
+      count: members.length,
+      total,
+    });
+  } catch (error) {
+    console.error(
+      "❌ [ONBOARDED_MEMBERS] Error fetching onboarded members:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch onboarded members",
     });
   }
 };

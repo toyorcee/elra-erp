@@ -3,6 +3,7 @@ import { body } from "express-validator";
 import {
   createInvitation,
   getInvitations,
+  getUserInvitations,
   getInvitation,
   resendInvitation,
   cancelInvitation,
@@ -59,6 +60,7 @@ const createInvitationValidation = [
 // Routes
 router.post("/", createInvitationValidation, createInvitation);
 router.get("/", getInvitations);
+router.get("/user", getUserInvitations);
 router.get("/stats", getInvitationStats);
 
 router.get("/salary-grades", getSalaryGrades);

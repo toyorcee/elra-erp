@@ -84,6 +84,19 @@ class MessageService {
     }
   }
 
+  // Get unread messages
+  async getUnreadMessages(limit = 10) {
+    try {
+      const response = await api.get(`/messages/unread`, {
+        params: { limit },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching unread messages:", error);
+      throw error;
+    }
+  }
+
   // Delete a message
   async deleteMessage(messageId) {
     try {

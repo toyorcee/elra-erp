@@ -346,7 +346,7 @@ export const getInvitations = asyncHandler(async (req, res) => {
   const currentUser = req.user;
 
   // Check if user is super admin
-  if (currentUser.role.level < 100) {
+  if (currentUser.role.level < 1000) {
     return res.status(403).json({
       success: false,
       message: "Access denied. Super admin privileges required.",
@@ -378,6 +378,83 @@ export const getInvitations = asyncHandler(async (req, res) => {
     success: true,
     data: {
       invitations,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    },
+  });
+});
+
+// @desc    Get invitations for current user (any user who can create invitations)
+// @route   GET /api/invitations/user
+// @access  Private
+export const getUserInvitations = asyncHandler(async (req, res) => {
+  const currentUser = req.user;
+
+  const canManageUsers =
+    currentUser.role.level >= 700 ||
+    currentUser.role.permissions?.includes("user.manage");
+
+  if (!canManageUsers) {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. User management privileges required.",
+    });
+  }
+
+  const { status, page = 1, limit = 20 } = req.query;
+
+  // Build filter - get invitations created by this user
+  const filter = { createdBy: currentUser._id };
+  if (status) {
+    filter.status = status;
+  }
+
+  // Pagination
+  const skip = (page - 1) * limit;
+
+  console.log("🔍 [USER_INVITATIONS] Fetching invitations for user:", {
+    userId: currentUser._id,
+    filter,
+    page,
+    limit,
+  });
+
+  const invitations = await Invitation.find(filter)
+    .populate("department", "name")
+    .populate("role", "name")
+    .populate("usedBy", "firstName lastName email")
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(parseInt(limit));
+
+  const total = await Invitation.countDocuments(filter);
+
+  const mappedInvitations = invitations.map((inv) => ({
+    id: inv._id,
+    email: inv.email,
+    department: inv.department?.name,
+    role: inv.role?.name,
+    batchId: inv.batchId,
+    createdAt: inv.createdAt,
+    status: inv.status,
+    emailSent: inv.emailSent,
+    emailError: inv.emailError,
+  }));
+
+  console.log("✅ [USER_INVITATIONS] Found invitations:", {
+    count: invitations.length,
+    total,
+    invitations: mappedInvitations,
+  });
+
+  res.json({
+    success: true,
+    data: {
+      invitations: mappedInvitations,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),

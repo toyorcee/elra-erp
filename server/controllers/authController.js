@@ -507,7 +507,6 @@ export const login = async (req, res) => {
       user ? "YES" : "NO"
     );
 
-    // If not found, try without isActive filter for debugging
     if (!user) {
       console.log("🔍 [AUTH] Trying alternative user lookup...");
       user = await User.findOne({
@@ -785,7 +784,6 @@ export const getMe = async (req, res) => {
 // @access  Private
 export const changePassword = async (req, res) => {
   try {
-    // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -797,7 +795,6 @@ export const changePassword = async (req, res) => {
 
     const { currentPassword, newPassword } = req.body;
 
-    // Get user with password
     const user = await User.findById(req.user.id).select("+password");
 
     if (!user) {
@@ -828,6 +825,9 @@ export const changePassword = async (req, res) => {
       user.isTemporaryPassword = false;
       user.temporaryPasswordExpiry = null;
       user.passwordChangeRequired = false;
+      user.lastPasswordChange = new Date();
+      user.passwordChangedAt = new Date();
+    } else {
       user.lastPasswordChange = new Date();
       user.passwordChangedAt = new Date();
     }
@@ -862,20 +862,12 @@ export const changePassword = async (req, res) => {
         },
       });
     } else {
-      // For regular password changes, clear tokens and force re-login
-      user.refreshTokens = [];
-      await user.save();
-
-      // Clear cookies
-      clearTokenCookies(res);
-
       res.status(200).json({
         success: true,
-        message: "Password changed successfully. Please login again.",
+        message: "Password changed successfully!",
       });
     }
   } catch (error) {
-    console.error("Change password error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",

@@ -14,28 +14,28 @@ const HRModule = () => {
       title: "Employee Management",
       description: "Add, edit, and manage employee records",
       icon: FaUsers,
-      color: "bg-blue-500",
+      color: "bg-[var(--elra-primary)]",
       path: "/dashboard/modules/hr/employees",
     },
     {
       title: "Recruitment",
       description: "Manage job postings and candidate applications",
       icon: FaUserPlus,
-      color: "bg-green-500",
+      color: "bg-[var(--elra-primary)]",
       path: "/dashboard/modules/hr/recruitment",
     },
     {
       title: "Leave Management",
       description: "Handle leave requests and approvals",
       icon: FaCalendarAlt,
-      color: "bg-purple-500",
+      color: "bg-[var(--elra-primary)]",
       path: "/dashboard/modules/hr/leave",
     },
     {
       title: "Performance Reviews",
       description: "Conduct and track performance evaluations",
       icon: FaChartBar,
-      color: "bg-orange-500",
+      color: "bg-[var(--elra-primary)]",
       path: "/dashboard/modules/hr/performance",
     },
   ];
@@ -81,7 +81,7 @@ const HRModule = () => {
                 <p className="text-gray-600 text-sm leading-relaxed">
                   {feature.description}
                 </p>
-                <div className="mt-4 flex items-center text-blue-600 text-sm font-medium">
+                <div className="mt-4 flex items-center text-[var(--elra-primary)] text-sm font-medium">
                   <span>Access Feature</span>
                   <svg
                     className="ml-2 h-4 w-4"
@@ -101,16 +101,6 @@ const HRModule = () => {
             </div>
           );
         })}
-      </div>
-
-      {/* Back to Dashboard */}
-      <div className="mt-8">
-        <button
-          onClick={() => (window.location.href = "/dashboard")}
-          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-        >
-          ← Back to Dashboard
-        </button>
       </div>
     </div>
   );

@@ -11,11 +11,10 @@ async function createMessageNotification(message, recipient) {
       await global.notificationService.createNotification({
         recipient: recipient._id,
         type: "MESSAGE_RECEIVED",
-        title: `New message from ${message.sender.name}`,
-        message:
-          message.content.length > 50
-            ? `${message.content.substring(0, 50)}...`
-            : message.content,
+        title: `New message received`,
+        message: `You have a new message from ${
+          message.sender.firstName || message.sender.name
+        }`,
         data: {
           senderId: message.sender._id,
           messageId: message._id,
@@ -108,10 +107,7 @@ export const getConversations = async (req, res) => {
     const conversations = await Message.aggregate([
       {
         $match: {
-          $or: [
-            { sender: currentUser.userId },
-            { recipient: currentUser.userId },
-          ],
+          $or: [{ sender: currentUser._id }, { recipient: currentUser._id }],
           isActive: true,
         },
       },
@@ -122,7 +118,7 @@ export const getConversations = async (req, res) => {
         $group: {
           _id: {
             $cond: [
-              { $eq: ["$sender", currentUser.userId] },
+              { $eq: ["$sender", currentUser._id] },
               "$recipient",
               "$sender",
             ],
@@ -133,7 +129,7 @@ export const getConversations = async (req, res) => {
               $cond: [
                 {
                   $and: [
-                    { $eq: ["$recipient", currentUser.userId] },
+                    { $eq: ["$recipient", currentUser._id] },
                     { $eq: ["$isRead", false] },
                   ],
                 },
@@ -353,7 +349,7 @@ export const updateLastSeen = async (req, res) => {
   try {
     const currentUser = req.user;
 
-    await User.findByIdAndUpdate(currentUser.userId, {
+    await User.findByIdAndUpdate(currentUser._id, {
       lastSeen: new Date(),
       isOnline: true,
     });
@@ -361,7 +357,7 @@ export const updateLastSeen = async (req, res) => {
     // Emit online status to other users
     if (global.io) {
       global.io.broadcast.emit("userOnline", {
-        userId: currentUser.userId,
+        userId: currentUser._id,
         lastSeen: new Date(),
       });
     }
@@ -379,13 +375,42 @@ export const updateLastSeen = async (req, res) => {
   }
 };
 
+// Get unread messages for current user
+export const getUnreadMessages = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const { limit = 10 } = req.query;
+
+    const unreadMessages = await Message.find({
+      recipient: currentUser._id,
+      isRead: false,
+      isActive: true,
+    })
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .populate("sender", "firstName lastName email avatar")
+      .populate("recipient", "firstName lastName email avatar");
+
+    res.json({
+      success: true,
+      data: unreadMessages,
+    });
+  } catch (error) {
+    console.error("Get unread messages error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get unread messages",
+    });
+  }
+};
+
 // Get unread message count
 export const getUnreadCount = async (req, res) => {
   try {
     const currentUser = req.user;
 
     const count = await Message.countDocuments({
-      recipient: currentUser.userId,
+      recipient: currentUser._id,
       isRead: false,
       isActive: true,
     });
@@ -411,7 +436,7 @@ export const deleteMessage = async (req, res) => {
 
     const message = await Message.findOne({
       _id: id,
-      sender: currentUser.userId,
+      sender: currentUser._id,
       isActive: true,
     });
 
@@ -429,7 +454,7 @@ export const deleteMessage = async (req, res) => {
     if (global.io) {
       global.io.to(message.recipient.toString()).emit("messageDeleted", {
         messageId: message._id,
-        deletedBy: currentUser.userId,
+        deletedBy: currentUser._id,
       });
     }
 
@@ -454,7 +479,7 @@ export const updateTypingStatus = async (req, res) => {
 
     if (global.io) {
       global.io.to(recipientId.toString()).emit("userTyping", {
-        userId: currentUser.userId,
+        userId: currentUser._id,
         isTyping,
       });
     }

@@ -53,7 +53,6 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     if (originalRequest.url === "/auth/refresh") {
-      console.log("🔄 Refresh token request failed, not retrying");
       return Promise.reject(error);
     }
 
@@ -62,12 +61,6 @@ api.interceptors.response.use(
       !originalRequest._retry &&
       hasLoggedIn
     ) {
-      console.log("🔄 Attempting token refresh...", {
-        hasLoggedIn,
-        isRefreshing,
-        url: originalRequest.url,
-      });
-
       if (isRefreshing) {
         console.log("⏳ Token refresh already in progress, queuing request");
         return new Promise(function (resolve, reject) {
@@ -81,9 +74,7 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        console.log("🔄 Calling refresh endpoint...");
         await api.post("/auth/refresh");
-        console.log("✅ Token refresh successful");
         processQueue(null);
         return api(originalRequest);
       } catch (refreshError) {
@@ -108,7 +99,6 @@ api.interceptors.response.use(
 export const authAPI = {
   register: async (formData) => {
     try {
-      console.log("[authAPI.register] Called with formData:", formData);
       const response = await api.post("/auth/register", formData);
       return response.data;
     } catch (error) {
@@ -151,6 +141,16 @@ export const authAPI = {
     }
   },
 
+  changePassword: async (formData) => {
+    try {
+      const response = await api.put("/auth/change-password", formData);
+      return response.data;
+    } catch (error) {
+      console.error("[authAPI.changePassword] Error:", error);
+      throw error;
+    }
+  },
+
   forgotPassword: async (data) => {
     try {
       const response = await api.post("/auth/forgotpassword", data);
@@ -163,21 +163,11 @@ export const authAPI = {
 
   resetPassword: async (data) => {
     try {
-      console.log(
-        "[authAPI.resetPassword] Attempting to reset password with data:",
-        {
-          token: data.token ? "present" : "missing",
-          passwordLength: data.password?.length,
-        }
-      );
       const response = await api.post("/auth/resetpassword", {
         token: data.token,
         password: data.password,
       });
-      console.log(
-        "[authAPI.resetPassword] Reset password response:",
-        response.data
-      );
+
       return response.data;
     } catch (error) {
       console.error("[authAPI.resetPassword] Error:", error);
@@ -187,12 +177,7 @@ export const authAPI = {
 
   resendVerification: async (data) => {
     try {
-      console.log(
-        "[authAPI.resendVerification] Attempting to resend verification email:",
-        data
-      );
       const response = await api.post("/auth/resend-verification", data);
-      console.log("[authAPI.resendVerification] Response:", response.data);
       return response;
     } catch (error) {
       console.error("[authAPI.resendVerification] Error:", error);
@@ -202,9 +187,7 @@ export const authAPI = {
 
   joinCompany: async (data) => {
     try {
-      console.log("[authAPI.joinCompany] Attempting to join company:", data);
       const response = await api.post("/auth/join-company", data);
-      console.log("[authAPI.joinCompany] Response:", response.data);
       return response;
     } catch (error) {
       console.error("[authAPI.joinCompany] Error:", error);

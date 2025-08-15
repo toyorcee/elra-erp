@@ -1,7 +1,9 @@
 import User from "../models/User.js";
 import Invitation from "../models/Invitation.js";
+import EmployeeLifecycle from "../models/EmployeeLifecycle.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import AuditService from "../services/auditService.js";
+import { generateEmployeeId } from "../utils/employeeIdGenerator.js";
 
 // @desc    Register user from invitation code
 // @route   POST /api/user-registration/register
@@ -79,10 +81,17 @@ export const registerFromInvitation = asyncHandler(async (req, res) => {
     });
   }
 
-  // Generate username from email
   const username = invitation.email.split("@")[0];
 
-  // Create user with invitation data
+  let employeeId;
+  try {
+    employeeId = await generateEmployeeId(invitation.department._id);
+    console.log("🆔 Generated employee ID:", employeeId);
+  } catch (error) {
+    console.error("❌ Error generating employee ID:", error);
+    employeeId = null;
+  }
+
   let user;
 
   const userData = {
@@ -97,7 +106,7 @@ export const registerFromInvitation = asyncHandler(async (req, res) => {
     position: invitation.position,
     jobTitle: invitation.jobTitle,
     salaryGrade: invitation.salaryGrade,
-    employeeId: invitation.employeeId,
+    employeeId: employeeId,
     status: "ACTIVE",
     isEmailVerified: true,
   };
@@ -151,10 +160,51 @@ export const registerFromInvitation = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Error marking invitation as used:", error);
-    // Continue anyway since user was created successfully
   }
 
-  // Log audit
+  try {
+    // Create Onboarding lifecycle
+    const onboardingLifecycle = await EmployeeLifecycle.createFromTemplates(
+      user._id,
+      "Onboarding",
+      invitation.department._id,
+      invitation.role._id,
+      invitation.createdBy || user._id,
+      invitation.createdBy || user._id
+    );
+
+    console.log("✅ Onboarding lifecycle created:", {
+      lifecycleId: onboardingLifecycle._id,
+      employeeId: user._id,
+      type: "Onboarding",
+    });
+
+    // Create Offboarding lifecycle (for future use when employee leaves)
+    const offboardingLifecycle = await EmployeeLifecycle.createFromTemplates(
+      user._id,
+      "Offboarding",
+      invitation.department._id,
+      invitation.role._id,
+      invitation.createdBy || user._id,
+      invitation.createdBy || user._id
+    );
+
+    // Mark offboarding as "Pending" since employee is just starting
+    offboardingLifecycle.status = "Pending";
+    offboardingLifecycle.notes =
+      "Offboarding lifecycle created for future use when employee leaves the company";
+    await offboardingLifecycle.save();
+
+    console.log("✅ Offboarding lifecycle created:", {
+      lifecycleId: offboardingLifecycle._id,
+      employeeId: user._id,
+      type: "Offboarding",
+      status: "Pending",
+    });
+  } catch (error) {
+    console.error("❌ Error creating lifecycles:", error);
+  }
+
   await AuditService.logUserAction(
     user._id,
     "USER_REGISTERED_FROM_INVITATION",
@@ -164,6 +214,7 @@ export const registerFromInvitation = asyncHandler(async (req, res) => {
       role: invitation.role.name,
       department: invitation.department.name,
       salaryGrade: invitation.salaryGrade,
+      employeeId: employeeId,
       ipAddress: req.ip,
       userAgent: req.get("User-Agent"),
     }
@@ -180,6 +231,7 @@ export const registerFromInvitation = asyncHandler(async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
+        employeeId: employeeId,
         role: invitation.role.name,
         department: invitation.department.name,
         salaryGrade: invitation.salaryGrade,

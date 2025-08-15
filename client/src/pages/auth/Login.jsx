@@ -112,7 +112,7 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex">
-      <div className="hidden lg:block lg:w-1/2 relative">
+      <div className="hidden lg:block lg:w-1/2 fixed left-0 top-0 h-full">
         <img
           src={ELRAHero3}
           alt="ELRA Background"
@@ -121,7 +121,7 @@ const Login = () => {
         <div className="absolute inset-0 bg-black/30"></div>
       </div>
 
-      <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-8 relative overflow-hidden">
+      <div className="w-full lg:w-1/2 lg:ml-[50%] flex items-center justify-center px-6 py-8 relative overflow-y-auto">
         <div className="absolute top-8 left-8 z-20">
           <ELRALogo size="lg" />
         </div>
@@ -190,9 +190,9 @@ const Login = () => {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className={`w-full pl-12 pr-4 py-4 bg-white border-2 rounded-xl focus:outline-none focus:ring-2 ${
+                    className={`w-full pl-12 pr-4 py-4 bg-white border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] ${
                       errors.email
-                        ? "border-red-400"
+                        ? "border-red-400 focus:border-red-400 focus:ring-red-200"
                         : "border-[var(--elra-border-primary)]"
                     }`}
                     placeholder="Enter your email"
@@ -220,9 +220,9 @@ const Login = () => {
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    className={`w-full pl-12 pr-12 py-4 bg-white border-2 rounded-xl focus:outline-none focus:ring-2 ${
+                    className={`w-full pl-12 pr-12 py-4 bg-white border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] ${
                       errors.password
-                        ? "border-red-400"
+                        ? "border-red-400 focus:border-red-400 focus:ring-red-200"
                         : "border-[var(--elra-border-primary)]"
                     }`}
                     placeholder="Enter your password"

@@ -11,9 +11,9 @@ const getInitialState = () => {
   return {
     user: null,
     isAuthenticated: false,
-    loading: true, // Start with loading true to prevent flash of login page
+    loading: true,
     error: null,
-    initialized: false, // Start with initialized false to trigger auth check
+    initialized: false,
     subscriptionPlans: [],
   };
 };
@@ -338,9 +338,9 @@ export const AuthProvider = ({ children }) => {
           .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
       });
 
-      localStorage.removeItem("redirectAfterLogin");
-
-      sessionStorage.clear();
+      if (window.queryClient) {
+        window.queryClient.clear();
+      }
 
       setHasLoggedIn(false);
       dispatch({ type: AUTH_ACTIONS.LOGOUT });

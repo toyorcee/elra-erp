@@ -9,6 +9,11 @@ import EmailVerification from "./pages/auth/EmailVerification";
 import EmailVerificationSuccess from "./pages/auth/EmailVerificationSuccess";
 import { Dashboard, Documents } from "./pages/user";
 import HRInvitations from "./pages/user/modules/hr/HRInvitations";
+import OnboardingManagement from "./pages/user/modules/hr/onboarding/OnboardingManagement";
+import OffboardingManagement from "./pages/user/modules/hr/offboarding/OffboardingManagement";
+import LeaveManagement from "./pages/user/modules/hr/leave/LeaveManagement";
+import AttendanceTracking from "./pages/user/modules/hr/attendance/AttendanceTracking";
+import LeaveCalendar from "./pages/user/modules/hr/leave/LeaveCalendar";
 import HRDepartments from "./pages/user/modules/hr/HRDepartments";
 import HRRoles from "./pages/user/modules/hr/HRRoles";
 import HRUsers from "./pages/user/modules/hr/HRUsers";
@@ -45,6 +50,7 @@ import TermsConditions from "./pages/legal/TermsConditions";
 import ModuleSelector from "./components/ModuleSelector";
 import Wireframe from "./pages/Wireframe";
 import ERPFlowchart from "./pages/ERPFlowchart";
+import Profile from "./pages/user/Profile";
 
 const AppRoutes = () => {
   return (
@@ -111,6 +117,7 @@ const AppRoutes = () => {
         <Route path="documents" element={<Documents />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="profile" element={<Profile />} />
 
         {/* Module routes - dynamic module dashboards */}
         <Route path="modules/:module" element={<Dashboard />} />
@@ -119,7 +126,18 @@ const AppRoutes = () => {
         <Route path="modules/hr/users" element={<HRUsers />} />
         <Route path="modules/hr/departments" element={<HRDepartments />} />
         <Route path="modules/hr/roles" element={<HRRoles />} />
-        <Route path="modules/hr/onboarding" element={<HRInvitations />} />
+        <Route path="modules/hr/invitation" element={<HRInvitations />} />
+        <Route
+          path="modules/hr/onboarding"
+          element={<OnboardingManagement />}
+        />
+        <Route
+          path="modules/hr/offboarding"
+          element={<OffboardingManagement />}
+        />
+        <Route path="modules/hr/leave/requests" element={<LeaveManagement />} />
+        <Route path="modules/hr/attendance" element={<AttendanceTracking />} />
+        <Route path="modules/hr/leave/calendar" element={<LeaveCalendar />} />
         <Route
           path="modules/payroll/salary-grades"
           element={<SalaryGradeManagement />}

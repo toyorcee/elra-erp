@@ -107,6 +107,34 @@ class NotificationService {
     return userPreferences;
   }
 
+  // Delete a notification
+  async deleteNotification(notificationId, userId) {
+    try {
+      const notification = await Notification.findOneAndDelete({
+        _id: notificationId,
+        recipient: userId,
+      });
+
+      if (!notification) {
+        console.log(
+          `❌ [NOTIFICATION] Notification ${notificationId} not found or not owned by user ${userId}`
+        );
+        return null;
+      }
+
+      console.log(
+        `✅ [NOTIFICATION] Successfully deleted notification ${notificationId}`
+      );
+      return notification;
+    } catch (error) {
+      console.error(
+        `❌ [NOTIFICATION] Error deleting notification ${notificationId}:`,
+        error
+      );
+      throw error;
+    }
+  }
+
   // Send document approval notification
   async sendApprovalNotification(documentId, approverId, documentTitle) {
     const approver = await User.findById(approverId);

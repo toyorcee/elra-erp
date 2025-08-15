@@ -12,8 +12,11 @@ import {
   EnvelopeIcon,
   PhoneIcon,
   CalendarIcon,
+  ChatBubbleLeftRightIcon,
 } from "@heroicons/react/24/outline";
 import { userModulesAPI } from "../../../../services/userModules.js";
+import { useMessageContext } from "../../../../context/MessageContext";
+import defaultAvatar from "../../../../assets/defaulticon.jpg";
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -24,6 +27,7 @@ const UserManagement = () => {
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const { openChatWithUser } = useMessageContext();
 
   useEffect(() => {
     loadData();
@@ -53,6 +57,49 @@ const UserManagement = () => {
     }
   };
 
+  // Image utility functions
+  const getDefaultAvatar = () => {
+    return defaultAvatar;
+  };
+
+  const getImageUrl = (avatarPath) => {
+    if (!avatarPath) return getDefaultAvatar();
+    if (avatarPath.startsWith("http")) return avatarPath;
+
+    const baseUrl = (
+      import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+    ).replace("/api", "");
+    return `${baseUrl}${avatarPath}`;
+  };
+
+  const getAvatarDisplay = (user) => {
+    if (user.avatar) {
+      return (
+        <img
+          src={getImageUrl(user.avatar)}
+          alt={`${user.firstName} ${user.lastName}`}
+          className="w-12 h-12 rounded-full object-cover"
+          onError={(e) => {
+            e.target.src = getDefaultAvatar();
+          }}
+        />
+      );
+    }
+    return (
+      <div className="w-12 h-12 bg-[var(--elra-primary)] rounded-full flex items-center justify-center">
+        <span className="text-white font-semibold text-lg">
+          {user.firstName?.[0]}
+          {user.lastName?.[0]}
+        </span>
+      </div>
+    );
+  };
+
+  const handleMessageUser = (user) => {
+    // Open chat with the selected user using the message context
+    openChatWithUser(user);
+  };
+
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
       user.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -71,7 +118,7 @@ const UserManagement = () => {
   const getStatusColor = (status) => {
     switch (status) {
       case "active":
-        return "bg-green-100 text-green-800";
+        return "bg-[var(--elra-secondary-3)] text-[var(--elra-primary)]";
       case "inactive":
         return "bg-red-100 text-red-800";
       case "pending":
@@ -214,12 +261,7 @@ const UserManagement = () => {
               {/* User Header */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-[var(--elra-primary)] rounded-full flex items-center justify-center">
-                    <span className="text-white font-semibold text-lg">
-                      {user.firstName?.[0]}
-                      {user.lastName?.[0]}
-                    </span>
-                  </div>
+                  {getAvatarDisplay(user)}
                   <div>
                     <h3 className="font-semibold text-gray-900">
                       {user.firstName} {user.lastName}
@@ -227,17 +269,13 @@ const UserManagement = () => {
                     <p className="text-sm text-gray-500">@{user.username}</p>
                   </div>
                 </div>
-                <div className="flex space-x-2">
-                  <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-                    <EyeIcon className="h-4 w-4" />
-                  </button>
-                  <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
-                    <PencilIcon className="h-4 w-4" />
-                  </button>
-                  <button className="p-2 text-gray-400 hover:text-red-600 transition-colors">
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
-                </div>
+                <button
+                  onClick={() => handleMessageUser(user)}
+                  className="p-2 text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] rounded-lg transition-colors"
+                  title={`Message ${user.firstName} ${user.lastName}`}
+                >
+                  <ChatBubbleLeftRightIcon className="h-5 w-5" />
+                </button>
               </div>
 
               {/* User Details */}
@@ -292,21 +330,11 @@ const UserManagement = () => {
 
               {/* User Stats */}
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <div className="grid grid-cols-2 gap-4 text-center">
-                  <div>
-                    <p className="text-xs text-gray-500">Joined</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {new Date(user.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Last Login</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {user.lastLoginAt
-                        ? new Date(user.lastLoginAt).toLocaleDateString()
-                        : "Never"}
-                    </p>
-                  </div>
+                <div className="text-center">
+                  <p className="text-xs text-gray-500">Joined</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {new Date(user.createdAt).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
             </div>

@@ -48,6 +48,8 @@ import userRegistrationRoutes from "./routes/userRegistration.js";
 import systemSetupRoutes from "./routes/systemSetup.js";
 import scanningRoutes from "./routes/scanning.js";
 import salaryGradeRoutes from "./routes/salaryGrades.js";
+import employeeLifecycleRoutes from "./routes/employeeLifecycle.js";
+import leaveRoutes from "./routes/leave.js";
 
 const isValidObjectId = (id) => {
   return (
@@ -222,6 +224,8 @@ app.use("/api/user-registration", userRegistrationRoutes);
 app.use("/api/system-setup", systemSetupRoutes);
 app.use("/api/scanning", scanningRoutes);
 app.use("/api/salary-grades", salaryGradeRoutes);
+app.use("/api/employee-lifecycle", employeeLifecycleRoutes);
+app.use("/api/leave", leaveRoutes);
 
 // Create Socket.IO server before starting HTTP server
 const io = new SocketIOServer(httpServer, {
@@ -424,11 +428,10 @@ io.on("connection", async (socket) => {
         await global.notificationService.createNotification({
           recipient: recipient,
           type: "MESSAGE_RECEIVED",
-          title: `New message from ${
-            message.sender.name || message.sender.firstName
+          title: `New message received`,
+          message: `You have a new message from ${
+            message.sender.firstName || message.sender.name
           }`,
-          message:
-            content.length > 50 ? `${content.substring(0, 50)}...` : content,
           data: {
             senderId: sender,
             messageId: message._id,

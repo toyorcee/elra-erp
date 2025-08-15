@@ -176,7 +176,7 @@ export const userModulesAPI = {
     // Get all invitations
     getAllInvitations: async (params = {}) => {
       try {
-        const response = await api.get("/invitations", { params });
+        const response = await api.get("/invitations/user", { params });
         return response.data;
       } catch (error) {
         console.error("❌ [invitationsAPI] Error fetching invitations:", error);
@@ -322,6 +322,16 @@ export const userModulesAPI = {
         throw error;
       }
     },
+
+    getOnboardedMembers: async (params) => {
+      try {
+        const response = await api.get("/users/onboarded", { params });
+        return response.data;
+      } catch (error) {
+        console.error("❌ [usersAPI] Error fetching onboarded members:", error);
+        throw error;
+      }
+    },
   },
 
   // Salary Grade Management API
@@ -443,6 +453,272 @@ export const userModulesAPI = {
         return response.data;
       } catch (error) {
         console.error("❌ [rolesAPI] Error deleting role:", error);
+        throw error;
+      }
+    },
+  },
+
+  profile: {
+    getProfile: async () => {
+      try {
+        const response = await api.get("/profile");
+        return response.data;
+      } catch (error) {
+        console.error("❌ [profileAPI] Error fetching profile:", error);
+        throw error;
+      }
+    },
+
+    updateProfile: async (profileData) => {
+      try {
+        const response = await api.put("/profile", profileData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
+        return response.data;
+      } catch (error) {
+        console.error("❌ [profileAPI] Error updating profile:", error);
+        throw error;
+      }
+    },
+
+    uploadAvatar: async (avatarFile) => {
+      try {
+        const formData = new FormData();
+        formData.append("avatar", avatarFile);
+
+        const response = await api.post("/profile/avatar", formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
+        return response.data;
+      } catch (error) {
+        console.error("❌ [profileAPI] Error uploading avatar:", error);
+        throw error;
+      }
+    },
+  },
+
+  employeeLifecycle: {
+    getAll: async (params) => {
+      try {
+        const response = await api.get("/employee-lifecycle", { params });
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [employeeLifecycleAPI] Error fetching lifecycles:",
+          error
+        );
+        throw error;
+      }
+    },
+    getById: async (id) => {
+      try {
+        const response = await api.get(`/employee-lifecycle/${id}`);
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [employeeLifecycleAPI] Error fetching lifecycle:",
+          error
+        );
+        throw error;
+      }
+    },
+    create: async (lifecycleData) => {
+      try {
+        const response = await api.post("/employee-lifecycle", lifecycleData);
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [employeeLifecycleAPI] Error creating lifecycle:",
+          error
+        );
+        throw error;
+      }
+    },
+    updateStatus: async (id, statusData) => {
+      try {
+        const response = await api.patch(
+          `/employee-lifecycle/${id}/status`,
+          statusData
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [employeeLifecycleAPI] Error updating status:",
+          error
+        );
+        throw error;
+      }
+    },
+    completeChecklistItem: async (id, itemData) => {
+      try {
+        const response = await api.patch(
+          `/employee-lifecycle/${id}/checklist`,
+          itemData
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [employeeLifecycleAPI] Error completing checklist item:",
+          error
+        );
+        throw error;
+      }
+    },
+    updateTaskStatus: async (id, taskData) => {
+      try {
+        const response = await api.patch(
+          `/employee-lifecycle/${id}/task`,
+          taskData
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [employeeLifecycleAPI] Error updating task status:",
+          error
+        );
+        throw error;
+      }
+    },
+    getActive: async () => {
+      try {
+        const response = await api.get("/employee-lifecycle/active");
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [employeeLifecycleAPI] Error fetching active lifecycles:",
+          error
+        );
+        throw error;
+      }
+    },
+    getOverdue: async () => {
+      try {
+        const response = await api.get("/employee-lifecycle/overdue");
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [employeeLifecycleAPI] Error fetching overdue lifecycles:",
+          error
+        );
+        throw error;
+      }
+    },
+    getStats: async () => {
+      try {
+        const response = await api.get("/employee-lifecycle/stats");
+        return response.data;
+      } catch (error) {
+        console.error("❌ [employeeLifecycleAPI] Error fetching stats:", error);
+        throw error;
+      }
+    },
+    initiateOffboarding: async (employeeId) => {
+      try {
+        const response = await api.post(
+          "/employee-lifecycle/initiate-offboarding",
+          { employeeId }
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [employeeLifecycleAPI] Error initiating offboarding:",
+          error
+        );
+        throw error;
+      }
+    },
+    getOffboarding: async (params) => {
+      try {
+        const response = await api.get("/employee-lifecycle/offboarding", {
+          params,
+        });
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [employeeLifecycleAPI] Error fetching offboarding lifecycles:",
+          error
+        );
+        throw error;
+      }
+    },
+  },
+
+  // Leave Management API
+  leave: {
+    // Create leave request
+    createRequest: async (leaveData) => {
+      try {
+        const response = await api.post("/leave", leaveData);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [leaveAPI] Error creating leave request:", error);
+        throw error;
+      }
+    },
+    // Get leave requests (role-based)
+    getRequests: async (params = {}) => {
+      try {
+        const response = await api.get("/leave", { params });
+        return response.data;
+      } catch (error) {
+        console.error("❌ [leaveAPI] Error fetching leave requests:", error);
+        throw error;
+      }
+    },
+    // Get leave request by ID
+    getRequestById: async (id) => {
+      try {
+        const response = await api.get(`/leave/${id}`);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [leaveAPI] Error fetching leave request:", error);
+        throw error;
+      }
+    },
+    // Approve/Reject leave request
+    approveRequest: async (id, action, comment = "") => {
+      try {
+        const response = await api.put(`/leave/${id}/approve`, {
+          action,
+          comment,
+        });
+        return response.data;
+      } catch (error) {
+        console.error("❌ [leaveAPI] Error approving leave request:", error);
+        throw error;
+      }
+    },
+    // Cancel leave request
+    cancelRequest: async (id, reason = "") => {
+      try {
+        const response = await api.put(`/leave/${id}/cancel`, { reason });
+        return response.data;
+      } catch (error) {
+        console.error("❌ [leaveAPI] Error cancelling leave request:", error);
+        throw error;
+      }
+    },
+    // Get leave statistics
+    getStats: async () => {
+      try {
+        const response = await api.get("/leave/stats/overview");
+        return response.data;
+      } catch (error) {
+        console.error("❌ [leaveAPI] Error fetching leave stats:", error);
+        throw error;
+      }
+    },
+    // Get pending approvals
+    getPendingApprovals: async () => {
+      try {
+        const response = await api.get("/leave/pending/approvals");
+        return response.data;
+      } catch (error) {
+        console.error("❌ [leaveAPI] Error fetching pending approvals:", error);
         throw error;
       }
     },

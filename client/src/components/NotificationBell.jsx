@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { MdNotifications, MdNotificationsActive } from "react-icons/md";
+import { BellIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-toastify";
 import notificationService from "../services/notifications";
 import { useSocket } from "../context/SocketContext";
@@ -194,95 +194,81 @@ const NotificationBell = ({ className = "" }) => {
     <div className={`relative ${className}`} ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2.5 rounded-xl bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+        className="p-2 rounded-xl text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] transition-all duration-200 hover:scale-105 relative cursor-pointer"
         title="Notifications"
       >
         {unreadCount > 0 ? (
-          <MdNotificationsActive className="w-5 h-5" />
+          <BellIcon className="w-6 h-6" />
         ) : (
-          <MdNotifications className="w-5 h-5" />
+          <BellIcon className="w-6 h-6" />
         )}
 
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-lg border-2 border-white">
+          <span className="absolute -top-1 -right-1 w-5 h-5 text-white text-xs rounded-full flex items-center justify-center font-bold transition-all duration-200 bg-red-500 scale-100 animate-pulse">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-[var(--elra-border-primary)] z-50">
+          <div className="p-4 border-b border-[var(--elra-border-primary)]">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900">
+              <h3 className="text-sm font-semibold text-[var(--elra-text-primary)]">
                 Notifications
               </h3>
-              {unreadCount > 0 && (
-                <button
-                  onClick={handleMarkAllAsRead}
-                  disabled={loading}
-                  className="text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
-                >
-                  {loading ? "Marking..." : "Mark all read"}
-                </button>
-              )}
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-[var(--elra-text-muted)] hover:text-[var(--elra-text-primary)]"
+              >
+                ×
+              </button>
             </div>
           </div>
 
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-96 overflow-y-auto">
             {notificationsLoading ? (
-              <div className="p-4 text-center text-gray-500">
-                Loading notifications...
+              <div className="p-4 text-center text-[var(--elra-text-muted)]">
+                Loading...
               </div>
             ) : notifications.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">
+              <div className="p-4 text-center text-[var(--elra-text-muted)]">
                 No notifications
               </div>
             ) : (
-              <div className="divide-y divide-gray-100">
-                {notifications.map((notification) => (
-                  <div
-                    key={notification._id}
-                    className={`p-4 hover:bg-gray-50 transition-colors duration-200 border-l-4 cursor-pointer ${getPriorityColor(
-                      notification.data?.priority || "medium"
-                    )} ${
-                      !notification.isRead ? "bg-[var(--elra-secondary-3)]" : ""
-                    }`}
-                    onClick={() => handleNotificationClick(notification)}
-                  >
-                    <div className="flex items-start space-x-3">
-                      <div className="flex-shrink-0 text-lg">
-                        {getNotificationIcon(notification.type)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {notification.title}
-                          </p>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xs text-gray-500">
-                              {formatTimestamp(notification.createdAt)}
-                            </span>
-                            {!notification.isRead && (
-                              <div className="w-2 h-2 bg-[var(--elra-primary)] rounded-full"></div>
-                            )}
-                          </div>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                          {notification.message}
+              notifications.map((notification) => (
+                <div
+                  key={notification._id}
+                  onClick={() => handleNotificationClick(notification)}
+                  className="p-4 border-b border-[var(--elra-border-primary)] hover:bg-[var(--elra-secondary-3)] cursor-pointer transition-colors"
+                >
+                  <div className="flex items-start space-x-3">
+                    <div className="w-8 h-8 bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white text-xs font-bold">
+                      {getNotificationIcon(notification.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-[var(--elra-text-primary)] truncate">
+                          {notification.title}
                         </p>
+                        <span className="text-xs text-[var(--elra-text-muted)]">
+                          {formatTimestamp(notification.createdAt)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-[var(--elra-text-muted)] truncate mt-1">
+                        {notification.message}
+                      </p>
+                      {!notification.isRead && (
                         <div className="flex items-center space-x-2 mt-2">
-                          {!notification.read && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleMarkAsRead(notification._id);
-                              }}
-                              className="text-xs text-blue-600 hover:text-blue-800"
-                            >
-                              Mark as read
-                            </button>
-                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMarkAsRead(notification._id);
+                            }}
+                            className="text-xs text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)]"
+                          >
+                            Mark as read
+                          </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -293,22 +279,22 @@ const NotificationBell = ({ className = "" }) => {
                             Delete
                           </button>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))
             )}
           </div>
 
           {notifications.length > 0 && (
-            <div className="px-4 py-2 border-t border-gray-200 bg-gray-50">
+            <div className="p-3 border-t border-[var(--elra-border-primary)]">
               <button
                 onClick={() => {
                   setIsOpen(false);
                   navigate("/dashboard/notifications");
                 }}
-                className="text-xs text-blue-600 hover:text-blue-800 font-medium w-full text-center"
+                className="w-full text-sm text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] font-medium"
               >
                 View all notifications
               </button>

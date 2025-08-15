@@ -149,11 +149,18 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     }
   };
 
-  const toggleSectionCollapse = (sectionTitle) => {
-    setCollapsedSections((prev) => ({
-      ...prev,
-      [sectionTitle]: !prev[sectionTitle],
-    }));
+  const toggleSectionCollapse = (sectionTitle, event) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    setTimeout(() => {
+      setCollapsedSections((prev) => ({
+        ...prev,
+        [sectionTitle]: !prev[sectionTitle],
+      }));
+    }, 50);
   };
 
   const isSectionCollapsed = (sectionTitle, defaultExpanded = false) => {
@@ -357,7 +364,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
       <div key={sectionKey} className={`mb-8 ${extraMarginTop}`}>
         {shouldShowExpanded && (
           <button
-            onClick={() => toggleSectionCollapse(sectionTitle)}
+            onClick={(e) => toggleSectionCollapse(sectionTitle, e)}
             className={`w-full px-4 text-sm font-bold uppercase tracking-wider mb-3 py-3 rounded-lg flex items-center justify-between transition-all duration-200 text-[var(--elra-primary)] cursor-pointer`}
           >
             <div className="flex items-center">
@@ -536,7 +543,9 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                 {shouldShowExpanded && (
                   <div className="mb-6 mt-4">
                     <button
-                      onClick={() => toggleSectionCollapse("Module Features")}
+                      onClick={(e) =>
+                        toggleSectionCollapse("Module Features", e)
+                      }
                       className="w-full px-4 text-sm font-bold text-[var(--elra-primary)] uppercase tracking-wider mb-3 py-3 rounded-lg flex items-center justify-between transition-all duration-200 cursor-pointer"
                     >
                       <span>Module Features</span>
@@ -567,8 +576,8 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                         <div key={sectionIndex} className="mb-4">
                           {shouldShowExpanded && (
                             <button
-                              onClick={() =>
-                                toggleSectionCollapse(section.title)
+                              onClick={(e) =>
+                                toggleSectionCollapse(section.title, e)
                               }
                               className="w-full px-4 text-xs font-semibold text-[var(--elra-primary)] uppercase tracking-wider mb-2 py-2 rounded-lg flex items-center justify-between transition-all duration-200 cursor-pointer"
                             >

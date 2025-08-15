@@ -53,6 +53,9 @@ const BulkInvitationSystem = () => {
 
   const [showResendModal, setShowResendModal] = useState(false);
   const [selectedInvitation, setSelectedInvitation] = useState(null);
+  const [showRetryConfirmation, setShowRetryConfirmation] = useState(false);
+  const [retryType, setRetryType] = useState(null);
+  const [retryTarget, setRetryTarget] = useState(null);
 
   const [csvFile, setCsvFile] = useState(null);
   const [csvEmails, setCsvEmails] = useState([]);
@@ -62,7 +65,10 @@ const BulkInvitationSystem = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [nextBatchNumber, setNextBatchNumber] = useState("");
   const [batchNumberLoading, setBatchNumberLoading] = useState(false);
-  const [retryingEmails, setRetryingEmails] = useState(false);
+  const [retryingSingleEmail, setRetryingSingleEmail] = useState(null);
+  const [retryingBatchEmails, setRetryingBatchEmails] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [submissionProgress, setSubmissionProgress] = useState(0);
@@ -75,6 +81,19 @@ const BulkInvitationSystem = () => {
 
   useEffect(() => {
     fetchInvitations(1, 10);
+    setLastRefreshTime(new Date());
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if ((event.ctrlKey && event.key === "r") || event.key === "F5") {
+        event.preventDefault();
+        handleRefresh();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   useEffect(() => {
@@ -123,9 +142,21 @@ const BulkInvitationSystem = () => {
     }
   };
 
+  const showRetryBatchConfirmation = (batchId) => {
+    setRetryType("batch");
+    setRetryTarget(batchId);
+    setShowRetryConfirmation(true);
+  };
+
+  const showRetrySingleConfirmation = (invitationId) => {
+    setRetryType("single");
+    setRetryTarget(invitationId);
+    setShowRetryConfirmation(true);
+  };
+
   const handleRetryEmails = async (batchId) => {
     console.log("🔄 [FRONTEND] Retrying emails for batch:", batchId);
-    setRetryingEmails(true);
+    setRetryingBatchEmails(batchId);
     try {
       const response = await userModulesAPI.invitations.retryFailedEmails(
         batchId
@@ -135,10 +166,28 @@ const BulkInvitationSystem = () => {
       // Update the result with new statistics
       setResult(response);
 
+      // Refresh the invitations list to update status
+      await fetchInvitations(
+        invitationPagination.page,
+        invitationPagination.limit,
+        true
+      );
+      setLastRefreshTime(new Date());
+
+      // Show success confirmation modal
+      setRetryType("batch");
+      setRetryTarget(batchId);
+      setShowRetryConfirmation(true);
+      console.log(
+        "🎉 [FRONTEND] Setting confirmation modal to show for batch retry"
+      );
+
       toast.success(
         <div className="flex items-center space-x-3">
           <div>
-            <div className="font-medium">Emails Retried Successfully!</div>
+            <div className="font-medium">
+              Batch Emails Retried Successfully!
+            </div>
             <div className="text-sm text-gray-600">
               {response.data?.statistics?.emailsSent || 0} emails sent
             </div>
@@ -151,7 +200,7 @@ const BulkInvitationSystem = () => {
         error.response?.data?.message || "Failed to retry emails";
       toast.error(errorMessage);
     } finally {
-      setRetryingEmails(false);
+      setRetryingBatchEmails(null);
     }
   };
 
@@ -160,7 +209,7 @@ const BulkInvitationSystem = () => {
       "🔄 [FRONTEND] Retrying single email for invitation:",
       invitationId
     );
-    setRetryingEmails(true);
+    setRetryingSingleEmail(invitationId);
     try {
       const response = await userModulesAPI.invitations.retrySingleEmail(
         invitationId
@@ -172,6 +221,21 @@ const BulkInvitationSystem = () => {
 
       // Update the result with new statistics
       setResult(response);
+
+      // Refresh the invitations list to update status
+      await fetchInvitations(
+        invitationPagination.page,
+        invitationPagination.limit,
+        true
+      );
+      setLastRefreshTime(new Date());
+
+      setRetryType("single");
+      setRetryTarget(invitationId);
+      setShowRetryConfirmation(true);
+      console.log(
+        "🎉 [FRONTEND] Setting confirmation modal to show for single retry"
+      );
 
       toast.success(
         <div className="flex items-center space-x-3">
@@ -189,18 +253,37 @@ const BulkInvitationSystem = () => {
         error.response?.data?.message || "Failed to retry email";
       toast.error(errorMessage);
     } finally {
-      setRetryingEmails(false);
+      setRetryingSingleEmail(null);
     }
   };
 
-  const fetchInvitations = async (page = 1, limit = 10) => {
+  const fetchInvitations = async (
+    page = 1,
+    limit = 10,
+    forceRefresh = false
+  ) => {
     setInvitationsLoading(true);
     setInvitationsError(null);
+
+    if (forceRefresh) {
+      setInvitations([]);
+      setResult(null);
+    }
+
     try {
-      const response = await userModulesAPI.invitations.getAllInvitations({
+      const params = {
         page,
         limit,
-      });
+      };
+
+      // Add cache-busting parameter for force refresh
+      if (forceRefresh) {
+        params._t = Date.now();
+      }
+
+      const response = await userModulesAPI.invitations.getAllInvitations(
+        params
+      );
       if (response.success) {
         setInvitations(response.data.invitations || []);
         setInvitationPagination(
@@ -220,6 +303,24 @@ const BulkInvitationSystem = () => {
     }
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchInvitations(
+        invitationPagination.page,
+        invitationPagination.limit,
+        true
+      );
+      setLastRefreshTime(new Date());
+      toast.success("Invitations refreshed successfully!");
+    } catch (error) {
+      console.error("Error refreshing invitations:", error);
+      toast.error("Failed to refresh invitations");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const handleResendInvitation = async (invitationId) => {
     try {
       setResendingId(invitationId);
@@ -227,8 +328,10 @@ const BulkInvitationSystem = () => {
       // Refresh list to reflect potential status changes
       await fetchInvitations(
         invitationPagination.page,
-        invitationPagination.limit
+        invitationPagination.limit,
+        true
       );
+      setLastRefreshTime(new Date());
       setShowResendModal(false);
       setSelectedInvitation(null);
 
@@ -236,7 +339,7 @@ const BulkInvitationSystem = () => {
       toast.success(
         <div className="flex items-center space-x-3">
           <div className="flex-shrink-0">
-            <CheckCircleIcon className="h-6 w-6 text-green-500 animate-bounce" />
+            <CheckCircleIcon className="h-6 w-6 text-[var(--elra-primary)] animate-bounce" />
           </div>
           <div>
             <div className="font-medium">Invitation Resent Successfully!</div>
@@ -487,7 +590,6 @@ const BulkInvitationSystem = () => {
       }
     });
 
-    // Set error message if there are invalid emails
     if (invalidEmails.length > 0) {
       setManualEmailError(
         `Invalid email addresses: ${invalidEmails.join(", ")}`
@@ -570,7 +672,8 @@ const BulkInvitationSystem = () => {
       setShowPreview(false);
       setShowSubmissionSummary(true);
 
-      await fetchInvitations(1, 10);
+      await fetchInvitations(1, 10, true);
+      setLastRefreshTime(new Date());
 
       toast.success(
         <div className="flex items-center space-x-3">
@@ -708,7 +811,7 @@ const BulkInvitationSystem = () => {
             </div>
             <button
               onClick={() => setShowCreateForm(!showCreateForm)}
-              className="inline-flex items-center px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors font-medium"
+              className="inline-flex items-center px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors font-medium cursor-pointer"
             >
               <EnvelopeIcon className="h-5 w-5 mr-2" />
               {showCreateForm ? "Hide Form" : "Create Invitation"}
@@ -1170,13 +1273,12 @@ const BulkInvitationSystem = () => {
                       validateManualEmails(e.target.value);
                     }}
                     onPaste={(e) => {
-                      // Handle pasted content - normalize line breaks and separators
                       e.preventDefault();
                       const pastedText = e.clipboardData.getData("text");
                       const normalizedText = pastedText
-                        .replace(/\r\n/g, "\n") // Windows line breaks
-                        .replace(/\r/g, "\n") // Mac line breaks
-                        .replace(/[,\s]+/g, "\n") // Convert commas and spaces to newlines
+                        .replace(/\r\n/g, "\n")
+                        .replace(/\r/g, "\n")
+                        .replace(/[,\s]+/g, "\n")
                         .split("\n")
                         .map((email) => email.trim())
                         .filter((email) => email)
@@ -1194,7 +1296,7 @@ const BulkInvitationSystem = () => {
                     }}
                     placeholder="Enter email addresses separated by commas, spaces, or new lines&#10;Example:&#10;john@company.com&#10;jane@company.com&#10;mike@company.com&#10;&#10;💡 You can also paste a list of emails from Excel, Word, or any text source"
                     rows={6}
-                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-[var(--elra-border-focus)] focus:border-[var(--elra-border-focus)] resize-none ${
+                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none bg-white/80 backdrop-blur-sm shadow-sm ${
                       manualEmailError
                         ? "border-red-500"
                         : "border-[var(--elra-border-primary)]"
@@ -1207,10 +1309,10 @@ const BulkInvitationSystem = () => {
                     </p>
                   )}
                   {formData.manualEmails && !manualEmailError && (
-                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="mt-2 p-2 bg-[var(--elra-secondary-3)] rounded-lg">
                       <div className="flex items-center space-x-2">
-                        <CheckCircleIcon className="h-4 w-4 text-green-500" />
-                        <span className="text-sm text-green-700">
+                        <CheckCircleIcon className="h-4 w-4 text-[var(--elra-primary)]" />
+                        <span className="text-sm text-[var(--elra-primary)]">
                           {(() => {
                             if (!formData.manualEmails.trim()) return 0;
                             const emailList = formData.manualEmails
@@ -1239,15 +1341,15 @@ const BulkInvitationSystem = () => {
 
               {/* CSV Preview */}
               {showCsvPreview && csvEmails.length > 0 && (
-                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="mb-4 p-3 bg-[var(--elra-secondary-3)] border border-[var(--elra-primary)] rounded-lg">
                   <div className="flex items-center space-x-2 mb-2">
-                    <CheckCircleIcon className="h-4 w-4 text-green-500" />
-                    <span className="text-sm font-medium text-green-800">
+                    <CheckCircleIcon className="h-4 w-4 text-[var(--elra-primary)]" />
+                    <span className="text-sm font-medium text-[var(--elra-primary)]">
                       📊 CSV Uploaded: {csvEmails.length} emails found
                     </span>
                   </div>
                   <div className="max-h-20 overflow-y-auto">
-                    <p className="text-xs text-green-700">
+                    <p className="text-xs text-[var(--elra-primary)]">
                       {csvEmails.slice(0, 5).join(", ")}
                       {csvEmails.length > 5 &&
                         ` ... and ${csvEmails.length - 5} more`}
@@ -1416,8 +1518,54 @@ const BulkInvitationSystem = () => {
               </h2>
             </div>
             <div className="flex items-center space-x-2">
+              {(() => {
+                const failedBatchEmails = (
+                  result?.data?.invitations ||
+                  invitations ||
+                  []
+                ).filter(
+                  (inv) =>
+                    inv.batchId &&
+                    (!inv.emailSent ||
+                      inv.emailError ||
+                      inv.status === "failed")
+                );
+                const uniqueBatches = [
+                  ...new Set(failedBatchEmails.map((inv) => inv.batchId)),
+                ];
+
+                if (uniqueBatches.length > 0) {
+                  const batchGroups = {};
+                  failedBatchEmails.forEach((inv) => {
+                    if (!batchGroups[inv.batchId]) {
+                      batchGroups[inv.batchId] = [];
+                    }
+                    batchGroups[inv.batchId].push(inv);
+                  });
+
+                  return (
+                    <div className="flex items-center space-x-2">
+                      {Object.entries(batchGroups).map(([batchId, emails]) => (
+                        <button
+                          key={batchId}
+                          onClick={() => showRetryBatchConfirmation(batchId)}
+                          disabled={retryingBatchEmails === batchId}
+                          className="inline-flex items-center px-3 py-1 rounded-md border text-sm cursor-pointer font-medium border-[var(--elra-primary)] text-[var(--elra-primary)] hover:bg-[var(--elra-primary)] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                          title={`Retry ${emails.length} failed emails in ${batchId}`}
+                        >
+                          <ArrowPathIcon className="h-4 w-4 mr-1" />
+                          {retryingBatchEmails === batchId
+                            ? "Retrying..."
+                            : `${batchId} (${emails.length})`}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               <button
-                className={`px-3 py-1 rounded-md border text-sm ${
+                className={`px-3 py-1 rounded-md border text-sm cursor-pointer ${
                   invitationFilter === "all"
                     ? "bg-[var(--elra-primary)] text-white"
                     : "border-[var(--elra-border-primary)] text-[var(--elra-text-primary)]"
@@ -1427,7 +1575,7 @@ const BulkInvitationSystem = () => {
                 All
               </button>
               <button
-                className={`px-3 py-1 rounded-md border text-sm ${
+                className={`px-3 py-1 rounded-md border text-sm cursor-pointer ${
                   invitationFilter === "single"
                     ? "bg-[var(--elra-primary)] text-white"
                     : "border-[var(--elra-border-primary)] text-[var(--elra-text-primary)]"
@@ -1437,7 +1585,7 @@ const BulkInvitationSystem = () => {
                 Single
               </button>
               <button
-                className={`px-3 py-1 rounded-md border text-sm ${
+                className={`px-3 py-1 rounded-md border text-sm cursor-pointer ${
                   invitationFilter === "batch"
                     ? "bg-[var(--elra-primary)] text-white"
                     : "border-[var(--elra-border-primary)] text-[var(--elra-text-primary)]"
@@ -1446,17 +1594,31 @@ const BulkInvitationSystem = () => {
               >
                 Batch
               </button>
-              <button
-                className="ml-2 px-3 py-1 rounded-md border border-[var(--elra-border-primary)] text-[var(--elra-text-primary)]"
-                onClick={() =>
-                  fetchInvitations(
-                    invitationPagination.page,
-                    invitationPagination.limit
-                  )
-                }
-              >
-                Refresh
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  className="px-3 py-2 rounded-md border border-[var(--elra-primary)] text-[var(--elra-primary)] hover:bg-[var(--elra-primary)] hover:text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 transition-colors duration-200"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  title="Refresh invitations (Ctrl+R or F5)"
+                >
+                  {refreshing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Refreshing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ArrowPathIcon className="h-4 w-4" />
+                      <span>Refresh</span>
+                    </>
+                  )}
+                </button>
+                {lastRefreshTime && (
+                  <span className="text-xs text-[var(--elra-text-secondary)]">
+                    Last updated: {lastRefreshTime.toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1510,13 +1672,10 @@ const BulkInvitationSystem = () => {
                           {inv.email}
                         </td>
                         <td className="py-3 pr-4 font-medium">
-                          {inv.department?.name || inv.department || "-"}
+                          {inv.department || "N/A"}
                         </td>
                         <td className="py-3 pr-4 font-medium">
-                          {(inv.role?.name || inv.role || "-").replace(
-                            /_/g,
-                            " "
-                          )}
+                          {(inv.role || "N/A").replace(/_/g, " ")}
                         </td>
                         <td className="py-3 pr-4 font-medium">
                           {inv.batchId ? "Batch" : "Single"}
@@ -1562,12 +1721,14 @@ const BulkInvitationSystem = () => {
                         <td className="py-3 pr-4 font-medium">
                           {inv.createdAt
                             ? new Date(inv.createdAt).toLocaleString()
+                            : inv.created_at
+                            ? new Date(inv.created_at).toLocaleString()
                             : inv.emailSentAt
                             ? new Date(inv.emailSentAt).toLocaleString()
-                            : "-"}
+                            : "N/A"}
                         </td>
                         <td className="py-3 pr-4 font-medium">
-                          {inv.batchId || "-"}
+                          {inv.batchId || "N/A"}
                         </td>
                         <td className="py-3 pr-4">
                           {(!inv.emailSent ||
@@ -1575,17 +1736,17 @@ const BulkInvitationSystem = () => {
                             inv.status === "failed") && (
                             <button
                               onClick={() => {
-                                if (inv.batchId) {
-                                  handleRetryEmails(inv.batchId);
-                                } else {
-                                  handleRetrySingleEmail(inv._id || inv.id);
-                                }
+                                showRetrySingleConfirmation(inv._id || inv.id);
                               }}
-                              disabled={retryingEmails}
-                              className="inline-flex items-center px-3 py-1 rounded-md border text-sm cursor-pointer font-medium border-green-600 text-green-600 hover:bg-green-600 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={
+                                retryingSingleEmail === (inv._id || inv.id)
+                              }
+                              className="inline-flex items-center px-3 py-1 rounded-md border text-sm cursor-pointer font-medium border-[var(--elra-primary)] text-[var(--elra-primary)] hover:bg-[var(--elra-primary)] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <ArrowPathIcon className="h-4 w-4 mr-1" />
-                              {retryingEmails ? "Retrying..." : "Retry Email"}
+                              {retryingSingleEmail === (inv._id || inv.id)
+                                ? "Retrying..."
+                                : "Retry Email"}
                             </button>
                           )}
                         </td>
@@ -1599,7 +1760,7 @@ const BulkInvitationSystem = () => {
                       <td className="py-12 text-center" colSpan="10">
                         <div className="empty-state">
                           <div className="empty-state-icon mb-4">
-                            <InformationCircleIcon className="h-16 w-16 text-[var(--elra-text-secondary)] mx-auto" />
+                            <InformationCircleIcon className="h-16 w-16 text-[var(--elra-primary)] mx-auto" />
                           </div>
                           <p className="text-[var(--elra-text-secondary)] font-medium text-lg mb-2">
                             No invitations found
@@ -1753,7 +1914,7 @@ const BulkInvitationSystem = () => {
           <div className="bg-white rounded-xl shadow-lg p-6 mt-6 border border-[var(--elra-border-primary)]">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
-                <CheckCircleIcon className="h-8 w-8 text-green-500 animate-bounce" />
+                <CheckCircleIcon className="h-8 w-8 text-[var(--elra-primary)] animate-bounce" />
                 <h3 className="text-xl font-bold text-[var(--elra-text-primary)]">
                   Invitations Sent Successfully!
                 </h3>
@@ -1767,20 +1928,20 @@ const BulkInvitationSystem = () => {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">
+              <div className="text-center p-4 bg-[var(--elra-secondary-3)] rounded-lg">
+                <div className="text-2xl font-bold text-[var(--elra-primary)]">
                   {result.data?.statistics?.successfulInvitations || 0}
                 </div>
                 <div className="text-sm text-black">Created</div>
               </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">
+              <div className="text-center p-4 bg-[var(--elra-secondary-3)] rounded-lg">
+                <div className="text-2xl font-bold text-[var(--elra-primary)]">
                   {result.data?.statistics?.emailsSent || 0}
                 </div>
                 <div className="text-sm text-black">Sent</div>
               </div>
-              <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                <div className="text-2xl font-bold text-yellow-600">
+              <div className="text-center p-4 bg-red-50 rounded-lg">
+                <div className="text-2xl font-bold text-red-600">
                   {result.data?.statistics?.emailsFailed || 0}
                 </div>
                 <div className="text-sm text-black">Email Failed</div>
@@ -1795,7 +1956,7 @@ const BulkInvitationSystem = () => {
 
             {/* Email Details */}
             {result.data?.invitations && result.data.invitations.length > 0 && (
-              <div className="mb-4 p-4 bg-green-50 rounded-lg">
+              <div className="mb-4 p-4 bg-[var(--elra-secondary-3)] rounded-lg">
                 <h4 className="font-medium text-black mb-2">
                   📧 Invitations Created ({result.data.invitations.length}):
                 </h4>
@@ -1806,7 +1967,7 @@ const BulkInvitationSystem = () => {
                       className="flex items-center justify-between p-2 bg-white rounded"
                     >
                       <div className="flex items-center space-x-3">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <div className="w-2 h-2 bg-[var(--elra-primary)] rounded-full"></div>
                         <span className="text-sm font-medium text-black">
                           {invitation.email}
                         </span>
@@ -1832,9 +1993,9 @@ const BulkInvitationSystem = () => {
             )}
 
             {/* What happens next? */}
-            <div className="mt-6 p-4 bg-green-50 rounded-lg">
+            <div className="mt-6 p-4 bg-[var(--elra-secondary-3)] rounded-lg">
               <div className="flex items-start space-x-3">
-                <InformationCircleIcon className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                <InformationCircleIcon className="h-5 w-5 text-[var(--elra-primary)] mt-0.5 flex-shrink-0" />
                 <div className="text-sm text-black">
                   <h4 className="font-normal text-black mb-2">
                     What happens next?
@@ -1874,10 +2035,10 @@ const BulkInvitationSystem = () => {
                       handleRetrySingleEmail(result.data.invitation?.id);
                     }
                   }}
-                  disabled={retryingEmails}
-                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  disabled={retryingBatchEmails || retryingSingleEmail}
+                  className="px-6 py-3 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 cursor-pointer"
                 >
-                  {retryingEmails ? (
+                  {retryingBatchEmails || retryingSingleEmail ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                       <span>Retrying...</span>
@@ -1897,8 +2058,11 @@ const BulkInvitationSystem = () => {
 
             <div className="flex justify-between items-center mt-6">
               <button
-                onClick={() => setShowSubmissionSummary(false)}
-                className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary)]"
+                onClick={() => {
+                  setShowSubmissionSummary(false);
+                  fetchInvitations(1, 10);
+                }}
+                className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary)] cursor-pointer"
               >
                 Close Summary
               </button>
@@ -1906,8 +2070,9 @@ const BulkInvitationSystem = () => {
                 onClick={() => {
                   setShowSubmissionSummary(false);
                   setResult(null);
+                  fetchInvitations(1, 10);
                 }}
-                className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary)]"
+                className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary)] cursor-pointer"
               >
                 Send Another Batch
               </button>
@@ -2037,6 +2202,85 @@ const BulkInvitationSystem = () => {
                         <span>Resend Invitation</span>
                       </>
                     )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Retry Confirmation Modal */}
+        {showRetryConfirmation && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full transform transition-all duration-300 ease-out border border-gray-100">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-[var(--elra-primary)] rounded-lg">
+                    <ArrowPathIcon className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-black">
+                      Confirm Email Retry
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      {retryType === "batch"
+                        ? "Are you sure you want to retry this batch?"
+                        : "Are you sure you want to retry this email?"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowRetryConfirmation(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-6">
+                <div className="mb-6">
+                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <div className="flex items-start space-x-3">
+                      <InformationCircleIcon className="h-5 w-5 text-[var(--elra-primary)] mt-0.5 flex-shrink-0" />
+                      <div className="text-sm text-black">
+                        <h4 className="font-medium text-black mb-2">
+                          What will happen?
+                        </h4>
+                        <ul className="space-y-1">
+                          <li>• A new invitation email will be sent</li>
+                          <li>
+                            • The previous invitation link will be invalidated
+                          </li>
+                          <li>• Email status will be updated</li>
+                          <li>• Retry button will be hidden after success</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={() => setShowRetryConfirmation(false)}
+                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowRetryConfirmation(false);
+                      if (retryType === "batch") {
+                        handleRetryEmails(retryTarget);
+                      } else {
+                        handleRetrySingleEmail(retryTarget);
+                      }
+                    }}
+                    className="px-6 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors cursor-pointer"
+                  >
+                    Confirm Retry
                   </button>
                 </div>
               </div>

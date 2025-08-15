@@ -11,6 +11,7 @@ import {
   updateUserProfile,
   getPendingRegistrationUsers,
   getAssignmentGuidanceForUser,
+  getOnboardedMembers,
 } from "../controllers/userController.js";
 import { protect } from "../middleware/auth.js";
 import { hasPermission } from "../utils/permissionUtils.js";
@@ -24,6 +25,7 @@ router.use(protect);
 router.get("/", getAllUsers);
 router.get("/pending", getPendingRegistrationUsers);
 router.get("/manageable", getManageableUsers);
+router.get("/onboarded", getOnboardedMembers);
 router.get("/profile", getUserProfile);
 router.put("/profile", updateUserProfile);
 router.get("/assignment-guidance", getAssignmentGuidanceForUser);

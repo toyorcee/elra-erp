@@ -1,9 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
-import { MdLogout, MdSettings, MdNotifications } from "react-icons/md";
+import { MdLogout, MdSettings, MdNotifications, MdEdit } from "react-icons/md";
 import { useAuth } from "../context/AuthContext";
+import { useProfile } from "../hooks/useProfile";
 import LogoutConfirmationModal from "./common/LogoutConfirmationModal";
+import defaultAvatar from "../assets/defaulticon.jpg";
 
 const getImageUrl = (avatarPath) => {
   if (!avatarPath) return null;
@@ -15,11 +17,32 @@ const getImageUrl = (avatarPath) => {
   return `${baseUrl}${avatarPath}`;
 };
 
+const getDefaultAvatar = () => {
+  return defaultAvatar;
+};
+
 const ProfileMenu = () => {
   const { user, logout } = useAuth();
+  const { profileData } = useProfile();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const currentUser = profileData || user;
+
+  useEffect(() => {
+    if (user?._id) {
+      setRefreshKey((prev) => prev + 1);
+      if (window.location.reload) {
+        setIsOpen(false);
+      }
+    }
+  }, [user?._id]);
+
+  useEffect(() => {
+    setIsOpen(false);
+  }, [user]);
 
   const handleLogoutClick = () => {
     setIsOpen(false);
@@ -32,15 +55,15 @@ const ProfileMenu = () => {
   };
 
   const getUserInitial = () => {
-    if (user?.firstName) return user.firstName[0].toUpperCase();
-    if (user?.name) return user.name[0].toUpperCase();
+    if (currentUser?.firstName) return currentUser.firstName[0].toUpperCase();
+    if (currentUser?.name) return currentUser.name[0].toUpperCase();
     return "U";
   };
 
   const getRoleTitle = () => {
-    if (!user?.role) return "User";
+    if (!currentUser?.role) return "User";
 
-    const roleLevel = user.role.level;
+    const roleLevel = currentUser.role.level;
     if (roleLevel >= 1000) return "Super Administrator";
     if (roleLevel >= 700) return "Head of Department";
     if (roleLevel >= 600) return "Manager";
@@ -59,35 +82,40 @@ const ProfileMenu = () => {
     navigate("/dashboard/notifications");
   };
 
+  const navigateToProfile = () => {
+    setIsOpen(false);
+    navigate("/dashboard/profile");
+  };
+
   return (
-    <div className="relative">
+    <div className="relative" key={refreshKey}>
       {/* Desktop Profile Section */}
       <div className="hidden lg:flex items-center space-x-3">
         {/* User Info */}
-        <div className="flex items-center space-x-3 bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] rounded-xl px-3 py-2 border border-white/20 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-xl backdrop-blur-sm">
+        <div
+          onClick={navigateToProfile}
+          className="flex items-center space-x-3 bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] rounded-xl px-3 py-2 border border-white/20 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-xl backdrop-blur-sm"
+          title="Go to your profile"
+        >
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg bg-white/20 backdrop-blur-sm overflow-hidden border border-white/30">
-            {user?.avatar ? (
-              <img
-                src={getImageUrl(user.avatar)}
-                alt="Profile"
-                className="w-full h-full object-cover rounded-full"
-                onError={(e) => {
-                  e.target.style.display = "none";
-                  e.target.nextSibling.style.display = "flex";
-                }}
-              />
-            ) : null}
-            <div
-              className={`w-full h-full flex items-center justify-center ${
-                user?.avatar ? "hidden" : ""
-              }`}
-            >
-              {getUserInitial()}
-            </div>
+            <img
+              src={
+                currentUser?.avatar
+                  ? getImageUrl(currentUser.avatar)
+                  : getDefaultAvatar()
+              }
+              alt="Profile"
+              className="w-full h-full object-cover rounded-full"
+              onError={(e) => {
+                e.target.src = getDefaultAvatar();
+              }}
+            />
           </div>
           <div className="text-white">
             <div className="text-sm font-medium">
-              {user?.firstName ? `${user.firstName} ${user.lastName}` : "User"}
+              {currentUser?.firstName
+                ? `${currentUser.firstName} ${currentUser.lastName}`
+                : "User"}
             </div>
             <div className="text-xs text-white/80">{getRoleTitle()}</div>
           </div>
@@ -185,46 +213,68 @@ const ProfileMenu = () => {
       {isOpen && (
         <div className="absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-2xl border border-gray-200 py-3 z-[9999]">
           {/* User Info Header */}
-          <div className="px-6 py-4 border-b border-gray-100">
+          <div
+            onClick={navigateToProfile}
+            className="px-6 py-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors duration-200"
+            title="Go to your profile"
+          >
             <div className="flex items-center space-x-4">
-              <div className="w-14 h-14 bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg overflow-hidden border-2 border-white/30">
-                {user?.avatar ? (
+              <div className="relative">
+                <div className="w-14 h-14 bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg overflow-hidden border-2 border-white/30">
                   <img
-                    src={getImageUrl(user.avatar)}
+                    src={
+                      currentUser?.avatar
+                        ? getImageUrl(currentUser.avatar)
+                        : getDefaultAvatar()
+                    }
                     alt="Profile"
                     className="w-full h-full object-cover rounded-full"
                     onError={(e) => {
-                      e.target.style.display = "none";
-                      e.target.nextSibling.style.display = "flex";
+                      e.target.src = getDefaultAvatar();
                     }}
                   />
-                ) : null}
-                <div
-                  className={`w-full h-full flex items-center justify-center ${
-                    user?.avatar ? "hidden" : ""
-                  }`}
-                >
-                  {getUserInitial()}
                 </div>
+                <button
+                  onClick={navigateToSettings}
+                  className="absolute -bottom-1 -right-1 w-6 h-6 bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white shadow-lg hover:bg-[var(--elra-primary-dark)] transition-all duration-200 cursor-pointer border-2 border-white"
+                  title="Edit Profile"
+                >
+                  <MdEdit className="w-3 h-3" />
+                </button>
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-bold text-gray-900 text-lg truncate">
-                  {user?.firstName
-                    ? `${user.firstName} ${user.lastName}`
+                  {currentUser?.firstName
+                    ? `${currentUser.firstName} ${currentUser.lastName}`
                     : "User"}
                 </div>
                 <div className="text-sm font-medium text-[var(--elra-primary)]">
                   {getRoleTitle()}
                 </div>
                 <div className="text-xs text-gray-500 truncate">
-                  {user?.email || "user@edms.com"}
+                  {currentUser?.email || "user@edms.com"}
                 </div>
+                {currentUser?.employeeId && (
+                  <div className="text-xs text-gray-400 truncate">
+                    ID: {currentUser.employeeId}
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
           {/* Menu Items */}
           <div className="py-2">
+            <button
+              onClick={navigateToProfile}
+              className="w-full flex items-center px-6 py-3 text-sm font-medium text-[var(--elra-text-primary)] hover:bg-[var(--elra-secondary-3)] hover:text-[var(--elra-primary)] transition-all duration-200 group"
+            >
+              <div className="w-8 h-8 bg-[var(--elra-secondary-3)] rounded-lg flex items-center justify-center mr-3 group-hover:bg-[var(--elra-secondary-2)] transition-colors duration-200">
+                <MdEdit className="w-4 h-4 text-[var(--elra-primary)]" />
+              </div>
+              <span>My Profile</span>
+            </button>
+
             <button
               onClick={navigateToNotifications}
               className="w-full flex items-center px-6 py-3 text-sm font-medium text-[var(--elra-text-primary)] hover:bg-[var(--elra-secondary-3)] hover:text-[var(--elra-primary)] transition-all duration-200 group"

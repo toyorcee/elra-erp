@@ -10,6 +10,16 @@ const LogoutConfirmationModal = ({ isOpen, onClose, onConfirm, user }) => {
     onClose();
   };
 
+  const getImageUrl = (avatarPath) => {
+    if (!avatarPath) return null;
+    if (avatarPath.startsWith("http")) return avatarPath;
+
+    const baseUrl = (
+      import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+    ).replace("/api", "");
+    return `${baseUrl}${avatarPath}`;
+  };
+
   const getUserInitial = () => {
     if (user?.firstName) return user.firstName[0].toUpperCase();
     if (user?.name) return user.name[0].toUpperCase();
@@ -78,10 +88,10 @@ const LogoutConfirmationModal = ({ isOpen, onClose, onConfirm, user }) => {
           <div className="p-6">
             {/* User Info */}
             <div className="flex items-center space-x-4 mb-6 p-4 bg-[var(--elra-secondary-3)] rounded-xl">
-              <div className="w-12 h-12 bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white font-bold text-lg">
+              <div className="w-12 h-12 bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white font-bold text-lg overflow-hidden">
                 {user?.avatar ? (
                   <img
-                    src={user.avatar}
+                    src={getImageUrl(user.avatar)}
                     alt="Profile"
                     className="w-full h-full object-cover rounded-full"
                     onError={(e) => {
@@ -90,7 +100,11 @@ const LogoutConfirmationModal = ({ isOpen, onClose, onConfirm, user }) => {
                     }}
                   />
                 ) : null}
-                <div className={user?.avatar ? "hidden" : ""}>
+                <div
+                  className={`w-full h-full flex items-center justify-center ${
+                    user?.avatar ? "hidden" : ""
+                  }`}
+                >
                   {getUserInitial()}
                 </div>
               </div>

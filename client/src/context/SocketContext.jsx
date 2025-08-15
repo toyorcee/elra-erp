@@ -22,11 +22,20 @@ export const SocketProvider = ({ children }) => {
   useEffect(() => {
     if (!user) {
       if (socket) {
+        console.log("🔌 Disconnecting socket - no user");
         socket.disconnect();
         setSocket(null);
         setIsConnected(false);
       }
       return;
+    }
+
+    // If we have a socket but the user changed, disconnect and reconnect
+    if (socket && socket.userId !== user._id) {
+      console.log("🔌 User changed, reconnecting socket");
+      socket.disconnect();
+      setSocket(null);
+      setIsConnected(false);
     }
 
     // Create socket connection
@@ -38,8 +47,14 @@ export const SocketProvider = ({ children }) => {
       auth: {
         token: user.token,
       },
+      query: {
+        userId: user._id || user.id,
+      },
       transports: ["websocket", "polling"],
     });
+
+    // Store user ID in socket for comparison
+    newSocket.userId = user._id || user.id;
 
     // Connection events
     newSocket.on("connect", () => {
@@ -65,19 +80,26 @@ export const SocketProvider = ({ children }) => {
     // Message events
     newSocket.on(SocketEventTypes.RECEIVE_MESSAGE, (message) => {
       console.log("💬 Message received via socket:", message);
-      toast.info(
-        `New message from ${
-          message.sender?.firstName || message.sender?.name || "Unknown"
-        }`
+      console.log(
+        "👤 Current user:",
+        user._id,
+        "Message sender:",
+        message.sender._id
       );
+      // Don't show toast - let the message count badge handle this
+      // The useMessages hook will handle updating the unread count
     });
 
     newSocket.on(SocketEventTypes.MESSAGE_SENT, (message) => {
       console.log("✅ Message sent confirmation:", message);
     });
 
-    newSocket.on(SocketEventTypes.MESSAGE_READ, (data) => {
+    newSocket.on(SocketEventTypes.MESSAGES_READ, (data) => {
       console.log("👁️ Messages read:", data);
+    });
+
+    newSocket.on(SocketEventTypes.MESSAGE_DELIVERED, (data) => {
+      console.log("📨 Message delivered:", data);
     });
 
     newSocket.on(SocketEventTypes.USER_TYPING, (data) => {
@@ -96,7 +118,7 @@ export const SocketProvider = ({ children }) => {
       console.log("🔴 User offline:", data);
     });
 
-    newSocket.on(SocketEventTypes.ERROR, (error) => {
+    newSocket.on("error", (error) => {
       console.error("❌ Socket error:", error);
       toast.error(error.message || "An error occurred");
     });
@@ -112,7 +134,7 @@ export const SocketProvider = ({ children }) => {
   // Socket methods
   const sendMessage = (messageData) => {
     if (socket && isConnected) {
-      socket.emit(SocketEventTypes.SEND_MESSAGE, messageData);
+      socket.emit("sendMessage", messageData);
     } else {
       console.warn("Socket not connected, cannot send message");
     }
@@ -120,19 +142,19 @@ export const SocketProvider = ({ children }) => {
 
   const markMessageRead = (senderId) => {
     if (socket && isConnected) {
-      socket.emit(SocketEventTypes.MESSAGE_READ, { senderId });
+      socket.emit("markMessageRead", { senderId });
     }
   };
 
   const updateTypingStatus = (recipientId, isTyping) => {
     if (socket && isConnected) {
-      socket.emit(SocketEventTypes.TYPING, { recipientId, isTyping });
+      socket.emit("typing", { recipientId, isTyping });
     }
   };
 
   const deleteMessage = (messageId) => {
     if (socket && isConnected) {
-      socket.emit(SocketEventTypes.MESSAGE_DELETED, { messageId });
+      socket.emit("deleteMessage", { messageId });
     }
   };
 

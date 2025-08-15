@@ -8,8 +8,12 @@ import MessageDropdown from "../components/MessageDropdown";
 import PasswordChangeModal from "../components/common/PasswordChangeModal";
 import { useAuth } from "../context/AuthContext";
 import { useMessages } from "../hooks/useMessages";
+import { useMessageContext } from "../context/MessageContext";
 import { DynamicSidebarProvider } from "../context/DynamicSidebarContext";
 import ELRALogo from "../components/ELRALogo";
+import messageService from "../services/messageService";
+import { toast } from "react-toastify";
+import defaultAvatar from "../assets/defaulticon.jpg";
 
 const SidebarContext = createContext();
 
@@ -25,13 +29,54 @@ const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [showMessageDropdown, setShowMessageDropdown] = useState(false);
+  const [showUnreadMessagesDropdown, setShowUnreadMessagesDropdown] =
+    useState(false);
+  const [unreadMessages, setUnreadMessages] = useState([]);
+  const [isLoadingUnread, setIsLoadingUnread] = useState(false);
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { getTotalUnreadCount } = useMessages();
+  const { showMessageDropdown, setShowMessageDropdown, openChatWithUser } =
+    useMessageContext();
 
   const totalUnreadMessages = getTotalUnreadCount ? getTotalUnreadCount() : 0;
+
+  // Image utility functions
+  const getDefaultAvatar = () => {
+    return defaultAvatar;
+  };
+
+  const getImageUrl = (avatarPath) => {
+    if (!avatarPath) return getDefaultAvatar();
+    if (avatarPath.startsWith("http")) return avatarPath;
+
+    const baseUrl = (
+      import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+    ).replace("/api", "");
+    return `${baseUrl}${avatarPath}`;
+  };
+
+  const getAvatarDisplay = (user) => {
+    if (user.avatar) {
+      return (
+        <img
+          src={getImageUrl(user.avatar)}
+          alt={`${user.firstName} ${user.lastName}`}
+          className="w-full h-full rounded-full object-cover"
+          onError={(e) => {
+            e.target.src = getDefaultAvatar();
+          }}
+        />
+      );
+    }
+    return (
+      <div className="w-full h-full bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white font-bold text-sm">
+        {user.firstName?.[0]}
+        {user.lastName?.[0]}
+      </div>
+    );
+  };
 
   // Check if user is on mobile
   useEffect(() => {
@@ -52,38 +97,17 @@ const DashboardLayout = () => {
 
   useEffect(() => {
     if (user && !loading) {
-      if (
-        user.role?.level < 300 &&
-        location.pathname.startsWith("/dashboard")
-      ) {
-        console.log(
-          "🚨 DashboardLayout: User doesn't have access to dashboard, redirecting to /"
-        );
-        navigate("/");
+      // Check if user needs to change password
+      if (user.passwordChangeRequired || user.isTemporaryPassword) {
+        setShowPasswordModal(true);
       }
     }
-  }, [user, loading, location.pathname, navigate]);
-
-  useEffect(() => {
-    if (user && (user.passwordChangeRequired || user.isTemporaryPassword)) {
-      console.log(
-        "🔐 User has temporary password, showing password change modal"
-      );
-      setShowPasswordModal(true);
-    }
-  }, [user]);
+  }, [user, loading, setShowPasswordModal]);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
-  const closeSidebar = () => {
-    if (isMobile) {
-      setSidebarOpen(false);
-    }
-  };
-
-  // Handle logo click - navigate to modules page for logged-in users
   const handleLogoClick = () => {
     if (user && !loading) {
       navigate("/modules");
@@ -91,6 +115,65 @@ const DashboardLayout = () => {
       navigate("/");
     }
   };
+
+  // Fetch unread messages
+  const fetchUnreadMessages = async () => {
+    try {
+      setIsLoadingUnread(true);
+      const response = await messageService.getUnreadMessages(10);
+      if (response.success) {
+        setUnreadMessages(response.data);
+      }
+    } catch (error) {
+      console.error("Error fetching unread messages:", error);
+      toast.error("Failed to fetch unread messages");
+    } finally {
+      setIsLoadingUnread(false);
+    }
+  };
+
+  // Handle clicking on unread message
+  const handleUnreadMessageClick = async (message) => {
+    try {
+      // Mark messages as read
+      await messageService.markMessagesAsRead(message.sender._id);
+
+      // Open chat with sender
+      openChatWithUser(message.sender);
+
+      // Close unread messages dropdown
+      setShowUnreadMessagesDropdown(false);
+
+      // Refresh unread messages
+      fetchUnreadMessages();
+    } catch (error) {
+      console.error("Error handling unread message click:", error);
+      toast.error("Failed to open chat");
+    }
+  };
+
+  // Toggle unread messages dropdown
+  const toggleUnreadMessagesDropdown = () => {
+    if (!showUnreadMessagesDropdown) {
+      fetchUnreadMessages();
+    }
+    setShowUnreadMessagesDropdown(!showUnreadMessagesDropdown);
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        showUnreadMessagesDropdown &&
+        !event.target.closest(".message-dropdown-container")
+      ) {
+        setShowUnreadMessagesDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showUnreadMessagesDropdown]);
 
   return (
     <SidebarContext.Provider
@@ -145,7 +228,7 @@ const DashboardLayout = () => {
                 {/* Message Icon - Always visible like other icons */}
                 <div className="relative">
                   <button
-                    onClick={() => setShowMessageDropdown(!showMessageDropdown)}
+                    onClick={toggleUnreadMessagesDropdown}
                     className="p-2 rounded-xl text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] transition-all duration-200 hover:scale-105 relative cursor-pointer"
                   >
                     <ChatBubbleLeftRightIcon className="h-6 w-6" />
@@ -159,6 +242,84 @@ const DashboardLayout = () => {
                       {totalUnreadMessages > 99 ? "99+" : totalUnreadMessages}
                     </span>
                   </button>
+
+                  {/* Unread Messages Dropdown */}
+                  {showUnreadMessagesDropdown && (
+                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-[var(--elra-border-primary)] z-50 message-dropdown-container">
+                      <div className="p-4 border-b border-[var(--elra-border-primary)]">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-semibold text-[var(--elra-text-primary)]">
+                            Unread Messages
+                          </h3>
+                          <button
+                            onClick={() => setShowUnreadMessagesDropdown(false)}
+                            className="text-[var(--elra-text-muted)] hover:text-[var(--elra-text-primary)]"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="max-h-96 overflow-y-auto">
+                        {isLoadingUnread ? (
+                          <div className="p-4 text-center text-[var(--elra-text-muted)]">
+                            Loading...
+                          </div>
+                        ) : unreadMessages.length === 0 ? (
+                          <div className="p-4 text-center text-[var(--elra-text-muted)]">
+                            No unread messages
+                          </div>
+                        ) : (
+                          unreadMessages.map((message) => (
+                            <div
+                              key={message._id}
+                              onClick={() => handleUnreadMessageClick(message)}
+                              className="p-4 border-b border-[var(--elra-border-primary)] hover:bg-[var(--elra-secondary-3)] cursor-pointer transition-colors"
+                            >
+                              <div className="flex items-start space-x-3">
+                                <div className="w-8 h-8 rounded-full overflow-hidden">
+                                  {getAvatarDisplay(message.sender)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-sm font-medium text-[var(--elra-text-primary)] truncate">
+                                      {message.sender.firstName}{" "}
+                                      {message.sender.lastName}
+                                    </p>
+                                    <span className="text-xs text-[var(--elra-text-muted)]">
+                                      {new Date(
+                                        message.createdAt
+                                      ).toLocaleTimeString([], {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-[var(--elra-text-muted)] truncate mt-1">
+                                    {message.content}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      {unreadMessages.length > 0 && (
+                        <div className="p-3 border-t border-[var(--elra-border-primary)]">
+                          <button
+                            onClick={() => {
+                              setShowUnreadMessagesDropdown(false);
+                              setShowMessageDropdown(true);
+                            }}
+                            className="w-full text-sm text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] font-medium"
+                          >
+                            View all messages
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <NotificationBell />

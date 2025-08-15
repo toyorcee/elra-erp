@@ -15,6 +15,8 @@ const queryClient = new QueryClient({
   },
 });
 
+window.queryClient = queryClient;
+
 const root = createRoot(document.getElementById("root"));
 
 root.render(

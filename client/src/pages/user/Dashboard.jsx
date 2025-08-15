@@ -48,6 +48,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isModulesCollapsed, setIsModulesCollapsed] = useState(false);
 
   const getUserRoleLevel = () => {
     if (!user) return 0;
@@ -57,15 +58,13 @@ const Dashboard = () => {
     switch (roleValue) {
       case "SUPER_ADMIN":
         return 1000;
-      case "ADMIN":
-        return 800;
+      case "HOD":
+        return 700;
       case "MANAGER":
         return 600;
-      case "SUPERVISOR":
-        return 400;
-      case "USER":
+      case "STAFF":
         return 300;
-      case "GUEST":
+      case "VIEWER":
         return 100;
       default:
         return 100;
@@ -74,12 +73,10 @@ const Dashboard = () => {
 
   const roleLevel = getUserRoleLevel();
 
-  // Check if user has access to a specific level
   const hasAccess = (minLevel) => {
     return roleLevel >= minLevel;
   };
 
-  // Get accessible modules based on user role
   const getAccessibleModules = () => {
     const allModules = [
       {
@@ -89,7 +86,7 @@ const Dashboard = () => {
         color: "text-[var(--elra-primary)]",
         bgColor: "bg-[var(--elra-secondary-3)]",
         borderColor: "border-[var(--elra-border-primary)]",
-        minLevel: 300,
+        minLevel: 400,
         description: "Manage employees, recruitment, and HR processes",
       },
       {
@@ -129,7 +126,7 @@ const Dashboard = () => {
         color: "text-[var(--elra-primary)]",
         bgColor: "bg-[var(--elra-secondary-3)]",
         borderColor: "border-[var(--elra-border-primary)]",
-        minLevel: 300,
+        minLevel: 400,
         description: "Internal and external communication tools",
       },
       {
@@ -139,7 +136,7 @@ const Dashboard = () => {
         color: "text-[var(--elra-primary)]",
         bgColor: "bg-[var(--elra-secondary-3)]",
         borderColor: "border-[var(--elra-border-primary)]",
-        minLevel: 300,
+        minLevel: 400,
         description: "Project management and task tracking",
       },
       {
@@ -319,14 +316,14 @@ const Dashboard = () => {
           <nav className="flex items-center space-x-2 text-sm">
             <button
               onClick={() => (window.location.href = "/dashboard")}
-              className="text-emerald-600 hover:text-emerald-800 hover:underline"
+              className="text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] hover:underline"
             >
               Dashboard
             </button>
             <span className="text-gray-400">/</span>
             <button
               onClick={() => (window.location.href = "/modules")}
-              className="text-emerald-600 hover:text-emerald-800 hover:underline"
+              className="text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] hover:underline"
             >
               Modules
             </button>
@@ -346,7 +343,7 @@ const Dashboard = () => {
             </button>
             <button
               onClick={() => (window.location.href = "/modules")}
-              className="flex-1 px-3 py-2 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors text-sm font-medium"
+              className="flex-1 px-3 py-2 bg-[var(--elra-secondary-3)] text-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-secondary-2)] transition-colors text-sm font-medium"
             >
               All Modules
             </button>
@@ -383,24 +380,6 @@ const Dashboard = () => {
                 </h1>
                 <p className="text-gray-600">{currentModuleData.description}</p>
               </div>
-            </div>
-
-            {/* Module Navigation */}
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={() => (window.location.href = "/dashboard")}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
-              >
-                <HomeIcon className="h-5 w-5" />
-                <span>Dashboard</span>
-              </button>
-              <button
-                onClick={() => (window.location.href = "/modules")}
-                className="px-4 py-2 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors flex items-center space-x-2"
-              >
-                <CubeIcon className="h-5 w-5" />
-                <span>All Modules</span>
-              </button>
             </div>
           </div>
         </div>
@@ -506,8 +485,8 @@ const Dashboard = () => {
           label: "Total Employees",
           value: "156",
           icon: UsersIcon,
-          color: "text-emerald-600",
-          bgColor: "bg-emerald-50",
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
         },
         {
           label: "This Month",
@@ -520,15 +499,15 @@ const Dashboard = () => {
           label: "Pending",
           value: "12",
           icon: ClockIcon,
-          color: "text-yellow-600",
-          bgColor: "bg-yellow-50",
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
         },
         {
           label: "Processed",
           value: "144",
           icon: CheckIcon,
-          color: "text-emerald-600",
-          bgColor: "bg-emerald-50",
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
         },
       ],
       hr: [
@@ -536,29 +515,29 @@ const Dashboard = () => {
           label: "Total Staff",
           value: "156",
           icon: UsersIcon,
-          color: "text-emerald-600",
-          bgColor: "bg-emerald-50",
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
         },
         {
           label: "New Hires",
           value: "8",
           icon: UserPlusIcon,
-          color: "text-green-600",
-          bgColor: "bg-green-50",
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
         },
         {
           label: "On Leave",
           value: "5",
           icon: ClockIcon,
-          color: "text-yellow-600",
-          bgColor: "bg-yellow-50",
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
         },
         {
           label: "Departments",
           value: "12",
           icon: BuildingOffice2Icon,
-          color: "text-purple-600",
-          bgColor: "bg-purple-50",
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
         },
       ],
       finance: [
@@ -580,15 +559,15 @@ const Dashboard = () => {
           label: "Profit",
           value: "$600K",
           icon: CalculatorIcon,
-          color: "text-emerald-600",
-          bgColor: "bg-emerald-50",
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
         },
         {
           label: "Pending",
           value: "$45K",
           icon: ClockIcon,
-          color: "text-yellow-600",
-          bgColor: "bg-yellow-50",
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
         },
       ],
     };
@@ -604,10 +583,10 @@ const Dashboard = () => {
           label: "Process Payroll",
           description: "Run monthly payroll",
           icon: CalculatorIcon,
-          iconColor: "text-green-600",
-          iconBgColor: "bg-green-50",
-          borderColor: "border-green-200",
-          bgColor: "bg-green-500",
+          iconColor: "text-[var(--elra-primary)]",
+          iconBgColor: "bg-[var(--elra-secondary-3)]",
+          borderColor: "border-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-primary)]",
           color: "text-white",
           onClick: () => console.log("Process Payroll"),
         },
@@ -615,10 +594,10 @@ const Dashboard = () => {
           label: "Add Employee",
           description: "Register new employee",
           icon: UserPlusIcon,
-          iconColor: "text-emerald-600",
-          iconBgColor: "bg-emerald-50",
-          borderColor: "border-emerald-200",
-          bgColor: "bg-emerald-500",
+          iconColor: "text-[var(--elra-primary)]",
+          iconBgColor: "bg-[var(--elra-secondary-3)]",
+          borderColor: "border-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-primary)]",
           color: "text-white",
           onClick: () => console.log("Add Employee"),
         },
@@ -639,10 +618,10 @@ const Dashboard = () => {
           label: "Add Staff",
           description: "Register new employee",
           icon: UserPlusIcon,
-          iconColor: "text-emerald-600",
-          iconBgColor: "bg-emerald-50",
-          borderColor: "border-emerald-200",
-          bgColor: "bg-emerald-500",
+          iconColor: "text-[var(--elra-primary)]",
+          iconBgColor: "bg-[var(--elra-secondary-3)]",
+          borderColor: "border-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-primary)]",
           color: "text-white",
           onClick: () => console.log("Add Staff"),
         },
@@ -650,10 +629,10 @@ const Dashboard = () => {
           label: "Leave Requests",
           description: "Manage time off",
           icon: ClockIcon,
-          iconColor: "text-yellow-600",
-          iconBgColor: "bg-yellow-50",
-          borderColor: "border-yellow-200",
-          bgColor: "bg-yellow-500",
+          iconColor: "text-[var(--elra-primary)]",
+          iconBgColor: "bg-[var(--elra-secondary-3)]",
+          borderColor: "border-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-primary)]",
           color: "text-white",
           onClick: () => console.log("Leave Requests"),
         },
@@ -661,10 +640,10 @@ const Dashboard = () => {
           label: "Performance",
           description: "Review evaluations",
           icon: ChartBarIcon,
-          iconColor: "text-purple-600",
-          iconBgColor: "bg-purple-50",
-          borderColor: "border-purple-200",
-          bgColor: "bg-purple-500",
+          iconColor: "text-[var(--elra-primary)]",
+          iconBgColor: "bg-[var(--elra-secondary-3)]",
+          borderColor: "border-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-primary)]",
           color: "text-white",
           onClick: () => console.log("Performance"),
         },
@@ -685,10 +664,10 @@ const Dashboard = () => {
           label: "View Reports",
           description: "Financial statements",
           icon: ChartBarIcon,
-          iconColor: "text-emerald-600",
-          iconBgColor: "bg-emerald-50",
-          borderColor: "border-emerald-200",
-          bgColor: "bg-emerald-500",
+          iconColor: "text-[var(--elra-primary)]",
+          iconBgColor: "bg-[var(--elra-secondary-3)]",
+          borderColor: "border-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-primary)]",
           color: "text-white",
           onClick: () => console.log("View Reports"),
         },
@@ -725,8 +704,8 @@ const Dashboard = () => {
           title: "New Employee Added",
           description: "John Doe added to payroll system",
           icon: UserPlusIcon,
-          color: "text-emerald-600",
-          bgColor: "bg-emerald-50",
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
           time: "4 hours ago",
         },
         {
@@ -743,24 +722,24 @@ const Dashboard = () => {
           title: "New Hire",
           description: "Sarah Wilson joined Marketing team",
           icon: UserPlusIcon,
-          color: "text-green-600",
-          bgColor: "bg-green-50",
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
           time: "1 hour ago",
         },
         {
           title: "Leave Approved",
           description: "Mike's vacation request approved",
           icon: CheckIcon,
-          color: "text-emerald-600",
-          bgColor: "bg-emerald-50",
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
           time: "3 hours ago",
         },
         {
           title: "Performance Review",
           description: "Annual review completed for IT team",
           icon: ChartBarIcon,
-          color: "text-purple-600",
-          bgColor: "bg-purple-50",
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
           time: "1 day ago",
         },
       ],
@@ -785,8 +764,8 @@ const Dashboard = () => {
           title: "Report Generated",
           description: "Monthly financial report created",
           icon: ChartBarIcon,
-          color: "text-emerald-600",
-          bgColor: "bg-emerald-50",
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
           time: "1 day ago",
         },
       ],
@@ -863,23 +842,65 @@ const Dashboard = () => {
 
         {/* ERP Modules Grid */}
         <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-[var(--elra-text-primary)] mb-2">
-              ERP Modules
-            </h2>
-            <p className="text-[var(--elra-text-secondary)]">
-              Access and manage different aspects of your business operations
-            </p>
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-[var(--elra-text-primary)] mb-2">
+                ERP Modules
+              </h2>
+              <p className="text-[var(--elra-text-secondary)]">
+                Access and manage different aspects of your business operations
+              </p>
+            </div>
+            <button
+              onClick={() => setIsModulesCollapsed(!isModulesCollapsed)}
+              className="p-2 text-gray-500 hover:text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] rounded-lg transition-colors cursor-pointer"
+              title={
+                isModulesCollapsed
+                  ? "Expand ERP Modules"
+                  : "Collapse ERP Modules"
+              }
+            >
+              {isModulesCollapsed ? (
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 15l7-7 7 7"
+                  />
+                </svg>
+              )}
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {accessibleModules.map(renderModuleCard)}
-          </div>
+          {!isModulesCollapsed && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {accessibleModules.map(renderModuleCard)}
+            </div>
+          )}
         </div>
       </div>
     );
 
-    // If we're viewing a specific module, add the module content below the main dashboard
     if (isModuleView && currentModule) {
       return (
         <div className="space-y-8">
@@ -887,15 +908,14 @@ const Dashboard = () => {
           {mainDashboardContent}
 
           {/* Module-specific content below the main dashboard */}
-          <div className="border-t-4 border-emerald-200 pt-8">
-            <div className="bg-emerald-50 rounded-2xl p-6 mb-6">
-              <h2 className="text-2xl font-bold text-emerald-800 mb-2">
+          <div className="pt-8">
+            <div className="bg-[var(--elra-secondary-3)] rounded-2xl p-6 mb-6">
+              <h2 className="text-2xl font-bold text-[var(--elra-primary)] mb-2">
                 Currently Viewing: {getCurrentModuleInfo()?.label || "Module"}
               </h2>
-              <p className="text-emerald-600">
+              <p className="text-[var(--elra-primary)]">
                 You're currently working in the{" "}
-                {getCurrentModuleInfo()?.label || "module"}. The main dashboard
-                remains visible above for easy navigation.
+                {getCurrentModuleInfo()?.label || "module"}.
               </p>
             </div>
 
@@ -905,11 +925,9 @@ const Dashboard = () => {
       );
     }
 
-    // Just the main dashboard (no module selected)
     return mainDashboardContent;
   };
 
-  // Helper function to get icon component
   const getIconComponent = (iconName) => {
     const iconMap = {
       UsersIcon,
@@ -973,7 +991,7 @@ const Dashboard = () => {
 
       <button
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        className="fixed bottom-6 left-6 z-50 p-3 bg-gray-800 text-white rounded-full shadow-2xl hover:bg-gray-700 transition-colors hover:scale-110"
+        className="fixed bottom-6 left-6 z-50 p-3 bg-[var(--elra-primary)] text-white rounded-full shadow-2xl hover:bg-[var(--elra-primary-dark)] transition-colors hover:scale-110"
         title="Back to top"
       >
         <svg

@@ -55,9 +55,26 @@ const PolicyManagement = () => {
     "Under Review": 0,
     Total: 0,
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [categories, setCategories] = useState(["All"]);
   const [statuses, setStatuses] = useState(["All"]);
+
+  // Helper function to reset form data
+  const resetFormData = () => {
+    setFormData({
+      title: "",
+      category: "",
+      status: "Draft",
+      version: "1.0",
+      effectiveDate: "",
+      description: "",
+      content: "",
+      department: "",
+      isCompanyWide: false,
+    });
+  };
 
   const canCreatePolicy = user?.role?.level >= 700;
   const canEditPolicy = user?.role?.level >= 700;
@@ -145,6 +162,8 @@ const PolicyManagement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
+
     try {
       // Prepare data for submission
       const submitData = {
@@ -160,19 +179,44 @@ const PolicyManagement = () => {
         if (response.success) {
           toast.success("Policy updated successfully");
           setShowEditModal(false);
-          fetchData();
+          setSelectedPolicy(null);
+          setFormData({
+            title: "",
+            category: "",
+            status: "Draft",
+            version: "1.0",
+            effectiveDate: "",
+            description: "",
+            content: "",
+            department: "",
+            isCompanyWide: false,
+          });
+          await fetchData();
         }
       } else {
         const response = await userModulesAPI.policies.create(submitData);
         if (response.success) {
           toast.success("Policy created successfully");
           setShowCreateModal(false);
-          fetchData();
+          setFormData({
+            title: "",
+            category: "",
+            status: "Draft",
+            version: "1.0",
+            effectiveDate: "",
+            description: "",
+            content: "",
+            department: "",
+            isCompanyWide: false,
+          });
+          await fetchData();
         }
       }
     } catch (error) {
       console.error("Error saving policy:", error);
       toast.error("Failed to save policy");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -207,15 +251,18 @@ const PolicyManagement = () => {
   const confirmDeletePolicy = async () => {
     if (!selectedPolicy) return;
 
+    setIsDeleting(true);
     try {
       await userModulesAPI.policies.delete(selectedPolicy._id);
       toast.success("Policy deleted successfully");
       setShowDeleteModal(false);
       setSelectedPolicy(null);
-      fetchData();
+      await fetchData();
     } catch (error) {
       console.error("Error deleting policy:", error);
       toast.error("Failed to delete policy");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -841,15 +888,26 @@ const PolicyManagement = () => {
                     setShowCreateModal(false);
                     setShowEditModal(false);
                   }}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors cursor-pointer"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
-                  {showEditModal ? "Update" : "Create"}
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      {showEditModal ? "Updating..." : "Creating..."}
+                    </>
+                  ) : showEditModal ? (
+                    "Update"
+                  ) : (
+                    "Create"
+                  )}
                 </button>
               </div>
             </form>
@@ -883,15 +941,24 @@ const PolicyManagement = () => {
                     setShowDeleteModal(false);
                     setSelectedPolicy(null);
                   }}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
+                  disabled={isDeleting}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmDeletePolicy}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors cursor-pointer"
+                  disabled={isDeleting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
-                  Delete Policy
+                  {isDeleting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    "Delete Policy"
+                  )}
                 </button>
               </div>
             </div>

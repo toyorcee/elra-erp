@@ -38,6 +38,7 @@ export const createCompliance = async (req, res) => {
       description,
       requirements,
       findings,
+      lastAudit: new Date(),
       createdBy: req.user._id,
       attachments: attachments || [],
     });
@@ -46,7 +47,6 @@ export const createCompliance = async (req, res) => {
       compliance._id
     ).populate("createdBy", "firstName lastName email");
 
-    // Send notifications for compliance creation
     try {
       const notificationService = new NotificationService();
       const notificationResult =
@@ -202,6 +202,8 @@ export const updateCompliance = async (req, res) => {
         message: "Compliance item not found",
       });
     }
+
+    updateData.lastAudit = new Date();
 
     const updatedCompliance = await Compliance.findByIdAndUpdate(
       id,

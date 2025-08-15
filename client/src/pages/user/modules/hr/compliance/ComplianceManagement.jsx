@@ -12,7 +12,6 @@ import {
   ExclamationTriangleIcon,
   DocumentIcon,
   CalendarIcon,
-  UserIcon,
   BuildingOfficeIcon,
   ChartBarIcon,
   FlagIcon,
@@ -29,7 +28,6 @@ const ComplianceManagement = () => {
   const [complianceItems, setComplianceItems] = useState([]);
   const [filteredItems, setFilteredItems] = useState([]);
   const [departments, setDepartments] = useState([]);
-  const [users, setUsers] = useState([]);
   const [filters, setFilters] = useState({
     status: "",
     category: "",
@@ -51,6 +49,9 @@ const ComplianceManagement = () => {
     requirements: [""],
     findings: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const categories = [
     "Legal",
@@ -67,10 +68,23 @@ const ComplianceManagement = () => {
   const canEditCompliance = user?.role?.level >= 1000;
   const canDeleteCompliance = user?.role?.level >= 1000;
 
+  const resetFormData = () => {
+    setFormData({
+      title: "",
+      category: "",
+      status: "Pending",
+      priority: "Medium",
+      dueDate: "",
+      nextAudit: "",
+      description: "",
+      requirements: [""],
+      findings: "",
+    });
+  };
+
   useEffect(() => {
     fetchData();
     fetchDepartments();
-    fetchUsers();
   }, []);
 
   const fetchData = async () => {
@@ -144,22 +158,14 @@ const ComplianceManagement = () => {
   };
 
   const handleCreateCompliance = () => {
-    setFormData({
-      title: "",
-      category: "",
-      status: "Pending",
-      priority: "Medium",
-      dueDate: "",
-      nextAudit: "",
-      description: "",
-      requirements: [""],
-      findings: "",
-    });
+    resetFormData();
     setShowCreateModal(true);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
+
     try {
       const complianceData = {
         ...formData,
@@ -174,19 +180,24 @@ const ComplianceManagement = () => {
         if (response.success) {
           toast.success("Compliance item updated successfully");
           setShowEditModal(false);
-          fetchData();
+          setSelectedItem(null);
+          resetFormData();
+          await fetchData();
         }
       } else {
         const response = await userModulesAPI.compliance.create(complianceData);
         if (response.success) {
           toast.success("Compliance item created successfully");
           setShowCreateModal(false);
-          fetchData();
+          resetFormData();
+          await fetchData();
         }
       }
     } catch (error) {
       console.error("Error saving compliance item:", error);
       toast.error("Failed to save compliance item");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -218,18 +229,28 @@ const ComplianceManagement = () => {
     setShowEditModal(true);
   };
 
-  const handleDeleteCompliance = async (item) => {
-    if (window.confirm(`Are you sure you want to delete "${item.title}"?`)) {
-      try {
-        const response = await userModulesAPI.compliance.delete(item._id);
-        if (response.success) {
-          toast.success("Compliance item deleted successfully");
-          fetchData();
-        }
-      } catch (error) {
-        console.error("Error deleting compliance item:", error);
-        toast.error("Failed to delete compliance item");
+  const handleDeleteCompliance = (item) => {
+    setSelectedItem(item);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteCompliance = async () => {
+    if (!selectedItem) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await userModulesAPI.compliance.delete(selectedItem._id);
+      if (response.success) {
+        toast.success("Compliance item deleted successfully");
+        setShowDeleteModal(false);
+        setSelectedItem(null);
+        await fetchData();
       }
+    } catch (error) {
+      console.error("Error deleting compliance item:", error);
+      toast.error("Failed to delete compliance item");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -565,12 +586,6 @@ const ComplianceManagement = () => {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <UserIcon className="h-4 w-4 mr-2" />
-                      {item.assignedTo?.firstName && item.assignedTo?.lastName
-                        ? `${item.assignedTo.firstName} ${item.assignedTo.lastName}`
-                        : "Unassigned"}
-                    </div>
                   </div>
 
                   <div className="flex items-center justify-between pt-4 border-t border-gray-100">
@@ -858,15 +873,26 @@ const ComplianceManagement = () => {
                     setShowCreateModal(false);
                     setShowEditModal(false);
                   }}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors cursor-pointer"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
-                  {showEditModal ? "Update" : "Create"}
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      {showEditModal ? "Updating..." : "Creating..."}
+                    </>
+                  ) : showEditModal ? (
+                    "Update"
+                  ) : (
+                    "Create"
+                  )}
                 </button>
               </div>
             </form>
@@ -996,6 +1022,57 @@ const ComplianceManagement = () => {
                     </div>
                   </div>
                 )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && selectedItem && (
+        <div className="fixed inset-0 bg-white bg-opacity-95 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl max-w-md w-full mx-4 shadow-lg">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="p-2 bg-red-100 rounded-lg mr-3">
+                  <TrashIcon className="h-6 w-6 text-red-600" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Delete Compliance Item
+                </h2>
+              </div>
+
+              <p className="text-gray-700 mb-6">
+                Are you sure you want to delete{" "}
+                <strong>"{selectedItem.title}"</strong>? This action cannot be
+                undone.
+              </p>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setSelectedItem(null);
+                  }}
+                  disabled={isDeleting}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteCompliance}
+                  disabled={isDeleting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  {isDeleting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    "Delete Compliance Item"
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

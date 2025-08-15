@@ -151,6 +151,42 @@ class AuditService {
   }
 
   /**
+   * Log leave request-related actions
+   */
+  static async logLeaveAction(userId, action, leaveRequestId, details = {}) {
+    try {
+      const auditData = {
+        userId,
+        action,
+        resourceType: "LEAVE_REQUEST",
+        resourceId: leaveRequestId,
+        resourceModel: "LeaveRequest",
+        details: {
+          ...details,
+          leaveType: details.leaveType,
+          startDate: details.startDate,
+          endDate: details.endDate,
+          days: details.days,
+          reason: details.reason,
+          status: details.status,
+          approverName: details.approverName,
+          comment: details.comment,
+          employeeName: details.employeeName,
+          department: details.department,
+        },
+        ipAddress: details.ipAddress,
+        userAgent: details.userAgent,
+        riskLevel: this.calculateRiskLevel(action, details),
+      };
+
+      return await AuditLog.log(auditData);
+    } catch (error) {
+      console.error("Error logging leave action:", error);
+      // Don't throw error to avoid breaking main functionality
+    }
+  }
+
+  /**
    * Calculate risk level based on action and details
    */
   static calculateRiskLevel(action, details = {}) {
@@ -168,6 +204,9 @@ class AuditService {
       "USER_CREATED",
       "USER_UPDATED",
       "SETTINGS_UPDATED",
+      "LEAVE_REQUEST_APPROVED",
+      "LEAVE_REQUEST_REJECTED",
+      "LEAVE_REQUEST_CANCELLED",
     ];
 
     if (highRiskActions.includes(action)) {

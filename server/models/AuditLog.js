@@ -62,6 +62,13 @@ const auditLogSchema = new mongoose.Schema(
         "SALARY_GRADE_UPDATED",
         "SALARY_GRADE_DELETED",
 
+        // Leave actions
+        "LEAVE_REQUEST_CREATED",
+        "LEAVE_REQUEST_UPDATED",
+        "LEAVE_REQUEST_APPROVED",
+        "LEAVE_REQUEST_REJECTED",
+        "LEAVE_REQUEST_CANCELLED",
+
         // Security actions
         "LOGIN_ATTEMPT",
         "PERMISSION_DENIED",
@@ -81,6 +88,7 @@ const auditLogSchema = new mongoose.Schema(
         "SYSTEM",
         "AUTH",
         "SALARY_GRADE",
+        "LEAVE_REQUEST",
       ],
     },
 
@@ -91,14 +99,21 @@ const auditLogSchema = new mongoose.Schema(
 
     resourceModel: {
       type: String,
-      enum: ["Document", "User", "Department", "SystemSettings", "SalaryGrade"],
+      enum: [
+        "Document",
+        "User",
+        "Department",
+        "SystemSettings",
+        "SalaryGrade",
+        "LeaveRequest",
+      ],
     },
 
     // Resource details for quick access (denormalized)
     resourceDetails: {
-      title: String, // For documents
-      name: String, // For users/departments
-      type: String, // Document type, user role, etc.
+      title: String,
+      name: String,
+      type: String,
     },
 
     // Action details

@@ -1,5 +1,9 @@
 import express from "express";
-import { protect, checkRole } from "../middleware/auth.js";
+import {
+  protect,
+  checkRole,
+  checkDepartmentAccess,
+} from "../middleware/auth.js";
 import {
   getAllLifecycles,
   getLifecycleById,
@@ -18,26 +22,31 @@ const router = express.Router();
 
 router.use(protect);
 
-router.post("/initiate-offboarding", checkRole(600), initiateOffboarding);
-router.get("/offboarding", checkRole(600), getOffboardingLifecycles);
+router.post(
+  "/initiate-offboarding",
+  checkRole(700),
+  checkDepartmentAccess,
+  initiateOffboarding
+);
+router.get("/offboarding", checkRole(700), getOffboardingLifecycles);
 
-router.get("/", checkRole(600), getAllLifecycles);
+router.get("/", checkRole(700), getAllLifecycles);
 
-router.get("/stats", checkRole(600), getLifecycleStats);
+router.get("/stats", checkRole(700), getLifecycleStats);
 
-router.get("/active", checkRole(600), getActiveLifecycles);
+router.get("/active", checkRole(700), getActiveLifecycles);
 
-router.get("/overdue", checkRole(600), getOverdueLifecycles);
+router.get("/overdue", checkRole(700), getOverdueLifecycles);
 
-router.post("/", checkRole(600), createLifecycle);
+router.post("/", checkRole(700), checkDepartmentAccess, createLifecycle);
 
 // Parameterized routes (must come LAST)
-router.get("/:id", checkRole(600), getLifecycleById);
+router.get("/:id", checkRole(700), getLifecycleById);
 
-router.patch("/:id/status", checkRole(600), updateLifecycleStatus);
+router.patch("/:id/status", checkRole(700), updateLifecycleStatus);
 
-router.patch("/:id/checklist", checkRole(600), completeChecklistItem);
+router.patch("/:id/checklist", checkRole(700), completeChecklistItem);
 
-router.patch("/:id/task", checkRole(600), updateTaskStatus);
+router.patch("/:id/task", checkRole(700), updateTaskStatus);
 
 export default router;

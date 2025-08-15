@@ -36,7 +36,7 @@ const allModules = [
     icon: "FaUsers",
     path: "/dashboard/hr",
     isReady: true,
-    requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
+    requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF", "VIEWER"],
     processFlow: {
       dataEntry: [
         "Employee profiles",
@@ -308,7 +308,7 @@ function ModuleSelector() {
     if (user !== undefined) {
       fetchModules();
     }
-  }, [user]); 
+  }, [user]);
 
   const getAccessibleModules = () => {
     if (loadingModules) {

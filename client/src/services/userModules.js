@@ -26,6 +26,52 @@ export const userModulesAPI = {
     }
   },
 
+  // Dashboard API
+  dashboard: {
+    // Get HR dashboard data
+    getHRDashboardData: async () => {
+      try {
+        console.log("🔍 [dashboardAPI] Fetching HR dashboard data...");
+        const response = await api.get("/dashboard/hr/overview");
+        console.log(
+          "✅ [dashboardAPI] HR dashboard data fetched successfully:",
+          response.data
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [dashboardAPI] Error fetching HR dashboard data:",
+          error
+        );
+        throw error;
+      }
+    },
+
+    // Get HR department-specific data
+    getHRDepartmentData: async (departmentId) => {
+      try {
+        console.log(
+          "🔍 [dashboardAPI] Fetching HR department data for:",
+          departmentId
+        );
+        const response = await api.get(
+          `/dashboard/hr/department/${departmentId}`
+        );
+        console.log(
+          "✅ [dashboardAPI] HR department data fetched successfully:",
+          response.data
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [dashboardAPI] Error fetching HR department data:",
+          error
+        );
+        throw error;
+      }
+    },
+  },
+
   // Invitation Management API
   invitations: {
     // Get salary grades
@@ -719,6 +765,229 @@ export const userModulesAPI = {
         return response.data;
       } catch (error) {
         console.error("❌ [leaveAPI] Error fetching pending approvals:", error);
+        throw error;
+      }
+    },
+    getLeaveTypes: async () => {
+      try {
+        const response = await api.get("/leave/types/available");
+        return response.data;
+      } catch (error) {
+        console.error("❌ [leaveAPI] Error fetching leave types:", error);
+        throw error;
+      }
+    },
+  },
+
+  // Policy Management API
+  policies: {
+    create: async (policyData) => {
+      try {
+        const response = await api.post("/policies", policyData);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [policiesAPI] Error creating policy:", error);
+        throw error;
+      }
+    },
+    getAll: async (params = {}) => {
+      try {
+        const response = await api.get("/policies", { params });
+        return response.data;
+      } catch (error) {
+        console.error("❌ [policiesAPI] Error fetching policies:", error);
+        throw error;
+      }
+    },
+    getById: async (id) => {
+      try {
+        const response = await api.get(`/policies/${id}`);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [policiesAPI] Error fetching policy:", error);
+        throw error;
+      }
+    },
+    update: async (id, policyData) => {
+      try {
+        const response = await api.put(`/policies/${id}`, policyData);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [policiesAPI] Error updating policy:", error);
+        throw error;
+      }
+    },
+    delete: async (id) => {
+      try {
+        const response = await api.delete(`/policies/${id}`);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [policiesAPI] Error deleting policy:", error);
+        throw error;
+      }
+    },
+    getStats: async () => {
+      try {
+        const response = await api.get("/policies/stats/overview");
+        return response.data;
+      } catch (error) {
+        console.error("❌ [policiesAPI] Error fetching policy stats:", error);
+        throw error;
+      }
+    },
+    updateVersion: async (id) => {
+      try {
+        const response = await api.put(`/policies/${id}/version`);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [policiesAPI] Error updating policy version:", error);
+        throw error;
+      }
+    },
+    getByDepartment: async (departmentId, params = {}) => {
+      try {
+        const response = await api.get(`/policies/department/${departmentId}`, {
+          params,
+        });
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [policiesAPI] Error fetching policies by department:",
+          error
+        );
+        throw error;
+      }
+    },
+    getOptions: async () => {
+      try {
+        const response = await api.get("/policies/options/available");
+        return response.data;
+      } catch (error) {
+        console.error("❌ [policiesAPI] Error fetching policy options:", error);
+        throw error;
+      }
+    },
+  },
+
+  // Compliance Management API
+  compliance: {
+    create: async (complianceData) => {
+      try {
+        const response = await api.post("/compliance", complianceData);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [complianceAPI] Error creating compliance:", error);
+        throw error;
+      }
+    },
+    getAll: async (params = {}) => {
+      try {
+        const response = await api.get("/compliance", { params });
+        return response.data;
+      } catch (error) {
+        console.error("❌ [complianceAPI] Error fetching compliance:", error);
+        throw error;
+      }
+    },
+    getById: async (id) => {
+      try {
+        const response = await api.get(`/compliance/${id}`);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [complianceAPI] Error fetching compliance:", error);
+        throw error;
+      }
+    },
+    update: async (id, complianceData) => {
+      try {
+        const response = await api.put(`/compliance/${id}`, complianceData);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [complianceAPI] Error updating compliance:", error);
+        throw error;
+      }
+    },
+    delete: async (id) => {
+      try {
+        const response = await api.delete(`/compliance/${id}`);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [complianceAPI] Error deleting compliance:", error);
+        throw error;
+      }
+    },
+    getStats: async () => {
+      try {
+        const response = await api.get("/compliance/stats/overview");
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [complianceAPI] Error fetching compliance stats:",
+          error
+        );
+        throw error;
+      }
+    },
+    getOverdueItems: async () => {
+      try {
+        const response = await api.get("/compliance/overdue/items");
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [complianceAPI] Error fetching overdue items:",
+          error
+        );
+        throw error;
+      }
+    },
+    getDueSoonItems: async () => {
+      try {
+        const response = await api.get("/compliance/due-soon/items");
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [complianceAPI] Error fetching due soon items:",
+          error
+        );
+        throw error;
+      }
+    },
+    updateAuditDates: async (id, auditData) => {
+      try {
+        const response = await api.put(
+          `/compliance/${id}/audit-dates`,
+          auditData
+        );
+        return response.data;
+      } catch (error) {
+        console.error("❌ [complianceAPI] Error updating audit dates:", error);
+        throw error;
+      }
+    },
+    getByDepartment: async (departmentId, params = {}) => {
+      try {
+        const response = await api.get(
+          `/compliance/department/${departmentId}`,
+          { params }
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [complianceAPI] Error fetching compliance by department:",
+          error
+        );
+        throw error;
+      }
+    },
+    getMyItems: async (params = {}) => {
+      try {
+        const response = await api.get("/compliance/my/items", { params });
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [complianceAPI] Error fetching my compliance items:",
+          error
+        );
         throw error;
       }
     },

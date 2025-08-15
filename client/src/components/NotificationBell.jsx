@@ -138,6 +138,7 @@ const NotificationBell = ({ className = "" }) => {
 
   const handleNotificationClick = (notification) => {
     setIsOpen(false);
+
     navigate("/dashboard/notifications", {
       state: { selectedNotificationId: notification._id },
     });
@@ -159,6 +160,16 @@ const NotificationBell = ({ className = "" }) => {
         return "🔔";
       case "WORKFLOW_UPDATE":
         return "🔄";
+      case "COMPLIANCE_CREATED":
+        return "⚠️";
+      case "COMPLIANCE_UPDATED":
+        return "📝";
+      case "COMPLIANCE_DELETED":
+        return "🗑️";
+      case "POLICY_CREATED":
+        return "📋";
+      case "POLICY_UPDATED":
+        return "📝";
       default:
         return "📢";
     }
@@ -204,7 +215,7 @@ const NotificationBell = ({ className = "" }) => {
         )}
 
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 text-white text-xs rounded-full flex items-center justify-center font-bold transition-all duration-200 bg-red-500 scale-100 animate-pulse">
+          <span className="absolute -top-1 -right-1 w-5 h-5 text-white text-xs rounded-full flex items-center justify-center font-bold transition-all duration-200 bg-orange-500 scale-100 animate-pulse">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}

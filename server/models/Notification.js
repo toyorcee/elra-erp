@@ -32,6 +32,14 @@ const notificationSchema = new mongoose.Schema(
         "MESSAGE_RECEIVED",
         "INVITATION_CREATED",
         "BULK_INVITATION_CREATED",
+        "POLICY_CREATED",
+        "POLICY_UPDATED",
+        "COMPLIANCE_CREATED",
+        "COMPLIANCE_UPDATED",
+        "COMPLIANCE_DELETED",
+        "LEAVE_REQUEST",
+        "LEAVE_RESPONSE",
+        "LEAVE_CANCELLED",
       ],
       required: true,
     },
@@ -47,6 +55,18 @@ const notificationSchema = new mongoose.Schema(
       documentId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Document",
+      },
+      policyId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Policy",
+      },
+      complianceId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Compliance",
+      },
+      leaveRequestId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "LeaveRequest",
       },
       senderId: {
         type: mongoose.Schema.Types.ObjectId,

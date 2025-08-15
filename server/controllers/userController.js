@@ -21,17 +21,9 @@ export const getAllUsers = async (req, res) => {
   try {
     const currentUser = req.user;
 
-    // Check if user has permission to view users (Manager+ can view users)
-    if (currentUser.role.level < 600) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Manager level required to view users.",
-      });
-    }
-
     let query = {};
 
-    // For super admins, show all users including pending, invited, and active users
+    // For super admins (level 1000), show all users across all departments
     if (currentUser.role.level >= 1000) {
       query.$or = [
         { isActive: true },
@@ -39,13 +31,34 @@ export const getAllUsers = async (req, res) => {
         { status: "INVITED" },
         { status: "ACTIVE" },
       ];
-    } else {
-      // For regular users, only show active users in their department
+      console.log(
+        "🔍 [USER MANAGEMENT] Super Admin - showing all users across all departments"
+      );
+    }
+    // For HODs (level 700), only show users in their own department
+    else if (currentUser.role.level >= 700) {
+      if (!currentUser.department) {
+        return res.status(403).json({
+          success: false,
+          message: "You must be assigned to a department to view users",
+        });
+      }
+
+      query.department = currentUser.department._id;
       query.isActive = true;
-      query.department = currentUser.department;
+      console.log(
+        "🔍 [USER MANAGEMENT] HOD - showing users only in department:",
+        currentUser.department.name
+      );
+    }
+    // For other roles, deny access
+    else {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only HOD and Super Admin can view users.",
+      });
     }
 
-    // Exclude platform admin users - they should not appear in company user lists
     query.email = { $not: /platformadmin/i };
 
     const users = await User.find(query)

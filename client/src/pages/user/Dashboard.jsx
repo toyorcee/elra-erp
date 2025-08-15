@@ -33,7 +33,18 @@ import {
   PlusIcon,
   MinusIcon,
   ReceiptPercentIcon,
+  ClipboardDocumentCheckIcon,
+  BuildingOfficeIcon,
+  BellIcon,
+  CogIcon,
+  UserCircleIcon,
+  PencilIcon,
+  XCircleIcon,
+  XMarkIcon,
+  UserIcon,
+  CheckCircleIcon,
 } from "@heroicons/react/24/outline";
+import { userModulesAPI } from "../../services/userModules.js";
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
@@ -49,6 +60,9 @@ const Dashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isModulesCollapsed, setIsModulesCollapsed] = useState(false);
+  const [hrDashboardData, setHrDashboardData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [showAllActivities, setShowAllActivities] = useState(false);
 
   const getUserRoleLevel = () => {
     if (!user) return 0;
@@ -214,6 +228,39 @@ const Dashboard = () => {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  // Fetch HR dashboard data when module is 'hr'
+  useEffect(() => {
+    if (module === "hr") {
+      fetchHRDashboardData();
+    }
+  }, [module]);
+
+  const fetchHRDashboardData = async () => {
+    try {
+      setLoading(true);
+      console.log("🔄 [Dashboard] Fetching HR dashboard data...");
+
+      const response = await userModulesAPI.dashboard.getHRDashboardData();
+
+      if (response.success) {
+        console.log(
+          "✅ [Dashboard] HR dashboard data received:",
+          response.data
+        );
+        setHrDashboardData(response.data);
+      } else {
+        console.error(
+          "❌ [Dashboard] Failed to fetch HR dashboard data:",
+          response.message
+        );
+      }
+    } catch (error) {
+      console.error("❌ [Dashboard] Error fetching HR dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Render module card
   const renderModuleCard = (module) => {
@@ -386,26 +433,117 @@ const Dashboard = () => {
 
         {/* Module Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {getModuleStats(currentModuleData.key).map((stat, index) => (
-            <div
-              key={index}
-              className="bg-white rounded-xl p-6 shadow-lg border border-gray-100"
-            >
-              <div className="flex items-center space-x-3">
-                <div className={`p-2 rounded-lg ${stat.bgColor} ${stat.color}`}>
-                  <stat.icon className="h-6 w-6" />
+          {module === "hr" && loading
+            ? // Loading state for HR module
+              Array.from({ length: 4 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 animate-pulse"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="h-8 w-24 bg-gray-200 rounded"></div>
+                    <div className="h-8 w-8 bg-gray-200 rounded"></div>
+                  </div>
+                  <div className="h-6 w-16 bg-gray-200 rounded"></div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-600">
-                    {stat.label}
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
+              ))
+            : getModuleStats(module).map((stat, index) => (
+                <div
+                  key={index}
+                  className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300 hover:scale-105"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-medium text-gray-600">
+                      {stat.label}
+                    </h3>
+                    <div
+                      className={`p-2 rounded-lg ${stat.bgColor} ${stat.color}`}
+                    >
+                      <stat.icon className="h-5 w-5" />
+                    </div>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900 mb-2">
                     {stat.value}
                   </p>
+
+                  {/* Enhanced HR-specific details */}
+                  {module === "hr" && hrDashboardData && (
+                    <div className="space-y-2">
+                      {stat.label === "Total Staff" && (
+                        <div className="text-xs text-gray-500">
+                          <div className="flex justify-between">
+                            <span>Active:</span>
+                            <span className="font-medium text-green-600">
+                              {hrDashboardData.summary?.totalStaff || 0}
+                            </span>
+                          </div>
+                          {hrDashboardData.summary?.pendingInvitations > 0 && (
+                            <div className="flex justify-between">
+                              <span>Pending Invites:</span>
+                              <span className="font-medium text-orange-600">
+                                {hrDashboardData.summary?.pendingInvitations}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {stat.label === "New Hires" && (
+                        <div className="text-xs text-gray-500">
+                          <div className="flex justify-between">
+                            <span>Last 30 days:</span>
+                            <span className="font-medium text-blue-600">
+                              {hrDashboardData.summary?.newHires || 0}
+                            </span>
+                          </div>
+                          {hrDashboardData.recentOnboardings?.length > 0 && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              Latest:{" "}
+                              {hrDashboardData.recentOnboardings[0]?.usedBy
+                                ?.firstName || "N/A"}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {stat.label === "On Leave" && (
+                        <div className="text-xs text-gray-500">
+                          <div className="flex justify-between">
+                            <span>Currently:</span>
+                            <span className="font-medium text-red-600">
+                              {hrDashboardData.summary?.onLeave || 0}
+                            </span>
+                          </div>
+                          {hrDashboardData.upcomingLeaves?.length > 0 && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              Upcoming: {hrDashboardData.upcomingLeaves.length}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {stat.label === "Departments" && (
+                        <div className="text-xs text-gray-500">
+                          <div className="flex justify-between">
+                            <span>Active:</span>
+                            <span className="font-medium text-purple-600">
+                              {hrDashboardData.summary?.totalDepartments || 0}
+                            </span>
+                          </div>
+                          {hrDashboardData.leaveStats?.pendingRequests > 0 && (
+                            <div className="flex justify-between">
+                              <span>Pending Leave:</span>
+                              <span className="font-medium text-orange-600">
+                                {hrDashboardData.leaveStats?.pendingRequests}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            </div>
-          ))}
+              ))}
         </div>
 
         {/* Module Quick Actions */}
@@ -447,12 +585,16 @@ const Dashboard = () => {
           <h2 className="text-xl font-bold text-gray-800 mb-4">
             Recent Activity
           </h2>
-          <div className="space-y-3">
+          <div
+            className={`space-y-3 ${
+              showAllActivities ? "max-h-96 overflow-y-auto" : ""
+            }`}
+          >
             {getModuleRecentActivity(currentModuleData.key).map(
               (activity, index) => (
                 <div
                   key={index}
-                  className="flex items-center space-x-3 p-3 rounded-lg bg-gray-50"
+                  className="flex items-center space-x-3 p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
                 >
                   <div
                     className={`p-2 rounded-full ${activity.bgColor} ${activity.color}`}
@@ -472,6 +614,39 @@ const Dashboard = () => {
               )
             )}
           </div>
+
+          {/* Show More/Less Button */}
+          {hasMoreActivities() && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowAllActivities(!showAllActivities)}
+                className="w-full py-2 px-4 text-sm font-medium text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] hover:bg-[var(--elra-secondary-3)] rounded-lg transition-colors flex items-center justify-center space-x-2"
+              >
+                <span>
+                  {showAllActivities
+                    ? "Show Less"
+                    : `Show More (${
+                        hrDashboardData?.recentActivity?.length - 3
+                      } more)`}
+                </span>
+                <svg
+                  className={`w-4 h-4 transition-transform ${
+                    showAllActivities ? "rotate-180" : ""
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -479,6 +654,101 @@ const Dashboard = () => {
 
   // Get module-specific statistics
   const getModuleStats = (moduleKey) => {
+    // For HR module, use real data from API
+    if (moduleKey === "hr") {
+      if (hrDashboardData) {
+        return [
+          {
+            label: "Total Staff",
+            value: hrDashboardData.summary?.totalStaff?.toString() || "0",
+            icon: UsersIcon,
+            color: "text-[var(--elra-primary)]",
+            bgColor: "bg-[var(--elra-secondary-3)]",
+          },
+          {
+            label: "New Hires",
+            value: hrDashboardData.summary?.newHires?.toString() || "0",
+            icon: UserPlusIcon,
+            color: "text-[var(--elra-primary)]",
+            bgColor: "bg-[var(--elra-secondary-3)]",
+          },
+          {
+            label: "On Leave",
+            value: hrDashboardData.summary?.onLeave?.toString() || "0",
+            icon: ClockIcon,
+            color: "text-[var(--elra-primary)]",
+            bgColor: "bg-[var(--elra-secondary-3)]",
+          },
+          {
+            label: "Departments",
+            value: hrDashboardData.summary?.totalDepartments?.toString() || "0",
+            icon: BuildingOffice2Icon,
+            color: "text-[var(--elra-primary)]",
+            bgColor: "bg-[var(--elra-secondary-3)]",
+          },
+          {
+            label: "Compliances",
+            value: hrDashboardData.summary?.totalCompliances?.toString() || "0",
+            icon: ShieldCheckIcon,
+            color: "text-green-600",
+            bgColor: "bg-green-50",
+          },
+          {
+            label: "Policies",
+            value: hrDashboardData.summary?.totalPolicies?.toString() || "0",
+            icon: DocumentTextIcon,
+            color: "text-purple-600",
+            bgColor: "bg-purple-50",
+          },
+        ];
+      } else {
+        return [
+          {
+            label: "Total Staff",
+            value: "Loading...",
+            icon: UsersIcon,
+            color: "text-gray-400",
+            bgColor: "bg-gray-100",
+          },
+          {
+            label: "New Hires",
+            value: "Loading...",
+            icon: UserPlusIcon,
+            color: "text-gray-400",
+            bgColor: "bg-gray-100",
+          },
+          {
+            label: "On Leave",
+            value: "Loading...",
+            icon: ClockIcon,
+            color: "text-gray-400",
+            bgColor: "bg-gray-100",
+          },
+          {
+            label: "Departments",
+            value: "Loading...",
+            icon: BuildingOffice2Icon,
+            color: "text-gray-400",
+            bgColor: "bg-gray-100",
+          },
+          {
+            label: "Compliances",
+            value: "Loading...",
+            icon: ShieldCheckIcon,
+            color: "text-gray-400",
+            bgColor: "bg-gray-100",
+          },
+          {
+            label: "Policies",
+            value: "Loading...",
+            icon: DocumentTextIcon,
+            color: "text-gray-400",
+            bgColor: "bg-gray-100",
+          },
+        ];
+      }
+    }
+
     const stats = {
       payroll: [
         {
@@ -506,36 +776,6 @@ const Dashboard = () => {
           label: "Processed",
           value: "144",
           icon: CheckIcon,
-          color: "text-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-secondary-3)]",
-        },
-      ],
-      hr: [
-        {
-          label: "Total Staff",
-          value: "156",
-          icon: UsersIcon,
-          color: "text-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-secondary-3)]",
-        },
-        {
-          label: "New Hires",
-          value: "8",
-          icon: UserPlusIcon,
-          color: "text-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-secondary-3)]",
-        },
-        {
-          label: "On Leave",
-          value: "5",
-          icon: ClockIcon,
-          color: "text-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-secondary-3)]",
-        },
-        {
-          label: "Departments",
-          value: "12",
-          icon: BuildingOffice2Icon,
           color: "text-[var(--elra-primary)]",
           bgColor: "bg-[var(--elra-secondary-3)]",
         },
@@ -572,11 +812,109 @@ const Dashboard = () => {
       ],
     };
 
-    return stats[moduleKey] || stats.hr; // Default to HR stats
+    return stats[moduleKey] || stats.hr;
   };
 
   // Get module-specific quick actions
   const getModuleQuickActions = (moduleKey) => {
+    // For HR module, use real data from API
+    if (moduleKey === "hr" && hrDashboardData?.quickActions) {
+      return hrDashboardData.quickActions.map((action) => ({
+        label: action.title,
+        description: action.description,
+        icon: getIconComponent(action.icon),
+        iconColor: "text-[var(--elra-primary)]",
+        iconBgColor: "bg-[var(--elra-secondary-3)]",
+        borderColor: "border-[var(--elra-primary)]",
+        bgColor: "bg-[var(--elra-primary)]",
+        color: "text-white",
+        onClick: () => navigate(action.path),
+      }));
+    }
+
+    if (moduleKey === "hr") {
+      return [
+        {
+          label: "User Management",
+          description: "Manage all users and employees",
+          icon: UsersIcon,
+          iconColor: "text-[var(--elra-primary)]",
+          iconBgColor: "bg-[var(--elra-secondary-3)]",
+          borderColor: "border-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-primary)]",
+          color: "text-white",
+          onClick: () => navigate("/dashboard/modules/hr/users"),
+        },
+        {
+          label: "Department Management",
+          description: "Manage company departments",
+          icon: BuildingOffice2Icon,
+          iconColor: "text-[var(--elra-primary)]",
+          iconBgColor: "bg-[var(--elra-secondary-3)]",
+          borderColor: "border-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-primary)]",
+          color: "text-white",
+          onClick: () => navigate("/dashboard/modules/hr/departments"),
+        },
+        {
+          label: "Leave Requests",
+          description: "Submit and manage leave requests",
+          icon: ClockIcon,
+          iconColor: "text-[var(--elra-primary)]",
+          iconBgColor: "bg-[var(--elra-secondary-3)]",
+          borderColor: "border-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-primary)]",
+          color: "text-white",
+          onClick: () => navigate("/dashboard/modules/hr/leave/requests"),
+        },
+        {
+          label: "Leave Management",
+          description: "Approve leave requests",
+          icon: CheckIcon,
+          iconColor: "text-[var(--elra-primary)]",
+          iconBgColor: "bg-[var(--elra-secondary-3)]",
+          borderColor: "border-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-primary)]",
+          color: "text-white",
+          onClick: () => navigate("/dashboard/modules/hr/leave/management"),
+        },
+        {
+          label: "Employee Invitation",
+          description: "Invite new employees",
+          icon: UserPlusIcon,
+          iconColor: "text-[var(--elra-primary)]",
+          iconBgColor: "bg-[var(--elra-secondary-3)]",
+          borderColor: "border-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-primary)]",
+          color: "text-white",
+          onClick: () => navigate("/dashboard/modules/hr/invitation"),
+        },
+        {
+          label: "Policy Management",
+          description: "Manage HR policies",
+          icon: DocumentTextIcon,
+          iconColor: "text-[var(--elra-primary)]",
+          iconBgColor: "bg-[var(--elra-secondary-3)]",
+          borderColor: "border-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-primary)]",
+          color: "text-white",
+          onClick: () => navigate("/dashboard/modules/hr/policies"),
+        },
+        {
+          label: "Compliance",
+          description: "Manage HR compliance",
+          icon: ShieldCheckIcon,
+          iconColor: "text-[var(--elra-primary)]",
+          iconBgColor: "bg-[var(--elra-secondary-3)]",
+          borderColor: "border-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-primary)]",
+          color: "text-white",
+          onClick: () => navigate("/dashboard/modules/hr/compliance"),
+        },
+      ];
+    }
+
+    // Fallback to hardcoded actions for other modules
     const actions = {
       payroll: [
         {
@@ -611,41 +949,6 @@ const Dashboard = () => {
           bgColor: "bg-purple-500",
           color: "text-white",
           onClick: () => console.log("View Reports"),
-        },
-      ],
-      hr: [
-        {
-          label: "Add Staff",
-          description: "Register new employee",
-          icon: UserPlusIcon,
-          iconColor: "text-[var(--elra-primary)]",
-          iconBgColor: "bg-[var(--elra-secondary-3)]",
-          borderColor: "border-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-primary)]",
-          color: "text-white",
-          onClick: () => console.log("Add Staff"),
-        },
-        {
-          label: "Leave Requests",
-          description: "Manage time off",
-          icon: ClockIcon,
-          iconColor: "text-[var(--elra-primary)]",
-          iconBgColor: "bg-[var(--elra-secondary-3)]",
-          borderColor: "border-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-primary)]",
-          color: "text-white",
-          onClick: () => console.log("Leave Requests"),
-        },
-        {
-          label: "Performance",
-          description: "Review evaluations",
-          icon: ChartBarIcon,
-          iconColor: "text-[var(--elra-primary)]",
-          iconBgColor: "bg-[var(--elra-secondary-3)]",
-          borderColor: "border-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-primary)]",
-          color: "text-white",
-          onClick: () => console.log("Performance"),
         },
       ],
       finance: [
@@ -685,11 +988,116 @@ const Dashboard = () => {
       ],
     };
 
-    return actions[moduleKey] || actions.hr; // Default to HR actions
+    return actions[moduleKey] || [];
   };
 
   // Get module-specific recent activity
   const getModuleRecentActivity = (moduleKey) => {
+    // For HR module, use real data from API
+    if (moduleKey === "hr" && hrDashboardData?.recentActivity) {
+      const activities = hrDashboardData.recentActivity.map((activity) => {
+        // Create meaningful descriptions based on action type
+        let description = "";
+        const action = activity.action || "";
+
+        if (action.includes("LEAVE_REQUEST")) {
+          if (action === "LEAVE_REQUEST_CREATED") {
+            description = `Created leave request for ${
+              activity.details?.leaveType || "time off"
+            }`;
+          } else if (action === "LEAVE_REQUEST_APPROVED") {
+            description = `Approved leave request - ${
+              activity.details?.approvalComment || "No comment"
+            }`;
+          } else if (action === "LEAVE_REQUEST_REJECTED") {
+            description = `Rejected leave request - ${
+              activity.details?.approvalReason || "No reason provided"
+            }`;
+          } else if (action === "LEAVE_REQUEST_CANCELLED") {
+            description = "Cancelled leave request";
+          } else {
+            description = `Updated leave request status to ${
+              activity.details?.newStatus || "unknown"
+            }`;
+          }
+        } else if (action.includes("USER")) {
+          if (action === "USER_CREATED") {
+            description = `Created new user account`;
+          } else if (action === "USER_UPDATED") {
+            description = `Updated user profile`;
+          } else if (action === "USER_ROLE_CHANGED") {
+            description = `Changed role from ${
+              activity.details?.oldRole || "unknown"
+            } to ${activity.details?.newRole || "unknown"}`;
+          } else if (action === "USER_DEPARTMENT_CHANGED") {
+            description = `Moved user from ${
+              activity.details?.oldDepartment || "unknown"
+            } to ${activity.details?.newDepartment || "unknown"}`;
+          } else {
+            description = "User management action performed";
+          }
+        } else if (action.includes("INVITATION")) {
+          if (action === "BULK_INVITATION_CREATED") {
+            description = `Sent ${
+              activity.details?.invitationCount || "multiple"
+            } invitations`;
+          } else if (action === "INVITATION_CREATED") {
+            description = "Sent invitation to new employee";
+          } else if (action === "INVITATION_USED") {
+            description = "Employee completed onboarding";
+          } else {
+            description = "Invitation management action";
+          }
+        } else if (action.includes("DEPARTMENT")) {
+          if (action === "DEPARTMENT_CREATED") {
+            description = `Created department: ${
+              activity.details?.departmentName || "New department"
+            }`;
+          } else if (action === "DEPARTMENT_UPDATED") {
+            description = `Updated department: ${
+              activity.details?.departmentName || "Department"
+            }`;
+          } else {
+            description = "Department management action";
+          }
+        } else {
+          // Fallback for other actions
+          description =
+            activity.details?.description ||
+            activity.details?.approvalComment ||
+            activity.details?.reason ||
+            "Action completed";
+        }
+
+        return {
+          title: activity.action?.replace(/_/g, " ") || "Activity",
+          description: description,
+          icon: getActivityIcon(activity.action),
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+          time: formatTimeAgo(activity.timestamp),
+        };
+      });
+
+      // Return limited activities for initial view, or all if showAllActivities is true
+      return showAllActivities ? activities : activities.slice(0, 3);
+    }
+
+    // Fallback to hardcoded activities for HR when API data not loaded
+    if (moduleKey === "hr") {
+      return [
+        {
+          title: "Loading...",
+          description: "Fetching recent activities",
+          icon: ClockIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+          time: "Just now",
+        },
+      ];
+    }
+
+    // Fallback to hardcoded activities for other modules
     const activities = {
       payroll: [
         {
@@ -714,32 +1122,6 @@ const Dashboard = () => {
           icon: ReceiptPercentIcon,
           color: "text-purple-600",
           bgColor: "bg-purple-50",
-          time: "1 day ago",
-        },
-      ],
-      hr: [
-        {
-          title: "New Hire",
-          description: "Sarah Wilson joined Marketing team",
-          icon: UserPlusIcon,
-          color: "text-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-secondary-3)]",
-          time: "1 hour ago",
-        },
-        {
-          title: "Leave Approved",
-          description: "Mike's vacation request approved",
-          icon: CheckIcon,
-          color: "text-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-secondary-3)]",
-          time: "3 hours ago",
-        },
-        {
-          title: "Performance Review",
-          description: "Annual review completed for IT team",
-          icon: ChartBarIcon,
-          color: "text-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-secondary-3)]",
           time: "1 day ago",
         },
       ],
@@ -771,7 +1153,74 @@ const Dashboard = () => {
       ],
     };
 
-    return activities[moduleKey] || activities.hr; // Default to HR activities
+    return activities[moduleKey] || [];
+  };
+
+  // Check if there are more activities to show
+  const hasMoreActivities = () => {
+    if (module === "hr" && hrDashboardData?.recentActivity) {
+      return hrDashboardData.recentActivity.length > 3;
+    }
+    return false;
+  };
+
+  // Helper function to get icon component
+  const getIconComponent = (iconName) => {
+    const iconMap = {
+      UserPlusIcon,
+      ClockIcon,
+      ClipboardDocumentCheckIcon: CheckIcon,
+      BuildingOfficeIcon: BuildingOffice2Icon,
+      ShieldCheckIcon: CogIcon,
+      ChartBarIcon,
+    };
+    return iconMap[iconName] || UserPlusIcon;
+  };
+
+  // Helper function to get activity icon
+  const getActivityIcon = (action) => {
+    if (!action) return CheckIcon;
+
+    // Leave request actions
+    if (action.includes("LEAVE_REQUEST_CREATED")) return ClockIcon;
+    if (action.includes("LEAVE_REQUEST_APPROVED")) return CheckIcon;
+    if (action.includes("LEAVE_REQUEST_REJECTED")) return XCircleIcon;
+    if (action.includes("LEAVE_REQUEST_CANCELLED")) return XMarkIcon;
+    if (action.includes("LEAVE")) return ClockIcon;
+
+    // User management actions
+    if (action.includes("USER_CREATED")) return UserPlusIcon;
+    if (action.includes("USER_UPDATED")) return PencilIcon;
+    if (action.includes("USER_ROLE_CHANGED")) return ShieldCheckIcon;
+    if (action.includes("USER_DEPARTMENT_CHANGED")) return BuildingOffice2Icon;
+    if (action.includes("USER")) return UserIcon;
+
+    // Invitation actions
+    if (action.includes("BULK_INVITATION_CREATED")) return UserGroupIcon;
+    if (action.includes("INVITATION_CREATED")) return EnvelopeIcon;
+    if (action.includes("INVITATION_USED")) return CheckCircleIcon;
+    if (action.includes("INVITATION")) return EnvelopeIcon;
+
+    // Department actions
+    if (action.includes("DEPARTMENT_CREATED")) return PlusIcon;
+    if (action.includes("DEPARTMENT_UPDATED")) return PencilIcon;
+    if (action.includes("DEPARTMENT")) return BuildingOffice2Icon;
+
+    // Default fallback
+    return CheckIcon;
+  };
+
+  // Helper function to format time ago
+  const formatTimeAgo = (timestamp) => {
+    if (!timestamp) return "Recently";
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffInMinutes = Math.floor((now - time) / (1000 * 60));
+
+    if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`;
+    if (diffInMinutes < 1440)
+      return `${Math.floor(diffInMinutes / 60)} hours ago`;
+    return `${Math.floor(diffInMinutes / 1440)} days ago`;
   };
 
   // Render dashboard content based on current view
@@ -926,36 +1375,6 @@ const Dashboard = () => {
     }
 
     return mainDashboardContent;
-  };
-
-  const getIconComponent = (iconName) => {
-    const iconMap = {
-      UsersIcon,
-      CurrencyDollarIcon,
-      ShoppingCartIcon,
-      CalculatorIcon,
-      ChatBubbleLeftRightIcon,
-      FolderIcon,
-      CubeIcon,
-      PhoneIcon,
-      UserGroupIcon,
-      ShieldCheckIcon,
-      BuildingOffice2Icon,
-      DocumentTextIcon,
-      ArchiveBoxIcon,
-      ChartBarIcon,
-      ChartPieIcon,
-      ClipboardDocumentListIcon,
-      BriefcaseIcon,
-      ShoppingBagIcon,
-      EnvelopeIcon,
-      MapPinIcon,
-      ClockIcon,
-      ArrowTrendingUpIcon,
-      ChartBarIcon,
-      HomeIcon,
-    };
-    return iconMap[iconName] || HomeIcon;
   };
 
   // Show loading spinner while authenticating or during initial load

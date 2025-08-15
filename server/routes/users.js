@@ -13,7 +13,7 @@ import {
   getAssignmentGuidanceForUser,
   getOnboardedMembers,
 } from "../controllers/userController.js";
-import { protect } from "../middleware/auth.js";
+import { protect, checkRole } from "../middleware/auth.js";
 import { hasPermission } from "../utils/permissionUtils.js";
 
 const router = express.Router();
@@ -21,18 +21,18 @@ const router = express.Router();
 // All routes require authentication
 router.use(protect);
 
-// User management routes
-router.get("/", getAllUsers);
-router.get("/pending", getPendingRegistrationUsers);
-router.get("/manageable", getManageableUsers);
-router.get("/onboarded", getOnboardedMembers);
+// User management routes - All require HOD (700) or Super Admin (1000) level
+router.get("/", checkRole(700), getAllUsers);
+router.get("/pending", checkRole(700), getPendingRegistrationUsers);
+router.get("/manageable", checkRole(700), getManageableUsers);
+router.get("/onboarded", checkRole(700), getOnboardedMembers);
 router.get("/profile", getUserProfile);
 router.put("/profile", updateUserProfile);
-router.get("/assignment-guidance", getAssignmentGuidanceForUser);
-router.get("/:id", getUserById);
-router.post("/", createUser);
-router.put("/:id", updateUser);
-router.delete("/:id", deleteUser);
-router.post("/assign-role", assignRole);
+router.get("/assignment-guidance", checkRole(700), getAssignmentGuidanceForUser);
+router.get("/:id", checkRole(700), getUserById);
+router.post("/", checkRole(700), createUser);
+router.put("/:id", checkRole(700), updateUser);
+router.delete("/:id", checkRole(700), deleteUser);
+router.post("/assign-role", checkRole(700), assignRole);
 
 export default router;

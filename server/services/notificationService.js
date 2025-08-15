@@ -92,6 +92,66 @@ class NotificationService {
     return await NotificationPreferences.getOrCreate(userId);
   }
 
+  // Send policy notifications to relevant users
+  async sendPolicyNotification(policy, action = "created", creatorId) {
+    try {
+      const { title, category, department, _id: policyId } = policy;
+
+      let usersToNotify = [];
+
+      if (department) {
+        usersToNotify = await User.find({
+          department: department,
+          isActive: true,
+          _id: { $ne: creatorId },
+        }).select("_id");
+      } else {
+        usersToNotify = await User.find({
+          isActive: true,
+          _id: { $ne: creatorId },
+        }).select("_id");
+      }
+
+      const actionText =
+        action === "created"
+          ? "created"
+          : action === "updated"
+          ? "updated"
+          : "deleted";
+
+      const scopeText = department ? "department" : "company-wide";
+
+      const notifications = [];
+
+      for (const user of usersToNotify) {
+        const notificationData = {
+          recipient: user._id,
+          type: `POLICY_${action.toUpperCase()}`,
+          title: `New ${scopeText} policy ${actionText}`,
+          message: `A ${category.toLowerCase()} policy "${title}" has been ${actionText}. Please review it.`,
+          data: {
+            policyId: policyId,
+            actionUrl: `/dashboard/modules/hr/policies`,
+            priority: "medium",
+          },
+        };
+
+        const notification = await this.createNotification(notificationData);
+        if (notification) {
+          notifications.push(notification);
+        }
+      }
+
+      console.log(
+        `Sent ${notifications.length} policy notifications for ${action} policy: ${title}`
+      );
+      return notifications;
+    } catch (error) {
+      console.error("Error sending policy notifications:", error);
+      throw error;
+    }
+  }
+
   // Update user's notification preferences
   async updateUserPreferences(userId, preferences) {
     const userPreferences = await NotificationPreferences.getOrCreate(userId);
@@ -844,6 +904,205 @@ class NotificationService {
       return platformAdmins.length;
     } catch (error) {
       console.error("Error notifying all platform admins:", error);
+      throw error;
+    }
+  }
+
+  // Send policy notifications to relevant users
+  async sendPolicyNotification(policy, action = "created", createdBy) {
+    try {
+      console.log(
+        `🔔 [POLICY NOTIFICATION] Sending ${action} notification for policy: ${policy.title}`
+      );
+
+      // Get all active users with populated department and role
+      const users = await User.find({ isActive: true })
+        .populate("department", "_id name")
+        .populate("role", "_id level")
+        .select("_id email firstName lastName role department");
+
+      console.log(
+        `🔍 [POLICY NOTIFICATION] Found ${users.length} active users`
+      );
+      console.log(
+        `🔍 [POLICY NOTIFICATION] Policy department:`,
+        policy.department
+      );
+
+      const notificationPromises = users.map(async (user) => {
+        let shouldNotify = false;
+        let priority = "medium";
+
+        // For company-wide policies (no department)
+        if (!policy.department) {
+          shouldNotify = true;
+          priority = "high";
+          console.log(
+            `🔔 [POLICY NOTIFICATION] Company-wide policy - notifying user: ${user.email}`
+          );
+        }
+        // For department-specific policies
+        else if (user.department && user.department._id) {
+          const userDeptId = user.department._id.toString();
+          const policyDeptId = policy.department._id
+            ? policy.department._id.toString()
+            : policy.department.toString();
+
+          if (userDeptId === policyDeptId) {
+            shouldNotify = true;
+            priority = "high";
+            console.log(
+              `🔔 [POLICY NOTIFICATION] Department match - notifying user: ${user.email} (dept: ${user.department.name})`
+            );
+          }
+        }
+
+        // Also notify HODs and Super Admins for department policies
+        if (!shouldNotify && user.role && user.role.level >= 700) {
+          shouldNotify = true;
+          priority = "medium";
+          console.log(
+            `🔔 [POLICY NOTIFICATION] Manager role - notifying user: ${user.email} (role level: ${user.role.level})`
+          );
+        }
+
+        if (!shouldNotify) {
+          console.log(
+            `❌ [POLICY NOTIFICATION] Skipping user: ${user.email} (dept: ${
+              user.department?.name || "none"
+            }, role: ${user.role?.level || "none"})`
+          );
+          return null;
+        }
+
+        const notificationData = {
+          recipient: user._id,
+          type: action === "created" ? "POLICY_CREATED" : "POLICY_UPDATED",
+          title:
+            action === "created"
+              ? `📋 New Policy: ${policy.title}`
+              : `📝 Policy Updated: ${policy.title}`,
+          message:
+            action === "created"
+              ? `A new ${
+                  policy.department ? "department" : "company-wide"
+                } policy "${policy.title}" has been created and is now active.`
+              : `The ${
+                  policy.department ? "department" : "company-wide"
+                } policy "${policy.title}" has been updated.`,
+          priority: priority,
+          data: {
+            policyId: policy._id,
+            policyTitle: policy.title,
+            policyCategory: policy.category,
+            policyStatus: policy.status,
+            department: policy.department,
+            createdBy: createdBy._id,
+            actionUrl: `/dashboard/modules/hr/policies`,
+          },
+        };
+
+        return await this.createNotification(notificationData);
+      });
+
+      const results = await Promise.allSettled(notificationPromises);
+      const successful = results.filter(
+        (result) => result.status === "fulfilled" && result.value
+      ).length;
+      const failed = results.filter(
+        (result) => result.status === "rejected"
+      ).length;
+
+      console.log(
+        `✅ [POLICY NOTIFICATION] Successfully sent ${successful} notifications, ${failed} failed`
+      );
+
+      return { successful, failed };
+    } catch (error) {
+      console.error("Error sending policy notifications:", error);
+      throw error;
+    }
+  }
+
+  async sendComplianceNotification(compliance, action = "created", createdBy) {
+    try {
+      const users = await User.find({ isActive: true }).select(
+        "_id email firstName lastName role department"
+      );
+
+      const notificationPromises = users.map(async (user) => {
+        let priority = "medium";
+
+        if (compliance.priority === "Critical") {
+          priority = "urgent";
+        } else if (compliance.priority === "High") {
+          priority = "high";
+        } else if (user.role && user.role.level >= 700) {
+          priority = "high";
+        }
+
+        const notificationData = {
+          recipient: user._id,
+          type:
+            action === "created" ? "COMPLIANCE_CREATED" : "COMPLIANCE_UPDATED",
+          title:
+            action === "created"
+              ? `⚠️ New Compliance: ${compliance.title}`
+              : `📝 Compliance Updated: ${compliance.title}`,
+          message:
+            action === "created"
+              ? `A new compliance requirement "${compliance.title}" (${
+                  compliance.category
+                }) has been created. Due date: ${new Date(
+                  compliance.dueDate
+                ).toLocaleDateString()}. Priority: ${compliance.priority}.`
+              : `The compliance requirement "${compliance.title}" (${
+                  compliance.category
+                }) has been updated. Due date: ${new Date(
+                  compliance.dueDate
+                ).toLocaleDateString()}. Priority: ${compliance.priority}.`,
+          priority: priority,
+          data: {
+            complianceId: compliance._id,
+            complianceTitle: compliance.title,
+            complianceCategory: compliance.category,
+            complianceStatus: compliance.status,
+            compliancePriority: compliance.priority,
+            dueDate: compliance.dueDate,
+            nextAudit: compliance.nextAudit,
+            description: compliance.description,
+            requirements: compliance.requirements,
+            findings: compliance.findings,
+            createdBy: createdBy._id,
+            actionUrl: `/dashboard/modules/hr/compliance`,
+          },
+        };
+
+        console.log("🔍 [COMPLIANCE NOTIFICATION] Sending notification data:", {
+          type: notificationData.type,
+          title: notificationData.title,
+          data: notificationData.data,
+          fullComplianceObject: compliance,
+        });
+
+        return await this.createNotification(notificationData);
+      });
+
+      const results = await Promise.allSettled(notificationPromises);
+      const successful = results.filter(
+        (result) => result.status === "fulfilled" && result.value
+      ).length;
+      const failed = results.filter(
+        (result) => result.status === "rejected"
+      ).length;
+
+      console.log(
+        `✅ [COMPLIANCE NOTIFICATION] Successfully sent ${successful} notifications, ${failed} failed`
+      );
+
+      return { successful, failed };
+    } catch (error) {
+      console.error("Error sending compliance notifications:", error);
       throw error;
     }
   }

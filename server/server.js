@@ -50,6 +50,8 @@ import scanningRoutes from "./routes/scanning.js";
 import salaryGradeRoutes from "./routes/salaryGrades.js";
 import employeeLifecycleRoutes from "./routes/employeeLifecycle.js";
 import leaveRoutes from "./routes/leave.js";
+import policyRoutes from "./routes/policy.js";
+import complianceRoutes from "./routes/compliance.js";
 
 const isValidObjectId = (id) => {
   return (
@@ -226,8 +228,9 @@ app.use("/api/scanning", scanningRoutes);
 app.use("/api/salary-grades", salaryGradeRoutes);
 app.use("/api/employee-lifecycle", employeeLifecycleRoutes);
 app.use("/api/leave", leaveRoutes);
+app.use("/api/policies", policyRoutes);
+app.use("/api/compliance", complianceRoutes);
 
-// Create Socket.IO server before starting HTTP server
 const io = new SocketIOServer(httpServer, {
   cors: {
     origin:

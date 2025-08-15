@@ -38,11 +38,12 @@ const LeaveManagement = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [departments, setDepartments] = useState([]);
 
-  const canRequestLeave = user?.role?.level >= 300 && user?.role?.level !== 100;
-
-  const canApproveLeave = user?.role?.level >= 600;
-
-  const canViewAllRequests = user?.role?.level >= 600;
+  // Role-based permissions for leave approval hierarchy
+  const canViewAllRequests = user?.role?.level >= 600; // MANAGER+ can view all requests
+  const canApproveLeave = user?.role?.level >= 600; // MANAGER+ can approve
+  const canApproveAllDepartments = user?.role?.level >= 1000; // SUPER_ADMIN can approve all
+  const canApproveOwnDepartment = user?.role?.level >= 700; // HOD can approve their department
+  const canApproveDirectReports = user?.role?.level >= 600; // MANAGER can approve direct reports
 
   const fetchData = async () => {
     try {
@@ -120,6 +121,21 @@ const LeaveManagement = () => {
     }
   };
 
+  const canApproveRequest = (request) => {
+    if (!canApproveLeave) return false;
+    
+    // Super Admin can approve all requests
+    if (canApproveAllDepartments) return true;
+    
+    // HOD can approve requests from their department
+    if (canApproveOwnDepartment && request.department === user?.department) return true;
+    
+    // Manager can approve direct reports (simplified - could be enhanced with reporting structure)
+    if (canApproveDirectReports && request.department === user?.department) return true;
+    
+    return false;
+  };
+
   const handleViewDetails = async (requestId) => {
     try {
       const response = await userModulesAPI.leave.getRequestById(requestId);
@@ -146,18 +162,9 @@ const LeaveManagement = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Leave Management</h1>
           <p className="text-gray-600">
-            Manage employee leave requests and approvals
+            Approve and manage leave requests
           </p>
         </div>
-        {canRequestLeave && (
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors"
-          >
-            <PlusIcon className="w-5 h-5 mr-2" />
-            New Leave Request
-          </button>
-        )}
       </div>
 
       {/* Stats Cards */}
@@ -354,7 +361,7 @@ const LeaveManagement = () => {
                       >
                         <EyeIcon className="w-4 h-4" />
                       </button>
-                      {request.status === "Pending" && canApproveLeave && (
+                      {request.status === "Pending" && canApproveRequest(request) && (
                         <>
                           <button
                             onClick={() =>

@@ -3,6 +3,11 @@ import User from "../models/User.js";
 import AuditLog from "../models/AuditLog.js";
 import Department from "../models/Department.js";
 import Role from "../models/Role.js";
+import LeaveRequest from "../models/LeaveRequest.js";
+import Invitation from "../models/Invitation.js";
+import Compliance from "../models/Compliance.js";
+import Policy from "../models/Policy.js";
+import AuditService from "../services/auditService.js";
 
 // Get dashboard data based on user role
 export const getDashboardData = async (req, res) => {
@@ -198,5 +203,510 @@ export const getSystemStats = async () => {
   } catch (error) {
     console.error("Get system stats error:", error);
     throw error;
+  }
+};
+
+// ==================== HR DASHBOARD METHODS ====================
+
+// Get HR dashboard data with role-based access
+export const getHRDashboardData = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const userRole = currentUser.role?.level;
+    const userDepartment = currentUser.department;
+
+    console.log("🚀 [HR Dashboard] Getting data for user:", {
+      userId: currentUser._id,
+      role: userRole,
+      department: userDepartment,
+    });
+
+    // Check if user has access to HR dashboard
+    if (userRole < 700) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Only HOD and Super Admin can access HR dashboard.",
+      });
+    }
+
+    // Build department filter based on role
+    let departmentFilter = {};
+    let userDepartmentFilter = {};
+    if (userRole === 700) {
+      // HOD: Only their department
+      departmentFilter = { department: userDepartment };
+      userDepartmentFilter = { department: userDepartment };
+    }
+    // Super Admin (1000): No filter (sees all departments)
+
+    // ==================== SUMMARY METRICS ====================
+
+    // 1. Total Staff Count - Active users from User model
+    const totalStaffQuery = {
+      isActive: true,
+      status: "ACTIVE",
+      ...userDepartmentFilter,
+    };
+    const totalStaff = await User.countDocuments(totalStaffQuery);
+
+    // 2. New Hires - Track from invitation completion flow
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // Get users who completed onboarding in last 30 days
+    const newHiresQuery = {
+      isActive: true,
+      status: "ACTIVE",
+      createdAt: { $gte: thirtyDaysAgo },
+      ...userDepartmentFilter,
+    };
+    const newHires = await User.countDocuments(newHiresQuery);
+
+    // Alternative: Track from completed invitations (more accurate for onboarding flow)
+    const completedInvitationsQuery = {
+      status: "used",
+      onboardingCompleted: true,
+      onboardingCompletedAt: { $gte: thirtyDaysAgo },
+      ...departmentFilter,
+    };
+    const completedInvitations = await Invitation.countDocuments(
+      completedInvitationsQuery
+    );
+
+    // Use the higher count between actual user creation and completed invitations
+    const actualNewHires = Math.max(newHires, completedInvitations);
+
+    // 3. Staff on Leave - Current approved leave requests
+    const currentDate = new Date();
+    const onLeaveQuery = {
+      status: "Approved",
+      startDate: { $lte: currentDate },
+      endDate: { $gte: currentDate },
+      ...departmentFilter,
+    };
+    const onLeave = await LeaveRequest.countDocuments(onLeaveQuery);
+
+    // 4. Total Departments - Active departments from Department model
+    const totalDepartmentsQuery = { isActive: true };
+    const totalDepartments =
+      userRole === 1000
+        ? await Department.countDocuments(totalDepartmentsQuery)
+        : 1; // HOD sees only their department
+
+    // ==================== LEAVE STATISTICS ====================
+
+    // Pending Leave Requests
+    const pendingLeaveQuery = {
+      status: "Pending",
+      ...departmentFilter,
+    };
+    const pendingLeaveRequests = await LeaveRequest.countDocuments(
+      pendingLeaveQuery
+    );
+
+    // Leave requests by status
+    const leaveByStatus = await LeaveRequest.aggregate([
+      { $match: departmentFilter },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]);
+
+    // Leave requests by type
+    const leaveByType = await LeaveRequest.aggregate([
+      { $match: departmentFilter },
+      { $group: { _id: "$leaveType", count: { $sum: 1 } } },
+    ]);
+
+    // ==================== RECENT ACTIVITY ====================
+
+    // Get recent HR-related audit logs performed by the current user
+    const recentActivityQuery = {
+      userId: currentUser._id,
+      resourceType: { $in: ["USER", "LEAVE_REQUEST", "DEPARTMENT"] },
+    };
+
+    const recentActivity = await AuditLog.find(recentActivityQuery)
+      .populate("userId", "firstName lastName email")
+      .populate("resourceId")
+      .sort({ timestamp: -1 })
+      .limit(10);
+
+    // ==================== QUICK ACTIONS ====================
+
+    // Determine available quick actions based on role
+    const quickActions = [];
+
+    if (userRole >= 700) {
+      quickActions.push({
+        id: "add_staff",
+        title: "Add Staff",
+        description: "Register new employee",
+        icon: "UserPlusIcon",
+        action: "navigate",
+        path: "/dashboard/modules/hr/user-management",
+        permission: userRole >= 700,
+      });
+    }
+
+    if (userRole >= 300) {
+      quickActions.push({
+        id: "leave_requests",
+        title: "Leave Requests",
+        description: "Manage time off",
+        icon: "ClockIcon",
+        action: "navigate",
+        path: "/dashboard/modules/hr/leave/requests",
+        permission: userRole >= 300,
+      });
+    }
+
+    if (userRole >= 600) {
+      quickActions.push({
+        id: "leave_management",
+        title: "Leave Management",
+        description: "Approve leave requests",
+        icon: "ClipboardDocumentCheckIcon",
+        action: "navigate",
+        path: "/dashboard/modules/hr/leave/management",
+        permission: userRole >= 600,
+      });
+    }
+
+    if (userRole >= 700) {
+      quickActions.push({
+        id: "department_management",
+        title: "Department Management",
+        description: "Manage departments",
+        icon: "BuildingOfficeIcon",
+        action: "navigate",
+        path: "/dashboard/modules/hr/department-management",
+        permission: userRole >= 700,
+      });
+    }
+
+    if (userRole >= 1000) {
+      quickActions.push({
+        id: "role_management",
+        title: "Role Management",
+        description: "Manage user roles",
+        icon: "ShieldCheckIcon",
+        action: "navigate",
+        path: "/dashboard/modules/hr/role-management",
+        permission: userRole >= 1000,
+      });
+    }
+
+    // ==================== RECENT STAFF ACTIVITY ====================
+
+    // Get recent user management activities performed by current user
+    const recentStaffActivity = await AuditLog.find({
+      userId: currentUser._id,
+      resourceType: "USER",
+      action: {
+        $in: [
+          "USER_CREATED",
+          "USER_UPDATED",
+          "USER_ROLE_CHANGED",
+          "USER_DEPARTMENT_CHANGED",
+        ],
+      },
+    })
+      .populate("userId", "firstName lastName email")
+      .populate("resourceId", "firstName lastName email department")
+      .sort({ timestamp: -1 })
+      .limit(5);
+
+    // ==================== LEAVE CALENDAR OVERVIEW ====================
+
+    // Get upcoming approved leaves
+    const upcomingLeaves = await LeaveRequest.find({
+      status: "Approved",
+      startDate: { $gte: currentDate },
+      ...departmentFilter,
+    })
+      .populate("employee", "firstName lastName email")
+      .populate("department", "name")
+      .sort({ startDate: 1 })
+      .limit(10);
+
+    // ==================== ADDITIONAL METRICS ====================
+
+    // Pending invitations (for onboarding tracking)
+    const pendingInvitationsQuery = {
+      status: { $in: ["active", "sent", "pending_approval"] },
+      ...departmentFilter,
+    };
+    const pendingInvitations = await Invitation.countDocuments(
+      pendingInvitationsQuery
+    );
+
+    // Recent onboarding completions
+    const recentOnboardings = await Invitation.find({
+      status: "used",
+      onboardingCompleted: true,
+      onboardingCompletedAt: { $gte: thirtyDaysAgo },
+      ...departmentFilter,
+    })
+      .populate("usedBy", "firstName lastName email")
+      .populate("department", "name")
+      .sort({ onboardingCompletedAt: -1 })
+      .limit(5);
+
+    // Compliance Counts
+    const totalCompliances = await Compliance.countDocuments();
+    const pendingCompliances = await Compliance.countDocuments({
+      status: "Pending",
+      ...departmentFilter,
+    });
+    const completedCompliances = await Compliance.countDocuments({
+      status: "Completed",
+      ...departmentFilter,
+    });
+
+    // Policy Counts
+    const totalPolicies = await Policy.countDocuments();
+    const pendingPolicies = await Policy.countDocuments({
+      status: "Pending",
+      ...departmentFilter,
+    });
+    const approvedPolicies = await Policy.countDocuments({
+      status: "Approved",
+      ...departmentFilter,
+    });
+
+    console.log(
+      "✅ [HR Dashboard] Comprehensive data retrieved successfully:",
+      {
+        userId: currentUser._id,
+        totalStaff,
+        newHires: actualNewHires,
+        onLeave,
+        totalDepartments,
+        pendingLeaveRequests,
+        pendingInvitations,
+        personalActivities: recentActivity.length,
+        personalStaffActions: recentStaffActivity.length,
+        recentOnboardings: recentOnboardings.length,
+        totalCompliances,
+        pendingCompliances,
+        completedCompliances,
+        totalPolicies,
+        pendingPolicies,
+        approvedPolicies,
+      }
+    );
+
+    res.json({
+      success: true,
+      data: {
+        // Summary Metrics
+        summary: {
+          totalStaff,
+          newHires: actualNewHires,
+          onLeave,
+          totalDepartments,
+          pendingInvitations,
+          totalCompliances,
+          pendingCompliances,
+          completedCompliances,
+          totalPolicies,
+          pendingPolicies,
+          approvedPolicies,
+        },
+
+        // Leave Statistics
+        leaveStats: {
+          pendingRequests: pendingLeaveRequests,
+          byStatus: leaveByStatus,
+          byType: leaveByType,
+        },
+
+        // Quick Actions
+        quickActions: quickActions.filter((action) => action.permission),
+
+        // Recent Activity
+        recentActivity,
+
+        // Staff Activity
+        recentStaffActivity,
+
+        // Leave Calendar
+        upcomingLeaves,
+
+        // Onboarding Data
+        recentOnboardings,
+
+        // User permissions
+        permissions: {
+          canAddStaff: userRole >= 700,
+          canManageLeave: userRole >= 600,
+          canManageDepartments: userRole >= 700,
+          canManageRoles: userRole >= 1000,
+          canViewAllDepartments: userRole === 1000,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("❌ [HR Dashboard] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load HR dashboard data",
+    });
+  }
+};
+
+// Get HR department-specific data
+export const getHRDepartmentData = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const { departmentId } = req.params;
+    const userRole = currentUser.role?.level;
+
+    // Check permissions
+    if (userRole < 700) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Only HOD and Super Admin can access department data.",
+      });
+    }
+
+    // HOD can only access their own department
+    if (
+      userRole === 700 &&
+      currentUser.department?.toString() !== departmentId
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. You can only access your own department data.",
+      });
+    }
+
+    const departmentFilter = { department: departmentId };
+
+    // ==================== DEPARTMENT-SPECIFIC METRICS ====================
+
+    const totalStaff = await User.countDocuments({
+      isActive: true,
+      status: "ACTIVE",
+      ...departmentFilter,
+    });
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const newHires = await User.countDocuments({
+      isActive: true,
+      status: "ACTIVE",
+      createdAt: { $gte: thirtyDaysAgo },
+      ...departmentFilter,
+    });
+
+    const completedInvitations = await Invitation.countDocuments({
+      status: "used",
+      onboardingCompleted: true,
+      onboardingCompletedAt: { $gte: thirtyDaysAgo },
+      ...departmentFilter,
+    });
+
+    const actualNewHires = Math.max(newHires, completedInvitations);
+
+    const currentDate = new Date();
+    const onLeave = await LeaveRequest.countDocuments({
+      status: "Approved",
+      startDate: { $lte: currentDate },
+      endDate: { $gte: currentDate },
+      ...departmentFilter,
+    });
+
+    const pendingLeaveRequests = await LeaveRequest.countDocuments({
+      status: "Pending",
+      ...departmentFilter,
+    });
+
+    const pendingInvitations = await Invitation.countDocuments({
+      status: { $in: ["active", "sent", "pending_approval"] },
+      ...departmentFilter,
+    });
+
+    const recentActivity = await AuditLog.find({
+      userId: currentUser._id,
+      resourceType: { $in: ["USER", "LEAVE_REQUEST"] },
+    })
+      .populate("userId", "firstName lastName email")
+      .populate("resourceId")
+      .sort({ timestamp: -1 })
+      .limit(10);
+
+    const recentOnboardings = await Invitation.find({
+      status: "used",
+      onboardingCompleted: true,
+      onboardingCompletedAt: { $gte: thirtyDaysAgo },
+      ...departmentFilter,
+    })
+      .populate("usedBy", "firstName lastName email")
+      .populate("department", "name")
+      .sort({ onboardingCompletedAt: -1 })
+      .limit(5);
+
+    const upcomingLeaves = await LeaveRequest.find({
+      status: "Approved",
+      startDate: { $gte: currentDate },
+      ...departmentFilter,
+    })
+      .populate("employee", "firstName lastName email")
+      .populate("department", "name")
+      .sort({ startDate: 1 })
+      .limit(10);
+
+    console.log(
+      "✅ [HR Department Data] Comprehensive data retrieved successfully:",
+      {
+        userId: currentUser._id,
+        departmentId,
+        totalStaff,
+        newHires: actualNewHires,
+        onLeave,
+        pendingLeaveRequests,
+        pendingInvitations,
+        personalActivities: recentActivity.length,
+        recentOnboardings: recentOnboardings.length,
+      }
+    );
+
+    res.json({
+      success: true,
+      data: {
+        // Summary Metrics
+        summary: {
+          totalStaff,
+          newHires: actualNewHires,
+          onLeave,
+          pendingLeaveRequests,
+          pendingInvitations,
+        },
+
+        // Recent Activity
+        recentActivity,
+
+        // Onboarding Data
+        recentOnboardings,
+
+        // Leave Calendar
+        upcomingLeaves,
+
+        // Department Info
+        department: {
+          id: departmentId,
+          name: currentUser.department?.name || "Unknown Department",
+        },
+      },
+    });
+  } catch (error) {
+    console.error("❌ [HR Department Data] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load department data",
+    });
   }
 };

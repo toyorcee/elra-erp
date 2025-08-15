@@ -126,4 +126,16 @@ router.get("/", protect, dashboardController.getDashboardData);
 // Get dashboard data for specific days
 router.get("/:days", protect, dashboardController.getDashboardData);
 
+// ==================== HR DASHBOARD ROUTES ====================
+
+// Get HR dashboard data
+router.get("/hr/overview", protect, dashboardController.getHRDashboardData);
+
+// Get HR department-specific data
+router.get(
+  "/hr/department/:departmentId",
+  protect,
+  dashboardController.getHRDepartmentData
+);
+
 export default router;

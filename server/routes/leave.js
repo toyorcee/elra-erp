@@ -7,6 +7,7 @@ import {
   cancelLeaveRequest,
   getLeaveStats,
   getPendingApprovals,
+  getLeaveTypes,
 } from "../controllers/leaveController.js";
 import { protect, checkRole } from "../middleware/auth.js";
 
@@ -27,5 +28,7 @@ router.put("/:id/cancel", checkRole(300), cancelLeaveRequest);
 router.get("/stats/overview", checkRole(100), getLeaveStats);
 
 router.get("/pending/approvals", checkRole(600), getPendingApprovals);
+
+router.get("/types/available", checkRole(100), getLeaveTypes);
 
 export default router;

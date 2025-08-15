@@ -20,7 +20,11 @@ import {
   retryFailedEmails,
   retrySingleEmail,
 } from "../controllers/invitationController.js";
-import { protect, authorize } from "../middleware/auth.js";
+import {
+  protect,
+  checkRole,
+  checkDepartmentAccess,
+} from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -57,25 +61,40 @@ const createInvitationValidation = [
     .withMessage("Notes must be less than 500 characters"),
 ];
 
-// Routes
-router.post("/", createInvitationValidation, createInvitation);
-router.get("/", getInvitations);
-router.get("/user", getUserInvitations);
-router.get("/stats", getInvitationStats);
+router.post(
+  "/",
+  checkRole(700),
+  checkDepartmentAccess,
+  createInvitationValidation,
+  createInvitation
+);
+router.get("/", checkRole(700), getInvitations);
+router.get("/user", checkRole(700), getUserInvitations);
+router.get("/stats", checkRole(700), getInvitationStats);
 
-router.get("/salary-grades", getSalaryGrades);
-router.get("/next-batch-number", getNextBatchNumber);
-router.post("/batch/:batchId/retry-emails", retryFailedEmails);
-router.post("/:invitationId/retry-email", retrySingleEmail);
-router.post("/bulk-create", createBulkInvitations);
-router.post("/bulk-csv", createBulkInvitationsFromCSV);
-router.get("/pending-approval", getPendingApprovalInvitations);
-router.post("/batch/:batchId/approve", approveBulkInvitations);
-router.get("/batch/:batchId", getBatchInvitations);
-router.get("/search-batches", searchBatches);
+router.get("/salary-grades", checkRole(700), getSalaryGrades);
+router.get("/next-batch-number", checkRole(700), getNextBatchNumber);
+router.post("/batch/:batchId/retry-emails", checkRole(700), retryFailedEmails);
+router.post("/:invitationId/retry-email", checkRole(700), retrySingleEmail);
+router.post(
+  "/bulk-create",
+  checkRole(700),
+  checkDepartmentAccess,
+  createBulkInvitations
+);
+router.post(
+  "/bulk-csv",
+  checkRole(700),
+  checkDepartmentAccess,
+  createBulkInvitationsFromCSV
+);
+router.get("/pending-approval", checkRole(700), getPendingApprovalInvitations);
+router.post("/batch/:batchId/approve", checkRole(700), approveBulkInvitations);
+router.get("/batch/:batchId", checkRole(700), getBatchInvitations);
+router.get("/search-batches", checkRole(700), searchBatches);
 
-router.get("/:id", getInvitation);
-router.post("/:id/resend", resendInvitation);
-router.delete("/:id", cancelInvitation);
+router.get("/:id", checkRole(700), getInvitation);
+router.post("/:id/resend", checkRole(700), resendInvitation);
+router.delete("/:id", checkRole(700), cancelInvitation);
 
 export default router;

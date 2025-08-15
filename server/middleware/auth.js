@@ -364,3 +364,112 @@ export const checkRole = (minLevel) => {
 export const authorize = (minLevel) => {
   return checkRole(minLevel);
 };
+
+// Department-based authorization for HODs
+export const checkDepartmentAccess = (req, res, next) => {
+  try {
+    const user = req.user;
+
+    // Super Admin (level 1000) can access all departments
+    if (user.role.level >= 1000) {
+      return next();
+    }
+
+    // HOD (level 700) can only access their own department
+    if (user.role.level >= 700) {
+      const userDepartmentId = user.department?._id?.toString();
+      const targetDepartmentId =
+        req.body.departmentId ||
+        req.params.departmentId ||
+        req.query.departmentId;
+
+      if (!userDepartmentId) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "You must be assigned to a department to perform this action",
+        });
+      }
+
+      if (!targetDepartmentId) {
+        return res.status(400).json({
+          success: false,
+          message: "Department ID is required",
+        });
+      }
+
+      if (userDepartmentId !== targetDepartmentId) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only invite people to your own department",
+        });
+      }
+
+      return next();
+    }
+
+    // Other roles don't have access
+    return res.status(403).json({
+      success: false,
+      message:
+        "Access denied. Only HOD and Super Admin can perform this action",
+    });
+  } catch (error) {
+    console.error("Department access check error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during authorization check",
+    });
+  }
+};
+
+// User operation authorization - checks if user can manage target user
+export const checkUserAccess = (req, res, next) => {
+  try {
+    const currentUser = req.user;
+    const targetUserId = req.params.id || req.body.userId;
+
+    if (currentUser.role.level >= 1000) {
+      return next();
+    }
+
+    if (currentUser.role.level >= 700) {
+      if (!currentUser.department) {
+        return res.status(403).json({
+          success: false,
+          message: "You must be assigned to a department to manage users",
+        });
+      }
+
+      if (req.method === "POST" && req.body.department) {
+        const userDepartmentId = currentUser.department._id.toString();
+        const targetDepartmentId = req.body.department.toString();
+
+        if (userDepartmentId !== targetDepartmentId) {
+          return res.status(403).json({
+            success: false,
+            message: "You can only create users in your own department",
+          });
+        }
+        return next();
+      }
+
+      if (targetUserId) {
+        return next();
+      }
+
+      return next();
+    }
+
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Only HOD and Super Admin can manage users",
+    });
+  } catch (error) {
+    console.error("User access check error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during authorization check",
+    });
+  }
+};

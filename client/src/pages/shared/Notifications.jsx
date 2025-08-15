@@ -46,6 +46,13 @@ const Notifications = () => {
     }
   }, [location.state, notifications]);
 
+  // Clear location state when selected notification is null
+  useEffect(() => {
+    if (!selectedNotification && location.state?.selectedNotificationId) {
+      window.history.replaceState({}, document.title);
+    }
+  }, [selectedNotification, location.state]);
+
   const fetchNotifications = async () => {
     try {
       setLoading(true);
@@ -181,8 +188,17 @@ const Notifications = () => {
     setShowDeleteModal(true);
   };
 
-  const handleNotificationClick = (notification) => {
+  const handleNotificationClick = async (notification) => {
+    console.log(
+      "🔍 [NOTIFICATION CLICK] Full notification object:",
+      notification
+    );
     setSelectedNotification(notification);
+  };
+
+  const handleModalClose = () => {
+    setSelectedNotification(null);
+    console.log("🔍 [MODAL CLOSE] Staying on notifications page");
   };
 
   const getNotificationIcon = (type) => {
@@ -402,11 +418,11 @@ const Notifications = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm font-medium mb-1">Unread</p>
-                <p className="text-4xl font-bold text-[var(--elra-primary)]">
+                <p className="text-4xl font-bold text-orange-600">
                   {unreadCount}
                 </p>
               </div>
-              <div className="p-4 rounded-xl bg-[var(--elra-primary)] text-white group-hover:scale-110 transition-transform duration-300">
+              <div className="p-4 rounded-xl bg-orange-500 text-white group-hover:scale-110 transition-transform duration-300">
                 <MdNotificationsActive size={28} />
               </div>
             </div>
@@ -420,11 +436,9 @@ const Notifications = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm font-medium mb-1">Read</p>
-                <p className="text-4xl font-bold text-[var(--elra-primary)]">
-                  {readCount}
-                </p>
+                <p className="text-4xl font-bold text-blue-600">{readCount}</p>
               </div>
-              <div className="p-4 rounded-xl bg-[var(--elra-primary)] text-white group-hover:scale-110 transition-transform duration-300">
+              <div className="p-4 rounded-xl bg-blue-500 text-white group-hover:scale-110 transition-transform duration-300">
                 <MdMarkEmailRead size={28} />
               </div>
             </div>
@@ -607,7 +621,7 @@ const Notifications = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/60 backdrop-blur-md z-[9999] flex items-center justify-center p-4"
-            onClick={() => setSelectedNotification(null)}
+            onClick={handleModalClose}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -632,7 +646,7 @@ const Notifications = () => {
                   <motion.button
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
-                    onClick={() => setSelectedNotification(null)}
+                    onClick={handleModalClose}
                     className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100 cursor-pointer"
                     title="Close"
                   >
@@ -742,7 +756,7 @@ const Notifications = () => {
                             if (selectedNotification._id) {
                               markAsRead(selectedNotification._id);
                             }
-                            setSelectedNotification(null);
+                            handleModalClose();
                           }}
                           className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-all duration-300 cursor-pointer"
                         >
@@ -772,7 +786,7 @@ const Notifications = () => {
                         if (selectedNotification._id) {
                           deleteNotification(selectedNotification._id);
                         }
-                        setSelectedNotification(null);
+                        handleModalClose();
                       }}
                       className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-300 cursor-pointer"
                     >

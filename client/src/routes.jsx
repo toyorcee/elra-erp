@@ -12,11 +12,14 @@ import HRInvitations from "./pages/user/modules/hr/HRInvitations";
 import OnboardingManagement from "./pages/user/modules/hr/onboarding/OnboardingManagement";
 import OffboardingManagement from "./pages/user/modules/hr/offboarding/OffboardingManagement";
 import LeaveManagement from "./pages/user/modules/hr/leave/LeaveManagement";
+import LeaveRequests from "./pages/user/modules/hr/leave/LeaveRequests";
 import AttendanceTracking from "./pages/user/modules/hr/attendance/AttendanceTracking";
 import LeaveCalendar from "./pages/user/modules/hr/leave/LeaveCalendar";
 import HRDepartments from "./pages/user/modules/hr/HRDepartments";
 import HRRoles from "./pages/user/modules/hr/HRRoles";
 import HRUsers from "./pages/user/modules/hr/HRUsers";
+import PolicyManagement from "./pages/user/modules/hr/policies/PolicyManagement";
+import ComplianceManagement from "./pages/user/modules/hr/compliance/ComplianceManagement";
 import SalaryGradeManagement from "./pages/user/modules/payroll/SalaryGradeManagement";
 import Notifications from "./pages/shared/Notifications";
 import Settings from "./pages/shared/Settings";
@@ -135,9 +138,18 @@ const AppRoutes = () => {
           path="modules/hr/offboarding"
           element={<OffboardingManagement />}
         />
-        <Route path="modules/hr/leave/requests" element={<LeaveManagement />} />
+        <Route path="modules/hr/leave/requests" element={<LeaveRequests />} />
+        <Route
+          path="modules/hr/leave/management"
+          element={<LeaveManagement />}
+        />
         <Route path="modules/hr/attendance" element={<AttendanceTracking />} />
         <Route path="modules/hr/leave/calendar" element={<LeaveCalendar />} />
+        <Route path="modules/hr/policies" element={<PolicyManagement />} />
+        <Route
+          path="modules/hr/compliance"
+          element={<ComplianceManagement />}
+        />
         <Route
           path="modules/payroll/salary-grades"
           element={<SalaryGradeManagement />}

@@ -24,7 +24,7 @@ export const sidebarConfig = [
     label: "Payroll Management",
     icon: "HiOutlineCurrencyDollar",
     path: "/dashboard/modules/payroll",
-    required: { minLevel: 300 },
+    required: { minLevel: 700 },
     section: "erp",
     badge: "Payroll",
   },

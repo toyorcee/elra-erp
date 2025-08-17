@@ -1106,6 +1106,109 @@ class NotificationService {
       throw error;
     }
   }
+
+  // Send deduction notifications based on scope
+  async sendDeductionNotifications(deduction, populatedDeduction, user) {
+    try {
+      // Skip notifications for penalty deductions
+      if (deduction.category === "penalty") {
+        console.log(
+          `🔇 [DEDUCTION NOTIFICATION] Skipping notification for penalty deduction: ${deduction.name}`
+        );
+        return { successful: 0, failed: 0 };
+      }
+
+      let targetUsers = [];
+      let notificationMessage = "";
+
+      switch (deduction.scope) {
+        case "company":
+          targetUsers = await User.find({
+            isActive: true,
+            "role.level": { $ne: 1000 },
+          });
+          notificationMessage = `New company-wide deduction "${deduction.name}" has been created. This will be applied to all employees.`;
+          break;
+
+        case "department":
+          if (deduction.departments && deduction.departments.length > 0) {
+            targetUsers = await User.find({
+              department: { $in: deduction.departments },
+              isActive: true,
+            });
+            const deptNames =
+              populatedDeduction.departments?.map((d) => d.name).join(", ") ||
+              "selected departments";
+            notificationMessage = `New department-wide deduction "${deduction.name}" has been created for ${deptNames}.`;
+          } else if (deduction.department) {
+            targetUsers = await User.find({
+              department: deduction.department,
+              isActive: true,
+            });
+            const deptName =
+              populatedDeduction.department?.name || "your department";
+            notificationMessage = `New department-wide deduction "${deduction.name}" has been created for ${deptName}.`;
+          }
+          break;
+
+        case "individual":
+          if (deduction.employees && deduction.employees.length > 0) {
+            targetUsers = await User.find({
+              _id: { $in: deduction.employees },
+              isActive: true,
+            });
+            notificationMessage = `New individual deduction "${deduction.name}" has been created for you.`;
+          } else if (deduction.employee) {
+            targetUsers = await User.find({
+              _id: deduction.employee,
+              isActive: true,
+            });
+            notificationMessage = `New individual deduction "${deduction.name}" has been created for you.`;
+          }
+          break;
+      }
+
+      const notificationPromises = targetUsers.map(async (targetUser) => {
+        const notificationData = {
+          recipient: targetUser._id,
+          type: "DEDUCTION_CREATED",
+          title: `💰 New Deduction: ${deduction.name}`,
+          message: notificationMessage,
+          priority: "medium",
+          data: {
+            deductionId: deduction._id,
+            deductionName: deduction.name,
+            deductionType: deduction.type,
+            deductionCategory: deduction.category,
+            deductionScope: deduction.scope,
+            amount: deduction.amount,
+            calculationType: deduction.calculationType,
+            createdBy: user._id,
+            actionUrl: `/dashboard/modules/payroll/deductions`,
+          },
+        };
+
+        return await this.createNotification(notificationData);
+      });
+
+      const results = await Promise.allSettled(notificationPromises);
+      const successful = results.filter(
+        (result) => result.status === "fulfilled" && result.value
+      ).length;
+      const failed = results.filter(
+        (result) => result.status === "rejected"
+      ).length;
+
+      console.log(
+        `✅ [DEDUCTION NOTIFICATION] Successfully sent ${successful} notifications, ${failed} failed for deduction: ${deduction.name}`
+      );
+
+      return { successful, failed };
+    } catch (error) {
+      console.error("Error sending deduction notifications:", error);
+      throw error;
+    }
+  }
 }
 
 export default NotificationService;

@@ -15,6 +15,7 @@ import {
   formatNumber,
   isNumberField,
 } from "../../../../utils/formatters.js";
+import DataTable from "../../../../components/common/DataTable";
 
 const SalaryGradeManagement = () => {
   const [salaryGrades, setSalaryGrades] = useState([]);
@@ -494,9 +495,9 @@ const SalaryGradeManagement = () => {
 
       {/* Salary Grades Tab */}
       {activeTab === "grades" && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="space-y-6">
           {/* Filter Controls */}
-          <div className="p-4 border-b border-gray-200 bg-gray-50">
+          <div className="bg-white rounded-2xl shadow-lg p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <label className="flex items-center">
@@ -523,176 +524,178 @@ const SalaryGradeManagement = () => {
               </div>
             </div>
           </div>
-          {salaryGrades.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="mx-auto h-24 w-24 text-gray-300 mb-4">
-                <CurrencyDollarIcon className="h-full w-full" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No salary grades found
-              </h3>
-              <p className="text-gray-500 mb-6">
-                Get started by creating your first salary grade to define your
-                compensation structure.
-              </p>
-              <button
-                onClick={async () => {
-                  await resetForm();
-                  setShowModal(true);
-                }}
-                className="inline-flex items-center px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors duration-200 cursor-pointer"
-              >
-                <PlusIcon className="h-4 w-4 mr-2" />
-                Create First Salary Grade
-              </button>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Grade
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Description
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Salary Range
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Allowances
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Mapped Roles
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {salaryGrades
-                    .filter(
-                      (grade) =>
-                        !showOnlyWithSteps ||
-                        (grade.steps && grade.steps.length > 0)
-                    )
-                    .map((grade) => (
-                      <tr
-                        key={grade._id}
-                        className="hover:bg-gray-50 transition-colors duration-200"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="h-10 w-10 rounded-full bg-[var(--elra-secondary-3)] flex items-center justify-center">
-                              <span className="text-sm font-semibold text-[var(--elra-primary)]">
-                                {grade.grade.split(" ")[1]}
-                              </span>
-                            </div>
-                            <div className="ml-3">
-                              <div className="text-sm font-semibold text-gray-900">
-                                {grade.grade}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                {grade.name}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
-                          <div className="break-words leading-relaxed">
-                            {grade.description}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <div className="font-medium">
-                            {formatCurrency(grade.minGrossSalary)}
-                          </div>
-                          <div className="text-gray-500">
-                            to {formatCurrency(grade.maxGrossSalary)}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          <div className="space-y-1">
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Housing:</span>
-                              <span>
-                                {formatCurrency(grade.allowances.housing)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Transport:</span>
-                              <span>
-                                {formatCurrency(grade.allowances.transport)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Meal:</span>
-                              <span>
-                                {formatCurrency(grade.allowances.meal)}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          <div className="space-y-1">
-                            {grade.roleMappings &&
-                            grade.roleMappings.length > 0 ? (
-                              grade.roleMappings.map((mapping, index) => (
-                                <div key={index} className="flex items-center">
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-green-800">
-                                    {(
-                                      mapping.role?.name || "Unknown Role"
-                                    ).replace(/_/g, " ")}
-                                  </span>
-                                </div>
-                              ))
-                            ) : (
-                              <span className="text-gray-400 text-xs">
-                                No roles mapped
-                              </span>
+
+          {/* Data Table */}
+          <DataTable
+            data={salaryGrades.filter(
+              (grade) =>
+                !showOnlyWithSteps || (grade.steps && grade.steps.length > 0)
+            )}
+            loading={loading}
+            columns={[
+              {
+                header: "Grade",
+                key: "grade",
+                renderer: (grade) => (
+                  <div className="flex items-center">
+                    <div className="h-10 w-10 rounded-full bg-[var(--elra-secondary-3)] flex items-center justify-center">
+                      <span className="text-sm font-semibold text-[var(--elra-primary)]">
+                        {grade.grade.split(" ")[1]}
+                      </span>
+                    </div>
+                    <div className="ml-3">
+                      <div className="text-sm font-semibold text-gray-900">
+                        {grade.grade}
+                      </div>
+                      <div className="text-sm text-gray-500">{grade.name}</div>
+                    </div>
+                  </div>
+                ),
+                skeletonRenderer: () => (
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 bg-gray-200 rounded-full mr-3"></div>
+                    <div>
+                      <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-16"></div>
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                header: "Description",
+                key: "description",
+                renderer: (grade) => (
+                  <div className="break-words leading-relaxed max-w-xs">
+                    {grade.description}
+                  </div>
+                ),
+                skeletonRenderer: () => (
+                  <div>
+                    <div className="h-4 bg-gray-200 rounded w-32 mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-24"></div>
+                  </div>
+                ),
+              },
+              {
+                header: "Salary Range",
+                key: "salaryRange",
+                renderer: (grade) => (
+                  <div>
+                    <div className="font-medium">
+                      {formatCurrency(grade.minGrossSalary)}
+                    </div>
+                    <div className="text-gray-500">
+                      to {formatCurrency(grade.maxGrossSalary)}
+                    </div>
+                  </div>
+                ),
+                skeletonRenderer: () => (
+                  <div>
+                    <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-16"></div>
+                  </div>
+                ),
+              },
+              {
+                header: "Allowances",
+                key: "allowances",
+                renderer: (grade) => (
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Housing:</span>
+                      <span>{formatCurrency(grade.allowances.housing)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Transport:</span>
+                      <span>{formatCurrency(grade.allowances.transport)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Meal:</span>
+                      <span>{formatCurrency(grade.allowances.meal)}</span>
+                    </div>
+                  </div>
+                ),
+                skeletonRenderer: () => (
+                  <div className="space-y-2">
+                    <div className="h-3 bg-gray-200 rounded w-16"></div>
+                    <div className="h-3 bg-gray-200 rounded w-20"></div>
+                    <div className="h-3 bg-gray-200 rounded w-12"></div>
+                  </div>
+                ),
+              },
+              {
+                header: "Mapped Roles",
+                key: "roles",
+                renderer: (grade) => (
+                  <div className="space-y-1">
+                    {grade.roleMappings && grade.roleMappings.length > 0 ? (
+                      grade.roleMappings.map((mapping, index) => (
+                        <div key={index} className="flex items-center">
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            {(mapping.role?.name || "Unknown Role").replace(
+                              /_/g,
+                              " "
                             )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              grade.isActive
-                                ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
-                            }`}
-                          >
-                            {grade.isActive ? "Active" : "Inactive"}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex items-center justify-end space-x-2">
-                            <button
-                              onClick={() => handleEdit(grade)}
-                              className="text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-colors duration-200 cursor-pointer"
-                            >
-                              <PencilIcon className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleDelete(grade._id, grade.grade)
-                              }
-                              className="text-red-600 hover:text-red-800 transition-colors duration-200 cursor-pointer"
-                            >
-                              <TrashIcon className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-gray-400 text-xs">
+                        No roles mapped
+                      </span>
+                    )}
+                  </div>
+                ),
+                skeletonRenderer: () => (
+                  <div className="h-6 bg-gray-200 rounded-full w-16"></div>
+                ),
+              },
+              {
+                header: "Status",
+                key: "status",
+                renderer: (grade) => (
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      grade.isActive
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {grade.isActive ? "Active" : "Inactive"}
+                  </span>
+                ),
+                skeletonRenderer: () => (
+                  <div className="h-6 bg-gray-200 rounded-full w-16"></div>
+                ),
+              },
+            ]}
+            actions={{
+              onEdit: handleEdit,
+              onDelete: handleDelete,
+              showEdit: true,
+              showDelete: true,
+              showToggle: false,
+            }}
+            emptyState={{
+              icon: <CurrencyDollarIcon className="w-12 h-12 text-white" />,
+              title: "No salary grades found",
+              description:
+                "Get started by creating your first salary grade to define your compensation structure.",
+              actionButton: (
+                <button
+                  onClick={async () => {
+                    await resetForm();
+                    setShowModal(true);
+                  }}
+                  className="inline-flex items-center px-6 py-3 bg-[var(--elra-primary)] text-white font-medium rounded-xl shadow-lg hover:bg-[var(--elra-primary-dark)] transition-all duration-200 transform hover:scale-105 cursor-pointer"
+                >
+                  <PlusIcon className="w-5 h-5 mr-2" />
+                  Create First Salary Grade
+                </button>
+              ),
+            }}
+            skeletonRows={5}
+          />
         </div>
       )}
 

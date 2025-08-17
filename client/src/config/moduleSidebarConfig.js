@@ -150,7 +150,7 @@ export const moduleSidebarConfig = {
     borderColor: "border-emerald-200",
     sections: [
       {
-        title: "Payroll Processing",
+        title: "Salary Structure",
         items: [
           {
             label: "Salary Grade Management",
@@ -160,18 +160,56 @@ export const moduleSidebarConfig = {
             description: "Manage salary grades and compensation structure",
           },
           {
-            label: "Salary Processing",
+            label: "Performance Allowances",
+            icon: "StarIcon",
+            path: "/dashboard/modules/payroll/allowances",
+            required: { minLevel: 600 },
+            description: "Manage performance-based allowances",
+          },
+          {
+            label: "Performance Bonuses",
+            icon: "GiftIcon",
+            path: "/dashboard/modules/payroll/bonuses",
+            required: { minLevel: 600 },
+            description: "Manage performance-based bonuses",
+          },
+        ],
+      },
+      {
+        title: "Deductions & Benefits",
+        items: [
+          {
+            label: "Deductions Management",
+            icon: "MinusCircleIcon",
+            path: "/dashboard/modules/payroll/deductions",
+            required: { minLevel: 700 },
+            description: "Manage both voluntary and statutory deductions",
+          },
+          {
+            label: "Benefits Administration",
+            icon: "HeartIcon",
+            path: "/dashboard/modules/payroll/benefits",
+            required: { minLevel: 600 },
+            description: "Manage employee benefits and perks",
+          },
+        ],
+      },
+      {
+        title: "Payroll Processing",
+        items: [
+          {
+            label: "Monthly Payroll",
             icon: "CalculatorIcon",
             path: "/dashboard/modules/payroll/processing",
             required: { minLevel: 600 },
             description: "Process monthly salary payments",
           },
           {
-            label: "Payroll Reports",
-            icon: "DocumentTextIcon",
-            path: "/dashboard/modules/payroll/reports",
+            label: "Usage Tracking",
+            icon: "ClipboardDocumentCheckIcon",
+            path: "/dashboard/modules/payroll/usage-tracking",
             required: { minLevel: 600 },
-            description: "Generate payroll reports",
+            description: "Track used allowances and bonuses",
           },
           {
             label: "Pay Slips",
@@ -180,57 +218,12 @@ export const moduleSidebarConfig = {
             required: { minLevel: 300 },
             description: "View and download pay slips",
           },
-        ],
-      },
-      {
-        title: "Tax & Benefits",
-        items: [
           {
-            label: "Tax Management",
-            icon: "ReceiptPercentIcon",
-            path: "/dashboard/modules/payroll/tax",
+            label: "Payroll Reports",
+            icon: "DocumentTextIcon",
+            path: "/dashboard/modules/payroll/reports",
             required: { minLevel: 600 },
-            description: "Handle tax calculations and filings",
-          },
-          {
-            label: "Benefits Administration",
-            icon: "GiftIcon",
-            path: "/dashboard/modules/payroll/benefits",
-            required: { minLevel: 600 },
-            description: "Manage employee benefits",
-          },
-          {
-            label: "Deductions",
-            icon: "MinusCircleIcon",
-            path: "/dashboard/modules/payroll/deductions",
-            required: { minLevel: 600 },
-            description: "Configure salary deductions",
-          },
-        ],
-      },
-      {
-        title: "Time & Attendance",
-        items: [
-          {
-            label: "Time Tracking",
-            icon: "ClockIcon",
-            path: "/dashboard/modules/payroll/time",
-            required: { minLevel: 600 },
-            description: "Track employee work hours",
-          },
-          {
-            label: "Overtime Management",
-            icon: "ClockIcon",
-            path: "/dashboard/modules/payroll/overtime",
-            required: { minLevel: 600 },
-            description: "Handle overtime calculations",
-          },
-          {
-            label: "Leave Integration",
-            icon: "CalendarIcon",
-            path: "/dashboard/modules/payroll/leave",
-            required: { minLevel: 600 },
-            description: "Integrate with leave management",
+            description: "Generate payroll reports",
           },
         ],
       },

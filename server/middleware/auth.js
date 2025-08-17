@@ -5,16 +5,14 @@ import User from "../models/User.js";
 const setTokenCookies = (res, accessToken, refreshToken) => {
   const isProd = process.env.NODE_ENV === "production";
 
-  // Access token cookie (non-httpOnly for client access)
   res.cookie("token", accessToken, {
     httpOnly: false,
     secure: isProd,
     sameSite: "lax",
     path: "/",
-    maxAge: 15 * 60 * 1000, // 15 minutes
+    maxAge: 15 * 60 * 1000,
   });
 
-  // Refresh token cookie (httpOnly for security)
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
     secure: isProd,
@@ -360,68 +358,145 @@ export const checkRole = (minLevel) => {
   };
 };
 
-// Alias for checkRole - authorize function for backward compatibility
 export const authorize = (minLevel) => {
   return checkRole(minLevel);
 };
 
-// Department-based authorization for HODs
-export const checkDepartmentAccess = (req, res, next) => {
-  try {
-    const user = req.user;
+// Reusable department-based authorization middleware
+export const checkDepartmentAccess = (options = {}) => {
+  const {
+    allowSuperAdmin = true,
+    allowHOD = true,
+    minLevel = 700,
+    resourceField = "department",
+    userDepartmentField = "department",
+    errorMessage = "Access denied. Insufficient permissions.",
+  } = options;
 
-    // Super Admin (level 1000) can access all departments
-    if (user.role.level >= 1000) {
-      return next();
-    }
+  return async (req, res, next) => {
+    try {
+      const user = req.user;
 
-    // HOD (level 700) can only access their own department
-    if (user.role.level >= 700) {
-      const userDepartmentId = user.department?._id?.toString();
-      const targetDepartmentId =
-        req.body.departmentId ||
-        req.params.departmentId ||
-        req.query.departmentId;
-
-      if (!userDepartmentId) {
+      // Check minimum role level (HOD = 700, SUPER_ADMIN = 1000)
+      if (user.role.level < minLevel) {
         return res.status(403).json({
           success: false,
-          message:
-            "You must be assigned to a department to perform this action",
+          message: errorMessage,
         });
       }
 
-      if (!targetDepartmentId) {
-        return res.status(400).json({
-          success: false,
-          message: "Department ID is required",
-        });
+      // SUPER_ADMIN (level 1000) can access everything if allowed
+      if (allowSuperAdmin && user.role.level >= 1000) {
+        return next();
       }
 
-      if (userDepartmentId !== targetDepartmentId) {
-        return res.status(403).json({
-          success: false,
-          message: "You can only invite people to your own department",
-        });
+      // HOD (level 700) can access their department if allowed
+      if (allowHOD && user.role.level >= 700) {
+        const userDepartmentId =
+          user[userDepartmentField]?._id?.toString() ||
+          user[userDepartmentField]?.toString();
+
+        if (!userDepartmentId) {
+          return res.status(403).json({
+            success: false,
+            message:
+              "You must be assigned to a department to perform this action",
+          });
+        }
+
+        // For GET requests, filter by department
+        if (req.method === "GET") {
+          req.departmentFilter = { [resourceField]: userDepartmentId };
+        }
+
+        // For other requests, check if the resource belongs to user's department
+        if (["POST", "PUT", "DELETE"].includes(req.method)) {
+          const resourceDepartmentId =
+            req.body[resourceField] || req.params[resourceField];
+
+          if (
+            resourceDepartmentId &&
+            resourceDepartmentId !== userDepartmentId
+          ) {
+            return res.status(403).json({
+              success: false,
+              message: `You can only manage ${resourceField} for your own department`,
+            });
+          }
+        }
+
+        return next();
       }
 
-      return next();
+      // If we reach here, user doesn't have sufficient permissions
+      return res.status(403).json({
+        success: false,
+        message: errorMessage,
+      });
+    } catch (error) {
+      console.error("Department access check error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error during authorization check",
+      });
     }
-
-    // Other roles don't have access
-    return res.status(403).json({
-      success: false,
-      message:
-        "Access denied. Only HOD and Super Admin can perform this action",
-    });
-  } catch (error) {
-    console.error("Department access check error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error during authorization check",
-    });
-  }
+  };
 };
+
+// Specific middleware for payroll modules (allowances, bonuses, etc.)
+export const checkPayrollAccess = checkDepartmentAccess({
+  allowSuperAdmin: true,
+  allowHOD: true,
+  minLevel: 700, // HOD level minimum
+  resourceField: "department",
+  userDepartmentField: "department",
+  errorMessage:
+    "Access denied. Only HOD (700) and Super Admin (1000) can manage payroll items.",
+});
+
+// Specific middleware for user management
+export const checkUserManagementAccess = checkDepartmentAccess({
+  allowSuperAdmin: true,
+  allowHOD: true,
+  minLevel: 700, // HOD level minimum
+  resourceField: "department",
+  userDepartmentField: "department",
+  errorMessage:
+    "Access denied. Only HOD (700) and Super Admin (1000) can manage users.",
+});
+
+// Specific middleware for leave management
+export const checkLeaveAccess = checkDepartmentAccess({
+  allowSuperAdmin: true,
+  allowHOD: true,
+  minLevel: 700, // HOD level minimum
+  resourceField: "department",
+  userDepartmentField: "department",
+  errorMessage:
+    "Access denied. Only HOD (700) and Super Admin (1000) can manage leave requests.",
+});
+
+// Specific middleware for document management
+export const checkDocumentAccess = checkDepartmentAccess({
+  allowSuperAdmin: true,
+  allowHOD: true,
+  minLevel: 700, // HOD level minimum
+  resourceField: "department",
+  userDepartmentField: "department",
+  errorMessage:
+    "Access denied. Only HOD (700) and Super Admin (1000) can manage documents.",
+});
+
+// Specific middleware for any other module
+export const checkModuleAccess = (moduleName) =>
+  checkDepartmentAccess({
+    allowSuperAdmin: true,
+    allowHOD: true,
+    minLevel: 700,
+    resourceField: "department",
+    userDepartmentField: "department",
+    errorMessage: `Access denied. Only HOD (700) and Super Admin (1000) can manage ${moduleName}.`,
+  });
 
 // User operation authorization - checks if user can manage target user
 export const checkUserAccess = (req, res, next) => {

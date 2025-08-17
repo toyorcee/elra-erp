@@ -21,6 +21,9 @@ import HRUsers from "./pages/user/modules/hr/HRUsers";
 import PolicyManagement from "./pages/user/modules/hr/policies/PolicyManagement";
 import ComplianceManagement from "./pages/user/modules/hr/compliance/ComplianceManagement";
 import SalaryGradeManagement from "./pages/user/modules/payroll/SalaryGradeManagement";
+import PerformanceAllowances from "./pages/user/modules/payroll/PerformanceAllowances";
+import PerformanceBonuses from "./pages/user/modules/payroll/PerformanceBonuses";
+import DeductionsManagement from "./pages/user/modules/payroll/DeductionsManagement";
 import Notifications from "./pages/shared/Notifications";
 import Settings from "./pages/shared/Settings";
 // Admin imports commented out - admin folder deleted
@@ -153,6 +156,18 @@ const AppRoutes = () => {
         <Route
           path="modules/payroll/salary-grades"
           element={<SalaryGradeManagement />}
+        />
+        <Route
+          path="modules/payroll/allowances"
+          element={<PerformanceAllowances />}
+        />
+        <Route
+          path="modules/payroll/bonuses"
+          element={<PerformanceBonuses />}
+        />
+        <Route
+          path="modules/payroll/deductions"
+          element={<DeductionsManagement />}
         />
       </Route>
 

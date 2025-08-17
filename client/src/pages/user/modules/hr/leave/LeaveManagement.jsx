@@ -16,6 +16,7 @@ import { toast } from "react-toastify";
 import { userModulesAPI } from "../../../../../services/userModules.js";
 import { useAuth } from "../../../../../context/AuthContext.jsx";
 import { getActiveDepartments } from "../../../../../services/departments.js";
+import defaultAvatar from "../../../../../assets/defaulticon.jpg";
 
 const LeaveManagement = () => {
   const { user } = useAuth();
@@ -45,6 +46,44 @@ const LeaveManagement = () => {
   const canApproveOwnDepartment = user?.role?.level >= 700; // HOD can approve their department
   const canApproveDirectReports = user?.role?.level >= 600; // MANAGER can approve direct reports
 
+  // Image utility functions
+  const getDefaultAvatar = () => {
+    return defaultAvatar;
+  };
+
+  const getImageUrl = (avatarPath) => {
+    if (!avatarPath) return getDefaultAvatar();
+    if (avatarPath.startsWith("http")) return avatarPath;
+
+    const baseUrl = (
+      import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+    ).replace("/api", "");
+    return `${baseUrl}${avatarPath}`;
+  };
+
+  const getAvatarDisplay = (user) => {
+    if (user.avatar) {
+      return (
+        <img
+          src={getImageUrl(user.avatar)}
+          alt={`${user.firstName} ${user.lastName}`}
+          className="w-10 h-10 rounded-full object-cover"
+          onError={(e) => {
+            e.target.src = getDefaultAvatar();
+          }}
+        />
+      );
+    }
+    return (
+      <div className="w-10 h-10 bg-[var(--elra-primary)] rounded-full flex items-center justify-center">
+        <span className="text-white font-semibold text-sm">
+          {user.firstName?.[0]}
+          {user.lastName?.[0]}
+        </span>
+      </div>
+    );
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -72,7 +111,7 @@ const LeaveManagement = () => {
   const getStatusColor = (status) => {
     switch (status) {
       case "Approved":
-        return "bg-green-100 text-green-800";
+        return "bg-[var(--elra-secondary-3)] text-[var(--elra-primary)]";
       case "Rejected":
         return "bg-red-100 text-red-800";
       case "Pending":
@@ -123,16 +162,20 @@ const LeaveManagement = () => {
 
   const canApproveRequest = (request) => {
     if (!canApproveLeave) return false;
-    
+
     // Super Admin can approve all requests
     if (canApproveAllDepartments) return true;
-    
+
+    // Get department IDs for comparison
+    const requestDeptId = request.department?._id || request.department;
+    const userDeptId = user?.department?._id || user?.department;
+
     // HOD can approve requests from their department
-    if (canApproveOwnDepartment && request.department === user?.department) return true;
-    
+    if (canApproveOwnDepartment && requestDeptId === userDeptId) return true;
+
     // Manager can approve direct reports (simplified - could be enhanced with reporting structure)
-    if (canApproveDirectReports && request.department === user?.department) return true;
-    
+    if (canApproveDirectReports && requestDeptId === userDeptId) return true;
+
     return false;
   };
 
@@ -161,9 +204,7 @@ const LeaveManagement = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Leave Management</h1>
-          <p className="text-gray-600">
-            Approve and manage leave requests
-          </p>
+          <p className="text-gray-600">Approve and manage leave requests</p>
         </div>
       </div>
 
@@ -311,9 +352,7 @@ const LeaveManagement = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10">
-                        <div className="h-10 w-10 rounded-full bg-[var(--elra-primary)] flex items-center justify-center">
-                          <UserIcon className="w-6 h-6 text-white" />
-                        </div>
+                        {getAvatarDisplay(request.employee)}
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">
@@ -361,22 +400,32 @@ const LeaveManagement = () => {
                       >
                         <EyeIcon className="w-4 h-4" />
                       </button>
-                      {request.status === "Pending" && canApproveRequest(request) && (
+                      {request.status === "Pending" && (
                         <>
-                          <button
-                            onClick={() =>
-                              handleApprove(request._id, "approve")
-                            }
-                            className="text-green-600 hover:text-green-900"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleApprove(request._id, "reject")}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            Reject
-                          </button>
+                          {canApproveRequest(request) ? (
+                            <>
+                              <button
+                                onClick={() =>
+                                  handleApprove(request._id, "approve")
+                                }
+                                className="text-green-600 hover:text-green-900"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() =>
+                                  handleApprove(request._id, "reject")
+                                }
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-xs text-gray-500">
+                              No approval rights
+                            </span>
+                          )}
                         </>
                       )}
                       {request.status === "Pending" &&

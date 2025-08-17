@@ -474,28 +474,6 @@ export const getHRDashboardData = async (req, res) => {
       ...departmentFilter,
     });
 
-    console.log(
-      "✅ [HR Dashboard] Comprehensive data retrieved successfully:",
-      {
-        userId: currentUser._id,
-        totalStaff,
-        newHires: actualNewHires,
-        onLeave,
-        totalDepartments,
-        pendingLeaveRequests,
-        pendingInvitations,
-        personalActivities: recentActivity.length,
-        personalStaffActions: recentStaffActivity.length,
-        recentOnboardings: recentOnboardings.length,
-        totalCompliances,
-        pendingCompliances,
-        completedCompliances,
-        totalPolicies,
-        pendingPolicies,
-        approvedPolicies,
-      }
-    );
-
     res.json({
       success: true,
       data: {
@@ -658,21 +636,6 @@ export const getHRDepartmentData = async (req, res) => {
       .populate("department", "name")
       .sort({ startDate: 1 })
       .limit(10);
-
-    console.log(
-      "✅ [HR Department Data] Comprehensive data retrieved successfully:",
-      {
-        userId: currentUser._id,
-        departmentId,
-        totalStaff,
-        newHires: actualNewHires,
-        onLeave,
-        pendingLeaveRequests,
-        pendingInvitations,
-        personalActivities: recentActivity.length,
-        recentOnboardings: recentOnboardings.length,
-      }
-    );
 
     res.json({
       success: true,

@@ -52,6 +52,10 @@ import employeeLifecycleRoutes from "./routes/employeeLifecycle.js";
 import leaveRoutes from "./routes/leave.js";
 import policyRoutes from "./routes/policy.js";
 import complianceRoutes from "./routes/compliance.js";
+import allowanceRoutes from "./routes/allowanceRoutes.js";
+import bonusRoutes from "./routes/bonusRoutes.js";
+import deductionRoutes from "./routes/deductionRoutes.js";
+import taxBracketRoutes from "./routes/taxBrackets.js";
 
 const isValidObjectId = (id) => {
   return (
@@ -230,6 +234,10 @@ app.use("/api/employee-lifecycle", employeeLifecycleRoutes);
 app.use("/api/leave", leaveRoutes);
 app.use("/api/policies", policyRoutes);
 app.use("/api/compliance", complianceRoutes);
+app.use("/api/allowances", allowanceRoutes);
+app.use("/api/bonuses", bonusRoutes);
+app.use("/api/deductions", deductionRoutes);
+app.use("/api/tax-brackets", taxBracketRoutes);
 
 const io = new SocketIOServer(httpServer, {
   cors: {

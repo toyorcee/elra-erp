@@ -90,6 +90,67 @@ class AuditService {
   }
 
   /**
+   * Log deduction-related actions
+   */
+  static async logDeductionAction(userId, action, deductionId, details = {}) {
+    try {
+      const auditData = {
+        userId,
+        action,
+        resourceType: "DEDUCTION",
+        resourceId: deductionId,
+        resourceModel: "Deduction",
+        details: {
+          ...details,
+          deductionName: details.deductionName,
+          type: details.type,
+          category: details.category,
+          scope: details.scope,
+          amount: details.amount,
+          calculationType: details.calculationType,
+          useTaxBrackets: details.useTaxBrackets,
+          isActive: details.isActive,
+        },
+        ipAddress: details.ipAddress,
+        userAgent: details.userAgent,
+        riskLevel: this.calculateRiskLevel(action, details),
+      };
+
+      return await AuditLog.log(auditData);
+    } catch (error) {
+      console.error("Error logging deduction action:", error);
+      // Don't throw error to avoid breaking main functionality
+    }
+  }
+
+  /**
+   * Log any activity with custom resource type
+   */
+  static async logActivity(data) {
+    try {
+      const auditData = {
+        userId: data.userId,
+        action: data.action,
+        resourceType: data.resourceType?.toUpperCase(),
+        resourceId: data.resourceId,
+        resourceModel:
+          data.resourceType?.charAt(0).toUpperCase() +
+          data.resourceType?.slice(1),
+        details: {
+          ...data.details,
+        },
+        ipAddress: data.ipAddress,
+        userAgent: data.userAgent,
+        riskLevel: this.calculateRiskLevel(data.action, data.details),
+      };
+
+      return await AuditLog.log(auditData);
+    } catch (error) {
+      console.error("Error logging activity:", error);
+    }
+  }
+
+  /**
    * Log salary grade-related actions
    */
   static async logSalaryGradeAction(
@@ -196,6 +257,7 @@ class AuditService {
       "USER_ROLE_CHANGED",
       "PERMISSION_DENIED",
       "SUSPICIOUS_ACTIVITY",
+      "DEDUCTION_DELETED",
     ];
 
     const mediumRiskActions = [
@@ -207,6 +269,10 @@ class AuditService {
       "LEAVE_REQUEST_APPROVED",
       "LEAVE_REQUEST_REJECTED",
       "LEAVE_REQUEST_CANCELLED",
+      "DEDUCTION_CREATED",
+      "DEDUCTION_UPDATED",
+      "DEDUCTION_ACTIVATED",
+      "DEDUCTION_DEACTIVATED",
     ];
 
     if (highRiskActions.includes(action)) {

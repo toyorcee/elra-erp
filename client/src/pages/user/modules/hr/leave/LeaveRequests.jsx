@@ -18,6 +18,7 @@ import { toast } from "react-toastify";
 import { useAuth } from "../../../../../context/AuthContext";
 import { userModulesAPI } from "../../../../../services/userModules";
 import { getActiveDepartments } from "../../../../../services/departments";
+import defaultAvatar from "../../../../../assets/defaulticon.jpg";
 
 const LeaveRequests = () => {
   const { user } = useAuth();
@@ -49,6 +50,44 @@ const LeaveRequests = () => {
   const canViewAllRequests = user?.role?.level >= 600;
   const canEditOwnRequests = true;
   const canCancelOwnRequests = true;
+
+  // Image utility functions
+  const getDefaultAvatar = () => {
+    return defaultAvatar;
+  };
+
+  const getImageUrl = (avatarPath) => {
+    if (!avatarPath) return getDefaultAvatar();
+    if (avatarPath.startsWith("http")) return avatarPath;
+
+    const baseUrl = (
+      import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+    ).replace("/api", "");
+    return `${baseUrl}${avatarPath}`;
+  };
+
+  const getAvatarDisplay = (user) => {
+    if (user.avatar) {
+      return (
+        <img
+          src={getImageUrl(user.avatar)}
+          alt={`${user.firstName} ${user.lastName}`}
+          className="w-10 h-10 rounded-full object-cover"
+          onError={(e) => {
+            e.target.src = getDefaultAvatar();
+          }}
+        />
+      );
+    }
+    return (
+      <div className="w-10 h-10 bg-[var(--elra-primary)] rounded-full flex items-center justify-center">
+        <span className="text-white font-semibold text-sm">
+          {user.firstName?.[0]}
+          {user.lastName?.[0]}
+        </span>
+      </div>
+    );
+  };
 
   useEffect(() => {
     fetchData();
@@ -245,7 +284,7 @@ const LeaveRequests = () => {
   const getStatusColor = (status) => {
     switch (status) {
       case "Approved":
-        return "bg-green-100 text-green-800";
+        return "bg-[var(--elra-secondary-3)] text-[var(--elra-primary)]";
       case "Rejected":
         return "bg-red-100 text-red-800";
       case "Pending":
@@ -429,13 +468,7 @@ const LeaveRequests = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-[var(--elra-primary)] flex items-center justify-center text-white font-semibold">
-                            {(
-                              request.employee?.firstName ||
-                              request.employee?.name ||
-                              "U"
-                            ).charAt(0)}
-                          </div>
+                          {getAvatarDisplay(request.employee)}
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">

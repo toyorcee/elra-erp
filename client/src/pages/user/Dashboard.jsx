@@ -450,19 +450,17 @@ const Dashboard = () => {
             : getModuleStats(module).map((stat, index) => (
                 <div
                   key={index}
-                  className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300 hover:scale-105"
+                  className="bg-[var(--elra-primary)] rounded-xl p-6 shadow-sm border border-[var(--elra-primary)] hover:shadow-md transition-all duration-300 hover:scale-105"
                 >
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-medium text-gray-600">
+                    <h3 className="text-sm font-medium text-white">
                       {stat.label}
                     </h3>
-                    <div
-                      className={`p-2 rounded-lg ${stat.bgColor} ${stat.color}`}
-                    >
-                      <stat.icon className="h-5 w-5" />
+                    <div className="p-2 rounded-lg bg-white/20">
+                      <stat.icon className="h-5 w-5 text-white" />
                     </div>
                   </div>
-                  <p className="text-2xl font-bold text-gray-900 mb-2">
+                  <p className="text-2xl font-bold text-white mb-2">
                     {stat.value}
                   </p>
 
@@ -470,17 +468,17 @@ const Dashboard = () => {
                   {module === "hr" && hrDashboardData && (
                     <div className="space-y-2">
                       {stat.label === "Total Staff" && (
-                        <div className="text-xs text-gray-500">
-                          <div className="flex justify-between">
+                        <div className="text-xs text-white/80 space-y-1">
+                          <div className="flex justify-between items-center">
                             <span>Active:</span>
-                            <span className="font-medium text-green-600">
+                            <span className="font-medium text-white">
                               {hrDashboardData.summary?.totalStaff || 0}
                             </span>
                           </div>
                           {hrDashboardData.summary?.pendingInvitations > 0 && (
-                            <div className="flex justify-between">
+                            <div className="flex justify-between items-center">
                               <span>Pending Invites:</span>
-                              <span className="font-medium text-orange-600">
+                              <span className="font-medium text-yellow-300">
                                 {hrDashboardData.summary?.pendingInvitations}
                               </span>
                             </div>
@@ -489,51 +487,56 @@ const Dashboard = () => {
                       )}
 
                       {stat.label === "New Hires" && (
-                        <div className="text-xs text-gray-500">
-                          <div className="flex justify-between">
+                        <div className="text-xs text-white/80 space-y-1">
+                          <div className="flex justify-between items-center">
                             <span>Last 30 days:</span>
-                            <span className="font-medium text-blue-600">
+                            <span className="font-medium text-white">
                               {hrDashboardData.summary?.newHires || 0}
                             </span>
                           </div>
                           {hrDashboardData.recentOnboardings?.length > 0 && (
-                            <div className="text-xs text-gray-400 mt-1">
-                              Latest:{" "}
-                              {hrDashboardData.recentOnboardings[0]?.usedBy
-                                ?.firstName || "N/A"}
+                            <div className="flex justify-between items-center">
+                              <span>Latest:</span>
+                              <span className="text-white/60">
+                                {hrDashboardData.recentOnboardings[0]?.usedBy
+                                  ?.firstName || "N/A"}
+                              </span>
                             </div>
                           )}
                         </div>
                       )}
 
                       {stat.label === "On Leave" && (
-                        <div className="text-xs text-gray-500">
-                          <div className="flex justify-between">
+                        <div className="text-xs text-white/80 space-y-1">
+                          <div className="flex justify-between items-center">
                             <span>Currently:</span>
-                            <span className="font-medium text-red-600">
+                            <span className="font-medium text-white">
                               {hrDashboardData.summary?.onLeave || 0}
                             </span>
                           </div>
                           {hrDashboardData.upcomingLeaves?.length > 0 && (
-                            <div className="text-xs text-gray-400 mt-1">
-                              Upcoming: {hrDashboardData.upcomingLeaves.length}
+                            <div className="flex justify-between items-center">
+                              <span>Upcoming:</span>
+                              <span className="font-medium text-white">
+                                {hrDashboardData.upcomingLeaves.length}
+                              </span>
                             </div>
                           )}
                         </div>
                       )}
 
                       {stat.label === "Departments" && (
-                        <div className="text-xs text-gray-500">
-                          <div className="flex justify-between">
+                        <div className="text-xs text-white/80 space-y-1">
+                          <div className="flex justify-between items-center">
                             <span>Active:</span>
-                            <span className="font-medium text-purple-600">
+                            <span className="font-medium text-white">
                               {hrDashboardData.summary?.totalDepartments || 0}
                             </span>
                           </div>
                           {hrDashboardData.leaveStats?.pendingRequests > 0 && (
-                            <div className="flex justify-between">
+                            <div className="flex justify-between items-center">
                               <span>Pending Leave:</span>
-                              <span className="font-medium text-orange-600">
+                              <span className="font-medium text-yellow-300">
                                 {hrDashboardData.leaveStats?.pendingRequests}
                               </span>
                             </div>
@@ -547,7 +550,7 @@ const Dashboard = () => {
         </div>
 
         {/* Module Quick Actions */}
-        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+        {/* <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
           <h2 className="text-xl font-bold text-gray-800 mb-4">
             Quick Actions
           </h2>
@@ -556,20 +559,16 @@ const Dashboard = () => {
               (action, index) => (
                 <button
                   key={index}
-                  className={`p-4 rounded-xl border-2 border-dashed ${action.borderColor} hover:${action.bgColor} hover:${action.color} transition-all duration-200 group`}
+                  className="p-4 rounded-xl bg-[var(--elra-primary)] text-white hover:bg-[var(--elra-primary-dark)] transition-all duration-200 group shadow-lg hover:shadow-xl"
                   onClick={action.onClick}
                 >
                   <div className="flex items-center space-x-3">
-                    <div
-                      className={`p-2 rounded-lg ${action.iconBgColor} ${action.iconColor}`}
-                    >
-                      <action.icon className="h-5 w-5" />
+                    <div className="p-2 rounded-lg bg-white/20">
+                      <action.icon className="h-5 w-5 text-white" />
                     </div>
                     <div className="text-left">
-                      <p className="font-medium text-gray-800 group-hover:text-white">
-                        {action.label}
-                      </p>
-                      <p className="text-sm text-gray-500 group-hover:text-gray-200">
+                      <p className="font-medium text-white">{action.label}</p>
+                      <p className="text-sm text-white/80">
                         {action.description}
                       </p>
                     </div>
@@ -578,7 +577,7 @@ const Dashboard = () => {
               )
             )}
           </div>
-        </div>
+        </div> */}
 
         {/* Module Recent Activity */}
         <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
@@ -1271,19 +1270,19 @@ const Dashboard = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
-              <div className="text-2xl font-bold">
+              <div className="text-lg font-bold">
                 {accessibleModules.length}
               </div>
               <div className="text-white/80 text-sm">Available Modules</div>
             </div>
             <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
-              <div className="text-2xl font-bold">
+              <div className="text-lg font-bold">
                 {(user?.role?.name || "USER").replace(/_/g, " ")}
               </div>
               <div className="text-white/80 text-sm">Your Role</div>
             </div>
             <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
-              <div className="text-2xl font-bold">{roleLevel}</div>
+              <div className="text-lg font-bold">{roleLevel}</div>
               <div className="text-white/80 text-sm">Access Level</div>
             </div>
           </div>

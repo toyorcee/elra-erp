@@ -69,6 +69,14 @@ const auditLogSchema = new mongoose.Schema(
         "LEAVE_REQUEST_REJECTED",
         "LEAVE_REQUEST_CANCELLED",
 
+        // Deduction actions
+        "DEDUCTION_CREATED",
+        "DEDUCTION_UPDATED",
+        "DEDUCTION_DELETED",
+        "DEDUCTION_ACTIVATED",
+        "DEDUCTION_DEACTIVATED",
+        "DEDUCTION_NOTIFICATION",
+
         // Security actions
         "LOGIN_ATTEMPT",
         "PERMISSION_DENIED",
@@ -89,6 +97,7 @@ const auditLogSchema = new mongoose.Schema(
         "AUTH",
         "SALARY_GRADE",
         "LEAVE_REQUEST",
+        "DEDUCTION",
       ],
     },
 
@@ -106,6 +115,7 @@ const auditLogSchema = new mongoose.Schema(
         "SystemSettings",
         "SalaryGrade",
         "LeaveRequest",
+        "Deduction",
       ],
     },
 

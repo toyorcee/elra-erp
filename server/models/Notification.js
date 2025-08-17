@@ -40,6 +40,11 @@ const notificationSchema = new mongoose.Schema(
         "LEAVE_REQUEST",
         "LEAVE_RESPONSE",
         "LEAVE_CANCELLED",
+        "DEDUCTION_CREATED",
+        "DEDUCTION_UPDATED",
+        "DEDUCTION_DELETED",
+        "DEDUCTION_ACTIVATED",
+        "DEDUCTION_DEACTIVATED",
       ],
       required: true,
     },
@@ -67,6 +72,10 @@ const notificationSchema = new mongoose.Schema(
       leaveRequestId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "LeaveRequest",
+      },
+      deductionId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Deduction",
       },
       senderId: {
         type: mongoose.Schema.Types.ObjectId,

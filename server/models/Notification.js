@@ -45,6 +45,11 @@ const notificationSchema = new mongoose.Schema(
         "DEDUCTION_DELETED",
         "DEDUCTION_ACTIVATED",
         "DEDUCTION_DEACTIVATED",
+        "BONUS_CREATED",
+        "BONUS_UPDATED",
+        "BONUS_DELETED",
+        "BONUS_ACTIVATED",
+        "BONUS_DEACTIVATED",
       ],
       required: true,
     },
@@ -76,6 +81,10 @@ const notificationSchema = new mongoose.Schema(
       deductionId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Deduction",
+      },
+      bonusId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "PersonalBonus",
       },
       senderId: {
         type: mongoose.Schema.Types.ObjectId,

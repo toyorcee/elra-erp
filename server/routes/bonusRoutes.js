@@ -7,6 +7,8 @@ import {
   deleteBonus,
   getBonusCategories,
   getBonusTypes,
+  getEmployeesByDepartments,
+  getTaxableStatus,
 } from "../controllers/bonusController.js";
 import { protect, checkPayrollAccess } from "../middleware/auth.js";
 
@@ -24,6 +26,10 @@ router.route("/").get(getAllBonuses).post(createBonus);
 router.route("/categories").get(getBonusCategories);
 
 router.route("/types").get(getBonusTypes);
+
+router.route("/employees-by-departments").get(getEmployeesByDepartments);
+
+router.route("/taxable-status").get(getTaxableStatus);
 
 router.route("/:id").get(getBonusById).put(updateBonus).delete(deleteBonus);
 

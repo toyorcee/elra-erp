@@ -1,9 +1,9 @@
 import api from "./api";
 
 // Get all bonuses
-export const fetchBonuses = async () => {
+export const fetchBonuses = async (params = {}) => {
   try {
-    const response = await api.get("/bonuses");
+    const response = await api.get("/bonuses", { params });
     return response.data;
   } catch (error) {
     console.error("Error fetching bonuses:", error);
@@ -73,6 +73,32 @@ export const getBonusById = async (id) => {
     return response.data;
   } catch (error) {
     console.error("Error fetching bonus:", error);
+    throw error;
+  }
+};
+
+// Get employees by departments (for bonus assignment)
+export const fetchEmployeesByDepartments = async (departmentIds) => {
+  try {
+    const response = await api.get(
+      `/bonuses/employees-by-departments?departmentIds=${departmentIds.join(
+        ","
+      )}`
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching employees by departments:", error);
+    throw error;
+  }
+};
+
+// Get taxable status for bonus type
+export const getTaxableStatus = async (type) => {
+  try {
+    const response = await api.get(`/bonuses/taxable-status?type=${type}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching taxable status:", error);
     throw error;
   }
 };

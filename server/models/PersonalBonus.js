@@ -2,12 +2,41 @@ import mongoose from "mongoose";
 
 const personalBonusSchema = new mongoose.Schema(
   {
-    // Employee this bonus belongs to
+    // Scope of the bonus (company, department, individual)
+    scope: {
+      type: String,
+      enum: ["company", "department", "individual"],
+      required: true,
+      default: "individual",
+    },
+
+    // Employee this bonus belongs to (for individual scope)
     employee: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
     },
+
+    // Employees this bonus applies to (for individual scope with multiple employees)
+    employees: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+
+    // Department this bonus applies to (for department scope)
+    department: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Department",
+    },
+
+    // Departments this bonus applies to (for company scope with multiple departments)
+    departments: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Department",
+      },
+    ],
 
     // Bonus details
     name: {
@@ -129,13 +158,6 @@ const personalBonusSchema = new mongoose.Schema(
       type: Date,
     },
 
-    // Department
-    department: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Department",
-      required: true,
-    },
-
     // Taxable status (auto-categorized based on Nigerian tax law)
     taxable: {
       type: Boolean,
@@ -187,7 +209,10 @@ const personalBonusSchema = new mongoose.Schema(
 
 // Indexes
 personalBonusSchema.index({ employee: 1, status: 1, isActive: 1 });
-personalBonusSchema.index({ department: 1, status: 1 });
+personalBonusSchema.index({ employees: 1, status: 1, isActive: 1 });
+personalBonusSchema.index({ department: 1, status: 1, isActive: 1 });
+personalBonusSchema.index({ departments: 1, status: 1, isActive: 1 });
+personalBonusSchema.index({ scope: 1, status: 1, isActive: 1 });
 personalBonusSchema.index({ startDate: 1, endDate: 1 });
 personalBonusSchema.index({ isUsed: 1, status: 1 });
 
@@ -265,29 +290,79 @@ personalBonusSchema.methods.isAvailableForPayroll = function (payrollDate) {
 // Static method to get active bonuses for employee
 personalBonusSchema.statics.getActiveBonuses = function (
   employeeId,
+  departmentId,
   payrollDate
 ) {
   return this.find({
-    employee: employeeId,
-    status: "active",
-    isActive: true,
-    startDate: { $lte: payrollDate },
-    $or: [{ endDate: { $gte: payrollDate } }, { endDate: null }],
+    $or: [
+      // Individual bonuses for this employee
+      {
+        scope: "individual",
+        $or: [{ employee: employeeId }, { employees: employeeId }],
+        status: "active",
+        isActive: true,
+        startDate: { $lte: payrollDate },
+        $or: [{ endDate: { $gte: payrollDate } }, { endDate: null }],
+      },
+      // Department bonuses for this employee's department
+      {
+        scope: "department",
+        department: departmentId,
+        status: "active",
+        isActive: true,
+        startDate: { $lte: payrollDate },
+        $or: [{ endDate: { $gte: payrollDate } }, { endDate: null }],
+      },
+      // Company-wide bonuses
+      {
+        scope: "company",
+        status: "active",
+        isActive: true,
+        startDate: { $lte: payrollDate },
+        $or: [{ endDate: { $gte: payrollDate } }, { endDate: null }],
+      },
+    ],
   });
 };
 
 // Static method to get unused bonuses for payroll
 personalBonusSchema.statics.getUnusedBonuses = function (
   employeeId,
+  departmentId,
   payrollDate
 ) {
   return this.find({
-    employee: employeeId,
-    status: "active",
-    isActive: true,
-    isUsed: false,
-    startDate: { $lte: payrollDate },
-    $or: [{ endDate: { $gte: payrollDate } }, { endDate: null }],
+    $or: [
+      // Individual bonuses for this employee
+      {
+        scope: "individual",
+        $or: [{ employee: employeeId }, { employees: employeeId }],
+        status: "active",
+        isActive: true,
+        isUsed: false,
+        startDate: { $lte: payrollDate },
+        $or: [{ endDate: { $gte: payrollDate } }, { endDate: null }],
+      },
+      // Department bonuses for this employee's department
+      {
+        scope: "department",
+        department: departmentId,
+        status: "active",
+        isActive: true,
+        isUsed: false,
+        startDate: { $lte: payrollDate },
+        $or: [{ endDate: { $gte: payrollDate } }, { endDate: null }],
+      },
+      // Company-wide bonuses
+      {
+        scope: "company",
+        status: "active",
+        isActive: true,
+        isUsed: false,
+        startDate: { $lte: payrollDate },
+        $or: [{ endDate: { $gte: payrollDate } }, { endDate: null }],
+      },
+    ],
   });
 };
 

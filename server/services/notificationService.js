@@ -1107,6 +1107,128 @@ class NotificationService {
     }
   }
 
+  // Send bonus notifications based on scope (ONLY FOR CREATION)
+  async sendBonusNotifications(bonus, populatedBonus, user) {
+    try {
+      let targetUsers = [];
+      let notificationMessage = "";
+
+      switch (bonus.scope) {
+        case "company":
+          targetUsers = await User.find({
+            isActive: true,
+            "role.level": { $ne: 1000 },
+          });
+          notificationMessage = `New company-wide bonus "${bonus.name}" has been created. This will be applied to all employees.`;
+          break;
+
+        case "department":
+          if (bonus.departments && bonus.departments.length > 0) {
+            targetUsers = await User.find({
+              department: { $in: bonus.departments },
+              isActive: true,
+            });
+            const deptNames =
+              populatedBonus.departments?.map((d) => d.name).join(", ") ||
+              "selected departments";
+            notificationMessage = `New department-wide bonus "${bonus.name}" has been created for ${deptNames}.`;
+          } else if (bonus.department) {
+            targetUsers = await User.find({
+              department: bonus.department,
+              isActive: true,
+            });
+            const deptName =
+              populatedBonus.department?.name || "your department";
+            notificationMessage = `New department-wide bonus "${bonus.name}" has been created for ${deptName}.`;
+          }
+          break;
+
+        case "individual":
+          if (bonus.employees && bonus.employees.length > 0) {
+            targetUsers = await User.find({
+              _id: { $in: bonus.employees },
+              isActive: true,
+            });
+            notificationMessage = `New individual bonus "${bonus.name}" has been created for you.`;
+          } else if (bonus.employee) {
+            targetUsers = await User.find({
+              _id: bonus.employee,
+              isActive: true,
+            });
+            notificationMessage = `New individual bonus "${bonus.name}" has been created for you.`;
+          }
+          break;
+      }
+
+      // Add creator to notification list (for confirmation)
+      const creatorNotification = {
+        recipient: user._id,
+        type: "BONUS_CREATED",
+        title: `✅ Bonus Created: ${bonus.name}`,
+        message: `You have successfully created the bonus "${bonus.name}" for ${bonus.scope} scope.`,
+        priority: "medium",
+        data: {
+          bonusId: bonus._id,
+          bonusName: bonus.name,
+          bonusType: bonus.type,
+          bonusCategory: bonus.category,
+          bonusScope: bonus.scope,
+          amount: bonus.amount,
+          calculationType: bonus.calculationType,
+          createdBy: user._id,
+          actionUrl: `/dashboard/modules/payroll/bonuses`,
+        },
+      };
+
+      // Send notifications to target users
+      const targetUserPromises = targetUsers.map(async (targetUser) => {
+        const notificationData = {
+          recipient: targetUser._id,
+          type: "BONUS_CREATED",
+          title: `🎉 New Bonus: ${bonus.name}`,
+          message: notificationMessage,
+          priority: "medium",
+          data: {
+            bonusId: bonus._id,
+            bonusName: bonus.name,
+            bonusType: bonus.type,
+            bonusCategory: bonus.category,
+            bonusScope: bonus.scope,
+            amount: bonus.amount,
+            calculationType: bonus.calculationType,
+            createdBy: user._id,
+            actionUrl: `/dashboard/modules/payroll/bonuses`,
+          },
+        };
+
+        return await this.createNotification(notificationData);
+      });
+
+      // Send notification to creator
+      const creatorPromise = this.createNotification(creatorNotification);
+
+      // Wait for all notifications
+      const allPromises = [...targetUserPromises, creatorPromise];
+      const results = await Promise.allSettled(allPromises);
+
+      const successful = results.filter(
+        (result) => result.status === "fulfilled" && result.value
+      ).length;
+      const failed = results.filter(
+        (result) => result.status === "rejected"
+      ).length;
+
+      console.log(
+        `✅ [BONUS NOTIFICATION] Successfully sent ${successful} notifications (including creator), ${failed} failed for bonus: ${bonus.name}`
+      );
+
+      return { successful, failed };
+    } catch (error) {
+      console.error("Error sending bonus notifications:", error);
+      throw error;
+    }
+  }
+
   // Send deduction notifications based on scope
   async sendDeductionNotifications(deduction, populatedDeduction, user) {
     try {

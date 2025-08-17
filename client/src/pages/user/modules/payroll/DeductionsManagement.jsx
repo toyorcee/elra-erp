@@ -73,6 +73,8 @@ const DeductionsManagement = () => {
     );
     if (hasActiveFilters) {
       fetchDeductionsData(true);
+    } else {
+      fetchDeductionsData(false);
     }
   }, [filters]);
 
@@ -234,6 +236,7 @@ const DeductionsManagement = () => {
     });
     // Load all categories when filters are cleared
     await fetchCategoriesByType();
+    // The useEffect will automatically fetch all deductions when filters are cleared
   };
 
   const getStatusColor = (isActive) => {

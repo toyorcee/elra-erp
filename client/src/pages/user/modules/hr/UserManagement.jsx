@@ -4,19 +4,18 @@ import {
   MagnifyingGlassIcon,
   FunnelIcon,
   PlusIcon,
-  PencilIcon,
-  TrashIcon,
-  EyeIcon,
   BuildingOfficeIcon,
   ShieldCheckIcon,
   EnvelopeIcon,
   PhoneIcon,
-  CalendarIcon,
   ChatBubbleLeftRightIcon,
+  CurrencyDollarIcon,
+  ClockIcon,
 } from "@heroicons/react/24/outline";
 import { userModulesAPI } from "../../../../services/userModules.js";
 import { useMessageContext } from "../../../../context/MessageContext";
 import defaultAvatar from "../../../../assets/defaulticon.jpg";
+import { toast } from "react-toastify";
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
@@ -27,29 +26,62 @@ const UserManagement = () => {
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [showSalaryModal, setShowSalaryModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [salaryData, setSalaryData] = useState({
+    salaryStep: "Step 1",
+    yearsOfService: null,
+  });
+  const [salaryLoading, setSalaryLoading] = useState(false);
+  const [isSubmittingSalary, setIsSubmittingSalary] = useState(false);
+  const [isOpeningModal, setIsOpeningModal] = useState(false);
+  const [salaryGrades, setSalaryGrades] = useState([]);
   const { openChatWithUser } = useMessageContext();
 
   useEffect(() => {
     loadData();
   }, []);
 
+  // Fetch fresh salary grades when modal opens
+  useEffect(() => {
+    if (showSalaryModal) {
+      const fetchFreshSalaryGrades = async () => {
+        try {
+          const response =
+            await userModulesAPI.salaryGrades.getAllSalaryGrades();
+
+          if (response.success) {
+            setSalaryGrades(response.data);
+          }
+        } catch (error) {
+          console.error("Error fetching salary grades:", error);
+        }
+      };
+
+      fetchFreshSalaryGrades();
+    }
+  }, [showSalaryModal]);
+
   const loadData = async () => {
     try {
       setLoading(true);
-      const [usersResponse, departmentsResponse, rolesResponse] =
-        await Promise.all([
-          userModulesAPI.users.getAllUsers(),
-          userModulesAPI.departments.getAllDepartments(),
-          userModulesAPI.roles.getAllRoles(),
-        ]);
-
-      console.log("Users response:", usersResponse);
-      console.log("Departments response:", departmentsResponse);
-      console.log("Roles response:", rolesResponse);
+      const [
+        usersResponse,
+        departmentsResponse,
+        rolesResponse,
+        salaryGradesResponse,
+      ] = await Promise.all([
+        userModulesAPI.users.getAllUsers(),
+        userModulesAPI.departments.getAllDepartments(),
+        userModulesAPI.roles.getAllRoles(),
+        userModulesAPI.salaryGrades.getAllSalaryGrades(),
+      ]);
 
       if (usersResponse.success) setUsers(usersResponse.data);
       if (departmentsResponse.success) setDepartments(departmentsResponse.data);
       if (rolesResponse.success) setRoles(rolesResponse.data);
+      if (salaryGradesResponse.success)
+        setSalaryGrades(salaryGradesResponse.data);
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -96,8 +128,128 @@ const UserManagement = () => {
   };
 
   const handleMessageUser = (user) => {
-    // Open chat with the selected user using the message context
     openChatWithUser(user);
+  };
+
+  const handleSalaryManagement = async (user) => {
+    setIsOpeningModal(true);
+    try {
+      setSelectedUser(user);
+      setSalaryData({
+        salaryStep: user.salaryStep || "Step 1",
+        yearsOfService: user.yearsOfService || null,
+      });
+      setShowSalaryModal(true);
+    } finally {
+      setIsOpeningModal(false);
+    }
+  };
+
+  // Get salary grade information for a user
+  const getUserSalaryGrade = (user) => {
+    // Find the salary grade that has a role mapping for this user's role
+    for (const grade of salaryGrades) {
+      if (grade.roleMappings && grade.roleMappings.length > 0) {
+        const roleMapping = grade.roleMappings.find(
+          (mapping) =>
+            mapping.role?._id?.toString() === user.role?._id?.toString() ||
+            mapping.role?.name === user.role?.name
+        );
+
+        if (roleMapping) {
+          return grade;
+        }
+      }
+    }
+
+    return null;
+  };
+
+  const getAvailableSteps = (user) => {
+    const grade = getUserSalaryGrade(user);
+
+    if (!grade || !grade.steps) {
+      return [];
+    }
+
+    const availableSteps = grade.steps.filter(
+      (step) => step.increment > 0 || step.step === "Step 1"
+    );
+
+    return availableSteps;
+  };
+
+  const getStepFromYearsOfService = (yearsOfService, steps) => {
+    if (
+      !steps ||
+      steps.length === 0 ||
+      yearsOfService === null ||
+      yearsOfService === undefined ||
+      yearsOfService < 0
+    ) {
+      return "Step 1";
+    }
+
+    const sortedSteps = [...steps].sort(
+      (a, b) => a.yearsOfService - b.yearsOfService
+    );
+
+    for (let i = sortedSteps.length - 1; i >= 0; i--) {
+      if (yearsOfService >= sortedSteps[i].yearsOfService) {
+        return sortedSteps[i].step;
+      }
+    }
+
+    return sortedSteps[0]?.step || "Step 1";
+  };
+
+  const handleSalarySubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmittingSalary(true);
+
+    try {
+      const availableSteps = getAvailableSteps(selectedUser);
+      const autoStep = getStepFromYearsOfService(
+        salaryData.yearsOfService,
+        availableSteps
+      );
+
+      const updateData = {
+        salaryStep: salaryData.salaryStep || autoStep,
+        yearsOfService:
+          salaryData.yearsOfService === null ? 0 : salaryData.yearsOfService,
+      };
+
+      const response = await userModulesAPI.users.updateUserSalary(
+        selectedUser._id,
+        updateData
+      );
+
+      if (response.success) {
+        setUsers((prevUsers) =>
+          prevUsers.map((user) =>
+            user._id === selectedUser._id ? { ...user, ...updateData } : user
+          )
+        );
+
+        toast.success("Salary information updated successfully!");
+        setShowSalaryModal(false);
+        setSelectedUser(null);
+        setSalaryData({
+          salaryStep: "Step 1",
+          yearsOfService: null,
+        });
+      } else {
+        toast.error(response.message || "Failed to update salary information");
+      }
+    } catch (error) {
+      console.error("Error updating salary:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to update salary information"
+      );
+    } finally {
+      setIsSubmittingSalary(false);
+    }
   };
 
   const filteredUsers = users.filter((user) => {
@@ -269,13 +421,27 @@ const UserManagement = () => {
                     <p className="text-sm text-gray-500">@{user.username}</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleMessageUser(user)}
-                  className="p-2 text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] rounded-lg transition-colors"
-                  title={`Message ${user.firstName} ${user.lastName}`}
-                >
-                  <ChatBubbleLeftRightIcon className="h-5 w-5" />
-                </button>
+                <div className="flex items-center space-x-1">
+                  <button
+                    onClick={() => handleMessageUser(user)}
+                    className="p-2 text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] rounded-lg transition-colors"
+                    title={`Message ${user.firstName} ${user.lastName}`}
+                  >
+                    <ChatBubbleLeftRightIcon className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={() => handleSalaryManagement(user)}
+                    disabled={isOpeningModal}
+                    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Manage Salary"
+                  >
+                    {isOpeningModal ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600"></div>
+                    ) : (
+                      <CurrencyDollarIcon className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* User Details */}
@@ -306,16 +472,23 @@ const UserManagement = () => {
                       user.role?.level
                     )}`}
                   >
-                    {user.role?.name || "No Role"}
+                    {user.role?.name?.replace(/_/g, "") || "No Role"}
                   </span>
                 </div>
 
-                {user.salaryGrade && (
-                  <div className="flex items-center space-x-2 text-sm">
-                    <CalendarIcon className="h-4 w-4 text-gray-400" />
-                    <span className="text-gray-600">{user.salaryGrade}</span>
-                  </div>
-                )}
+                {/* Years of Service Information */}
+                <div className="flex items-center space-x-2 text-sm">
+                  <ClockIcon className="h-4 w-4 text-gray-400" />
+                  <span className="text-gray-600 font-medium">
+                    {user.yearsOfService === null ||
+                    user.yearsOfService === undefined ||
+                    user.yearsOfService === 0
+                      ? "New employee"
+                      : `${user.yearsOfService} year${
+                          user.yearsOfService === 1 ? "" : "s"
+                        }`}
+                  </span>
+                </div>
 
                 <div className="flex items-center space-x-2 text-sm">
                   <span
@@ -344,7 +517,7 @@ const UserManagement = () => {
         {/* Empty State */}
         {filteredUsers.length === 0 && (
           <div className="bg-white rounded-2xl p-12 shadow-lg border border-gray-100 text-center">
-            <UserGroupIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <UserGroupIcon className="h-16 w-16 mx-auto mb-4 text-gray-400" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
               No users found
             </h3>
@@ -368,6 +541,249 @@ const UserManagement = () => {
           </div>
         )}
       </div>
+
+      {/* Salary Management Modal */}
+      {showSalaryModal && selectedUser && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Manage Salary - {selectedUser.firstName}{" "}
+                  {selectedUser.lastName}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowSalaryModal(false);
+                    setSelectedUser(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSalarySubmit} className="p-6 space-y-6">
+              {salaryLoading && (
+                <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-xl">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--elra-primary)]"></div>
+                </div>
+              )}
+
+              {/* User Avatar */}
+              <div className="flex justify-center mb-4">
+                <div className="relative">
+                  <img
+                    src={getImageUrl(selectedUser.avatar)}
+                    alt={`${selectedUser.firstName} ${selectedUser.lastName}`}
+                    className="w-20 h-20 rounded-full object-cover border-4 border-[var(--elra-primary)] shadow-lg"
+                    onError={(e) => {
+                      e.target.src = getDefaultAvatar();
+                    }}
+                  />
+                  <div className="absolute -bottom-1 -right-1 bg-green-500 w-6 h-6 rounded-full border-2 border-white flex items-center justify-center">
+                    <svg
+                      className="w-3 h-3 text-white"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* User Info */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-700">
+                      Employee ID:
+                    </span>
+                    <p className="text-gray-900">{selectedUser.employeeId}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">
+                      Department:
+                    </span>
+                    <p className="text-gray-900">
+                      {selectedUser.department?.name || "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Role:</span>
+                    <p className="text-gray-900">
+                      {selectedUser.role?.name || "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">
+                      Salary Grade:
+                    </span>
+                    <p className="text-gray-900">
+                      {(() => {
+                        const grade = getUserSalaryGrade(selectedUser);
+                        console.log(
+                          "🔍 [MODAL_DISPLAY] Salary grade display:",
+                          {
+                            grade,
+                            result: grade
+                              ? `${grade.grade} (${grade.name})`
+                              : "N/A",
+                          }
+                        );
+                        return grade ? `${grade.grade} (${grade.name})` : "N/A";
+                      })()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Salary Grade Information */}
+              {(() => {
+                console.log(
+                  "🔍 [MODAL_DISPLAY] Rendering salary grade information for selectedUser:",
+                  selectedUser
+                );
+                const grade = getUserSalaryGrade(selectedUser);
+                console.log(
+                  "🔍 [MODAL_DISPLAY] Grade for information section:",
+                  grade
+                );
+
+                if (!grade) {
+                  console.log(
+                    "❌ [MODAL_DISPLAY] No grade found, showing no grade message"
+                  );
+                  return (
+                    <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+                      <h3 className="font-medium text-yellow-900 mb-2">
+                        ⚠️ Salary Grade Not Assigned
+                      </h3>
+                      <p className="text-yellow-800 text-sm">
+                        This employee's role does not have a salary grade
+                        assigned. Please assign a salary grade to their role in
+                        the Salary Grade Management.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                    <h3 className="font-medium text-green-900 mb-3">
+                      📊 Salary Grade Information
+                    </h3>
+
+                    {/* Grade Details */}
+                    <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                      <div>
+                        <span className="font-medium text-green-700">
+                          Grade Name:
+                        </span>
+                        <p className="text-green-900 font-semibold">
+                          {grade.grade} - {grade.name}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-green-700">
+                          Description:
+                        </span>
+                        <p className="text-green-900 text-xs">
+                          {grade.description || "No description available"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Years of Service Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Years of Service
+                </label>
+                <input
+                  type="number"
+                  value={
+                    salaryData.yearsOfService === null ||
+                    salaryData.yearsOfService === undefined
+                      ? ""
+                      : salaryData.yearsOfService
+                  }
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === "") {
+                      setSalaryData((prev) => ({
+                        ...prev,
+                        yearsOfService: null,
+                      }));
+                    } else {
+                      const years = parseInt(value);
+                      if (!isNaN(years) && years >= 0) {
+                        setSalaryData((prev) => ({
+                          ...prev,
+                          yearsOfService: years,
+                        }));
+                      }
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                  placeholder="0"
+                  min="0"
+                  max="50"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  💡 Years of service automatically determines salary steps &
+                  calculation.
+                </p>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSalaryModal(false);
+                    setSelectedUser(null);
+                  }}
+                  disabled={isSubmittingSalary}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingSalary}
+                  className="px-6 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors disabled:opacity-50 flex items-center"
+                >
+                  {isSubmittingSalary && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  )}
+                  {isSubmittingSalary ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

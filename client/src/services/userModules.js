@@ -1,12 +1,4 @@
-import axios from "axios";
-
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "/api",
-  withCredentials: true,
-  headers: {
-    Accept: "application/json",
-  },
-});
+import api from "./api.js";
 
 export const userModulesAPI = {
   // Fetch available modules for the current user
@@ -375,6 +367,16 @@ export const userModulesAPI = {
         return response.data;
       } catch (error) {
         console.error("❌ [usersAPI] Error fetching onboarded members:", error);
+        throw error;
+      }
+    },
+
+    updateUserSalary: async (userId, salaryData) => {
+      try {
+        const response = await api.put(`/users/${userId}/salary`, salaryData);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [usersAPI] Error updating user salary:", error);
         throw error;
       }
     },
@@ -988,6 +990,269 @@ export const userModulesAPI = {
           "❌ [complianceAPI] Error fetching my compliance items:",
           error
         );
+        throw error;
+      }
+    },
+  },
+
+  // Payroll Management API
+  payroll: {
+    processPayroll: async (payrollData) => {
+      try {
+        console.log("📋 [payrollAPI] Processing payroll:", payrollData);
+        const response = await api.post("/payroll/process", payrollData);
+        console.log("✅ [payrollAPI] Process payroll response:", response.data);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [payrollAPI] Error processing payroll:", error);
+        throw error;
+      }
+    },
+
+    calculateEmployeePayroll: async (employeeData) => {
+      try {
+        console.log(
+          "📋 [payrollAPI] Calculating employee payroll:",
+          employeeData
+        );
+        const response = await api.post(
+          "/payroll/calculate-employee",
+          employeeData
+        );
+        console.log(
+          "✅ [payrollAPI] Calculate employee payroll response:",
+          response.data
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [payrollAPI] Error calculating employee payroll:",
+          error
+        );
+        throw error;
+      }
+    },
+
+    getPayrollPreview: async (previewData) => {
+      try {
+        console.log("📋 [payrollAPI] Getting payroll preview:", previewData);
+        const response = await api.post("/payroll/preview", previewData);
+        console.log("✅ [payrollAPI] Payroll preview response:", response.data);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [payrollAPI] Error getting payroll preview:", error);
+        throw error;
+      }
+    },
+
+    processPayrollWithData: async (payrollData) => {
+      try {
+        console.log(
+          "📋 [payrollAPI] Processing payroll with data:",
+          payrollData
+        );
+        const response = await api.post("/payroll/process-with-data", {
+          payrollData,
+        });
+        console.log(
+          "✅ [payrollAPI] Payroll processed with data response:",
+          response.data
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [payrollAPI] Error processing payroll with data:",
+          error
+        );
+        throw error;
+      }
+    },
+
+    getPayrollSummary: async (month, year) => {
+      try {
+        console.log("📋 [payrollAPI] Getting payroll summary:", {
+          month,
+          year,
+        });
+        const response = await api.get(
+          `/payroll/summary?month=${month}&year=${year}`
+        );
+        console.log("✅ [payrollAPI] Payroll summary response:", response.data);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [payrollAPI] Error getting payroll summary:", error);
+        throw error;
+      }
+    },
+
+    getEmployeePayrollBreakdown: async (employeeId, month, year) => {
+      try {
+        console.log("📋 [payrollAPI] Getting employee payroll breakdown:", {
+          employeeId,
+          month,
+          year,
+        });
+        const response = await api.get(
+          `/payroll/breakdown/${employeeId}?month=${month}&year=${year}`
+        );
+        console.log(
+          "✅ [payrollAPI] Employee payroll breakdown response:",
+          response.data
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [payrollAPI] Error getting employee payroll breakdown:",
+          error
+        );
+        throw error;
+      }
+    },
+
+    getEmployeesForPayroll: async () => {
+      try {
+        console.log("📋 [payrollAPI] Getting employees for payroll");
+        const response = await userModulesAPI.users.getAllUsers();
+        const employees = response.data.filter((user) => user.isActive);
+        console.log("✅ [payrollAPI] Employees for payroll:", employees);
+        return employees;
+      } catch (error) {
+        console.error(
+          "❌ [payrollAPI] Error getting employees for payroll:",
+          error
+        );
+        throw error;
+      }
+    },
+
+    getDepartmentsForPayroll: async () => {
+      try {
+        console.log("📋 [payrollAPI] Getting departments for payroll");
+        const response = await userModulesAPI.departments.getAllDepartments();
+        console.log("✅ [payrollAPI] Departments for payroll:", response.data);
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [payrollAPI] Error getting departments for payroll:",
+          error
+        );
+        throw error;
+      }
+    },
+
+    getSavedPayrolls: async (filters = {}) => {
+      try {
+        console.log(
+          "📋 [payrollAPI] Getting saved payrolls with filters:",
+          filters
+        );
+        const response = await api.get("/payroll/saved", { params: filters });
+        console.log("✅ [payrollAPI] Saved payrolls response:", response.data);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [payrollAPI] Error getting saved payrolls:", error);
+        throw error;
+      }
+    },
+
+    resendPayslips: async (payrollId, employeeIds = null) => {
+      try {
+        console.log("📋 [payrollAPI] Resending payslips:", {
+          payrollId,
+          employeeIds,
+        });
+        const response = await api.post("/payroll/resend-payslips", {
+          payrollId,
+          employeeIds,
+        });
+        console.log("✅ [payrollAPI] Resend payslips response:", response.data);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [payrollAPI] Error resending payslips:", error);
+        throw error;
+      }
+    },
+
+    getPayslips: async (payrollId, employeeId = null) => {
+      try {
+        console.log("📋 [payrollAPI] Getting payslips:", {
+          payrollId,
+          employeeId,
+        });
+        const params = employeeId ? { employeeId } : {};
+        const response = await api.get(`/payroll/payslips/${payrollId}`, {
+          params,
+        });
+        console.log("✅ [payrollAPI] Get payslips response:", response.data);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [payrollAPI] Error getting payslips:", error);
+        throw error;
+      }
+    },
+
+    viewPayslip: async (payrollId, employeeId) => {
+      try {
+        console.log("📋 [payrollAPI] Viewing payslip:", {
+          payrollId,
+          employeeId,
+        });
+        const baseUrl =
+          import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+        const payslipUrl = `${baseUrl}/payroll/payslips/${payrollId}/view/${employeeId}`;
+
+        // Open PDF in new tab
+        window.open(payslipUrl, "_blank");
+        return { success: true, message: "Opening payslip in new tab..." };
+      } catch (error) {
+        console.error("❌ [payrollAPI] Error viewing payslip:", error);
+        throw error;
+      }
+    },
+
+    downloadPayslip: async (payrollId, employeeId, fileName = null) => {
+      try {
+        console.log("📋 [payrollAPI] Downloading payslip:", {
+          payrollId,
+          employeeId,
+          fileName,
+        });
+        const baseUrl =
+          import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+        const payslipUrl = `${baseUrl}/payroll/payslips/${payrollId}/download/${employeeId}`;
+
+        // Create a temporary link to download the file
+        const link = document.createElement("a");
+        link.href = payslipUrl;
+
+        if (fileName) {
+          link.download = fileName;
+        }
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        return { success: true, message: "Payslip download started!" };
+      } catch (error) {
+        console.error("❌ [payrollAPI] Error downloading payslip:", error);
+        throw error;
+      }
+    },
+
+    resendPayslip: async (payrollId, employeeId) => {
+      try {
+        console.log("📋 [payrollAPI] Resending payslip:", {
+          payrollId,
+          employeeId,
+        });
+        const response = await api.post(
+          `/payroll/payslips/${payrollId}/resend/${employeeId}`
+        );
+        console.log("✅ [payrollAPI] Resend payslip response:", response.data);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [payrollAPI] Error resending payslip:", error);
         throw error;
       }
     },

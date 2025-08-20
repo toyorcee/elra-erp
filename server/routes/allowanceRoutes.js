@@ -6,6 +6,9 @@ import {
   updateAllowance,
   deleteAllowance,
   getAllowanceCategories,
+  getAllowanceTypes,
+  getTaxableStatus,
+  getEmployeesByDepartments,
 } from "../controllers/allowanceController.js";
 import { protect, checkPayrollAccess } from "../middleware/auth.js";
 
@@ -21,6 +24,9 @@ router.use(checkPayrollAccess);
 router.route("/").get(getAllAllowances).post(createAllowance);
 
 router.route("/categories").get(getAllowanceCategories);
+router.route("/types").get(getAllowanceTypes);
+router.route("/taxable-status").get(getTaxableStatus);
+router.route("/employees-by-departments").get(getEmployeesByDepartments);
 
 router
   .route("/:id")

@@ -185,31 +185,17 @@ export const moduleSidebarConfig = {
             required: { minLevel: 700 },
             description: "Manage both voluntary and statutory deductions",
           },
-          {
-            label: "Benefits Administration",
-            icon: "HeartIcon",
-            path: "/dashboard/modules/payroll/benefits",
-            required: { minLevel: 600 },
-            description: "Manage employee benefits and perks",
-          },
         ],
       },
       {
         title: "Payroll Processing",
         items: [
           {
-            label: "Monthly Payroll",
+            label: "Payroll Processing",
             icon: "CalculatorIcon",
             path: "/dashboard/modules/payroll/processing",
             required: { minLevel: 600 },
             description: "Process monthly salary payments",
-          },
-          {
-            label: "Usage Tracking",
-            icon: "ClipboardDocumentCheckIcon",
-            path: "/dashboard/modules/payroll/usage-tracking",
-            required: { minLevel: 600 },
-            description: "Track used allowances and bonuses",
           },
           {
             label: "Pay Slips",

@@ -31,6 +31,7 @@ const notificationPreferencesSchema = new mongoose.Schema(
         DEDUCTION_ACTIVATED: { type: Boolean, default: true },
         DEDUCTION_DEACTIVATED: { type: Boolean, default: true },
         BONUS_CREATED: { type: Boolean, default: true },
+        ALLOWANCE_CREATED: { type: Boolean, default: true },
       },
     },
     // In-app notification preferences
@@ -56,6 +57,7 @@ const notificationPreferencesSchema = new mongoose.Schema(
         DEDUCTION_ACTIVATED: { type: Boolean, default: true },
         DEDUCTION_DEACTIVATED: { type: Boolean, default: true },
         BONUS_CREATED: { type: Boolean, default: true },
+        ALLOWANCE_CREATED: { type: Boolean, default: true },
       },
     },
     // Push notification preferences (for future mobile app)
@@ -81,6 +83,7 @@ const notificationPreferencesSchema = new mongoose.Schema(
         DEDUCTION_ACTIVATED: { type: Boolean, default: true },
         DEDUCTION_DEACTIVATED: { type: Boolean, default: true },
         BONUS_CREATED: { type: Boolean, default: true },
+        ALLOWANCE_CREATED: { type: Boolean, default: true },
       },
     },
     // General preferences

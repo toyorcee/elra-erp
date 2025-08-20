@@ -30,7 +30,6 @@ const GradientSpinner = ({
     xl: "text-3xl",
   };
 
-  // Ensure white background regardless of variant
   const containerClasses = `GradientSpinner flex flex-col items-center justify-center gap-4 bg-white ${className}`;
 
   return (

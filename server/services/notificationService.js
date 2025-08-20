@@ -1331,6 +1331,105 @@ class NotificationService {
       throw error;
     }
   }
+
+  // Send allowance notifications to relevant users
+  async sendAllowanceNotifications(allowance, populatedAllowance, user) {
+    try {
+      console.log(
+        `🔔 [ALLOWANCE NOTIFICATION] Sending notifications for allowance: ${allowance.name}`
+      );
+
+      let targetUsers = [];
+      let notificationMessage = "";
+
+      switch (allowance.scope) {
+        case "company":
+          targetUsers = await User.find({
+            isActive: true,
+            "role.level": { $ne: 1000 },
+          });
+          notificationMessage = `New company-wide allowance "${allowance.name}" has been created. This will be applied to all employees.`;
+          break;
+
+        case "department":
+          if (allowance.departments && allowance.departments.length > 0) {
+            targetUsers = await User.find({
+              department: { $in: allowance.departments },
+              isActive: true,
+            });
+            const deptNames =
+              populatedAllowance.departments?.map((d) => d.name).join(", ") ||
+              "selected departments";
+            notificationMessage = `New department-wide allowance "${allowance.name}" has been created for ${deptNames}.`;
+          } else if (allowance.department) {
+            targetUsers = await User.find({
+              department: allowance.department,
+              isActive: true,
+            });
+            const deptName =
+              populatedAllowance.department?.name || "your department";
+            notificationMessage = `New department-wide allowance "${allowance.name}" has been created for ${deptName}.`;
+          }
+          break;
+
+        case "individual":
+          if (allowance.employees && allowance.employees.length > 0) {
+            targetUsers = await User.find({
+              _id: { $in: allowance.employees },
+              isActive: true,
+            });
+            notificationMessage = `New individual allowance "${allowance.name}" has been created for you.`;
+          } else if (allowance.employee) {
+            targetUsers = await User.find({
+              _id: allowance.employee,
+              isActive: true,
+            });
+            notificationMessage = `New individual allowance "${allowance.name}" has been created for you.`;
+          }
+          break;
+      }
+
+      const notificationPromises = targetUsers.map(async (targetUser) => {
+        const notificationData = {
+          recipient: targetUser._id,
+          type: "ALLOWANCE_CREATED",
+          title: `💰 New Allowance: ${allowance.name}`,
+          message: notificationMessage,
+          priority: "medium",
+          data: {
+            allowanceId: allowance._id,
+            allowanceName: allowance.name,
+            allowanceType: allowance.type,
+            allowanceCategory: allowance.category,
+            allowanceScope: allowance.scope,
+            amount: allowance.amount,
+            calculationType: allowance.calculationType,
+            createdBy: user._id,
+            actionUrl: `/dashboard/modules/payroll/allowances`,
+          },
+        };
+
+        return await this.createNotification(notificationData);
+      });
+
+      const results = await Promise.allSettled(notificationPromises);
+      const successful = results.filter(
+        (result) => result.status === "fulfilled" && result.value
+      ).length;
+      const failed = results.filter(
+        (result) => result.status === "rejected"
+      ).length;
+
+      console.log(
+        `✅ [ALLOWANCE NOTIFICATION] Successfully sent ${successful} notifications, ${failed} failed for allowance: ${allowance.name}`
+      );
+
+      return { successful, failed };
+    } catch (error) {
+      console.error("Error sending allowance notifications:", error);
+      throw error;
+    }
+  }
 }
 
 export default NotificationService;

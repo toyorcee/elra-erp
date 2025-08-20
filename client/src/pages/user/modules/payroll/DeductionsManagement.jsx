@@ -616,29 +616,33 @@ const DeductionsManagement = () => {
         loading={loading}
         onRowClick={handleRowClick}
         rowClassName={(row) => {
-          const baseClass =
-            "cursor-pointer hover:bg-gray-50 transition-colors duration-200 relative";
-          return loadingRow === row._id ? `${baseClass} opacity-50` : baseClass;
+          return "cursor-pointer hover:bg-gray-50 transition-colors duration-200 relative";
         }}
         columns={[
           {
             header: "Deduction",
             key: "name",
             renderer: (deduction) => (
-              <div className="flex items-center space-x-3">
+              <div className="relative">
                 {loadingRow === deduction._id && (
-                  <div className="flex items-center space-x-2 text-[var(--elra-primary)]">
-                    <HiRefresh className="w-4 h-4 animate-spin" />
-                    <span className="text-sm font-medium">Loading...</span>
+                  <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
+                    <div className="flex items-center space-x-2 text-[var(--elra-primary)]">
+                      <HiRefresh className="w-5 h-5 animate-spin" />
+                      <span className="text-sm font-medium">Loading...</span>
+                    </div>
                   </div>
                 )}
-                <div className="flex-1">
-                  <p className="font-medium text-gray-900">{deduction.name}</p>
-                  {deduction.description && (
-                    <p className="text-sm text-gray-500">
-                      {deduction.description}
+                <div className="flex items-center space-x-3">
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">
+                      {deduction.name}
                     </p>
-                  )}
+                    {deduction.description && (
+                      <p className="text-sm text-gray-500">
+                        {deduction.description}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             ),
@@ -1111,6 +1115,8 @@ const DeductionsManagement = () => {
                     <p className="text-gray-900 font-medium">
                       {selectedDeduction.calculationType === "percentage"
                         ? "Percentage"
+                        : selectedDeduction.calculationType === "tax_brackets"
+                        ? "Tax Brackets"
                         : "Fixed Amount"}
                     </p>
                   </div>
@@ -1122,6 +1128,8 @@ const DeductionsManagement = () => {
                     <p className="text-2xl font-bold text-[var(--elra-primary)]">
                       {selectedDeduction.calculationType === "percentage"
                         ? `${selectedDeduction.amount}%`
+                        : selectedDeduction.calculationType === "tax_brackets"
+                        ? "Tax Brackets Auto-Applied"
                         : formatCurrency(selectedDeduction.amount)}
                     </p>
                   </div>

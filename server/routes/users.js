@@ -12,6 +12,7 @@ import {
   getPendingRegistrationUsers,
   getAssignmentGuidanceForUser,
   getOnboardedMembers,
+  updateUserSalary,
 } from "../controllers/userController.js";
 import { protect, checkRole } from "../middleware/auth.js";
 import { hasPermission } from "../utils/permissionUtils.js";
@@ -28,11 +29,16 @@ router.get("/manageable", checkRole(700), getManageableUsers);
 router.get("/onboarded", checkRole(700), getOnboardedMembers);
 router.get("/profile", getUserProfile);
 router.put("/profile", updateUserProfile);
-router.get("/assignment-guidance", checkRole(700), getAssignmentGuidanceForUser);
+router.get(
+  "/assignment-guidance",
+  checkRole(700),
+  getAssignmentGuidanceForUser
+);
 router.get("/:id", checkRole(700), getUserById);
 router.post("/", checkRole(700), createUser);
 router.put("/:id", checkRole(700), updateUser);
 router.delete("/:id", checkRole(700), deleteUser);
 router.post("/assign-role", checkRole(700), assignRole);
+router.put("/:id/salary", checkRole(700), updateUserSalary);
 
 export default router;

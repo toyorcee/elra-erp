@@ -12,7 +12,6 @@ import {
   formatNumberWithCommas,
   parseFormattedNumber,
   formatCurrency,
-  formatNumber,
   isNumberField,
 } from "../../../../utils/formatters.js";
 import DataTable from "../../../../components/common/DataTable";
@@ -24,12 +23,11 @@ const SalaryGradeManagement = () => {
   const [editingGrade, setEditingGrade] = useState(null);
   const [activeTab, setActiveTab] = useState("grades");
   const [selectedGrade, setSelectedGrade] = useState("");
-  const [selectedStep, setSelectedStep] = useState("Step 1");
+  const [selectedStep, setSelectedStep] = useState("");
   const [dropdownGrades, setDropdownGrades] = useState([]);
   const [roles, setRoles] = useState([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [showOnlyWithSteps, setShowOnlyWithSteps] = useState(false);
   const [formData, setFormData] = useState({
     grade: "",
     name: "",
@@ -44,9 +42,9 @@ const SalaryGradeManagement = () => {
       other: 0,
     },
     customAllowances: [],
-    steps: [{ step: "Step 1", increment: "", yearsOfService: "" }],
-    enableSteps: false,
     enableCustomAllowances: false,
+    steps: [],
+    enableSteps: false,
   });
 
   useEffect(() => {
@@ -122,16 +120,9 @@ const SalaryGradeManagement = () => {
     }
   };
 
-  const handleStepChange = (index, field, value) => {
-    const updatedSteps = [...formData.steps];
-    updatedSteps[index] = { ...updatedSteps[index], [field]: value };
-    setFormData((prev) => ({ ...prev, steps: updatedSteps }));
-  };
-
   const handleCustomAllowanceChange = (index, field, value) => {
     const updatedAllowances = [...formData.customAllowances];
 
-    // Apply number formatting for amount field
     const formattedValue =
       field === "amount" ? formatNumberWithCommas(value) : value;
 
@@ -156,6 +147,20 @@ const SalaryGradeManagement = () => {
     }));
   };
 
+  const handleStepChange = (index, field, value) => {
+    const updatedSteps = [...formData.steps];
+    const formattedValue =
+      field === "increment" || field === "yearsOfService"
+        ? formatNumberWithCommas(value)
+        : value;
+
+    updatedSteps[index] = {
+      ...updatedSteps[index],
+      [field]: formattedValue,
+    };
+    setFormData((prev) => ({ ...prev, steps: updatedSteps }));
+  };
+
   const addStep = () => {
     const nextStepNumber = formData.steps.length + 1;
     setFormData((prev) => ({
@@ -172,12 +177,10 @@ const SalaryGradeManagement = () => {
   };
 
   const removeStep = (index) => {
-    if (formData.steps.length > 1) {
-      setFormData((prev) => ({
-        ...prev,
-        steps: prev.steps.filter((_, i) => i !== index),
-      }));
-    }
+    setFormData((prev) => ({
+      ...prev,
+      steps: prev.steps.filter((_, i) => i !== index),
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -208,10 +211,10 @@ const SalaryGradeManagement = () => {
         minGrossSalary: parseFormattedNumber(formData.minGrossSalary),
         maxGrossSalary: parseFormattedNumber(formData.maxGrossSalary),
         allowances: {
-          housing: parseFormattedNumber(formData.allowances.housing),
-          transport: parseFormattedNumber(formData.allowances.transport),
-          meal: parseFormattedNumber(formData.allowances.meal),
-          other: parseFormattedNumber(formData.allowances.other),
+          housing: parseFormattedNumber(formData.allowances.housing) || 0,
+          transport: parseFormattedNumber(formData.allowances.transport) || 0,
+          meal: parseFormattedNumber(formData.allowances.meal) || 0,
+          other: parseFormattedNumber(formData.allowances.other) || 0,
         },
         customAllowances: formData.customAllowances.map((allowance) => ({
           ...allowance,
@@ -220,8 +223,8 @@ const SalaryGradeManagement = () => {
         steps: formData.enableSteps
           ? formData.steps.map((step) => ({
               ...step,
-              increment: parseFormattedNumber(step.increment || ""),
-              yearsOfService: parseFormattedNumber(step.yearsOfService || ""),
+              increment: parseFormattedNumber(step.increment) || 0,
+              yearsOfService: parseFormattedNumber(step.yearsOfService) || 0,
             }))
           : [],
       };
@@ -301,23 +304,18 @@ const SalaryGradeManagement = () => {
               : "",
           }))
         : [],
-      steps:
-        grade.steps && grade.steps.length > 0
-          ? grade.steps
-              .filter((step) => step.increment > 0 || step.yearsOfService > 0)
-              .map((step) => ({
-                ...step,
-                increment: step.increment ? step.increment.toString() : "",
-                yearsOfService: step.yearsOfService
-                  ? step.yearsOfService.toString()
-                  : "",
-              }))
-          : [{ step: "Step 1", increment: "", yearsOfService: "" }],
-      enableSteps:
-        grade.steps &&
-        grade.steps.some(
-          (step) => step.increment > 0 || step.yearsOfService > 0
-        ),
+      steps: grade.steps
+        ? grade.steps.map((step) => ({
+            ...step,
+            increment: step.increment
+              ? formatNumberWithCommas(step.increment.toString())
+              : "",
+            yearsOfService: step.yearsOfService
+              ? formatNumberWithCommas(step.yearsOfService.toString())
+              : "",
+          }))
+        : [],
+      enableSteps: grade.steps && grade.steps.length > 0,
       enableCustomAllowances:
         grade.customAllowances && grade.customAllowances.length > 0,
     };
@@ -390,18 +388,14 @@ const SalaryGradeManagement = () => {
         other: "",
       },
       customAllowances: [],
-      steps: [{ step: "Step 1", increment: "", yearsOfService: "" }],
+      steps: [],
       enableSteps: false,
       enableCustomAllowances: false,
     });
   };
 
-  const calculateTotalCompensation = (grade, step = "Step 1") => {
-    const stepData =
-      step === "Base" ? null : grade.steps.find((s) => s.step === step);
+  const calculateTotalCompensation = (grade) => {
     const baseSalary = grade.minGrossSalary;
-    const increment = stepData ? (baseSalary * stepData.increment) / 100 : 0;
-    const adjustedSalary = baseSalary + increment;
 
     const customAllowancesTotal = grade.customAllowances
       ? grade.customAllowances.reduce(
@@ -411,7 +405,7 @@ const SalaryGradeManagement = () => {
       : 0;
 
     return {
-      baseSalary: adjustedSalary,
+      baseSalary: baseSalary,
       housing: grade.allowances.housing,
       transport: grade.allowances.transport,
       meal: grade.allowances.meal,
@@ -419,7 +413,7 @@ const SalaryGradeManagement = () => {
       customAllowances: grade.customAllowances || [],
       customAllowancesTotal,
       total:
-        adjustedSalary +
+        baseSalary +
         grade.allowances.housing +
         grade.allowances.transport +
         grade.allowances.meal +
@@ -500,37 +494,17 @@ const SalaryGradeManagement = () => {
           <div className="bg-white rounded-2xl shadow-lg p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={showOnlyWithSteps}
-                    onChange={(e) => setShowOnlyWithSteps(e.target.checked)}
-                    className="h-4 w-4 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] border-gray-300 rounded"
-                  />
-                  <span className="ml-2 text-sm font-medium text-gray-700">
-                    Show only grades with steps
-                  </span>
-                </label>
+                {/* REMOVED: Step filter - redundant with bonuses and allowances system */}
               </div>
               <div className="text-sm text-gray-500">
-                {
-                  salaryGrades.filter(
-                    (grade) =>
-                      !showOnlyWithSteps ||
-                      (grade.steps && grade.steps.length > 0)
-                  ).length
-                }{" "}
-                of {salaryGrades.length} grades
+                {salaryGrades.length} grades
               </div>
             </div>
           </div>
 
           {/* Data Table */}
           <DataTable
-            data={salaryGrades.filter(
-              (grade) =>
-                !showOnlyWithSteps || (grade.steps && grade.steps.length > 0)
-            )}
+            data={salaryGrades}
             loading={loading}
             columns={[
               {
@@ -703,9 +677,9 @@ const SalaryGradeManagement = () => {
       {activeTab === "calculator" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Calculator Form */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-gradient-to-br from-white to-green-50 rounded-xl shadow-sm border border-green-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Salary Calculator
+              Gross Salary Calculator
             </h2>
             <div className="space-y-4">
               <div>
@@ -714,7 +688,10 @@ const SalaryGradeManagement = () => {
                 </label>
                 <select
                   value={selectedGrade}
-                  onChange={(e) => setSelectedGrade(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedGrade(e.target.value);
+                    setSelectedStep("");
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent cursor-pointer"
                 >
                   <option value="">Select a grade</option>
@@ -725,101 +702,109 @@ const SalaryGradeManagement = () => {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Step
-                </label>
-                <select
-                  value={selectedStep}
-                  onChange={(e) => setSelectedStep(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent cursor-pointer"
-                  disabled={!selectedGrade}
-                >
-                  <option value="">Select a step</option>
-                  {selectedGrade &&
-                    (() => {
-                      const grade = salaryGrades.find(
-                        (g) => g._id === selectedGrade
-                      );
-                      const validSteps =
-                        grade?.steps?.filter(
-                          (step) =>
-                            step.increment > 0 || step.yearsOfService > 0
-                        ) || [];
 
-                      // Always show base salary option first
-                      const options = [
-                        <option key="Base" value="Base">
-                          Base Salary Only (Min:{" "}
-                          {formatCurrency(grade.minGrossSalary)})
-                        </option>,
-                      ];
+              {/* Step Selector */}
+              {selectedGrade &&
+                (() => {
+                  const grade = salaryGrades.find(
+                    (g) => g._id === selectedGrade
+                  );
 
-                      // Add step options if they exist
-                      if (validSteps.length > 0) {
-                        validSteps.forEach((step) => {
-                          options.push(
+                  if (!grade) {
+                    return (
+                      <div className="flex items-center justify-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--elra-primary)]"></div>
+                        <span className="ml-2 text-sm text-gray-600">
+                          Loading grade data...
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  if (grade && grade.steps && grade.steps.length > 0) {
+                    return (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Select Step
+                        </label>
+                        <select
+                          value={selectedStep}
+                          onChange={(e) => setSelectedStep(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent cursor-pointer"
+                        >
+                          <option value="">Select a step</option>
+                          {grade.steps.map((step) => (
                             <option key={step.step} value={step.step}>
-                              {step.step} ({step.yearsOfService} years,{" "}
-                              {step.increment}% increment)
+                              {step.step} ({step.increment}% increment)
                             </option>
-                          );
-                        });
-                      }
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
 
-                      return options;
-                    })()}
-                </select>
-              </div>
+                  return (
+                    <div className="text-center py-4 text-gray-500">
+                      <div className="text-sm">
+                        No steps configured for this grade
+                      </div>
+                    </div>
+                  );
+                })()}
             </div>
           </div>
 
           {/* Calculator Results */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-gradient-to-br from-white to-green-50 rounded-xl shadow-sm border border-green-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Compensation Breakdown
+              Gross Salary Breakdown
             </h2>
-            {selectedGrade && selectedStep ? (
+            {selectedGrade ? (
               <div className="space-y-3">
                 {(() => {
                   const grade = salaryGrades.find(
                     (g) => g._id === selectedGrade
                   );
-                  const stepData =
-                    selectedStep === "Base"
-                      ? null
-                      : grade?.steps?.find((s) => s.step === selectedStep);
-                  const compensation = calculateTotalCompensation(
-                    grade,
-                    selectedStep
-                  );
+
+                  let basicSalary = grade.minGrossSalary;
+                  let stepInfo = "";
+
+                  if (selectedStep && grade.steps) {
+                    const step = grade.steps.find(
+                      (s) => s.step === selectedStep
+                    );
+                    if (step) {
+                      const increment =
+                        (grade.minGrossSalary * step.increment) / 100;
+                      basicSalary = grade.minGrossSalary + increment;
+                      stepInfo = ` (${selectedStep} - ${step.increment}% increment)`;
+                    }
+                  }
+
+                  const totalGradeAllowances =
+                    grade.allowances.housing +
+                    grade.allowances.transport +
+                    grade.allowances.meal +
+                    grade.allowances.other;
+
+                  const customAllowancesTotal = grade.customAllowances
+                    ? grade.customAllowances.reduce(
+                        (sum, allowance) => sum + allowance.amount,
+                        0
+                      )
+                    : 0;
+
+                  const grossSalary =
+                    basicSalary + totalGradeAllowances + customAllowancesTotal;
+
                   return (
                     <>
                       <div className="flex justify-between py-2 border-b border-gray-100">
-                        <span className="text-gray-600">Base Salary:</span>
+                        <span className="text-gray-600">
+                          Basic Salary{stepInfo}:
+                        </span>
                         <span className="font-semibold">
-                          {formatCurrency(grade.minGrossSalary)}
-                        </span>
-                      </div>
-                      {stepData && (
-                        <div className="flex justify-between py-2 border-b border-gray-100">
-                          <span className="text-gray-600">
-                            Step Increment ({stepData.increment}%):
-                          </span>
-                          <span className="font-semibold text-green-600">
-                            +
-                            {formatCurrency(
-                              compensation.baseSalary - grade.minGrossSalary
-                            )}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex justify-between py-2 border-b border-gray-100 bg-gray-50 px-2">
-                        <span className="text-gray-700 font-medium">
-                          Adjusted Base Salary:
-                        </span>
-                        <span className="font-semibold text-blue-600">
-                          {formatCurrency(compensation.baseSalary)}
+                          {formatCurrency(basicSalary)}
                         </span>
                       </div>
                       <div className="flex justify-between py-2 border-b border-gray-100">
@@ -827,7 +812,7 @@ const SalaryGradeManagement = () => {
                           Housing Allowance:
                         </span>
                         <span className="font-semibold">
-                          {formatCurrency(compensation.housing)}
+                          {formatCurrency(grade.allowances.housing)}
                         </span>
                       </div>
                       <div className="flex justify-between py-2 border-b border-gray-100">
@@ -835,51 +820,49 @@ const SalaryGradeManagement = () => {
                           Transport Allowance:
                         </span>
                         <span className="font-semibold">
-                          {formatCurrency(compensation.transport)}
+                          {formatCurrency(grade.allowances.transport)}
                         </span>
                       </div>
                       <div className="flex justify-between py-2 border-b border-gray-100">
                         <span className="text-gray-600">Meal Allowance:</span>
                         <span className="font-semibold">
-                          {formatCurrency(compensation.meal)}
+                          {formatCurrency(grade.allowances.meal)}
                         </span>
                       </div>
-                      {compensation.other > 0 && (
+                      {grade.allowances.other > 0 && (
                         <div className="flex justify-between py-2 border-b border-gray-100">
                           <span className="text-gray-600">
                             Other Allowances:
                           </span>
                           <span className="font-semibold">
-                            {formatCurrency(compensation.other)}
+                            {formatCurrency(grade.allowances.other)}
                           </span>
                         </div>
                       )}
-                      {compensation.customAllowances &&
-                        compensation.customAllowances.length > 0 && (
+                      {grade.customAllowances &&
+                        grade.customAllowances.length > 0 && (
                           <>
-                            {compensation.customAllowances.map(
-                              (allowance, index) => (
-                                <div
-                                  key={index}
-                                  className="flex justify-between py-2 border-b border-gray-100"
-                                >
-                                  <span className="text-gray-600">
-                                    {allowance.name}:
-                                  </span>
-                                  <span className="font-semibold">
-                                    {formatCurrency(allowance.amount)}
-                                  </span>
-                                </div>
-                              )
-                            )}
+                            {grade.customAllowances.map((allowance, index) => (
+                              <div
+                                key={index}
+                                className="flex justify-between py-2 border-b border-gray-100"
+                              >
+                                <span className="text-gray-600">
+                                  {allowance.name}:
+                                </span>
+                                <span className="font-semibold">
+                                  {formatCurrency(allowance.amount)}
+                                </span>
+                              </div>
+                            ))}
                           </>
                         )}
-                      <div className="flex justify-between py-3 border-t-2 border-[var(--elra-primary)]">
-                        <span className="text-lg font-semibold text-[var(--elra-primary)]">
-                          Total:
+                      <div className="flex justify-between py-3 border-t-2 border-green-500 bg-green-50 rounded-lg p-3">
+                        <span className="text-lg font-semibold text-green-700">
+                          Total Gross Salary:
                         </span>
-                        <span className="text-lg font-bold text-[var(--elra-primary)]">
-                          {formatCurrency(compensation.total)}
+                        <span className="text-lg font-bold text-green-800">
+                          {formatCurrency(grossSalary)}
                         </span>
                       </div>
                     </>
@@ -973,7 +956,7 @@ const SalaryGradeManagement = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Minimum Gross Salary *
+                    Minimum Basic Salary *
                   </label>
                   <input
                     type="text"
@@ -989,7 +972,7 @@ const SalaryGradeManagement = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Maximum Gross Salary *
+                    Maximum Basic Salary *
                   </label>
                   <input
                     type="text"
@@ -1010,6 +993,10 @@ const SalaryGradeManagement = () => {
                 <h3 className="text-lg font-medium text-gray-900 mb-4">
                   Allowances
                 </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  💡 Leave allowance fields empty if you don't want to set any
+                  amount.
+                </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1157,7 +1144,7 @@ const SalaryGradeManagement = () => {
                 )}
               </div>
 
-              {/* Steps */}
+              {/* Steps Management */}
               <div>
                 <div className="flex items-center mb-4">
                   <input
@@ -1177,93 +1164,90 @@ const SalaryGradeManagement = () => {
                     htmlFor="enableSteps"
                     className="ml-2 text-lg font-medium text-gray-900"
                   >
-                    Enable Salary Steps (Optional)
+                    Enable Salary Steps
                   </label>
                 </div>
 
                 {formData.enableSteps && (
-                  <>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Define salary progression based on years of service. Each
-                      step represents a percentage increment on the base salary.
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600">
+                      Configure salary steps based on years of service. Each
+                      step increases the base salary by a percentage.
                     </p>
-                    <div className="space-y-4">
-                      {formData.steps.map((step, index) => (
-                        <div
-                          key={index}
-                          className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg"
-                        >
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Step
-                            </label>
-                            <input
-                              type="text"
-                              value={step.step}
-                              onChange={(e) =>
-                                handleStepChange(index, "step", e.target.value)
-                              }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Increment (%)
-                            </label>
-                            <input
-                              type="text"
-                              value={step.increment}
-                              onChange={(e) =>
-                                handleStepChange(
-                                  index,
-                                  "increment",
-                                  e.target.value
-                                )
-                              }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-                              placeholder="0"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Years of Service
-                            </label>
-                            <input
-                              type="text"
-                              value={step.yearsOfService}
-                              onChange={(e) =>
-                                handleStepChange(
-                                  index,
-                                  "yearsOfService",
-                                  e.target.value
-                                )
-                              }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-                              placeholder="0"
-                            />
-                          </div>
-                          <div className="flex items-end">
-                            {formData.steps.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => removeStep(index)}
-                                className="px-3 py-2 text-red-600 hover:text-red-800 transition-colors duration-200 cursor-pointer"
-                              >
-                                Remove
-                              </button>
-                            )}
-                          </div>
+
+                    {(formData.steps || []).map((step, index) => (
+                      <div
+                        key={index}
+                        className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg"
+                      >
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Step Name
+                          </label>
+                          <input
+                            type="text"
+                            value={step.step}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 cursor-not-allowed"
+                            placeholder="Auto-generated"
+                            readOnly
+                          />
                         </div>
-                      ))}
-                    </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Increment (%)
+                          </label>
+                          <input
+                            type="text"
+                            value={step.increment}
+                            onChange={(e) =>
+                              handleStepChange(
+                                index,
+                                "increment",
+                                e.target.value
+                              )
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                            placeholder="5"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Years of Service
+                          </label>
+                          <input
+                            type="text"
+                            value={step.yearsOfService}
+                            onChange={(e) =>
+                              handleStepChange(
+                                index,
+                                "yearsOfService",
+                                e.target.value
+                              )
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                            placeholder="2"
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <button
+                            type="button"
+                            onClick={() => removeStep(index)}
+                            className="px-3 py-2 text-red-600 hover:text-red-800 transition-colors duration-200 cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
                     <button
                       type="button"
                       onClick={addStep}
                       className="px-4 py-2 text-[var(--elra-primary)] border border-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary)] hover:text-white transition-colors duration-200 cursor-pointer"
                     >
-                      + Add New Step
+                      + Add Step
                     </button>
-                  </>
+                  </div>
                 )}
               </div>
 

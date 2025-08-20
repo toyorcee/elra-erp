@@ -153,19 +153,19 @@ const personalBonusSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Payroll",
     },
-
     lastUsedDate: {
       type: Date,
     },
 
+    usageCount: {
+      type: Number,
+      default: 0,
+    },
     // Taxable status (auto-categorized based on Nigerian tax law)
     taxable: {
       type: Boolean,
       default: function () {
-        // Most bonuses are taxable in Nigeria
-        const nonTaxableBonuses = [
-          "retention", // Some retention bonuses might be non-taxable
-        ];
+        const nonTaxableBonuses = ["retention"];
         return !nonTaxableBonuses.includes(this.type);
       },
     },
@@ -266,7 +266,7 @@ personalBonusSchema.methods.calculateAmount = function (
 
 // Instance method to check if bonus is available for payroll
 personalBonusSchema.methods.isAvailableForPayroll = function (payrollDate) {
-  if (this.status !== "active" || this.isUsed) {
+  if (this.status !== "active" || !this.isActive) {
     return false;
   }
 
@@ -279,9 +279,42 @@ personalBonusSchema.methods.isAvailableForPayroll = function (payrollDate) {
     return false;
   }
 
-  // Check frequency
+  // Check frequency-based usage
   if (this.frequency === "one_time" && this.isUsed) {
     return false;
+  }
+
+  // For recurring items, check if already used in this period
+  if (this.frequency !== "one_time" && this.lastUsedDate) {
+    const lastUsed = new Date(this.lastUsedDate);
+    const payroll = new Date(payrollDate);
+
+    // Check if already used in the same period
+    if (
+      this.frequency === "monthly" &&
+      lastUsed.getFullYear() === payroll.getFullYear() &&
+      lastUsed.getMonth() === payroll.getMonth()
+    ) {
+      return false;
+    }
+
+    if (this.frequency === "quarterly") {
+      const lastQuarter = Math.floor(lastUsed.getMonth() / 3);
+      const currentQuarter = Math.floor(payroll.getMonth() / 3);
+      if (
+        lastUsed.getFullYear() === payroll.getFullYear() &&
+        lastQuarter === currentQuarter
+      ) {
+        return false;
+      }
+    }
+
+    if (
+      this.frequency === "yearly" &&
+      lastUsed.getFullYear() === payroll.getFullYear()
+    ) {
+      return false;
+    }
   }
 
   return true;
@@ -364,6 +397,19 @@ personalBonusSchema.statics.getUnusedBonuses = function (
       },
     ],
   });
+};
+
+personalBonusSchema.methods.markAsUsed = function (payrollId, payrollDate) {
+  this.isUsed = true;
+  this.lastUsedInPayroll = payrollId;
+  this.lastUsedDate = payrollDate;
+  this.usageCount += 1;
+
+  if (this.frequency !== "one_time") {
+    this.isUsed = false;
+  }
+
+  return this.save();
 };
 
 const PersonalBonus = mongoose.model("PersonalBonus", personalBonusSchema);

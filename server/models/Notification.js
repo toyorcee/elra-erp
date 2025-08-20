@@ -50,6 +50,9 @@ const notificationSchema = new mongoose.Schema(
         "BONUS_DELETED",
         "BONUS_ACTIVATED",
         "BONUS_DEACTIVATED",
+        "ALLOWANCE_CREATED",
+        "PAYROLL_PROCESSED",
+        "PAYSLIP_GENERATED",
       ],
       required: true,
     },
@@ -85,6 +88,10 @@ const notificationSchema = new mongoose.Schema(
       bonusId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "PersonalBonus",
+      },
+      allowanceId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Allowance",
       },
       senderId: {
         type: mongoose.Schema.Types.ObjectId,

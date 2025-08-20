@@ -77,6 +77,20 @@ const auditLogSchema = new mongoose.Schema(
         "DEDUCTION_DEACTIVATED",
         "DEDUCTION_NOTIFICATION",
 
+        // Payroll actions
+        "PAYROLL_PROCESSED",
+        "PAYROLL_PREVIEW_GENERATED",
+        "PAYROLL_ITEM_MARKED_USED",
+        "PAYROLL_ITEM_CREATED",
+        "PAYROLL_ITEM_UPDATED",
+        "PAYROLL_ITEM_DELETED",
+        "PAYROLL_ITEM_ACTIVATED",
+        "PAYROLL_ITEM_DEACTIVATED",
+        "PAYROLL_TAX_CALCULATED",
+        "PAYROLL_ALLOWANCE_APPLIED",
+        "PAYROLL_BONUS_APPLIED",
+        "PAYROLL_DEDUCTION_APPLIED",
+
         // Security actions
         "LOGIN_ATTEMPT",
         "PERMISSION_DENIED",
@@ -98,6 +112,9 @@ const auditLogSchema = new mongoose.Schema(
         "SALARY_GRADE",
         "LEAVE_REQUEST",
         "DEDUCTION",
+        "PAYROLL",
+        "PERSONAL_ALLOWANCE",
+        "PERSONAL_BONUS",
       ],
     },
 
@@ -116,6 +133,9 @@ const auditLogSchema = new mongoose.Schema(
         "SalaryGrade",
         "LeaveRequest",
         "Deduction",
+        "Payroll",
+        "PersonalAllowance",
+        "PersonalBonus",
       ],
     },
 
@@ -163,6 +183,25 @@ const auditLogSchema = new mongoose.Schema(
       // Generic
       description: String,
       metadata: mongoose.Schema.Types.Mixed,
+
+      // For payroll actions
+      payrollPeriod: {
+        month: Number,
+        year: Number,
+        frequency: String,
+      },
+      payrollScope: String,
+      payrollScopeId: mongoose.Schema.Types.ObjectId,
+      employeeId: mongoose.Schema.Types.ObjectId,
+      employeeName: String,
+      itemType: String,
+      itemName: String,
+      itemAmount: Number,
+      usageCount: Number,
+      lastUsedDate: Date,
+      lastUsedScope: String,
+      lastUsedFrequency: String,
+      lastUsedTimestamp: String,
     },
 
     // IP and location tracking

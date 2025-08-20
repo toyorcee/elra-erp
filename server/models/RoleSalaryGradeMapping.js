@@ -6,7 +6,7 @@ const roleSalaryGradeMappingSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Role",
       required: true,
-      unique: true, // One role = One salary grade
+      unique: true, 
     },
     salaryGrade: {
       type: mongoose.Schema.Types.ObjectId,

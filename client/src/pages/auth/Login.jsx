@@ -5,7 +5,7 @@ import { HiMail, HiLockClosed, HiKey } from "react-icons/hi";
 import { MdVisibility, MdVisibilityOff } from "react-icons/md";
 import { useAuth } from "../../context/AuthContext";
 import ELRALogo from "../../components/ELRALogo";
-import ELRAHero3 from "../../assets/ELRAHero3.jpg";
+import rectLight from "../../assets/rect-light.svg";
 import elraImage from "../../assets/ELRA.png";
 
 const Login = () => {
@@ -114,7 +114,7 @@ const Login = () => {
     <div className="min-h-screen flex">
       <div className="hidden lg:block lg:w-1/2 fixed left-0 top-0 h-full">
         <img
-          src={ELRAHero3}
+          src={rectLight}
           alt="ELRA Background"
           className="w-full h-full object-cover"
         />
@@ -243,15 +243,15 @@ const Login = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-[var(--elra-primary-dark)] hover:bg-[var(--elra-primary)] text-white py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl cursor-pointer"
+                className="w-full bg-[var(--elra-primary-dark)] hover:bg-[var(--elra-primary)] text-white py-3 px-4 rounded-xl font-semibold text-base transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl cursor-pointer"
               >
                 {loading ? (
                   <div className="flex items-center justify-center">
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3"></div>
-                    Signing in...
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    <span className="text-xs">Signing in...</span>
                   </div>
                 ) : (
-                  "Login now"
+                  "Login"
                 )}
               </button>
             </form>
@@ -273,7 +273,7 @@ const Login = () => {
               <button
                 type="button"
                 onClick={() => setShowJoinWithCode(true)}
-                className="w-full flex items-center justify-center space-x-2 text-[var(--elra-primary)] font-semibold py-3 px-4 rounded-lg border-2 border-[var(--elra-primary)] hover:bg-[var(--elra-primary)] hover:text-white transition-all duration-300 cursor-pointer"
+                className="w-full flex items-center justify-center space-x-2 text-[var(--elra-primary)] font-medium py-2 px-4 rounded-lg  transition-all duration-300 cursor-pointer text-sm"
               >
                 <HiKey className="h-5 w-5" />
                 <span>Join with Invitation Code</span>

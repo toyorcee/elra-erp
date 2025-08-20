@@ -24,6 +24,9 @@ import SalaryGradeManagement from "./pages/user/modules/payroll/SalaryGradeManag
 import PerformanceAllowances from "./pages/user/modules/payroll/PerformanceAllowances";
 import PerformanceBonuses from "./pages/user/modules/payroll/PerformanceBonuses";
 import DeductionsManagement from "./pages/user/modules/payroll/DeductionsManagement";
+import PayrollProcessing from "./pages/user/modules/payroll/PayrollProcessing";
+import PaySlips from "./pages/user/modules/payroll/PaySlips";
+import PayrollReports from "./pages/user/modules/payroll/PayrollReports";
 import Notifications from "./pages/shared/Notifications";
 import Settings from "./pages/shared/Settings";
 // Admin imports commented out - admin folder deleted
@@ -169,6 +172,12 @@ const AppRoutes = () => {
           path="modules/payroll/deductions"
           element={<DeductionsManagement />}
         />
+        <Route
+          path="modules/payroll/processing"
+          element={<PayrollProcessing />}
+        />
+        <Route path="modules/payroll/payslips" element={<PaySlips />} />
+        <Route path="modules/payroll/reports" element={<PayrollReports />} />
       </Route>
 
       {/* Admin routes - commented out - admin folder deleted */}

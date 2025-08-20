@@ -242,13 +242,21 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    salaryStep: {
+      type: String,
+      default: "Step 1",
+    },
+    yearsOfService: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
   },
   {
     timestamps: true,
   }
 );
 
-// Pre-save middleware to hash password
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
 

@@ -14,24 +14,160 @@ const payrollSchema = new mongoose.Schema(
       required: true,
     },
 
+    // Payroll frequency
+    frequency: {
+      type: String,
+      enum: ["monthly", "quarterly", "yearly", "one_time"],
+      default: "monthly",
+      required: true,
+    },
+
+    // Payroll scope
+    scope: {
+      type: String,
+      enum: ["company", "department", "individual"],
+      default: "company",
+      required: true,
+    },
+
     processingDate: {
       type: Date,
       required: true,
     },
 
-    // Department this payroll is for
+    // Department this payroll is for (required for department scope)
     department: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Department",
-      required: true,
+      required: function () {
+        return this.scope === "department";
+      },
     },
 
-    // Employee payroll details
+    // Employee this payroll is for (required for individual scope)
     employee: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: function () {
+        return this.scope === "individual";
+      },
     },
+
+    // Batch payrolls array (for company/department scope)
+    payrolls: [
+      {
+        employee: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        baseSalary: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+        housingAllowance: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+        transportAllowance: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+        mealAllowance: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+        otherAllowance: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+        personalAllowances: [
+          {
+            name: String,
+            amount: Number,
+            type: {
+              type: String,
+              enum: ["fixed", "percentage"],
+            },
+          },
+        ],
+        personalBonuses: [
+          {
+            name: String,
+            amount: Number,
+            type: {
+              type: String,
+              enum: ["fixed", "percentage"],
+            },
+          },
+        ],
+        paye: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+        pension: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+        nhis: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+        voluntaryDeductions: [
+          {
+            name: String,
+            amount: Number,
+            type: {
+              type: String,
+              enum: ["fixed", "percentage"],
+            },
+          },
+        ],
+        grossSalary: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+        totalAllowances: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+        totalBonuses: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+        taxableIncome: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+        nonTaxableAllowances: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+        totalDeductions: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
+        netSalary: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+      },
+    ],
 
     // Salary structure (from salary grade)
     baseSalary: {
@@ -131,6 +267,16 @@ const payrollSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    taxableIncome: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    nonTaxableAllowances: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     totalDeductions: {
       type: Number,
       default: 0,
@@ -179,49 +325,8 @@ const payrollSchema = new mongoose.Schema(
 // Indexes
 payrollSchema.index({ month: 1, year: 1, department: 1 });
 payrollSchema.index({ employee: 1, month: 1, year: 1 });
+payrollSchema.index({ "payrolls.employee": 1, month: 1, year: 1 });
 payrollSchema.index({ status: 1, isActive: 1 });
-
-// Pre-save middleware to calculate totals
-payrollSchema.pre("save", function (next) {
-  // Calculate total allowances
-  const builtInAllowances =
-    (this.housingAllowance || 0) +
-    (this.transportAllowance || 0) +
-    (this.mealAllowance || 0) +
-    (this.otherAllowance || 0);
-
-  const personalAllowancesTotal =
-    this.personalAllowances?.reduce(
-      (sum, allowance) => sum + (allowance.amount || 0),
-      0
-    ) || 0;
-
-  this.totalAllowances = builtInAllowances + personalAllowancesTotal;
-
-  // Calculate total bonuses
-  this.totalBonuses =
-    this.personalBonuses?.reduce(
-      (sum, bonus) => sum + (bonus.amount || 0),
-      0
-    ) || 0;
-
-  // Calculate total deductions
-  const statutoryDeductions =
-    (this.paye || 0) + (this.pension || 0) + (this.nhis || 0);
-  const voluntaryDeductionsTotal =
-    this.voluntaryDeductions?.reduce(
-      (sum, deduction) => sum + (deduction.amount || 0),
-      0
-    ) || 0;
-
-  this.totalDeductions = statutoryDeductions + voluntaryDeductionsTotal;
-
-  // Calculate gross and net salary
-  this.grossSalary = this.baseSalary + this.totalAllowances + this.totalBonuses;
-  this.netSalary = this.grossSalary - this.totalDeductions;
-
-  next();
-});
 
 // Static method to get payroll for employee
 payrollSchema.statics.getEmployeePayroll = function (employeeId, month, year) {

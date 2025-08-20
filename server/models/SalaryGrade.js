@@ -66,26 +66,36 @@ const salaryGradeSchema = new mongoose.Schema(
         },
       },
     ],
-    // Steps within this grade
+    // Salary steps based on years of service
     steps: [
       {
         step: {
           type: String,
-          required: false,
-          enum: ["Step 1", "Step 2", "Step 3", "Step 4", "Step 5"],
+          required: true,
+          trim: true,
         },
         increment: {
           type: Number,
-          required: false,
-          min: 0,
-          max: 100, // Percentage increment
           default: 0,
+          min: 0,
         },
         yearsOfService: {
           type: Number,
-          required: false,
-          min: 0,
           default: 0,
+          min: 0,
+        },
+      },
+    ],
+    roleMappings: [
+      {
+        role: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Role",
+          required: true,
+        },
+        isActive: {
+          type: Boolean,
+          default: true,
         },
       },
     ],
@@ -134,22 +144,15 @@ salaryGradeSchema.statics.getActiveGrades = function () {
   return this.find({ isActive: true }).sort({ minGrossSalary: 1 });
 };
 
-// Instance method to calculate total compensation
-salaryGradeSchema.methods.calculateTotalCompensation = function (
-  baseSalary,
-  step = "Step 1"
-) {
-  const stepData = this.steps.find((s) => s.step === step);
-  const increment = stepData ? (baseSalary * stepData.increment) / 100 : 0;
-  const adjustedSalary = baseSalary + increment;
-
+// Instance method to calculate total compensation (without steps)
+salaryGradeSchema.methods.calculateTotalCompensation = function (baseSalary) {
   const customAllowancesTotal = this.customAllowances.reduce(
     (sum, allowance) => sum + allowance.amount,
     0
   );
 
   return {
-    baseSalary: adjustedSalary,
+    baseSalary: baseSalary,
     housing: this.allowances.housing,
     transport: this.allowances.transport,
     meal: this.allowances.meal,
@@ -157,7 +160,7 @@ salaryGradeSchema.methods.calculateTotalCompensation = function (
     customAllowances: this.customAllowances,
     customAllowancesTotal,
     total:
-      adjustedSalary +
+      baseSalary +
       this.allowances.housing +
       this.allowances.transport +
       this.allowances.meal +

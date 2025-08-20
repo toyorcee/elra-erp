@@ -477,6 +477,135 @@ class AuditService {
 
     return csvRows.join("\n");
   }
+
+  // ==================== PAYROLL AUDIT METHODS ====================
+
+  /**
+   * Log payroll processing activity
+   */
+  static async logPayrollProcessed(userId, payrollData) {
+    try {
+      await AuditLog.log({
+        userId,
+        action: "PAYROLL_PROCESSED",
+        resourceType: "PAYROLL",
+        resourceId: null, 
+        resourceModel: "Payroll",
+        details: {
+          description: `Payroll processed for ${payrollData.scope} scope`,
+          payrollPeriod: {
+            month: payrollData.month,
+            year: payrollData.year,
+            frequency: payrollData.frequency,
+          },
+          payrollScope: payrollData.scope,
+          payrollScopeId: null, 
+          metadata: {
+            totalEmployees: payrollData.totalEmployees,
+            totalGrossPay: payrollData.totalGrossPay,
+            totalNetPay: payrollData.totalNetPay,
+            totalDeductions: payrollData.totalDeductions,
+          },
+        },
+        riskLevel: "LOW",
+      });
+
+      console.log(`📝 [AUDIT] Payroll processed logged for user ${userId}`);
+    } catch (error) {
+      console.error("Error logging payroll processed:", error);
+    }
+  }
+
+  /**
+   * Log when a payroll item (allowance/bonus/deduction) is marked as used
+   */
+  static async logPayrollItemMarkedUsed(userId, itemData, payrollData) {
+    try {
+      await AuditLog.log({
+        userId,
+        action: "PAYROLL_ITEM_MARKED_USED",
+        resourceType: itemData.resourceType, // PERSONAL_ALLOWANCE, PERSONAL_BONUS, or DEDUCTION
+        resourceId: itemData.id,
+        resourceModel: itemData.resourceModel, // PersonalAllowance, PersonalBonus, or Deduction
+        details: {
+          description: `${itemData.itemType} "${itemData.name}" marked as used for payroll processing`,
+          payrollPeriod: {
+            month: payrollData.month,
+            year: payrollData.year,
+            frequency: payrollData.frequency,
+          },
+          payrollScope: payrollData.scope,
+          payrollScopeId: payrollData.scopeId,
+          employeeId: itemData.employeeId,
+          employeeName: itemData.employeeName,
+          itemType: itemData.itemType, // allowance, bonus, deduction
+          itemName: itemData.name,
+          itemAmount: itemData.amount,
+          usageCount: itemData.usageCount,
+          lastUsedDate: itemData.lastUsedDate,
+          lastUsedScope: itemData.lastUsedScope,
+          lastUsedFrequency: itemData.lastUsedFrequency,
+          lastUsedTimestamp: itemData.lastUsedTimestamp,
+        },
+        riskLevel: "LOW",
+      });
+
+      console.log(
+        `📝 [AUDIT] ${itemData.itemType} "${itemData.name}" marked as used logged for user ${userId}`
+      );
+    } catch (error) {
+      console.error("Error logging payroll item marked as used:", error);
+    }
+  }
+
+  /**
+   * Get recent payroll activity
+   */
+  static async getRecentPayrollActivity(options = {}) {
+    try {
+      const payrollActions = [
+        "PAYROLL_PROCESSED",
+        "PAYROLL_PREVIEW_GENERATED",
+        "PAYROLL_ITEM_MARKED_USED",
+        "PAYROLL_ITEM_CREATED",
+        "PAYROLL_ITEM_UPDATED",
+        "PAYROLL_ITEM_DELETED",
+        "PAYROLL_ITEM_ACTIVATED",
+        "PAYROLL_ITEM_DEACTIVATED",
+        "PAYROLL_TAX_CALCULATED",
+        "PAYROLL_ALLOWANCE_APPLIED",
+        "PAYROLL_BONUS_APPLIED",
+        "PAYROLL_DEDUCTION_APPLIED",
+      ];
+
+      const query = {
+        isDeleted: false,
+        action: { $in: payrollActions },
+      };
+
+      if (options.userId) query.userId = options.userId;
+      if (options.resourceType) query.resourceType = options.resourceType;
+      if (options.action) query.action = options.action;
+      if (options.department)
+        query["userDetails.department"] = options.department;
+
+      if (options.startDate || options.endDate) {
+        query.timestamp = {};
+        if (options.startDate)
+          query.timestamp.$gte = new Date(options.startDate);
+        if (options.endDate) query.timestamp.$lte = new Date(options.endDate);
+      }
+
+      return await AuditLog.find(query)
+        .sort({ timestamp: -1 })
+        .limit(options.limit || 50)
+        .populate("userId", "firstName lastName email")
+        .populate("resourceId");
+    } catch (error) {
+      console.error("Error getting recent payroll activity:", error);
+      throw error;
+    }
+  }
 }
 
 export default AuditService;

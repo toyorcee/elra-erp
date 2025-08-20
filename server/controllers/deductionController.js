@@ -327,7 +327,22 @@ export const createDeduction = async (req, res) => {
       "✅ [deductionController] Set isActive to true for new deduction"
     );
 
-    if (
+    // Handle PAYE deductions with tax brackets
+    if (deductionData.category === "paye") {
+      console.log(
+        "🔧 [deductionController] Processing PAYE deduction with tax brackets"
+      );
+      await createNigerianTaxBrackets(user._id);
+
+      // Set correct fields for PAYE
+      deductionData.calculationType = "tax_brackets";
+      deductionData.amount = null;
+      deductionData.useTaxBrackets = true;
+
+      console.log(
+        "✅ [deductionController] PAYE deduction configured for tax brackets"
+      );
+    } else if (
       deductionData.calculationType === "percentage" &&
       deductionData.amount
     ) {
@@ -339,11 +354,6 @@ export const createDeduction = async (req, res) => {
         });
       }
       deductionData.amount = amount;
-    }
-
-    // If this is a PAYE deduction, ensure tax brackets exist
-    if (deductionData.category === "paye") {
-      await createNigerianTaxBrackets(user._id);
     }
 
     const deduction = await Deduction.create(deductionData);
@@ -472,6 +482,25 @@ export const updateDeduction = async (req, res) => {
           updateData.department = null;
         }
       }
+    }
+
+    // Handle PAYE deductions with tax brackets
+    if (updateData.category === "paye") {
+      console.log(
+        "🔧 [deductionController] Processing PAYE deduction update with tax brackets"
+      );
+
+      // Ensure tax brackets exist
+      await createNigerianTaxBrackets(user._id);
+
+      // Set correct fields for PAYE
+      updateData.calculationType = "tax_brackets";
+      updateData.amount = null;
+      updateData.useTaxBrackets = true;
+
+      console.log(
+        "✅ [deductionController] PAYE deduction update configured for tax brackets"
+      );
     }
 
     // Clean up empty strings for ObjectId fields

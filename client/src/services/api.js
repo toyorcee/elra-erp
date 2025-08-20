@@ -194,6 +194,16 @@ export const authAPI = {
       throw error;
     }
   },
+
+  refreshToken: async () => {
+    try {
+      const response = await api.post("/auth/refresh");
+      return response.data;
+    } catch (error) {
+      console.error("[authAPI.refreshToken] Error:", error);
+      throw error;
+    }
+  },
 };
 
 // Invitation API

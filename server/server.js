@@ -56,6 +56,7 @@ import allowanceRoutes from "./routes/allowanceRoutes.js";
 import bonusRoutes from "./routes/bonusRoutes.js";
 import deductionRoutes from "./routes/deductionRoutes.js";
 import taxBracketRoutes from "./routes/taxBrackets.js";
+import payrollRoutes from "./routes/payrollRoutes.js";
 
 const isValidObjectId = (id) => {
   return (
@@ -238,6 +239,7 @@ app.use("/api/allowances", allowanceRoutes);
 app.use("/api/bonuses", bonusRoutes);
 app.use("/api/deductions", deductionRoutes);
 app.use("/api/tax-brackets", taxBracketRoutes);
+app.use("/api/payroll", payrollRoutes);
 
 const io = new SocketIOServer(httpServer, {
   cors: {

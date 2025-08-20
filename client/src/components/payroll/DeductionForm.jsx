@@ -91,17 +91,20 @@ const DeductionForm = ({
     };
   }, [showEmployeeDropdown]);
 
-  // Fetch employees when departments change
   useEffect(() => {
     const fetchDepartmentEmployees = async () => {
-      if (formData.scope === "individual" && selectedDepartments.length > 0) {
+      if (formData.scope === "individual") {
         setLoadingDepartmentEmployees(true);
 
         try {
-          const response = await fetchEmployeesByDepartments(
-            selectedDepartments
-          );
-          setDepartmentEmployees(response.data);
+          if (selectedDepartments.length > 0) {
+            const response = await fetchEmployeesByDepartments(
+              selectedDepartments
+            );
+            setDepartmentEmployees(response.data || []);
+          } else {
+            setDepartmentEmployees(employees);
+          }
         } catch (error) {
           console.error("Error fetching department employees:", error);
           setDepartmentEmployees([]);
@@ -114,7 +117,7 @@ const DeductionForm = ({
     };
 
     fetchDepartmentEmployees();
-  }, [selectedDepartments, formData.scope]);
+  }, [selectedDepartments, formData.scope, employees]);
 
   useEffect(() => {
     if (deduction) {
@@ -145,9 +148,21 @@ const DeductionForm = ({
         departments: deduction.departments || [],
       });
 
-      // Set selected arrays
-      setSelectedEmployees(deduction.employees || []);
-      setSelectedDepartments(deduction.departments || []);
+      // Initialize selected employees and departments with proper ID extraction
+      if (deduction.employees && Array.isArray(deduction.employees)) {
+        // Handle both employee IDs and employee objects
+        const employeeIds = deduction.employees.map((emp) =>
+          typeof emp === "string" ? emp : emp._id || emp.id
+        );
+        setSelectedEmployees(employeeIds);
+      }
+      if (deduction.departments && Array.isArray(deduction.departments)) {
+        // Handle both department IDs and department objects
+        const departmentIds = deduction.departments.map((dept) =>
+          typeof dept === "string" ? dept : dept._id || dept.id
+        );
+        setSelectedDepartments(departmentIds);
+      }
     } else {
       console.log("🔍 [DeductionForm] Resetting form for new deduction");
       // Reset form when no deduction (new creation)
@@ -350,19 +365,14 @@ const DeductionForm = ({
           : [],
     };
 
-    // Category is now handled by user selection for all deduction types
-
-    // Only parse amount for non-PAYE deductions
     if (formData.category !== "paye") {
       submissionData.amount = parseFloat(formData.amount);
     } else {
-      // For PAYE deductions, don't send amount since it uses tax brackets
-      delete submissionData.amount;
-      delete submissionData.calculationType;
+      submissionData.calculationType = "tax_brackets";
+      submissionData.amount = null;
       delete submissionData.percentageBase;
     }
 
-    // Remove status field - backend will auto-set it
     delete submissionData.status;
 
     onSubmit(submissionData);
@@ -710,7 +720,7 @@ const DeductionForm = ({
                                   {employeeSearchTerm}"
                                 </p>
                               ) : selectedDepartments.length === 0 ? (
-                                <p>Please select departments first</p>
+                                <p>No employees found in the system</p>
                               ) : (
                                 <p>
                                   No employees found in selected departments

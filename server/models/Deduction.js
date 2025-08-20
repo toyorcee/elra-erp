@@ -37,18 +37,14 @@ const deductionSchema = new mongoose.Schema(
     // Calculation method
     calculationType: {
       type: String,
-      enum: ["fixed", "percentage"],
-      required: function () {
-        return this.category !== "paye";
-      },
+      enum: ["fixed", "percentage", "tax_brackets"],
+      required: false,
     },
 
     // Amount or percentage
     amount: {
       type: Number,
-      required: function () {
-        return this.category !== "paye";
-      },
+      required: false,
       min: 0,
     },
 
@@ -142,14 +138,16 @@ const deductionSchema = new mongoose.Schema(
       type: Date,
     },
 
-    // Department (for department scope)
+    usageCount: {
+      type: Number,
+      default: 0,
+    },
+
     department: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Department",
-      // Required only for department scope
     },
 
-    // Multiple departments for department scope
     departments: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -157,7 +155,6 @@ const deductionSchema = new mongoose.Schema(
       },
     ],
 
-    // Audit fields
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -197,6 +194,30 @@ deductionSchema.pre("save", function (next) {
 
   if (this.endDate && new Date() > this.endDate) {
     this.status = "expired";
+  }
+
+  // Validate PAYE deductions
+  if (this.category === "paye") {
+    if (this.calculationType !== "tax_brackets") {
+      this.calculationType = "tax_brackets";
+    }
+    if (this.amount !== null && this.amount !== undefined) {
+      this.amount = null;
+    }
+    this.useTaxBrackets = true;
+  } else {
+    // For non-PAYE deductions, ensure required fields
+    if (!this.calculationType) {
+      return next(
+        new Error("Calculation type is required for non-PAYE deductions")
+      );
+    }
+    if (
+      this.calculationType !== "tax_brackets" &&
+      (!this.amount || this.amount <= 0)
+    ) {
+      return next(new Error("Amount is required for non-PAYE deductions"));
+    }
   }
 
   // Validate scope-dependent fields
@@ -281,7 +302,7 @@ deductionSchema.methods.calculateAmount = function (
 
 // Instance method to check if deduction is available for payroll
 deductionSchema.methods.isAvailableForPayroll = function (payrollDate) {
-  if (this.status !== "active" || this.isUsed) {
+  if (this.status !== "active" || !this.isActive) {
     return false;
   }
 
@@ -294,9 +315,42 @@ deductionSchema.methods.isAvailableForPayroll = function (payrollDate) {
     return false;
   }
 
-  // Check frequency
+  // Check frequency-based usage
   if (this.frequency === "one_time" && this.isUsed) {
     return false;
+  }
+
+  // For recurring items, check if already used in this period
+  if (this.frequency !== "one_time" && this.lastUsedDate) {
+    const lastUsed = new Date(this.lastUsedDate);
+    const payroll = new Date(payrollDate);
+
+    // Check if already used in the same period
+    if (
+      this.frequency === "monthly" &&
+      lastUsed.getFullYear() === payroll.getFullYear() &&
+      lastUsed.getMonth() === payroll.getMonth()
+    ) {
+      return false;
+    }
+
+    if (this.frequency === "quarterly") {
+      const lastQuarter = Math.floor(lastUsed.getMonth() / 3);
+      const currentQuarter = Math.floor(payroll.getMonth() / 3);
+      if (
+        lastUsed.getFullYear() === payroll.getFullYear() &&
+        lastQuarter === currentQuarter
+      ) {
+        return false;
+      }
+    }
+
+    if (
+      this.frequency === "yearly" &&
+      lastUsed.getFullYear() === payroll.getFullYear()
+    ) {
+      return false;
+    }
   }
 
   return true;
@@ -349,6 +403,22 @@ deductionSchema.statics.getStatutoryDeductions = function (employeeId) {
     status: "active",
     isActive: true,
   });
+};
+
+// Instance method to mark as used
+deductionSchema.methods.markAsUsed = function (payrollId, payrollDate) {
+  this.isUsed = true;
+  this.lastUsedInPayroll = payrollId;
+  this.lastUsedDate = payrollDate;
+  this.usageCount += 1;
+
+  // For one-time deductions, keep isUsed as true
+  // For recurring deductions, reset isUsed for next period
+  if (this.frequency !== "one_time") {
+    this.isUsed = false; // Reset for next period
+  }
+
+  return this.save();
 };
 
 const Deduction = mongoose.model("Deduction", deductionSchema);

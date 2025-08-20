@@ -797,3 +797,99 @@ export const getOnboardedMembers = async (req, res) => {
     });
   }
 };
+
+// Update user salary information
+export const updateUserSalary = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { salaryStep, yearsOfService } = req.body;
+    const currentUser = req.user;
+
+    console.log("🔍 [UPDATE_USER_SALARY] Updating salary for user:", {
+      userId: id,
+      salaryStep,
+      yearsOfService,
+      updatedBy: currentUser.email,
+    });
+
+    const user = await User.findById(id).populate(
+      "role",
+      "name level description"
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    if (!canManageUser(currentUser, user)) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to update this user's salary",
+      });
+    }
+
+    const updateData = {
+      salaryStep: salaryStep || "Step 1",
+      yearsOfService: yearsOfService || 0,
+    };
+
+    const updatedUser = await User.findByIdAndUpdate(id, updateData, {
+      new: true,
+    })
+      .populate("role", "name level description")
+      .populate("department");
+
+    console.log("✅ [UPDATE_USER_SALARY] Salary updated successfully:", {
+      userId: id,
+      salaryStep: updatedUser.salaryStep,
+      yearsOfService: updatedUser.yearsOfService,
+    });
+
+    await AuditService.logUserAction(
+      currentUser._id,
+      "USER_UPDATED",
+      user._id,
+      {
+        company: currentUser.company,
+        previousSalary: {
+          customBaseSalary: user.customBaseSalary,
+          salaryStep: user.salaryStep,
+          useStepCalculation: user.useStepCalculation,
+          yearsOfService: user.yearsOfService,
+        },
+        newSalary: updateData,
+        description: `Salary updated for user ${user.firstName} ${user.lastName}`,
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      }
+    );
+
+    res.json({
+      success: true,
+      message: "User salary updated successfully",
+      data: {
+        user: {
+          id: updatedUser._id,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+          employeeId: updatedUser.employeeId,
+          customBaseSalary: updatedUser.customBaseSalary,
+          salaryStep: updatedUser.salaryStep,
+          useStepCalculation: updatedUser.useStepCalculation,
+          yearsOfService: updatedUser.yearsOfService,
+          department: updatedUser.department?.name,
+          role: updatedUser.role?.name,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("❌ [UPDATE_USER_SALARY] Error updating user salary:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update user salary",
+    });
+  }
+};

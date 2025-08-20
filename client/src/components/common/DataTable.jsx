@@ -142,7 +142,11 @@ const DataTable = ({
               >
                 {columns.map((column, colIndex) => (
                   <td key={colIndex} className="px-6 py-4">
-                    {column.renderer ? column.renderer(row) : row[column.key]}
+                    {column.renderer
+                      ? column.renderer(row)
+                      : typeof row[column.accessor] === "object"
+                      ? JSON.stringify(row[column.accessor])
+                      : row[column.accessor] || row[column.key] || ""}
                   </td>
                 ))}
                 {(actions.showEdit ||

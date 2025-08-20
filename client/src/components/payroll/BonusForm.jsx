@@ -74,12 +74,22 @@ const BonusForm = ({
         departments: bonus.departments || [],
       });
 
-      if (bonus.employees) {
-        setSelectedEmployees(bonus.employees);
+      if (bonus.employees && Array.isArray(bonus.employees)) {
+        const employeeIds = bonus.employees.map((emp) =>
+          typeof emp === "string" ? emp : emp._id || emp.id
+        );
+        setSelectedEmployees(employeeIds);
       }
-      if (bonus.departments) {
-        setSelectedDepartments(bonus.departments);
+      if (bonus.departments && Array.isArray(bonus.departments)) {
+        const departmentIds = bonus.departments.map((dept) =>
+          typeof dept === "string" ? dept : dept._id || dept.id
+        );
+        setSelectedDepartments(departmentIds);
       }
+    } else {
+      // Reset form when not editing
+      setSelectedEmployees([]);
+      setSelectedDepartments([]);
     }
   }, [bonus]);
 
@@ -106,19 +116,20 @@ const BonusForm = ({
     loadData();
   }, []);
 
-  // Click outside handler for employee dropdown
-
-  // Fetch employees when departments change
   useEffect(() => {
     const fetchDepartmentEmployees = async () => {
-      if (formData.scope === "individual" && selectedDepartments.length > 0) {
+      if (formData.scope === "individual") {
         setLoadingDepartmentEmployees(true);
 
         try {
-          const response = await fetchEmployeesByDepartments(
-            selectedDepartments
-          );
-          setDepartmentEmployees(response.data || []);
+          if (selectedDepartments.length > 0) {
+            const response = await fetchEmployeesByDepartments(
+              selectedDepartments
+            );
+            setDepartmentEmployees(response.data || []);
+          } else {
+            setDepartmentEmployees(employees);
+          }
         } catch (error) {
           console.error("Error fetching department employees:", error);
           setDepartmentEmployees([]);
@@ -131,7 +142,7 @@ const BonusForm = ({
     };
 
     fetchDepartmentEmployees();
-  }, [selectedDepartments, formData.scope]);
+  }, [selectedDepartments, formData.scope, employees]);
 
   const [loadingTaxableStatus, setLoadingTaxableStatus] = useState(false);
 
@@ -164,6 +175,15 @@ const BonusForm = ({
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
 
+    // Handle scope change
+    if (field === "scope") {
+      setSelectedEmployees([]);
+      // Only clear departments when switching to company scope
+      if (value === "company") {
+        setSelectedDepartments([]);
+      }
+    }
+
     // Taxable status will be determined by backend
     // No frontend manipulation of taxable status
 
@@ -173,6 +193,22 @@ const BonusForm = ({
         ...prev,
         category: value,
       }));
+    }
+
+    // Real-time date validation when frequency or dates change
+    if (field === "frequency" || field === "startDate" || field === "endDate") {
+      const newFormData = { ...formData, [field]: value };
+      const dateValidation = validateDatesByFrequency(
+        newFormData.frequency,
+        newFormData.startDate,
+        newFormData.endDate
+      );
+
+      if (!dateValidation.isValid) {
+        setErrors((prev) => ({ ...prev, endDate: dateValidation.message }));
+      } else if (errors.endDate && field === "endDate") {
+        setErrors((prev) => ({ ...prev, endDate: "" }));
+      }
     }
   };
 
@@ -221,6 +257,60 @@ const BonusForm = ({
     }
   };
 
+  // Frequency-based date validation
+  const validateDatesByFrequency = (frequency, startDate, endDate) => {
+    if (!startDate) return { isValid: true };
+
+    const start = new Date(startDate);
+    const end = endDate ? new Date(endDate) : null;
+
+    switch (frequency) {
+      case "yearly":
+        if (end) {
+          const endYear = end.getFullYear();
+          const startYear = start.getFullYear();
+
+          // Check if end date is before December of the start year
+          if (endYear === startYear && end.getMonth() < 11) {
+            return {
+              isValid: false,
+              message: `Yearly bonuses are only processed in December. Your end date (${end.toLocaleDateString()}) is before December, so this bonus will never be used. Please set end date to December 31st or later, or remove the end date entirely.`,
+            };
+          }
+
+          // Check if end date is in a different year but before December
+          if (endYear > startYear && end.getMonth() < 11) {
+            return {
+              isValid: false,
+              message: `Yearly bonuses are only processed in December. Your end date (${end.toLocaleDateString()}) is before December ${endYear}, so this bonus will never be used in ${endYear}. Please set end date to December 31st or later.`,
+            };
+          }
+        }
+        break;
+
+      case "quarterly":
+        if (end) {
+          const monthsDiff =
+            (end.getFullYear() - start.getFullYear()) * 12 +
+            (end.getMonth() - start.getMonth());
+          if (monthsDiff < 3) {
+            return {
+              isValid: false,
+              message: `Quarterly bonuses are processed in months 3, 6, 9, and 12. Your end date doesn't allow enough time for quarterly processing. Please set end date to at least 3 months after start date.`,
+            };
+          }
+        }
+        break;
+
+      case "monthly":
+      case "one_time":
+        // No special validation needed for monthly and one-time
+        break;
+    }
+
+    return { isValid: true };
+  };
+
   const validateForm = () => {
     const newErrors = {};
 
@@ -229,6 +319,16 @@ const BonusForm = ({
       newErrors.amount = "Valid amount is required";
     if (!formData.startDate) newErrors.startDate = "Start date is required";
     if (!formData.type) newErrors.type = "Bonus type is required";
+
+    // Frequency-based date validation
+    const dateValidation = validateDatesByFrequency(
+      formData.frequency,
+      formData.startDate,
+      formData.endDate
+    );
+    if (!dateValidation.isValid) {
+      newErrors.endDate = dateValidation.message;
+    }
 
     // Scope-specific validation
     if (formData.scope === "individual" && selectedEmployees.length === 0) {
@@ -367,7 +467,14 @@ const BonusForm = ({
                     placeholder="Enter bonus name"
                   />
                   {errors.name && (
-                    <p className="text-red-500 text-sm mt-1">{errors.name}</p>
+                    <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-start space-x-2">
+                        <span className="text-red-500 text-sm mt-0.5">⚠️</span>
+                        <p className="text-red-700 text-sm leading-relaxed break-words">
+                          {errors.name}
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -414,9 +521,14 @@ const BonusForm = ({
                     ))}
                   </div>
                   {errors.departments && (
-                    <p className="text-red-500 text-sm mt-1">
-                      {errors.departments}
-                    </p>
+                    <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-start space-x-2">
+                        <span className="text-red-500 text-sm mt-0.5">⚠️</span>
+                        <p className="text-red-700 text-sm leading-relaxed break-words">
+                          {errors.departments}
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
@@ -425,8 +537,12 @@ const BonusForm = ({
                 <div className="mt-4 space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Departments (to filter employees)
+                      Filter by Departments (Optional)
                     </label>
+                    <p className="text-sm text-gray-500 mb-3">
+                      Select departments to filter employees, or leave empty to
+                      show all employees
+                    </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {departments.map((dept) => (
                         <label
@@ -563,7 +679,7 @@ const BonusForm = ({
                                       {employeeSearchTerm}"
                                     </p>
                                   ) : selectedDepartments.length === 0 ? (
-                                    <p>Please select departments first</p>
+                                    <p>No employees found in the system</p>
                                   ) : (
                                     <p>
                                       No employees found in selected departments
@@ -609,9 +725,14 @@ const BonusForm = ({
                     </div>
                   )}
                   {errors.employees && (
-                    <p className="text-red-500 text-sm mt-1">
-                      {errors.employees}
-                    </p>
+                    <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-start space-x-2">
+                        <span className="text-red-500 text-sm mt-0.5">⚠️</span>
+                        <p className="text-red-700 text-sm leading-relaxed break-words">
+                          {errors.employees}
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
@@ -658,7 +779,14 @@ const BonusForm = ({
                   ))}
                 </select>
                 {errors.type && (
-                  <p className="text-red-500 text-sm mt-1">{errors.type}</p>
+                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-start space-x-2">
+                      <span className="text-red-500 text-sm mt-0.5">⚠️</span>
+                      <p className="text-red-700 text-sm leading-relaxed break-words">
+                        {errors.type}
+                      </p>
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -764,9 +892,16 @@ const BonusForm = ({
                       </div>
                     </div>
                     {errors.amount && (
-                      <p className="text-red-500 text-sm mt-1">
-                        {errors.amount}
-                      </p>
+                      <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <div className="flex items-start space-x-2">
+                          <span className="text-red-500 text-sm mt-0.5">
+                            ⚠️
+                          </span>
+                          <p className="text-red-700 text-sm leading-relaxed break-words">
+                            {errors.amount}
+                          </p>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -831,9 +966,14 @@ const BonusForm = ({
                     }`}
                   />
                   {errors.startDate && (
-                    <p className="text-red-500 text-sm mt-1">
-                      {errors.startDate}
-                    </p>
+                    <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-start space-x-2">
+                        <span className="text-red-500 text-sm mt-0.5">⚠️</span>
+                        <p className="text-red-700 text-sm leading-relaxed break-words">
+                          {errors.startDate}
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -847,8 +987,67 @@ const BonusForm = ({
                     onChange={(e) =>
                       handleInputChange("endDate", e.target.value)
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                    min={formData.startDate}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] ${
+                      errors.endDate ? "border-red-500" : "border-gray-300"
+                    }`}
                   />
+                  {errors.endDate && (
+                    <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-start space-x-2">
+                        <span className="text-red-500 text-sm mt-0.5">⚠️</span>
+                        <p className="text-red-700 text-sm leading-relaxed break-words">
+                          {errors.endDate}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {/* Frequency processing info */}
+                  <div className="mt-1 text-xs text-gray-500">
+                    {formData.frequency === "yearly" && (
+                      <div className="flex items-center space-x-1">
+                        <span className="text-orange-600">⚠️</span>
+                        <span>Processed in December only</span>
+                      </div>
+                    )}
+                    {formData.frequency === "quarterly" && (
+                      <div className="flex items-center space-x-1">
+                        <span className="text-blue-600">ℹ️</span>
+                        <span>Processed in months 3, 6, 9, 12</span>
+                      </div>
+                    )}
+                    {formData.frequency === "monthly" && (
+                      <div className="flex items-center space-x-1">
+                        <span className="text-green-600">✓</span>
+                        <span>Processed every month</span>
+                      </div>
+                    )}
+                    {formData.frequency === "one_time" && (
+                      <div className="flex items-center space-x-1">
+                        <span className="text-purple-600">⚡</span>
+                        <span>Processed once when eligible</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Smart date suggestions */}
+                  {formData.frequency === "yearly" &&
+                    formData.startDate &&
+                    !formData.endDate && (
+                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+                        💡 <strong>Suggestion:</strong> For yearly bonuses,
+                        consider setting end date to December 31st of the target
+                        year to ensure it can be processed.
+                      </div>
+                    )}
+                  {formData.frequency === "quarterly" &&
+                    formData.startDate &&
+                    !formData.endDate && (
+                      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+                        💡 <strong>Suggestion:</strong> For quarterly bonuses,
+                        ensure end date allows at least 3 months for processing.
+                      </div>
+                    )}
                 </div>
               </div>
             </div>

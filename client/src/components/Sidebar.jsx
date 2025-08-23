@@ -60,6 +60,7 @@ import {
   getNavigationForRole,
   getRoleInfo,
   hasSectionAccess,
+  getModulesForUser,
 } from "../config/sidebarConfig";
 import { useAuth } from "../context/AuthContext";
 import { useDynamicSidebar } from "../context/DynamicSidebarContext";
@@ -105,10 +106,27 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     startModuleLoading,
   } = useDynamicSidebar();
 
-  // Ensure we get the correct role level
+  // Use the existing role-based filtering system
   const userRoleLevel = user?.role?.level || user?.roleLevel || 300;
+  const userDepartment = user?.department?.name || null;
+  const userPermissions = user?.permissions || [];
+  const userModuleAccess = user?.moduleAccess || [];
+
+  // Use the existing getNavigationForRole function that handles all the filtering
+  const navigation = getNavigationForRole(
+    userRoleLevel,
+    userDepartment,
+    userPermissions,
+    userModuleAccess
+  );
   const roleInfo = getRoleInfo(userRoleLevel);
-  const navigation = getNavigationForRole(userRoleLevel);
+
+  console.log("🔍 [Sidebar] User:", user);
+  console.log("🔍 [Sidebar] User Role Level:", userRoleLevel);
+  console.log("🔍 [Sidebar] User Department:", userDepartment);
+  console.log("🔍 [Sidebar] User Permissions:", userPermissions);
+  console.log("🔍 [Sidebar] User Module Access:", userModuleAccess);
+  console.log("🔍 [Sidebar] Navigation Items:", navigation);
 
   const handleMouseEnter = () => {
     if (!isMobile && !isOpen && !isPinned) {
@@ -167,8 +185,14 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     if (collapsedSections.hasOwnProperty(sectionTitle)) {
       return collapsedSections[sectionTitle];
     }
-    return !defaultExpanded;
+    return true;
   };
+
+  React.useEffect(() => {
+    if (isModuleView && currentModule) {
+      setCollapsedSections({});
+    }
+  }, [currentModule, isModuleView]);
 
   const handleLogout = async () => {
     try {
@@ -386,16 +410,16 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     );
   };
 
-  // Group navigation items by section
+  // Group navigation items by section using the filtered navigation
   const sections = {
-    main: sidebarConfig.filter((item) => item.section === "main"),
-    erp: sidebarConfig.filter((item) => item.section === "erp"),
-    system: sidebarConfig.filter((item) => item.section === "system"),
-    documents: sidebarConfig.filter((item) => item.section === "documents"),
-    communication: sidebarConfig.filter(
+    main: navigation.filter((item) => item.section === "main"),
+    erp: navigation.filter((item) => item.section === "erp"),
+    system: navigation.filter((item) => item.section === "system"),
+    documents: navigation.filter((item) => item.section === "documents"),
+    communication: navigation.filter(
       (item) => item.section === "communication"
     ),
-    reports: sidebarConfig.filter((item) => item.section === "reports"),
+    reports: navigation.filter((item) => item.section === "reports"),
   };
 
   return (
@@ -534,7 +558,22 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             {sections.main.map(renderNavItem)}
 
             {/* Other sections */}
-            {renderSection("erp", "ERP Modules", sections.erp)}
+            {(() => {
+              console.log("🔍 [Sidebar] ERP Modules Section:", sections.erp);
+              console.log(
+                "🔍 [Sidebar] ERP Modules Count:",
+                sections.erp.length
+              );
+              console.log(
+                "🔍 [Sidebar] ERP Modules Details:",
+                sections.erp.map((item) => ({
+                  label: item.label,
+                  path: item.path,
+                  section: item.section,
+                }))
+              );
+              return renderSection("erp", "ERP Modules", sections.erp);
+            })()}
 
             {/* Render module-specific navigation when in module view */}
             {isModuleView && currentModule && (

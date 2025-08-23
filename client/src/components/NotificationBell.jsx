@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { BellIcon } from "@heroicons/react/24/outline";
+import { BellIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-toastify";
 import notificationService from "../services/notifications";
 import { useSocket } from "../context/SocketContext";
@@ -15,7 +15,6 @@ const NotificationBell = ({ className = "" }) => {
   const { socket, isConnected } = useSocket();
   const navigate = useNavigate();
 
-  // Fetch unread count
   const {
     data: unreadData,
     isLoading: unreadLoading,
@@ -111,7 +110,14 @@ const NotificationBell = ({ className = "" }) => {
         );
         refetchUnread();
         refetchNotifications();
-        toast.success("All notifications marked as read");
+        toast.success("All notifications marked as read", {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
       } else {
         throw new Error(response.message || "Failed to mark all as read");
       }
@@ -228,12 +234,27 @@ const NotificationBell = ({ className = "" }) => {
               <h3 className="text-sm font-semibold text-[var(--elra-text-primary)]">
                 Notifications
               </h3>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="text-[var(--elra-text-muted)] hover:text-[var(--elra-text-primary)]"
-              >
-                ×
-              </button>
+              <div className="flex items-center gap-2">
+                {unreadCount > 0 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMarkAllAsRead();
+                    }}
+                    disabled={loading}
+                    className="flex items-center gap-1 text-xs text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  >
+                    <CheckIcon className="w-3 h-3" />
+                    {loading ? "Marking..." : "Mark all read"}
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="text-[var(--elra-text-muted)] hover:text-[var(--elra-text-primary)]"
+                >
+                  ×
+                </button>
+              </div>
             </div>
           </div>
 

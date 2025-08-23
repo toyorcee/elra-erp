@@ -61,6 +61,11 @@ const moduleSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    requiredRoleLevel: {
+      type: Number,
+      default: 300,
+      enum: [0, 100, 300, 600, 700, 1000],
+    },
   },
   {
     timestamps: true,

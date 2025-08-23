@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import PayrollService from "../services/payrollService.js";
+import PayslipService from "../services/payslipService.js";
 import User from "../models/User.js";
 import Department from "../models/Department.js";
 import Role from "../models/Role.js";
@@ -447,8 +448,136 @@ const finalComprehensiveTest = async () => {
       );
     });
 
-    // STEP 9: FINAL SUMMARY
-    console.log("\n🎯 STEP 9: FINAL SUMMARY");
+    // STEP 9: CREATE PAYROLL DATA STRUCTURE FOR PAYSLIP
+    console.log("\n📄 STEP 9: CREATING PAYROLL DATA FOR PAYSLIP");
+    console.log("-".repeat(50));
+
+    // Create the payroll data structure that matches what the payslip service expects
+    const payrollData = {
+      period: {
+        month: 8,
+        year: 2025,
+        monthName: "August",
+        frequency: "monthly",
+      },
+      scope: {
+        type: "individual",
+        details: null,
+      },
+      payrolls: [
+        {
+          employee: {
+            id: itEmployee._id,
+            name: `${itEmployee.firstName} ${itEmployee.lastName}`,
+            employeeId: itEmployee.employeeId,
+            department: itEmployee.department,
+            role: itEmployee.role,
+            avatar: itEmployee.avatar,
+          },
+          baseSalary: payroll.baseSalary.effectiveBaseSalary,
+          grossSalary: payroll.summary.grossPay,
+          netSalary: payroll.summary.netPay,
+          totalDeductions: payroll.deductions.total,
+          paye: payroll.deductions.paye,
+          pension: payroll.deductions.pension || 0,
+          nhis: payroll.deductions.nhis || 0,
+          personalAllowances: payroll.allowances.items,
+          personalBonuses: payroll.bonuses.items,
+          voluntaryDeductions: payroll.deductions.items,
+          taxableIncome: payroll.summary.taxableIncome,
+          nonTaxableAllowances: payroll.allowances.nonTaxable,
+          totalAllowances: payroll.allowances.total,
+          totalBonuses: payroll.bonuses.total,
+          period: {
+            month: 8,
+            year: 2025,
+            monthName: "August",
+          },
+          summary: {
+            grossPay: payroll.summary.grossPay,
+            netPay: payroll.summary.netPay,
+            totalDeductions: payroll.deductions.total,
+            taxableIncome: payroll.summary.taxableIncome,
+          },
+        },
+      ],
+      payrollId: new mongoose.Types.ObjectId(), // Generate a new ID for this test
+    };
+
+    console.log("✅ Payroll data structure created for payslip generation");
+
+    // STEP 10: GENERATE AND SAVE PAYSLIP
+    console.log("\n📄 STEP 10: GENERATING AND SAVING PAYSLIP");
+    console.log("-".repeat(50));
+
+    const payslipService = new PayslipService();
+
+    // Create employee data structure
+    const employeeData = {
+      _id: itEmployee._id,
+      firstName: itEmployee.firstName,
+      lastName: itEmployee.lastName,
+      employeeId: itEmployee.employeeId,
+      email: itEmployee.email,
+      department: itEmployee.department,
+      role: itEmployee.role,
+      avatar: itEmployee.avatar,
+    };
+
+    console.log("🔍 Employee data for payslip:", {
+      id: employeeData._id,
+      name: `${employeeData.firstName} ${employeeData.lastName}`,
+      employeeId: employeeData.employeeId,
+      email: employeeData.email,
+    });
+
+    try {
+      // Generate payslip PDF
+      console.log("📄 Generating payslip PDF...");
+      const payslipFile = await payslipService.generatePayslipPDF(
+        payrollData,
+        employeeData
+      );
+      console.log("✅ Payslip PDF generated:", payslipFile.fileName);
+
+      // Save payslip to database
+      console.log("💾 Saving payslip to database...");
+      const savedPayslip = await payslipService.savePayslipToDatabase(
+        payrollData,
+        employeeData,
+        payslipFile,
+        itEmployee._id // Using employee as creator for this test
+      );
+      console.log("✅ Payslip saved to database:", savedPayslip._id);
+
+      // Send payslip notification and email
+      console.log("📧 Sending payslip notification and email...");
+      await payslipService.sendPayslipNotification(
+        payrollData,
+        employeeData,
+        payslipFile
+      );
+      console.log("✅ Payslip notification and email sent successfully");
+
+      console.log("\n🎉 PAYSLIP GENERATION COMPLETE!");
+      console.log("=".repeat(50));
+      console.log(`📄 Payslip File: ${payslipFile.fileName}`);
+      console.log(`💾 Database ID: ${savedPayslip._id}`);
+      console.log(
+        `👤 Employee: ${employeeData.firstName} ${employeeData.lastName}`
+      );
+      console.log(`📅 Period: August 2025`);
+      console.log(`💰 Net Pay: ₦${payroll.summary.netPay.toLocaleString()}`);
+    } catch (payslipError) {
+      console.error("❌ Error generating/saving payslip:", payslipError);
+      console.error("Error details:", {
+        message: payslipError.message,
+        stack: payslipError.stack,
+      });
+    }
+
+    // STEP 11: FINAL SUMMARY
+    console.log("\n🎯 STEP 11: FINAL SUMMARY");
     console.log("-".repeat(50));
 
     console.log(
@@ -485,6 +614,8 @@ const finalComprehensiveTest = async () => {
     console.log(`   - Usage tracking prevents double-counting`);
     console.log(`   - Tax calculations are accurate`);
     console.log(`   - Frequency rules are respected`);
+    console.log(`   - Payslip generated and saved to database`);
+    console.log(`   - Notification and email sent to employee`);
   } catch (error) {
     console.error("❌ Error in comprehensive test:", error);
   } finally {

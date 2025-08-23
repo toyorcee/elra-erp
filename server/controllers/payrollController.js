@@ -146,52 +146,6 @@ const processPayrollWithData = async (req, res) => {
       req.user._id
     );
 
-    console.log(
-      "💾 [PAYROLL CONTROLLER] =========================================="
-    );
-    console.log("💾 [PAYROLL CONTROLLER] PAYROLL SAVED TO DATABASE!");
-    console.log("💾 [PAYROLL CONTROLLER] Summary Data:");
-    console.log(
-      "💾 [PAYROLL CONTROLLER] - Total Employees:",
-      payrollData.payrolls.length
-    );
-    console.log(
-      "💾 [PAYROLL CONTROLLER] - Total Gross Pay: ₦" +
-        payrollData.totalGrossPay?.toLocaleString()
-    );
-    console.log(
-      "💾 [PAYROLL CONTROLLER] - Total Net Pay: ₦" +
-        payrollData.totalNetPay?.toLocaleString()
-    );
-    console.log(
-      "💾 [PAYROLL CONTROLLER] - Total Deductions: ₦" +
-        payrollData.totalDeductions?.toLocaleString()
-    );
-    console.log(
-      "💾 [PAYROLL CONTROLLER] - Total PAYE: ₦" +
-        payrollData.totalPAYE?.toLocaleString()
-    );
-    console.log(
-      "💾 [PAYROLL CONTROLLER] - Total Taxable Income: ₦" +
-        payrollData.totalTaxableIncome?.toLocaleString()
-    );
-    console.log(
-      "💾 [PAYROLL CONTROLLER] - Period:",
-      payrollData.period?.monthName + " " + payrollData.period?.year
-    );
-    console.log(
-      "💾 [PAYROLL CONTROLLER] - Scope Type:",
-      payrollData.scope?.type
-    );
-    console.log(
-      "💾 [PAYROLL CONTROLLER] - Saved Payroll ID:",
-      savedPayroll.payrollId
-    );
-    console.log(
-      "💾 [PAYROLL CONTROLLER] =========================================="
-    );
-
-    // Send notification to the creator
     try {
       const notificationService = new NotificationService();
       const scopeDescription = getScopeDescription(
@@ -218,22 +172,25 @@ const processPayrollWithData = async (req, res) => {
           actionUrl: "/dashboard/modules/payroll",
         },
       });
-      console.log("✅ [PAYROLL CONTROLLER] Notification sent to creator");
     } catch (notificationError) {
-      console.error(
-        "❌ [PAYROLL CONTROLLER] Failed to send notification:",
-        notificationError
-      );
+      console.error("Failed to send notification:", notificationError);
     }
 
-    // Generate and send payslips for all employees
     try {
-      console.log("📄 [PAYROLL CONTROLLER] Starting payslip generation...");
       const payslipService = new PayslipService();
 
       for (const payroll of payrollData.payrolls) {
         try {
-          const employeeData = payroll.employee;
+          const employeeData = {
+            _id: payroll.employee.id,
+            firstName: payroll.employee.name.split(" ")[0] || "",
+            lastName: payroll.employee.name.split(" ").slice(1).join(" ") || "",
+            employeeId: payroll.employee.employeeId,
+            email: payroll.employee.email,
+            department: payroll.employee.department,
+            role: payroll.employee.role,
+            avatar: payroll.employee.avatar,
+          };
 
           const payslipPayrollData = {
             period: payrollData.period,
@@ -247,37 +204,39 @@ const processPayrollWithData = async (req, res) => {
             employeeData
           );
 
-          console.log(
-            `📄 [PAYROLL CONTROLLER] Payslip generated for ${employeeData.firstName} ${employeeData.lastName}: ${payslipFile.fileName}`
+          await payslipService.savePayslipToDatabase(
+            payslipPayrollData,
+            employeeData,
+            payslipFile,
+            req.user._id
           );
+
+          // Handle both name formats (firstName/lastName vs name)
+          const employeeName =
+            employeeData.firstName && employeeData.lastName
+              ? `${employeeData.firstName} ${employeeData.lastName}`
+              : employeeData.name || "Unknown Employee";
 
           await payslipService.sendPayslipNotification(
             payslipPayrollData,
             employeeData,
             payslipFile
           );
-
-          console.log(
-            `📧 [PAYROLL CONTROLLER] Payslip sent to ${employeeData.firstName} ${employeeData.lastName} (${employeeData.email})`
-          );
         } catch (payslipError) {
+          // Handle both name formats for error message
+          const errorEmployeeName =
+            payroll.employee?.firstName && payroll.employee?.lastName
+              ? `${payroll.employee.firstName} ${payroll.employee.lastName}`
+              : payroll.employee?.name || "Unknown Employee";
+
           console.error(
-            `❌ [PAYROLL CONTROLLER] Failed to generate/send payslip for employee ${payroll.employee?.firstName} ${payroll.employee?.lastName}:`,
+            `Failed to generate/send payslip for employee ${errorEmployeeName}:`,
             payslipError
           );
-          // Continue with other employees even if one fails
         }
       }
-
-      console.log(
-        "✅ [PAYROLL CONTROLLER] Payslip generation and sending completed"
-      );
     } catch (payslipError) {
-      console.error(
-        "❌ [PAYROLL CONTROLLER] Failed to generate/send payslips:",
-        payslipError
-      );
-      // Don't fail the entire payroll process if payslip generation fails
+      console.error("Failed to generate/send payslips:", payslipError);
     }
 
     res.status(200).json({
@@ -540,7 +499,8 @@ const getSavedPayrolls = async (req, res) => {
       const key = `${payroll.month}-${payroll.year}-${payroll.scope}`;
       if (!acc[key]) {
         acc[key] = {
-          _id: key,
+          _id: payroll._id,
+          groupKey: key,
           period: {
             month: payroll.month,
             year: payroll.year,
@@ -780,7 +740,7 @@ const resendPayslips = async (req, res) => {
         });
       } catch (payslipError) {
         console.error(
-          `❌ [PAYROLL CONTROLLER] Failed to resend payslip for employee ${payroll.employee?.firstName} ${payroll.employee?.lastName}:`,
+          `Failed to resend payslip for employee ${payroll.employee?.firstName} ${payroll.employee?.lastName}:`,
           payslipError
         );
         errorCount++;
@@ -811,8 +771,7 @@ const resendPayslips = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ [PAYROLL CONTROLLER] Error resending payslips:", error);
-    console.error("❌ [PAYROLL CONTROLLER] Error stack:", error.stack);
+    console.error("Error resending payslips:", error);
     res.status(500).json({
       success: false,
       message: "Error resending payslips",
@@ -899,6 +858,347 @@ const getEmployeePayrollBreakdown = async (req, res) => {
   }
 };
 
+// @desc    Get all payslips from database
+// @route   GET /api/payroll/payslips
+// @access  Private (Super Admin, HOD)
+const getAllPayslips = async (req, res) => {
+  try {
+    const {
+      month,
+      year,
+      scope,
+      frequency,
+      department,
+      employeeId,
+      employeeName,
+      searchTerm,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+      page = 1,
+      limit = 50,
+    } = req.query;
+
+    // Check user permissions
+    const isSuperAdmin = req.user.role && req.user.role.level >= 1000;
+    const isHOD = req.user.role && req.user.role.level >= 700;
+
+    // Build filters object
+    const filters = {
+      month,
+      year,
+      scope,
+      frequency,
+      department,
+      employeeId,
+      employeeName,
+      searchTerm,
+    };
+
+    // For HOD, restrict to their department
+    if (isHOD && !isSuperAdmin) {
+      if (req.user.department) {
+        filters.department = req.user.department._id.toString();
+      } else {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. HOD must be assigned to a department.",
+        });
+      }
+    }
+
+    const payslipService = new PayslipService();
+    const payslips = await payslipService.getPayslipsByFilters(filters);
+
+    // Transform payslips to frontend format
+    const transformedPayslips = payslips.map((payslip) => ({
+      id: payslip._id,
+      payrollId: payslip.payrollId._id,
+      employee: {
+        id: payslip.employee._id,
+        name: `${payslip.employee.firstName} ${payslip.employee.lastName}`,
+        employeeId: payslip.employee.employeeId,
+        email: payslip.employee.email,
+        department: payslip.employee.department?.name || "N/A",
+        role: payslip.employee.role?.name || "N/A",
+      },
+      period: {
+        month: payslip.period.month,
+        year: payslip.period.year,
+        monthName: payslip.period.monthName,
+        frequency: payslip.period.frequency,
+      },
+      scope: payslip.scope,
+      summary: {
+        grossPay: payslip.summary.grossPay,
+        netPay: payslip.summary.netPay,
+        totalDeductions: payslip.summary.totalDeductions,
+        taxableIncome: payslip.summary.taxableIncome,
+      },
+      baseSalary: payslip.baseSalary,
+      allowances: payslip.personalAllowances,
+      bonuses: payslip.personalBonuses,
+      deductions: payslip.voluntaryDeductions,
+      taxBreakdown: {
+        paye: payslip.paye,
+        pension: payslip.pension,
+        nhis: payslip.nhis,
+      },
+      status: payslip.status,
+      payslipUrl: `/api/payroll/payslips/${payslip.payrollId._id}/view/${payslip.employee._id}`,
+      downloadUrl: `/api/payroll/payslips/${payslip.payrollId._id}/download/${payslip.employee._id}`,
+      resendUrl: `/api/payroll/payslips/${payslip.payrollId._id}/resend/${payslip.employee._id}`,
+      createdAt: payslip.createdAt,
+      updatedAt: payslip.updatedAt,
+    }));
+
+    // Sort payslips
+    const sortedPayslips = transformedPayslips.sort((a, b) => {
+      let aValue, bValue;
+
+      switch (sortBy) {
+        case "employeeName":
+          aValue = a.employee.name;
+          bValue = b.employee.name;
+          break;
+        case "employeeId":
+          aValue = a.employee.employeeId;
+          bValue = b.employee.employeeId;
+          break;
+        case "grossPay":
+          aValue = a.summary.grossPay;
+          bValue = b.summary.grossPay;
+          break;
+        case "netPay":
+          aValue = a.summary.netPay;
+          bValue = b.summary.netPay;
+          break;
+        case "deductions":
+          aValue = a.summary.totalDeductions;
+          bValue = b.summary.totalDeductions;
+          break;
+        case "department":
+          aValue = a.employee.department;
+          bValue = b.employee.department;
+          break;
+        case "period":
+          aValue = new Date(a.period.year, a.period.month - 1);
+          bValue = new Date(b.period.year, b.period.month - 1);
+          break;
+        default:
+          aValue = new Date(a.createdAt);
+          bValue = new Date(b.createdAt);
+      }
+
+      if (sortOrder === "asc") {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+
+    // Pagination
+    const totalPayslips = sortedPayslips.length;
+    const totalPages = Math.ceil(totalPayslips / limit);
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + parseInt(limit);
+    const paginatedPayslips = sortedPayslips.slice(startIndex, endIndex);
+
+    res.status(200).json({
+      success: true,
+      message: "Payslips retrieved successfully",
+      data: {
+        payslips: paginatedPayslips,
+        total: totalPayslips,
+        totalPages,
+        currentPage: parseInt(page),
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+        filters: {
+          month,
+          year,
+          scope,
+          frequency,
+          department,
+          employeeId,
+          employeeName,
+          searchTerm,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error getting payslips:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error getting payslips",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Search payslips across all payrolls
+// @route   GET /api/payroll/search-payslips
+// @access  Private (Super Admin, HOD)
+const searchPayslips = async (req, res) => {
+  try {
+    const {
+      month,
+      year,
+      scope,
+      frequency,
+      department,
+      employeeId,
+      employeeName,
+      searchTerm,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+    } = req.query;
+
+    // Check user permissions
+    const isSuperAdmin = req.user.role && req.user.role.level >= 1000;
+    const isHOD = req.user.role && req.user.role.level >= 700;
+
+    // Build filters object
+    const filters = {
+      month,
+      year,
+      scope,
+      frequency,
+      department,
+      employeeId,
+      employeeName,
+      searchTerm,
+    };
+
+    // For HOD, restrict to their department
+    if (isHOD && !isSuperAdmin) {
+      if (req.user.department) {
+        filters.department = req.user.department._id.toString();
+      } else {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. HOD must be assigned to a department.",
+        });
+      }
+    }
+
+    const payslipService = new PayslipService();
+    const payslips = await payslipService.getPayslipsByFilters(filters);
+
+    // Transform payslips to frontend format
+    const transformedPayslips = payslips.map((payslip) => ({
+      id: payslip._id,
+      payrollId: payslip.payrollId._id,
+      employee: {
+        id: payslip.employee._id,
+        name: `${payslip.employee.firstName} ${payslip.employee.lastName}`,
+        employeeId: payslip.employee.employeeId,
+        email: payslip.employee.email,
+        department: payslip.employee.department?.name || "N/A",
+        role: payslip.employee.role?.name || "N/A",
+      },
+      period: {
+        month: payslip.period.month,
+        year: payslip.period.year,
+        monthName: payslip.period.monthName,
+        frequency: payslip.period.frequency,
+      },
+      scope: payslip.scope,
+      summary: {
+        grossPay: payslip.summary.grossPay,
+        netPay: payslip.summary.netPay,
+        totalDeductions: payslip.summary.totalDeductions,
+        taxableIncome: payslip.summary.taxableIncome,
+      },
+      baseSalary: payslip.baseSalary,
+      allowances: payslip.personalAllowances,
+      bonuses: payslip.personalBonuses,
+      deductions: payslip.voluntaryDeductions,
+      taxBreakdown: {
+        paye: payslip.paye,
+        pension: payslip.pension,
+        nhis: payslip.nhis,
+      },
+      status: payslip.status,
+      payslipUrl: `/api/payroll/payslips/${payslip.payrollId._id}/view/${payslip.employee._id}`,
+      downloadUrl: `/api/payroll/payslips/${payslip.payrollId._id}/download/${payslip.employee._id}`,
+      resendUrl: `/api/payroll/payslips/${payslip.payrollId._id}/resend/${payslip.employee._id}`,
+      createdAt: payslip.createdAt,
+      updatedAt: payslip.updatedAt,
+    }));
+
+    // Sort payslips
+    const sortedPayslips = transformedPayslips.sort((a, b) => {
+      let aValue, bValue;
+
+      switch (sortBy) {
+        case "employeeName":
+          aValue = a.employee.name;
+          bValue = b.employee.name;
+          break;
+        case "employeeId":
+          aValue = a.employee.employeeId;
+          bValue = b.employee.employeeId;
+          break;
+        case "grossPay":
+          aValue = a.summary.grossPay;
+          bValue = b.summary.grossPay;
+          break;
+        case "netPay":
+          aValue = a.summary.netPay;
+          bValue = b.summary.netPay;
+          break;
+        case "deductions":
+          aValue = a.summary.totalDeductions;
+          bValue = b.summary.totalDeductions;
+          break;
+        case "department":
+          aValue = a.employee.department;
+          bValue = b.employee.department;
+          break;
+        case "period":
+          aValue = new Date(a.period.year, a.period.month - 1);
+          bValue = new Date(b.period.year, b.period.month - 1);
+          break;
+        default:
+          aValue = new Date(a.createdAt);
+          bValue = new Date(b.createdAt);
+      }
+
+      if (sortOrder === "asc") {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Payslips search completed successfully",
+      data: {
+        payslips: sortedPayslips,
+        total: sortedPayslips.length,
+        filters: {
+          month,
+          year,
+          scope,
+          frequency,
+          department,
+          employeeId,
+          employeeName,
+          searchTerm,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error searching payslips:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error searching payslips",
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Get payslips for a specific payroll
 // @route   GET /api/payroll/payslips/:payrollId
 // @access  Private (Super Admin, HOD)
@@ -927,7 +1227,7 @@ const getPayslips = async (req, res) => {
     // Check if user has access to this payroll
     if (
       savedPayroll.createdBy.toString() !== req.user._id.toString() &&
-      !req.user.role.includes("SUPER_ADMIN")
+      !(req.user.role && req.user.role.level >= 1000)
     ) {
       return res.status(403).json({
         success: false,
@@ -1138,7 +1438,18 @@ const viewPayslip = async (req, res) => {
       employeePayroll.employee
     );
 
-    // Set response headers for PDF viewing
+    try {
+      const payslips = await payslipService.getPayslipsByFilters({
+        payrollId: savedPayroll._id.toString(),
+        employeeId: employeeId,
+      });
+      if (payslips && payslips.length > 0) {
+        await payslipService.markPayslipAsViewed(payslips[0]._id);
+      }
+    } catch (error) {
+      console.error("Error marking payslip as viewed:", error);
+    }
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
@@ -1146,117 +1457,12 @@ const viewPayslip = async (req, res) => {
     );
     res.setHeader("Cache-Control", "public, max-age=3600");
 
-    // Send the PDF file
     res.sendFile(payslipFile.filePath);
   } catch (error) {
     console.error("Error viewing payslip:", error);
     res.status(500).json({
       success: false,
       message: "Error viewing payslip",
-      error: error.message,
-    });
-  }
-};
-
-// @desc    Download payslip PDF
-// @route   GET /api/payroll/payslips/:payrollId/download/:employeeId
-// @access  Private (Super Admin, HOD, Employee)
-const downloadPayslip = async (req, res) => {
-  try {
-    const { payrollId, employeeId } = req.params;
-
-    // Validate input
-    if (!payrollId || !employeeId) {
-      return res.status(400).json({
-        success: false,
-        message: "Payroll ID and Employee ID are required",
-      });
-    }
-
-    const savedPayroll = await PayrollService.getPayrollById(payrollId);
-    if (!savedPayroll) {
-      return res.status(404).json({
-        success: false,
-        message: "Payroll not found",
-      });
-    }
-
-    // Find the specific employee payroll
-    const employeePayroll = savedPayroll.payrolls.find(
-      (p) => p.employee._id.toString() === employeeId
-    );
-
-    if (!employeePayroll) {
-      return res.status(404).json({
-        success: false,
-        message: "Employee payroll not found",
-      });
-    }
-
-    // Check access permissions
-    const isOwner =
-      savedPayroll.createdBy &&
-      savedPayroll.createdBy.toString() === req.user._id.toString();
-    const isSuperAdmin = req.user.role && req.user.role.level >= 1000;
-    const isEmployee =
-      employeePayroll.employee._id.toString() === req.user._id.toString();
-    const isHOD = req.user.role && req.user.role.level >= 700;
-
-    // For HOD, check if they can access this specific employee's department
-    const canHODAccess =
-      isHOD &&
-      // HOD can access if employee is in their department
-      ((employeePayroll.employee.department &&
-        req.user.department &&
-        employeePayroll.employee.department._id.toString() ===
-          req.user.department._id.toString()) ||
-        // Or if HOD is the manager of the employee's department
-        (employeePayroll.employee.department &&
-          employeePayroll.employee.department.manager &&
-          employeePayroll.employee.department.manager.toString() ===
-            req.user._id.toString()));
-
-    if (!isOwner && !isSuperAdmin && !isEmployee && !canHODAccess) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied to this payslip",
-      });
-    }
-
-    // Generate payslip PDF
-    const payslipService = new PayslipService();
-    const payslipPayrollData = {
-      period: {
-        month: savedPayroll.month,
-        year: savedPayroll.year,
-        monthName: getMonthName(savedPayroll.month),
-        frequency: savedPayroll.frequency || "monthly",
-      },
-      scope: savedPayroll.scope,
-      payrolls: [employeePayroll],
-      payrollId: savedPayroll._id,
-    };
-
-    const payslipFile = await payslipService.generatePayslipPDF(
-      payslipPayrollData,
-      employeePayroll.employee
-    );
-
-    // Set response headers for PDF download
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${payslipFile.fileName}"`
-    );
-    res.setHeader("Cache-Control", "no-cache");
-
-    // Send the PDF file
-    res.sendFile(payslipFile.filePath);
-  } catch (error) {
-    console.error("Error downloading payslip:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error downloading payslip",
       error: error.message,
     });
   }
@@ -1298,10 +1504,9 @@ const resendPayslip = async (req, res) => {
       });
     }
 
-    // Check if user has access to this payroll
     if (
       savedPayroll.createdBy.toString() !== req.user._id.toString() &&
-      !req.user.role.includes("SUPER_ADMIN")
+      !(req.user.role && req.user.role.level >= 1000)
     ) {
       return res.status(403).json({
         success: false,
@@ -1355,6 +1560,307 @@ const resendPayslip = async (req, res) => {
   }
 };
 
+// @desc    Download payslip PDF
+// @route   GET /api/payroll/payslips/:payrollId/download/:employeeId
+// @access  Private (Super Admin, HOD, Employee - own payslip only)
+const downloadPayslip = async (req, res) => {
+  try {
+    const { payrollId, employeeId } = req.params;
+
+    // Helper function to get month name
+    const getMonthName = (month) => {
+      const months = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ];
+      return months[month - 1] || "Unknown";
+    };
+
+    // Validate input
+    if (!payrollId || !employeeId) {
+      return res.status(400).json({
+        success: false,
+        message: "Payroll ID and Employee ID are required",
+      });
+    }
+
+    // Get the saved payroll data
+    const Payroll = (await import("../models/Payroll.js")).default;
+    const savedPayroll = await Payroll.findById(payrollId);
+
+    if (!savedPayroll) {
+      return res.status(404).json({
+        success: false,
+        message: "Payroll not found",
+      });
+    }
+
+    let employeePayroll = null;
+
+    if (savedPayroll.payrolls && savedPayroll.payrolls.length > 0) {
+      employeePayroll = savedPayroll.payrolls.find(
+        (p) => p.employee._id.toString() === employeeId
+      );
+    } else if (
+      savedPayroll.employee &&
+      savedPayroll.employee._id.toString() === employeeId
+    ) {
+      const employee = savedPayroll.employee;
+      employeePayroll = {
+        employee: employee,
+        baseSalary: savedPayroll.baseSalary,
+        grossSalary: savedPayroll.grossSalary,
+        netSalary: savedPayroll.netSalary,
+        totalDeductions: savedPayroll.totalDeductions,
+        paye: savedPayroll.paye,
+        pension: savedPayroll.pension,
+        nhis: savedPayroll.nhis,
+        personalAllowances: savedPayroll.personalAllowances,
+        personalBonuses: savedPayroll.personalBonuses,
+        voluntaryDeductions: savedPayroll.voluntaryDeductions,
+        taxableIncome: savedPayroll.taxableIncome,
+        nonTaxableAllowances: savedPayroll.nonTaxableAllowances,
+        totalAllowances: savedPayroll.totalAllowances,
+        totalBonuses: savedPayroll.totalBonuses,
+      };
+    }
+
+    if (!employeePayroll) {
+      return res.status(404).json({
+        success: false,
+        message: "Employee payroll not found",
+      });
+    }
+
+    // Permission checks
+    const isOwner =
+      savedPayroll.createdBy &&
+      savedPayroll.createdBy.toString() === req.user._id.toString();
+    const isSuperAdmin = req.user.role && req.user.role.level >= 1000;
+    const isEmployee =
+      employeePayroll.employee._id.toString() === req.user._id.toString();
+    const isHOD = req.user.role && req.user.role.level >= 700;
+
+    const canHODAccess =
+      isHOD &&
+      ((employeePayroll.employee.department &&
+        req.user.department &&
+        employeePayroll.employee.department._id.toString() ===
+          req.user.department._id.toString()) ||
+        (employeePayroll.employee.department &&
+          employeePayroll.employee.department.manager &&
+          employeePayroll.employee.department.manager.toString() ===
+            req.user._id.toString()));
+
+    if (!isOwner && !isSuperAdmin && !isEmployee && !canHODAccess) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied to this payslip",
+      });
+    }
+
+    // Generate PDF using PayslipService
+    const PayslipService = (await import("../services/payslipService.js"))
+      .default;
+    const payslipService = new PayslipService();
+
+    const payslipPayrollData = {
+      period: {
+        month: savedPayroll.month,
+        year: savedPayroll.year,
+        monthName: getMonthName(savedPayroll.month),
+        frequency: savedPayroll.frequency || "monthly",
+      },
+      scope: savedPayroll.scope,
+      payrolls: [employeePayroll],
+      payrollId: savedPayroll._id,
+    };
+
+    const payslipFile = await payslipService.generatePayslipPDF(
+      payslipPayrollData,
+      employeePayroll.employee
+    );
+
+    const fileName = `${employeePayroll.employee.firstName}_${employeePayroll.employee.lastName}_${payslipPayrollData.period.monthName}_${payslipPayrollData.period.year}_payslip.pdf`;
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.setHeader("Cache-Control", "public, max-age=3600");
+
+    res.sendFile(payslipFile.filePath);
+  } catch (error) {
+    console.error("Error downloading payslip:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error downloading payslip",
+      error: error.message,
+    });
+  }
+};
+
+// Get personal payslips for the logged-in employee
+const getPersonalPayslips = async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    const employeeId = req.user._id;
+
+    const filter = {
+      $or: [{ employee: employeeId }, { "payrolls.employee": employeeId }],
+    };
+
+    if (year && year !== "all") {
+      filter.year = parseInt(year);
+    }
+    if (month && month !== "all") {
+      filter.month = parseInt(month);
+    }
+
+    const Payroll = (await import("../models/Payroll.js")).default;
+
+    const payrolls = await Payroll.find(filter)
+      .populate({
+        path: "employee",
+        select: "firstName lastName employeeId email department role",
+        populate: [
+          { path: "department", select: "name" },
+          { path: "role", select: "name" },
+        ],
+      })
+      .populate({
+        path: "payrolls.employee",
+        select: "firstName lastName employeeId email department role",
+        populate: [
+          { path: "department", select: "name" },
+          { path: "role", select: "name" },
+        ],
+      })
+      .sort({ year: -1, month: -1 })
+      .lean();
+
+    const personalPayslips = [];
+
+    payrolls.forEach((payroll, index) => {
+      // Handle individual payrolls (direct employee field)
+      if (
+        payroll.employee &&
+        payroll.employee._id.toString() === employeeId.toString()
+      ) {
+        const payslip = {
+          id: `${payroll._id}-${employeeId}`,
+          payrollId: payroll._id,
+          employee: {
+            id: payroll.employee._id,
+            name: `${payroll.employee.firstName} ${payroll.employee.lastName}`,
+            employeeId: payroll.employee.employeeId,
+            email: payroll.employee.email,
+            department: payroll.employee.department?.name || "Not Assigned",
+            role: payroll.employee.role?.name || "Not Assigned",
+          },
+          period: {
+            month: payroll.month,
+            year: payroll.year,
+            monthName: getMonthName(payroll.month),
+            frequency: payroll.frequency,
+          },
+          scope: payroll.scope,
+          summary: {
+            grossPay: payroll.grossSalary || 0,
+            netPay: payroll.netSalary || 0,
+            totalDeductions: payroll.totalDeductions || 0,
+            taxableIncome: payroll.taxableIncome || 0,
+          },
+          baseSalary: payroll.baseSalary || 0,
+          allowances: payroll.personalAllowances || [],
+          bonuses: payroll.personalBonuses || [],
+          deductions: payroll.deductions || [],
+          taxBreakdown: {
+            paye: payroll.paye || 0,
+            pension: payroll.pension || 0,
+            nhis: payroll.nhis || 0,
+          },
+          status: "generated",
+          createdAt: payroll.createdAt,
+          updatedAt: payroll.updatedAt,
+        };
+
+        personalPayslips.push(payslip);
+      }
+
+      if (payroll.payrolls && Array.isArray(payroll.payrolls)) {
+        const employeePayroll = payroll.payrolls.find(
+          (p) => p.employee._id.toString() === employeeId.toString()
+        );
+
+        if (employeePayroll) {
+          const payslip = {
+            id: `${payroll._id}-${employeeId}`,
+            payrollId: payroll._id,
+            employee: {
+              id: employeePayroll.employee._id,
+              name: `${employeePayroll.employee.firstName} ${employeePayroll.employee.lastName}`,
+              employeeId: employeePayroll.employee.employeeId,
+              email: employeePayroll.employee.email,
+              department:
+                employeePayroll.employee.department?.name || "Not Assigned",
+              role: employeePayroll.employee.role?.name || "Not Assigned",
+            },
+            period: {
+              month: payroll.month,
+              year: payroll.year,
+              monthName: getMonthName(payroll.month),
+              frequency: payroll.frequency,
+            },
+            scope: payroll.scope,
+            summary: {
+              grossPay: employeePayroll.grossSalary || 0,
+              netPay: employeePayroll.netSalary || 0,
+              totalDeductions: employeePayroll.totalDeductions || 0,
+              taxableIncome: employeePayroll.taxableIncome || 0,
+            },
+            baseSalary: employeePayroll.baseSalary || 0,
+            allowances: employeePayroll.personalAllowances || [],
+            bonuses: employeePayroll.personalBonuses || [],
+            deductions: employeePayroll.deductions || [],
+            taxBreakdown: {
+              paye: employeePayroll.paye || 0,
+              pension: employeePayroll.pension || 0,
+              nhis: employeePayroll.nhis || 0,
+            },
+            status: "generated",
+            createdAt: payroll.createdAt,
+            updatedAt: payroll.updatedAt,
+          };
+
+          personalPayslips.push(payslip);
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      data: personalPayslips,
+      total: personalPayslips.length,
+    });
+  } catch (error) {
+    console.error("Error fetching personal payslips:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch personal payslips",
+      error: error.message,
+    });
+  }
+};
+
 export {
   processPayroll,
   processPayrollWithData,
@@ -1365,7 +1871,10 @@ export {
   getEmployeePayrollBreakdown,
   resendPayslips,
   getPayslips,
+  searchPayslips,
   viewPayslip,
-  downloadPayslip,
   resendPayslip,
+  getAllPayslips,
+  getPersonalPayslips,
+  downloadPayslip,
 };

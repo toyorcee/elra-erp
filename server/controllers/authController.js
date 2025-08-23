@@ -13,7 +13,6 @@ import {
 import WelcomeNotificationService from "../services/welcomeNotificationService.js";
 import Invitation from "../models/Invitation.js";
 
-// Helper function to notify HODs (Heads of Department)
 const notifyHODs = async (newUser, department) => {
   try {
     const hods = await User.find({
@@ -1512,21 +1511,16 @@ export const getUserModules = async (req, res) => {
       });
     }
 
-    // Get modules based on user's role and department
     let availableModules = [];
 
     console.log("🔍 [getUserModules] User role:", user.role?.name);
     console.log("🔍 [getUserModules] User department:", user.department?.name);
-    console.log(
-      "🔍 [getUserModules] User role moduleAccess:",
-      user.role?.moduleAccess
-    );
+    console.log("🔍 [getUserModules] User moduleAccess:", user.moduleAccess);
 
-    if (user.role && user.role.moduleAccess) {
-      // Get module details for each accessible module
+    if (user.moduleAccess && user.moduleAccess.length > 0) {
       const Module = (await import("../models/Module.js")).default;
 
-      for (const moduleAccess of user.role.moduleAccess) {
+      for (const moduleAccess of user.moduleAccess) {
         console.log(
           `🔍 [getUserModules] Checking module: ${moduleAccess.module}`
         );

@@ -26,29 +26,39 @@ import PerformanceBonuses from "./pages/user/modules/payroll/PerformanceBonuses"
 import DeductionsManagement from "./pages/user/modules/payroll/DeductionsManagement";
 import PayrollProcessing from "./pages/user/modules/payroll/PayrollProcessing";
 import PaySlips from "./pages/user/modules/payroll/PaySlips";
+import MyPayslips from "./pages/user/modules/self-service/MyPayslips";
+import SubmitTicket from "./pages/user/modules/self-service/SubmitTicket";
+import MyTickets from "./pages/user/modules/self-service/MyTickets";
+import ITSupport from "./pages/user/modules/self-service/ITSupport";
+import EquipmentRequests from "./pages/user/modules/self-service/EquipmentRequests";
+import MyLeaveRequests from "./pages/user/modules/self-service/MyLeaveRequests";
+import MyDocuments from "./pages/user/modules/self-service/MyDocuments";
 import PayrollReports from "./pages/user/modules/payroll/PayrollReports";
 import Notifications from "./pages/shared/Notifications";
 import Settings from "./pages/shared/Settings";
-// Admin imports commented out - admin folder deleted
-// import {
-//   Dashboard as AdminDashboard,
-//   Users,
-//   Departments,
-//   AuditLogs,
-//   Settings as AdminSettings,
-//   RoleManagement,
-// } from "./pages/admin";
-
-// import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
-// import ApprovalLevels from "./pages/admin/ApprovalLevels";
-// import WorkflowTemplates from "./pages/admin/WorkflowTemplates";
-// import {
-//   CompanyList,
-//   CreateCompany,
-//   SubscriptionManagement,
-//   PricingManagement,
-// } from "./pages/platform-admin";
-
+import ProjectList from "./pages/user/modules/projects/ProjectList";
+import ProjectAnalytics from "./pages/user/modules/projects/ProjectAnalytics";
+import ProjectTeams from "./pages/user/modules/projects/ProjectTeams";
+import ProjectReports from "./pages/user/modules/projects/ProjectReports";
+import ProjectProgress from "./pages/user/modules/projects/ProjectProgress";
+import ProjectResources from "./pages/user/modules/projects/ProjectResources";
+import ApprovalDashboard from "./pages/user/modules/projects/ApprovalDashboard";
+import TaskList from "./pages/user/modules/tasks/TaskList";
+import TaskAnalytics from "./pages/user/modules/tasks/TaskAnalytics";
+import TaskAssignments from "./pages/user/modules/tasks/TaskAssignments";
+import TaskReports from "./pages/user/modules/tasks/TaskReports";
+import InventoryList from "./pages/user/modules/inventory/InventoryList";
+import AvailableItems from "./pages/user/modules/inventory/AvailableItems";
+import MaintenanceSchedule from "./pages/user/modules/inventory/MaintenanceSchedule";
+import InventoryReports from "./pages/user/modules/inventory/InventoryReports";
+import PurchaseOrders from "./pages/user/modules/procurement/PurchaseOrders";
+import PendingApprovals from "./pages/user/modules/procurement/PendingApprovals";
+import SupplierManagement from "./pages/user/modules/procurement/SupplierManagement";
+import ProcurementReports from "./pages/user/modules/procurement/ProcurementReports";
+import FinancialTransactions from "./pages/user/modules/finance/FinancialTransactions";
+import RevenueManagement from "./pages/user/modules/finance/RevenueManagement";
+import ExpenseManagement from "./pages/user/modules/finance/ExpenseManagement";
+import FinancialReports from "./pages/user/modules/finance/FinancialReports";
 import SystemSetupOnboarding from "./pages/shared/SystemSetupOnboarding";
 import DashboardLayout from "./layouts/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -177,7 +187,90 @@ const AppRoutes = () => {
           element={<PayrollProcessing />}
         />
         <Route path="modules/payroll/payslips" element={<PaySlips />} />
+
+        <Route
+          path="modules/self-service"
+          element={<Navigate to="modules/self-service/payslips" replace />}
+        />
+        <Route path="modules/self-service/payslips" element={<MyPayslips />} />
+        <Route
+          path="modules/self-service/projects"
+          element={<div>My Projects - Coming Soon</div>}
+        />
+        <Route
+          path="modules/self-service/leave-requests"
+          element={<MyLeaveRequests />}
+        />
+        <Route
+          path="modules/self-service/documents"
+          element={<MyDocuments />}
+        />
+        <Route path="modules/self-service/tickets" element={<SubmitTicket />} />
+        <Route path="modules/self-service/my-tickets" element={<MyTickets />} />
+        <Route path="modules/self-service/it-support" element={<ITSupport />} />
+        <Route
+          path="modules/self-service/equipment"
+          element={<EquipmentRequests />}
+        />
         <Route path="modules/payroll/reports" element={<PayrollReports />} />
+
+        {/* New ERP Module Routes */}
+        <Route path="modules/projects/list" element={<ProjectList />} />
+        <Route
+          path="modules/projects/analytics"
+          element={<ProjectAnalytics />}
+        />
+        <Route path="modules/projects/teams" element={<ProjectTeams />} />
+        <Route path="modules/projects/reports" element={<ProjectReports />} />
+        <Route path="modules/projects/progress" element={<ProjectProgress />} />
+        <Route
+          path="modules/projects/resources"
+          element={<ProjectResources />}
+        />
+        <Route
+          path="modules/projects/approvals"
+          element={<ApprovalDashboard />}
+        />
+        <Route path="modules/tasks/list" element={<TaskList />} />
+        <Route path="modules/tasks/analytics" element={<TaskAnalytics />} />
+        <Route path="modules/tasks/assignments" element={<TaskAssignments />} />
+        <Route path="modules/tasks/reports" element={<TaskReports />} />
+        <Route path="modules/inventory/list" element={<InventoryList />} />
+        <Route
+          path="modules/inventory/available"
+          element={<AvailableItems />}
+        />
+        <Route
+          path="modules/inventory/maintenance"
+          element={<MaintenanceSchedule />}
+        />
+        <Route
+          path="modules/inventory/reports"
+          element={<InventoryReports />}
+        />
+        <Route path="modules/procurement/orders" element={<PurchaseOrders />} />
+        <Route
+          path="modules/procurement/approvals"
+          element={<PendingApprovals />}
+        />
+        <Route
+          path="modules/procurement/suppliers"
+          element={<SupplierManagement />}
+        />
+        <Route
+          path="modules/procurement/reports"
+          element={<ProcurementReports />}
+        />
+        <Route
+          path="modules/finance/transactions"
+          element={<FinancialTransactions />}
+        />
+        <Route path="modules/finance/revenue" element={<RevenueManagement />} />
+        <Route
+          path="modules/finance/expenses"
+          element={<ExpenseManagement />}
+        />
+        <Route path="modules/finance/reports" element={<FinancialReports />} />
       </Route>
 
       {/* Admin routes - commented out - admin folder deleted */}

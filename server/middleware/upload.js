@@ -11,7 +11,7 @@ const profilePicturesDir = path.join(uploadsDir, "profile-pictures");
 const documentsDir = path.join(uploadsDir, "documents");
 const tempDir = path.join(uploadsDir, "temp");
 
-[profilePicturesDir, documentsDir, tempDir].forEach(dir => {
+[profilePicturesDir, documentsDir, tempDir].forEach((dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -42,11 +42,16 @@ const documentStorage = multer.diskStorage({
 // File filter for images
 const imageFilter = (req, file, cb) => {
   const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-  
+
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error("Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed."), false);
+    cb(
+      new Error(
+        "Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed."
+      ),
+      false
+    );
   }
 };
 
@@ -62,11 +67,16 @@ const documentFilter = (req, file, cb) => {
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     "text/plain",
   ];
-  
+
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error("Invalid file type. Only PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, and TXT files are allowed."), false);
+    cb(
+      new Error(
+        "Invalid file type. Only PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, and TXT files are allowed."
+      ),
+      false
+    );
   }
 };
 
@@ -76,14 +86,14 @@ export const uploadProfilePicture = multer({
   limits: {
     fileSize: 5 * 1024 * 1024,
   },
-}).single("profilePicture");
+}).single("avatar");
 
 // Document upload middleware
 export const uploadDocument = multer({
   storage: documentStorage,
   fileFilter: documentFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
+    fileSize: 10 * 1024 * 1024,
   },
 }).single("document");
 
@@ -119,14 +129,14 @@ export const handleUploadError = (error, req, res, next) => {
       });
     }
   }
-  
+
   if (error.message.includes("Invalid file type")) {
     return res.status(400).json({
       success: false,
       message: error.message,
     });
   }
-  
+
   console.error("Upload error:", error);
   return res.status(500).json({
     success: false,
@@ -149,4 +159,4 @@ export const deleteFile = (filePath) => {
 
 export const getFileUrl = (filename, type = "profile-pictures") => {
   return `/uploads/${type}/${filename}`;
-}; 
+};

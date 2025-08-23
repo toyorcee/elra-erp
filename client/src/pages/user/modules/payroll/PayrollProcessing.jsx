@@ -109,7 +109,7 @@ const PayrollProcessing = () => {
         return;
       }
 
-      const payrollId = payroll.payrollIds?.[0] || payroll._id;
+      const payrollId = payroll._id; // Use the group's _id which is now a valid MongoDB ObjectId
       const payslipUrl = `/api/payroll/payslips/${payrollId}/view/${employeeId}`;
       const fullUrl = `${window.location.origin}${payslipUrl}?t=${Date.now()}`;
 
@@ -138,7 +138,7 @@ const PayrollProcessing = () => {
   const confirmResendPayslips = async () => {
     if (!selectedPayrollForResend) return;
 
-    const actualPayrollId = selectedPayrollForResend.payrollIds?.[0];
+    const actualPayrollId = selectedPayrollForResend._id;
     if (!actualPayrollId) {
       toast.error(
         "No payroll data found for resending. Please refresh and try again."

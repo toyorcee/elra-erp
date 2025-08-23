@@ -51,6 +51,14 @@ const Profile = () => {
   const [editing, setEditing] = useState(false);
   const [avatar, setAvatar] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
+
+  // Debug avatarPreview changes
+  useEffect(() => {
+    console.log(
+      "🔄 [Avatar] avatarPreview state changed to:",
+      avatarPreview ? "data URL" : "null"
+    );
+  }, [avatarPreview]);
   const [departments, setDepartments] = useState([]);
   const [roles, setRoles] = useState([]);
   const [error, setError] = useState(null);
@@ -59,6 +67,19 @@ const Profile = () => {
     loadProfile();
     loadDepartmentsAndRoles();
   }, [user]); // Only reload when user changes
+
+  // Update avatarPreview when user avatar changes
+  useEffect(() => {
+    console.log("🔄 [Avatar] User avatar changed in context:", user?.avatar);
+    console.log(
+      "🔄 [Avatar] Current avatarPreview before clearing:",
+      avatarPreview ? "has data URL" : "null"
+    );
+    if (user?.avatar) {
+      console.log("🔄 [Avatar] Clearing avatarPreview to use context avatar");
+      setAvatarPreview(null); // Clear any old preview
+    }
+  }, [user?.avatar]);
 
   const loadProfile = async () => {
     try {
@@ -72,38 +93,120 @@ const Profile = () => {
             userData.address.street || userData.address.address || "";
         }
 
+        // Handle emergency contact - parse if it's a string
+        if (
+          userData.emergencyContact &&
+          typeof userData.emergencyContact === "string"
+        ) {
+          try {
+            userData.emergencyContact = JSON.parse(userData.emergencyContact);
+          } catch (e) {
+            userData.emergencyContact = {
+              name: "",
+              relationship: "",
+              phone: "",
+            };
+          }
+        }
+
+        // Handle other fields that might be strings
+        if (userData.skills && typeof userData.skills === "string") {
+          try {
+            userData.skills = JSON.parse(userData.skills);
+          } catch (e) {
+            // Keep as string if parsing fails
+          }
+        }
+
+        if (
+          userData.certifications &&
+          typeof userData.certifications === "string"
+        ) {
+          try {
+            userData.certifications = JSON.parse(userData.certifications);
+          } catch (e) {
+            // Keep as string if parsing fails
+          }
+        }
+
+        if (
+          userData.workExperience &&
+          typeof userData.workExperience === "string"
+        ) {
+          try {
+            userData.workExperience = JSON.parse(userData.workExperience);
+          } catch (e) {
+            // Keep as string if parsing fails
+          }
+        }
+
+        if (userData.education && typeof userData.education === "string") {
+          try {
+            userData.education = JSON.parse(userData.education);
+          } catch (e) {}
+        }
+
         setProfile(userData);
         if (userData.avatar) {
           setAvatarPreview(userData.avatar);
         }
       } else {
         if (user) {
-          setProfile((prev) => ({
-            ...prev,
+          setProfile({
             firstName: user.firstName || "",
             lastName: user.lastName || "",
             email: user.email || "",
+            phone: user.phone || "",
+            dateOfBirth: user.dateOfBirth || "",
+            bio: user.bio || "",
+            address: user.address || "",
+            city: user.city || "",
+            state: user.state || "",
+            zipCode: user.zipCode || "",
+            emergencyContact: user.emergencyContact || {
+              name: "",
+              relationship: "",
+              phone: "",
+            },
+            skills: user.skills || "",
+            certifications: user.certifications || "",
+            workExperience: user.workExperience || "",
+            education: user.education || "",
             department: user.department?.name || user.department || "",
             role: user.role?.name || user.role || "",
             position: user.position || "",
-          }));
+          });
         }
       }
     } catch (error) {
       console.error("Error loading profile:", error);
       // If API fails, still pre-fill with user data from invitation
       if (user) {
-        setProfile((prev) => ({
-          ...prev,
+        setProfile({
           firstName: user.firstName || "",
           lastName: user.lastName || "",
           email: user.email || "",
+          phone: user.phone || "",
+          dateOfBirth: user.dateOfBirth || "",
+          bio: user.bio || "",
+          address: user.address || "",
+          city: user.city || "",
+          state: user.state || "",
+          zipCode: user.zipCode || "",
+          emergencyContact: user.emergencyContact || {
+            name: "",
+            relationship: "",
+            phone: "",
+          },
+          skills: user.skills || "",
+          certifications: user.certifications || "",
+          workExperience: user.workExperience || "",
+          education: user.education || "",
           department: user.department?.name || user.department || "",
           role: user.role?.name || user.role || "",
           position: user.position || "",
-        }));
+        });
       }
-      setError("Failed to load profile");
     } finally {
       setLoading(false);
     }
@@ -149,12 +252,16 @@ const Profile = () => {
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      console.log("🔄 [Avatar] File selected:", file.name, "Size:", file.size);
       setAvatar(file);
       const reader = new FileReader();
       reader.onload = (e) => {
+        console.log("🔄 [Avatar] Setting avatarPreview to data URL");
         setAvatarPreview(e.target.result);
       };
       reader.readAsDataURL(file);
+
+      handleAvatarUpload(file);
     }
   };
 
@@ -163,33 +270,184 @@ const Profile = () => {
       setSaving(true);
       setError(null);
 
-      const formData = new FormData();
+      // Only send fields that were actually changed
+      const updateData = {};
 
-      // Add basic profile data
-      Object.keys(profile).forEach((key) => {
-        if (key !== "avatar" && typeof profile[key] !== "object") {
-          formData.append(key, profile[key]);
-        }
+      console.log("🔍 [Profile] Original user data:", {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        dateOfBirth: user.dateOfBirth,
+        bio: user.bio,
+        address: user.address,
+        city: user.city,
+        state: user.state,
+        zipCode: user.zipCode,
+        emergencyContact: user.emergencyContact,
+        skills: user.skills,
+        certifications: user.certifications,
+        workExperience: user.workExperience,
+        education: user.education,
       });
 
-      // Add emergency contact
-      formData.append(
-        "emergencyContact",
-        JSON.stringify(profile.emergencyContact)
-      );
+      console.log("🔍 [Profile] Current profile data:", {
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        email: profile.email,
+        phone: profile.phone,
+        dateOfBirth: profile.dateOfBirth,
+        bio: profile.bio,
+        address: profile.address,
+        city: profile.city,
+        state: profile.state,
+        zipCode: profile.zipCode,
+        emergencyContact: profile.emergencyContact,
+        skills: profile.skills,
+        certifications: profile.certifications,
+        workExperience: profile.workExperience,
+        education: profile.education,
+      });
 
-      // Add arrays
-      formData.append("skills", JSON.stringify(profile.skills));
-      formData.append("certifications", JSON.stringify(profile.certifications));
-      formData.append("workExperience", JSON.stringify(profile.workExperience));
-      formData.append("education", JSON.stringify(profile.education));
-
-      // Add avatar if selected
-      if (avatar) {
-        formData.append("avatar", avatar);
+      // Check each field and only include if it's different from the original user data
+      if (profile.firstName !== user.firstName) {
+        updateData.firstName = profile.firstName;
+        console.log(
+          "✅ [Profile] firstName changed:",
+          user.firstName,
+          "→",
+          profile.firstName
+        );
+      }
+      if (profile.lastName !== user.lastName) {
+        updateData.lastName = profile.lastName;
+        console.log(
+          "✅ [Profile] lastName changed:",
+          user.lastName,
+          "→",
+          profile.lastName
+        );
+      }
+      if (profile.email !== user.email) {
+        updateData.email = profile.email;
+        console.log(
+          "✅ [Profile] email changed:",
+          user.email,
+          "→",
+          profile.email
+        );
+      }
+      if (profile.phone !== user.phone) {
+        updateData.phone = profile.phone;
+        console.log(
+          "✅ [Profile] phone changed:",
+          user.phone,
+          "→",
+          profile.phone
+        );
+      }
+      if (profile.dateOfBirth !== user.dateOfBirth) {
+        updateData.dateOfBirth = profile.dateOfBirth;
+        console.log(
+          "✅ [Profile] dateOfBirth changed:",
+          user.dateOfBirth,
+          "→",
+          profile.dateOfBirth
+        );
+      }
+      if (profile.bio !== user.bio) {
+        updateData.bio = profile.bio;
+        console.log("✅ [Profile] bio changed:", user.bio, "→", profile.bio);
+      }
+      if (profile.address !== user.address) {
+        updateData.address = profile.address;
+        console.log(
+          "✅ [Profile] address changed:",
+          user.address,
+          "→",
+          profile.address
+        );
+      }
+      if (profile.city !== user.city) {
+        updateData.city = profile.city;
+        console.log("✅ [Profile] city changed:", user.city, "→", profile.city);
+      }
+      if (profile.state !== user.state) {
+        updateData.state = profile.state;
+        console.log(
+          "✅ [Profile] state changed:",
+          user.state,
+          "→",
+          profile.state
+        );
+      }
+      if (profile.zipCode !== user.zipCode) {
+        updateData.zipCode = profile.zipCode;
+        console.log(
+          "✅ [Profile] zipCode changed:",
+          user.zipCode,
+          "→",
+          profile.zipCode
+        );
+      }
+      if (
+        JSON.stringify(profile.emergencyContact) !==
+        JSON.stringify(user.emergencyContact)
+      ) {
+        updateData.emergencyContact = profile.emergencyContact;
+        console.log(
+          "✅ [Profile] emergencyContact changed:",
+          user.emergencyContact,
+          "→",
+          profile.emergencyContact
+        );
+      }
+      if (profile.skills !== user.skills) {
+        updateData.skills = profile.skills || "";
+        console.log(
+          "✅ [Profile] skills changed:",
+          user.skills,
+          "→",
+          profile.skills
+        );
+      }
+      if (profile.certifications !== user.certifications) {
+        updateData.certifications = profile.certifications || "";
+        console.log(
+          "✅ [Profile] certifications changed:",
+          user.certifications,
+          "→",
+          profile.certifications
+        );
+      }
+      if (profile.workExperience !== user.workExperience) {
+        updateData.workExperience = profile.workExperience || "";
+        console.log(
+          "✅ [Profile] workExperience changed:",
+          user.workExperience,
+          "→",
+          profile.workExperience
+        );
+      }
+      if (profile.education !== user.education) {
+        updateData.education = profile.education || "";
+        console.log(
+          "✅ [Profile] education changed:",
+          user.education,
+          "→",
+          profile.education
+        );
       }
 
-      const response = await userModulesAPI.profile.updateProfile(formData);
+      console.log("🔄 [Profile] Final update data being sent:", updateData);
+      console.log(
+        "🔄 [Profile] Number of fields being updated:",
+        Object.keys(updateData).length
+      );
+
+      const response = await userModulesAPI.profile.updateProfileData(
+        updateData
+      );
 
       if (response.success) {
         toast.success("Profile updated successfully!");
@@ -201,11 +459,13 @@ const Profile = () => {
           const updatedUser = {
             ...user,
             ...response.data.user,
-            avatar: response.data.user.avatar || user.avatar,
           };
           console.log("🔄 Updating global user state:", updatedUser);
           updateProfile(updatedUser);
         }
+
+        // Reload profile data to show all updated fields
+        await loadProfile();
       } else {
         setError(response.message || "Failed to update profile");
       }
@@ -217,6 +477,51 @@ const Profile = () => {
     }
   };
 
+  const handleAvatarUpload = async (file) => {
+    try {
+      console.log("🔄 [Profile] Uploading avatar:", file.name);
+
+      const response = await userModulesAPI.profile.uploadAvatar(file);
+
+      if (response.success) {
+        toast.success("Profile picture updated successfully!");
+
+        console.log("🔄 [Avatar] Upload successful, response:", response.data);
+
+        // Clear the preview since the upload is complete
+        console.log(
+          "🔄 [Avatar] Clearing avatarPreview after successful upload"
+        );
+        setAvatarPreview(null);
+        console.log(
+          "🔄 [Avatar] avatarPreview cleared, should now use user.avatar"
+        );
+
+        if (response.data && response.data.user) {
+          const updatedUser = {
+            ...user,
+            avatar: response.data.user.avatar,
+          };
+          console.log(
+            "🔄 [Avatar] Updating global user state with new avatar:",
+            response.data.user.avatar
+          );
+          updateProfile(updatedUser);
+        }
+
+        // Reload profile data
+        await loadProfile();
+      } else {
+        setError(response.message || "Failed to upload profile picture");
+      }
+    } catch (error) {
+      console.error("Error uploading avatar:", error);
+      setError(
+        error.response?.data?.message || "Failed to upload profile picture"
+      );
+    }
+  };
+
   const getInitials = () => {
     const first = profile.firstName?.charAt(0) || "";
     const last = profile.lastName?.charAt(0) || "";
@@ -225,6 +530,18 @@ const Profile = () => {
 
   const getDefaultAvatar = () => {
     return defaultAvatar;
+  };
+
+  const getImageUrl = (avatarPath) => {
+    if (!avatarPath) return null;
+    if (avatarPath.startsWith("http")) return avatarPath;
+
+    const baseUrl = (
+      import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+    ).replace("/api", "");
+    const fullUrl = `${baseUrl}${avatarPath}`;
+    console.log("🖼️ [getImageUrl] Input:", avatarPath, "Output:", fullUrl);
+    return fullUrl;
   };
 
   if (loading) {
@@ -269,7 +586,7 @@ const Profile = () => {
               {!editing && (
                 <button
                   onClick={() => setEditing(true)}
-                  className="inline-flex items-center px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors font-medium"
+                  className="inline-flex items-center px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors font-medium cursor-pointer"
                 >
                   <PencilIcon className="h-4 w-4 mr-2" />
                   Edit Profile
@@ -297,15 +614,24 @@ const Profile = () => {
                   <div className="w-32 h-32 rounded-full bg-[var(--elra-primary)] flex items-center justify-center text-white text-3xl font-bold mb-4 mx-auto overflow-hidden">
                     <img
                       src={
-                        avatarPreview ||
-                        (profile.avatar
-                          ? getImageUrl(profile.avatar)
-                          : getDefaultAvatar())
+                        user?.avatar
+                          ? getImageUrl(user.avatar)
+                          : getDefaultAvatar()
                       }
                       alt="Profile"
                       className="w-32 h-32 rounded-full object-cover"
                       onError={(e) => {
+                        console.log(
+                          "❌ [Avatar] Image failed to load:",
+                          e.target.src
+                        );
                         e.target.src = getDefaultAvatar();
+                      }}
+                      onLoad={(e) => {
+                        console.log(
+                          "✅ [Avatar] Image loaded successfully:",
+                          e.target.src
+                        );
                       }}
                     />
                   </div>
@@ -325,7 +651,7 @@ const Profile = () => {
                   {profile.firstName} {profile.lastName}
                 </h2>
                 <p className="text-[var(--elra-text-secondary)]">
-                  {profile.position}
+                  {profile.position || "Position not assigned"}
                 </p>
                 <p className="text-sm text-[var(--elra-text-muted)]">
                   {profile.department?.name || profile.department || ""}
@@ -377,11 +703,11 @@ const Profile = () => {
                     <button
                       onClick={handleSave}
                       disabled={saving}
-                      className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                      className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 cursor-pointer"
                     >
                       {saving ? (
                         <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white "></div>
                           <span>Saving...</span>
                         </>
                       ) : (
@@ -479,11 +805,11 @@ const Profile = () => {
                     <input
                       type="text"
                       name="position"
-                      value={profile.position}
+                      value={profile.position || "Not assigned"}
                       onChange={handleInputChange}
-                      disabled={!editing}
-                      placeholder="e.g., Leasing Agent, Property Manager"
-                      className="w-full p-3 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 disabled:bg-gray-50"
+                      disabled={true}
+                      className="w-full p-3 border border-[var(--elra-border-primary)] rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+                      title="Position is set during invitation and cannot be edited"
                     />
                   </div>
 
@@ -627,6 +953,477 @@ const Profile = () => {
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Professional Details */}
+              <div className="mt-8">
+                <h4 className="text-md font-semibold text-[var(--elra-text-primary)] mb-4">
+                  Professional Details
+                </h4>
+                {editing ? (
+                  <div className="space-y-6">
+                    {/* Step 1: Skills */}
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="block text-sm font-medium text-[var(--elra-text-primary)]">
+                          Step 1: Skills
+                        </label>
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          1/4
+                        </span>
+                      </div>
+                      <div className="flex gap-2 mb-2">
+                        <input
+                          type="text"
+                          placeholder="Enter a skill (e.g., Project Management)"
+                          className="flex-1 p-2 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                          onKeyPress={(e) => {
+                            if (e.key === "Enter" && e.target.value.trim()) {
+                              e.preventDefault();
+                              const newSkill = e.target.value.trim();
+                              const currentSkills = profile.skills
+                                ? profile.skills.split(", ")
+                                : [];
+                              if (!currentSkills.includes(newSkill)) {
+                                setProfile((prev) => ({
+                                  ...prev,
+                                  skills:
+                                    currentSkills.length > 0
+                                      ? `${prev.skills}, ${newSkill}`
+                                      : newSkill,
+                                }));
+                              }
+                              e.target.value = "";
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="px-3 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors"
+                          onClick={(e) => {
+                            const input = e.target.previousElementSibling;
+                            if (input.value.trim()) {
+                              const newSkill = input.value.trim();
+                              const currentSkills = profile.skills
+                                ? profile.skills.split(", ")
+                                : [];
+                              if (!currentSkills.includes(newSkill)) {
+                                setProfile((prev) => ({
+                                  ...prev,
+                                  skills:
+                                    currentSkills.length > 0
+                                      ? `${prev.skills}, ${newSkill}`
+                                      : newSkill,
+                                }));
+                              }
+                              input.value = "";
+                            }
+                          }}
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {profile.skills && (
+                        <div className="flex flex-wrap gap-2">
+                          {profile.skills.split(", ").map((skill, index) => (
+                            <span
+                              key={index}
+                              className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm flex items-center gap-1"
+                            >
+                              {skill}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const skills = profile.skills
+                                    .split(", ")
+                                    .filter((_, i) => i !== index);
+                                  setProfile((prev) => ({
+                                    ...prev,
+                                    skills: skills.join(", "),
+                                  }));
+                                }}
+                                className="text-green-600 hover:text-green-800"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Step 2: Certifications */}
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="block text-sm font-medium text-[var(--elra-text-primary)]">
+                          Step 2: Certifications
+                        </label>
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          2/4
+                        </span>
+                      </div>
+                      <div className="flex gap-2 mb-2">
+                        <input
+                          type="text"
+                          placeholder="Enter a certification (e.g., PMP, ACCA)"
+                          className="flex-1 p-2 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                          onKeyPress={(e) => {
+                            if (e.key === "Enter" && e.target.value.trim()) {
+                              e.preventDefault();
+                              const newCert = e.target.value.trim();
+                              const currentCerts = profile.certifications
+                                ? profile.certifications.split(", ")
+                                : [];
+                              if (!currentCerts.includes(newCert)) {
+                                setProfile((prev) => ({
+                                  ...prev,
+                                  certifications:
+                                    currentCerts.length > 0
+                                      ? `${prev.certifications}, ${newCert}`
+                                      : newCert,
+                                }));
+                              }
+                              e.target.value = "";
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="px-3 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors"
+                          onClick={(e) => {
+                            const input = e.target.previousElementSibling;
+                            if (input.value.trim()) {
+                              const newCert = input.value.trim();
+                              const currentCerts = profile.certifications
+                                ? profile.certifications.split(", ")
+                                : [];
+                              if (!currentCerts.includes(newCert)) {
+                                setProfile((prev) => ({
+                                  ...prev,
+                                  certifications:
+                                    currentCerts.length > 0
+                                      ? `${prev.certifications}, ${newCert}`
+                                      : newCert,
+                                }));
+                              }
+                              input.value = "";
+                            }
+                          }}
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {profile.certifications && (
+                        <div className="flex flex-wrap gap-2">
+                          {profile.certifications
+                            .split(", ")
+                            .map((cert, index) => (
+                              <span
+                                key={index}
+                                className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm flex items-center gap-1"
+                              >
+                                {cert}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const certs = profile.certifications
+                                      .split(", ")
+                                      .filter((_, i) => i !== index);
+                                    setProfile((prev) => ({
+                                      ...prev,
+                                      certifications: certs.join(", "),
+                                    }));
+                                  }}
+                                  className="text-blue-600 hover:text-blue-800"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Step 3: Work Experience */}
+                    <div className="border border-[var(--elra-border-primary)] p-4 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="block text-sm font-medium text-[var(--elra-text-primary)]">
+                          Step 3: Work Experience
+                        </label>
+                        <span className="text-xs bg-[var(--elra-primary)] text-white px-2 py-1 rounded">
+                          3/4
+                        </span>
+                      </div>
+                      <div className="flex gap-2 mb-2">
+                        <input
+                          type="text"
+                          placeholder="Enter work experience (e.g., Finance Director at Financial Services Ltd (2020-2023))"
+                          className="flex-1 p-2 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                          onKeyPress={(e) => {
+                            if (e.key === "Enter" && e.target.value.trim()) {
+                              e.preventDefault();
+                              const newExp = e.target.value.trim();
+                              const currentExp = profile.workExperience
+                                ? profile.workExperience.split(", ")
+                                : [];
+                              if (!currentExp.includes(newExp)) {
+                                setProfile((prev) => ({
+                                  ...prev,
+                                  workExperience:
+                                    currentExp.length > 0
+                                      ? `${prev.workExperience}, ${newExp}`
+                                      : newExp,
+                                }));
+                              }
+                              e.target.value = "";
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="px-3 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors"
+                          onClick={(e) => {
+                            const input = e.target.previousElementSibling;
+                            if (input.value.trim()) {
+                              const newExp = input.value.trim();
+                              const currentExp = profile.workExperience
+                                ? profile.workExperience.split(", ")
+                                : [];
+                              if (!currentExp.includes(newExp)) {
+                                setProfile((prev) => ({
+                                  ...prev,
+                                  workExperience:
+                                    currentExp.length > 0
+                                      ? `${prev.workExperience}, ${newExp}`
+                                      : newExp,
+                                }));
+                              }
+                              input.value = "";
+                            }
+                          }}
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {profile.workExperience && (
+                        <div className="flex flex-wrap gap-2">
+                          {profile.workExperience
+                            .split(", ")
+                            .map((exp, index) => (
+                              <span
+                                key={index}
+                                className="bg-[var(--elra-primary)] text-white px-2 py-1 rounded-full text-sm flex items-center gap-1"
+                              >
+                                {exp}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const expList = profile.workExperience
+                                      .split(", ")
+                                      .filter((_, i) => i !== index);
+                                    setProfile((prev) => ({
+                                      ...prev,
+                                      workExperience: expList.join(", "),
+                                    }));
+                                  }}
+                                  className="text-white hover:text-gray-200"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Step 4: Education */}
+                    <div className="border border-[var(--elra-border-primary)] p-4 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="block text-sm font-medium text-[var(--elra-text-primary)]">
+                          Step 4: Education
+                        </label>
+                        <span className="text-xs bg-[var(--elra-primary)] text-white px-2 py-1 rounded">
+                          4/4
+                        </span>
+                      </div>
+                      <div className="flex gap-2 mb-2">
+                        <input
+                          type="text"
+                          placeholder="Enter education (e.g., Bachelor of Science - Accounting, University of Nigeria (2014))"
+                          className="flex-1 p-2 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                          onKeyPress={(e) => {
+                            if (e.key === "Enter" && e.target.value.trim()) {
+                              e.preventDefault();
+                              const newEdu = e.target.value.trim();
+                              const currentEdu = profile.education
+                                ? profile.education.split(", ")
+                                : [];
+                              if (!currentEdu.includes(newEdu)) {
+                                setProfile((prev) => ({
+                                  ...prev,
+                                  education:
+                                    currentEdu.length > 0
+                                      ? `${prev.education}, ${newEdu}`
+                                      : newEdu,
+                                }));
+                              }
+                              e.target.value = "";
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="px-3 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors"
+                          onClick={(e) => {
+                            const input = e.target.previousElementSibling;
+                            if (input.value.trim()) {
+                              const newEdu = input.value.trim();
+                              const currentEdu = profile.education
+                                ? profile.education.split(", ")
+                                : [];
+                              if (!currentEdu.includes(newEdu)) {
+                                setProfile((prev) => ({
+                                  ...prev,
+                                  education:
+                                    currentEdu.length > 0
+                                      ? `${prev.education}, ${newEdu}`
+                                      : newEdu,
+                                }));
+                              }
+                              input.value = "";
+                            }
+                          }}
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {profile.education && (
+                        <div className="flex flex-wrap gap-2">
+                          {profile.education.split(", ").map((edu, index) => (
+                            <span
+                              key={index}
+                              className="bg-[var(--elra-primary)] text-white px-2 py-1 rounded-full text-sm flex items-center gap-1"
+                            >
+                              {edu}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const eduList = profile.education
+                                    .split(", ")
+                                    .filter((_, i) => i !== index);
+                                  setProfile((prev) => ({
+                                    ...prev,
+                                    education: eduList.join(", "),
+                                  }));
+                                }}
+                                className="text-white hover:text-gray-200"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
+                        Skills
+                      </label>
+                      <div className="p-3 border border-[var(--elra-border-primary)] rounded-lg bg-gray-50">
+                        {profile.skills ? (
+                          <div className="flex flex-wrap gap-2">
+                            {profile.skills.split(", ").map((skill, index) => (
+                              <span
+                                key={index}
+                                className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm"
+                              >
+                                {skill}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-500">No skills added</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
+                        Certifications
+                      </label>
+                      <div className="p-3 border border-[var(--elra-border-primary)] rounded-lg bg-gray-50">
+                        {profile.certifications ? (
+                          <div className="flex flex-wrap gap-2">
+                            {profile.certifications
+                              .split(", ")
+                              .map((cert, index) => (
+                                <span
+                                  key={index}
+                                  className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm"
+                                >
+                                  {cert}
+                                </span>
+                              ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-500">
+                            No certifications added
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
+                        Work Experience
+                      </label>
+                      <div className="p-3 border border-[var(--elra-border-primary)] rounded-lg">
+                        {profile.workExperience ? (
+                          <div className="flex flex-wrap gap-2">
+                            {profile.workExperience
+                              .split(", ")
+                              .map((exp, index) => (
+                                <span
+                                  key={index}
+                                  className="bg-[var(--elra-primary)] text-white px-2 py-1 rounded-full text-sm"
+                                >
+                                  {exp}
+                                </span>
+                              ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-500">
+                            No work experience added
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
+                        Education
+                      </label>
+                      <div className="p-3 border border-[var(--elra-border-primary)] rounded-lg">
+                        {profile.education ? (
+                          <div className="flex flex-wrap gap-2">
+                            {profile.education.split(", ").map((edu, index) => (
+                              <span
+                                key={index}
+                                className="bg-[var(--elra-primary)] text-white px-2 py-1 rounded-full text-sm"
+                              >
+                                {edu}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-500">
+                            No education added
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

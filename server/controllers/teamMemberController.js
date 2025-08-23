@@ -1,0 +1,537 @@
+import TeamMember from "../models/TeamMember.js";
+import Project from "../models/Project.js";
+import User from "../models/User.js";
+
+// ============================================================================
+// TEAM MEMBER CONTROLLERS
+// ============================================================================
+
+// @desc    Get all team members (with role-based filtering)
+// @route   GET /api/team-members
+// @access  Private (Manager+)
+export const getAllTeamMembers = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const { projectId, status, role } = req.query;
+
+    let query = { isActive: true };
+
+    // SUPER_ADMIN (1000) - see all team members across all projects
+    if (currentUser.role.level >= 1000) {
+      console.log("🔍 [TEAM MEMBERS] Super Admin - showing all team members");
+    }
+    // HOD (700) - see team members in their department's projects
+    else if (currentUser.role.level >= 700) {
+      if (!currentUser.department) {
+        return res.status(403).json({
+          success: false,
+          message: "You must be assigned to a department to view team members",
+        });
+      }
+
+      // Get projects in user's department
+      const departmentProjects = await Project.find({
+        isActive: true,
+        $or: [
+          { projectManager: currentUser._id },
+          { "teamMembers.user": currentUser._id },
+        ],
+      }).select("_id");
+
+      const projectIds = departmentProjects.map((p) => p._id);
+      query.project = { $in: projectIds };
+
+      console.log(
+        "🔍 [TEAM MEMBERS] HOD - showing team members for department projects"
+      );
+    }
+    // MANAGER (600) - see team members in projects they manage
+    else if (currentUser.role.level >= 600) {
+      const managedProjects = await Project.find({
+        isActive: true,
+        projectManager: currentUser._id,
+      }).select("_id");
+
+      const projectIds = managedProjects.map((p) => p._id);
+      query.project = { $in: projectIds };
+
+      console.log(
+        "🔍 [TEAM MEMBERS] Manager - showing team members for managed projects"
+      );
+    }
+    // STAFF (300) - see only their own team memberships
+    else if (currentUser.role.level >= 300) {
+      query.user = currentUser._id;
+      console.log("🔍 [TEAM MEMBERS] Staff - showing own team memberships");
+    }
+    // VIEWER (100) - see only their own team memberships
+    else if (currentUser.role.level >= 100) {
+      query.user = currentUser._id;
+      console.log("🔍 [TEAM MEMBERS] Viewer - showing own team memberships");
+    } else {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Insufficient permissions to view team members.",
+      });
+    }
+
+    // Apply filters
+    if (projectId) {
+      query.project = projectId;
+    }
+    if (status) {
+      query.status = status;
+    }
+    if (role) {
+      query.role = role;
+    }
+
+    const teamMembers = await TeamMember.find(query)
+      .populate("project", "name code status startDate endDate")
+      .populate("user", "firstName lastName email avatar department role")
+      .populate("assignedBy", "firstName lastName")
+      .sort({ assignedDate: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: teamMembers,
+      total: teamMembers.length,
+    });
+  } catch (error) {
+    console.error("❌ [TEAM MEMBERS] Get all team members error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching team members",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get team members by project
+// @route   GET /api/team-members/project/:projectId
+// @access  Private (Manager+)
+export const getTeamMembersByProject = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const currentUser = req.user;
+    const { status } = req.query;
+
+    // Check if project exists
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    // Check access permissions
+    const hasAccess = await checkProjectAccess(currentUser, project);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. You don't have permission to view this project's team.",
+      });
+    }
+
+    const options = {};
+    if (status) {
+      options.status = status;
+    }
+
+    const teamMembers = await TeamMember.getByProject(projectId, options);
+
+    res.status(200).json({
+      success: true,
+      data: teamMembers,
+      total: teamMembers.length,
+    });
+  } catch (error) {
+    console.error(
+      "❌ [TEAM MEMBERS] Get team members by project error:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Error fetching project team members",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Add team member to project
+// @route   POST /api/team-members
+// @access  Private (Manager+)
+export const addTeamMember = async (req, res) => {
+  try {
+    const {
+      projectId,
+      userId,
+      role,
+      allocationPercentage = 100,
+      permissions = {},
+    } = req.body;
+    const currentUser = req.user;
+
+    // Check if project exists
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    // Check if user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Check access permissions
+    const canManage = await checkProjectEditAccess(currentUser, project);
+    if (!canManage) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. You don't have permission to manage this project's team.",
+      });
+    }
+
+    // Check if user is already a team member
+    const existingMember = await TeamMember.findOne({
+      project: projectId,
+      user: userId,
+      isActive: true,
+    });
+
+    if (existingMember) {
+      return res.status(400).json({
+        success: false,
+        message: "User is already a team member of this project",
+      });
+    }
+
+    // Create team member
+    const teamMember = new TeamMember({
+      project: projectId,
+      user: userId,
+      role,
+      allocationPercentage,
+      permissions,
+      assignedBy: currentUser._id,
+    });
+
+    await teamMember.save();
+
+    // Populate the created team member
+    await teamMember.populate(
+      "user",
+      "firstName lastName email avatar department role"
+    );
+    await teamMember.populate("assignedBy", "firstName lastName");
+
+    res.status(201).json({
+      success: true,
+      message: "Team member added successfully",
+      data: teamMember,
+    });
+  } catch (error) {
+    console.error("❌ [TEAM MEMBERS] Add team member error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error adding team member",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Update team member
+// @route   PUT /api/team-members/:id
+// @access  Private (Manager+)
+export const updateTeamMember = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role, allocationPercentage, permissions, status } = req.body;
+    const currentUser = req.user;
+
+    const teamMember = await TeamMember.findById(id)
+      .populate("project")
+      .populate("user", "firstName lastName email");
+
+    if (!teamMember) {
+      return res.status(404).json({
+        success: false,
+        message: "Team member not found",
+      });
+    }
+
+    // Check access permissions
+    const canManage = await checkProjectEditAccess(
+      currentUser,
+      teamMember.project
+    );
+    if (!canManage) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. You don't have permission to manage this team member.",
+      });
+    }
+
+    // Update fields
+    if (role) teamMember.role = role;
+    if (allocationPercentage !== undefined)
+      teamMember.allocationPercentage = allocationPercentage;
+    if (permissions)
+      teamMember.permissions = { ...teamMember.permissions, ...permissions };
+    if (status) teamMember.status = status;
+
+    await teamMember.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Team member updated successfully",
+      data: teamMember,
+    });
+  } catch (error) {
+    console.error("❌ [TEAM MEMBERS] Update team member error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error updating team member",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Remove team member from project
+// @route   DELETE /api/team-members/:id
+// @access  Private (Manager+)
+export const removeTeamMember = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUser = req.user;
+
+    const teamMember = await TeamMember.findById(id)
+      .populate("project")
+      .populate("user", "firstName lastName email");
+
+    if (!teamMember) {
+      return res.status(404).json({
+        success: false,
+        message: "Team member not found",
+      });
+    }
+
+    // Check access permissions
+    const canManage = await checkProjectEditAccess(
+      currentUser,
+      teamMember.project
+    );
+    if (!canManage) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. You don't have permission to remove this team member.",
+      });
+    }
+
+    // Soft delete
+    teamMember.isActive = false;
+    teamMember.status = "removed";
+    await teamMember.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Team member removed successfully",
+    });
+  } catch (error) {
+    console.error("❌ [TEAM MEMBERS] Remove team member error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error removing team member",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get available users for team assignment
+// @route   GET /api/team-members/available/:projectId
+// @access  Private (Manager+)
+export const getAvailableUsers = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const currentUser = req.user;
+    const { search, department } = req.query;
+
+    // Check if project exists
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    // Check access permissions
+    const canManage = await checkProjectEditAccess(currentUser, project);
+    if (!canManage) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. You don't have permission to manage this project's team.",
+      });
+    }
+
+    // Get current team members
+    const currentTeamMembers = await TeamMember.find({
+      project: projectId,
+      isActive: true,
+    }).select("user");
+
+    const currentUserIds = currentTeamMembers.map((tm) => tm.user);
+
+    // Build user query
+    let userQuery = {
+      isActive: true,
+      _id: { $nin: currentUserIds },
+    };
+
+    // SUPER_ADMIN can see all users
+    if (currentUser.role.level >= 1000) {
+      console.log(
+        "🔍 [TEAM MEMBERS] Super Admin - showing all available users"
+      );
+    }
+    // HOD can see users in their department
+    else if (currentUser.role.level >= 700) {
+      if (!currentUser.department) {
+        return res.status(403).json({
+          success: false,
+          message: "You must be assigned to a department to view users",
+        });
+      }
+      userQuery.department = currentUser.department;
+      console.log(
+        "🔍 [TEAM MEMBERS] HOD - showing available users in department"
+      );
+    }
+    // MANAGER can see users in their department
+    else if (currentUser.role.level >= 600) {
+      if (!currentUser.department) {
+        return res.status(403).json({
+          success: false,
+          message: "You must be assigned to a department to view users",
+        });
+      }
+      userQuery.department = currentUser.department;
+      console.log(
+        "🔍 [TEAM MEMBERS] Manager - showing available users in department"
+      );
+    } else {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Insufficient permissions to view available users.",
+      });
+    }
+
+    if (department) {
+      userQuery.department = department;
+    }
+
+    if (search) {
+      userQuery.$or = [
+        { firstName: { $regex: search, $options: "i" } },
+        { lastName: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const users = await User.find(userQuery)
+      .populate("department", "name")
+      .populate("role", "name level")
+      .select("firstName lastName email avatar department role")
+      .sort({ firstName: 1, lastName: 1 })
+      .limit(50);
+
+    res.status(200).json({
+      success: true,
+      data: users,
+      total: users.length,
+    });
+  } catch (error) {
+    console.error("❌ [TEAM MEMBERS] Get available users error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching available users",
+      error: error.message,
+    });
+  }
+};
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+// Check if user has access to view project
+const checkProjectAccess = async (user, project) => {
+  // SUPER_ADMIN can access everything
+  if (user.role.level >= 1000) return true;
+
+  // HOD can access projects in their department or where they're manager
+  if (user.role.level >= 700) {
+    return (
+      project.projectManager.toString() === user._id.toString() ||
+      project.teamMembers.some(
+        (member) =>
+          member.user.toString() === user._id.toString() && member.isActive
+      ) ||
+      project.company.toString() === user.company.toString()
+    );
+  }
+
+  // MANAGER can access projects they manage
+  if (user.role.level >= 600) {
+    return project.projectManager.toString() === user._id.toString();
+  }
+
+  // STAFF can access projects they're assigned to
+  if (user.role.level >= 300) {
+    return (
+      project.projectManager.toString() === user._id.toString() ||
+      project.teamMembers.some(
+        (member) =>
+          member.user.toString() === user._id.toString() && member.isActive
+      )
+    );
+  }
+
+  return false;
+};
+
+// Check if user can edit project
+const checkProjectEditAccess = async (user, project) => {
+  // SUPER_ADMIN can edit everything
+  if (user.role.level >= 1000) return true;
+
+  // HOD can edit projects in their department or where they're manager
+  if (user.role.level >= 700) {
+    return (
+      project.projectManager.toString() === user._id.toString() ||
+      project.company.toString() === user.company.toString()
+    );
+  }
+
+  // MANAGER can edit projects they manage
+  if (user.role.level >= 600) {
+    return project.projectManager.toString() === user._id.toString();
+  }
+
+  return false;
+};

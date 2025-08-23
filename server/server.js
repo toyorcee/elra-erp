@@ -57,6 +57,13 @@ import bonusRoutes from "./routes/bonusRoutes.js";
 import deductionRoutes from "./routes/deductionRoutes.js";
 import taxBracketRoutes from "./routes/taxBrackets.js";
 import payrollRoutes from "./routes/payrollRoutes.js";
+import projectRoutes from "./routes/projects.js";
+import taskRoutes from "./routes/tasks.js";
+import teamMemberRoutes from "./routes/teamMembers.js";
+import approvalRoutes from "./routes/approvals.js";
+import inventoryRoutes from "./routes/inventory.js";
+import procurementRoutes from "./routes/procurement.js";
+import financeRoutes from "./routes/finance.js";
 
 const isValidObjectId = (id) => {
   return (
@@ -240,6 +247,13 @@ app.use("/api/bonuses", bonusRoutes);
 app.use("/api/deductions", deductionRoutes);
 app.use("/api/tax-brackets", taxBracketRoutes);
 app.use("/api/payroll", payrollRoutes);
+app.use("/api/projects", projectRoutes);
+app.use("/api/tasks", taskRoutes);
+app.use("/api/team-members", teamMemberRoutes);
+app.use("/api/approvals", approvalRoutes);
+app.use("/api/inventory", inventoryRoutes);
+app.use("/api/procurement", procurementRoutes);
+app.use("/api/finance", financeRoutes);
 
 const io = new SocketIOServer(httpServer, {
   cors: {

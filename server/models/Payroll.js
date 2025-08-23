@@ -361,6 +361,41 @@ payrollSchema.statics.getPayrollForPeriod = function (month, year) {
   }).populate("employee", "firstName lastName email employeeId department");
 };
 
+payrollSchema.pre(
+  "deleteOne",
+  { document: true, query: false },
+  async function (next) {
+    try {
+      const Payslip = mongoose.model("Payslip");
+      await Payslip.deleteMany({ payrollId: this._id });
+      next();
+    } catch (error) {
+      console.error(
+        `❌ [PAYROLL MODEL] Error cascade deleting payslips:`,
+        error
+      );
+      next(error);
+    }
+  }
+);
+
+payrollSchema.pre("findOneAndDelete", async function (next) {
+  try {
+    const Payslip = mongoose.model("Payslip");
+    const payroll = await this.model.findOne(this.getQuery());
+    if (payroll) {
+      await Payslip.deleteMany({ payrollId: payroll._id });
+      console.log(
+        `🗑️ [PAYROLL MODEL] Cascade deleted payslips for payroll: ${payroll._id}`
+      );
+    }
+    next();
+  } catch (error) {
+    console.error(`❌ [PAYROLL MODEL] Error cascade deleting payslips:`, error);
+    next(error);
+  }
+});
+
 const Payroll = mongoose.model("Payroll", payrollSchema);
 
 export default Payroll;

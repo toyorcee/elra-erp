@@ -1502,7 +1502,7 @@ const sendPayslipEmail = async ({
           
           .payslip-details {
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             margin: 15px 0;
             padding: 10px 0;
             border-top: 1px solid #e2e8f0;
@@ -1511,6 +1511,10 @@ const sendPayslipEmail = async ({
           
           .payslip-detail {
             text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
           }
           
           .detail-label {
@@ -1611,22 +1615,11 @@ const sendPayslipEmail = async ({
             </p>
             
             <div class="payslip-card">
-              <div class="payslip-icon">💰</div>
-              <div class="payslip-title">Payslip Summary</div>
+              <div class="payslip-icon" style="text-align: center; margin: 0 auto 15px; font-size: 48px;">💰</div>
+              <div class="payslip-title" style="text-align: center; font-size: 20px; font-weight: 600; color: #1f2937; margin-bottom: 15px;">Payslip Summary</div>
               
-              <div class="payslip-details">
-                <div class="payslip-detail">
-                  <div class="detail-label">Pay Period</div>
-                  <div class="detail-value">${period}</div>
-                </div>
-                <div class="payslip-detail">
-                  <div class="detail-label">Net Pay</div>
-                  <div class="detail-value">${netPay}</div>
-                </div>
-              </div>
-              
-              <div class="net-pay">
-                Net Pay: ${netPay}
+              <div style="text-align: center; margin: 20px 0;">
+                <div style="font-size: 28px; font-weight: 700; color: #059669; margin: 0;">₦${netPay ? netPay.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}</div>
               </div>
               
               <p style="color: #6b7280; font-size: 14px; margin: 15px 0;">
@@ -1635,7 +1628,7 @@ const sendPayslipEmail = async ({
             </div>
             
             <p class="message">
-              If you have any questions about your payslip, please contact your HR department or Head of Department.
+              If you have any questions about your payslip, please contact your Head of Department.
             </p>
             
             <div class="company-info">

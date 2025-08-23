@@ -285,3 +285,14 @@ export async function handleDocumentAction(docData, action) {
       throw new Error(`Unknown action: ${action}`);
   }
 }
+
+// Image URL utility function for consistent avatar/image handling
+export const getImageUrl = (avatarPath) => {
+  if (!avatarPath) return null;
+  if (avatarPath.startsWith("http")) return avatarPath;
+
+  const baseUrl = (
+    import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+  ).replace("/api", "");
+  return `${baseUrl}${avatarPath}`;
+};

@@ -517,33 +517,68 @@ export const userModulesAPI = {
       }
     },
 
-    updateProfile: async (profileData) => {
+    // Update profile form data (text fields only)
+    updateProfileData: async (profileData) => {
       try {
+        console.log("📝 [profileAPI] Updating profile data:", profileData);
+
         const response = await api.put("/profile", profileData, {
           headers: {
-            "Content-Type": "multipart/form-data",
+            "Content-Type": "application/json",
           },
         });
+
+        console.log("✅ [profileAPI] Profile data updated successfully");
         return response.data;
       } catch (error) {
-        console.error("❌ [profileAPI] Error updating profile:", error);
+        console.error("❌ [profileAPI] Error updating profile data:", error);
         throw error;
       }
     },
 
+    // Upload profile avatar only
     uploadAvatar: async (avatarFile) => {
       try {
+        console.log("📁 [profileAPI] Uploading avatar:", avatarFile.name);
+
         const formData = new FormData();
         formData.append("avatar", avatarFile);
 
-        const response = await api.post("/profile/avatar", formData, {
+        const response = await api.put("/profile/avatar", formData, {
           headers: {
             "Content-Type": "multipart/form-data",
           },
         });
+
+        console.log("✅ [profileAPI] Avatar uploaded successfully");
         return response.data;
       } catch (error) {
         console.error("❌ [profileAPI] Error uploading avatar:", error);
+        throw error;
+      }
+    },
+
+    // Legacy function for backward compatibility
+    updateProfile: async (profileData) => {
+      try {
+        const isFormData = profileData instanceof FormData;
+
+        const config = isFormData
+          ? {
+              headers: {
+                "Content-Type": "multipart/form-data",
+              },
+            }
+          : {
+              headers: {
+                "Content-Type": "application/json",
+              },
+            };
+
+        const response = await api.put("/profile", profileData, config);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [profileAPI] Error updating profile:", error);
         throw error;
       }
     },
@@ -1155,6 +1190,20 @@ export const userModulesAPI = {
       }
     },
 
+    getAllPayslips: async (searchParams = {}) => {
+      try {
+        console.log("📋 [payrollAPI] Getting all payslips:", searchParams);
+        const response = await api.get("/payroll/payslips", {
+          params: searchParams,
+        });
+        console.log("✅ [payrollAPI] All payslips response:", response.data);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [payrollAPI] Error getting all payslips:", error);
+        throw error;
+      }
+    },
+
     resendPayslips: async (payrollId, employeeIds = null) => {
       try {
         console.log("📋 [payrollAPI] Resending payslips:", {
@@ -1191,6 +1240,20 @@ export const userModulesAPI = {
       }
     },
 
+    searchPayslips: async (searchParams = {}) => {
+      try {
+        console.log("📋 [payrollAPI] Searching payslips:", searchParams);
+        const response = await api.get("/payroll/search-payslips", {
+          params: searchParams,
+        });
+        console.log("✅ [payrollAPI] Search payslips response:", response.data);
+        return response.data;
+      } catch (error) {
+        console.error("❌ [payrollAPI] Error searching payslips:", error);
+        throw error;
+      }
+    },
+
     viewPayslip: async (payrollId, employeeId) => {
       try {
         console.log("📋 [payrollAPI] Viewing payslip:", {
@@ -1210,30 +1273,23 @@ export const userModulesAPI = {
       }
     },
 
-    downloadPayslip: async (payrollId, employeeId, fileName = null) => {
+    downloadPayslip: async (payrollId, employeeId) => {
       try {
         console.log("📋 [payrollAPI] Downloading payslip:", {
           payrollId,
           employeeId,
-          fileName,
         });
-        const baseUrl =
-          import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-        const payslipUrl = `${baseUrl}/payroll/payslips/${payrollId}/download/${employeeId}`;
-
-        // Create a temporary link to download the file
-        const link = document.createElement("a");
-        link.href = payslipUrl;
-
-        if (fileName) {
-          link.download = fileName;
-        }
-
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        return { success: true, message: "Payslip download started!" };
+        const response = await api.get(
+          `/payroll/payslips/${payrollId}/download/${employeeId}`,
+          {
+            responseType: "blob",
+          }
+        );
+        console.log(
+          "✅ [payrollAPI] Download payslip response:",
+          response.data
+        );
+        return response.data;
       } catch (error) {
         console.error("❌ [payrollAPI] Error downloading payslip:", error);
         throw error;
@@ -1253,6 +1309,23 @@ export const userModulesAPI = {
         return response.data;
       } catch (error) {
         console.error("❌ [payrollAPI] Error resending payslip:", error);
+        throw error;
+      }
+    },
+
+    getPersonalPayslips: async (filters = {}) => {
+      try {
+        const params = new URLSearchParams();
+        if (filters.month && filters.month !== "all")
+          params.append("month", filters.month);
+        if (filters.year && filters.year !== "all")
+          params.append("year", filters.year);
+
+        const response = await api.get(
+          `/payroll/personal-payslips?${params.toString()}`
+        );
+        return response.data;
+      } catch (error) {
         throw error;
       }
     },

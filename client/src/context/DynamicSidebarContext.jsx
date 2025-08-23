@@ -3,7 +3,9 @@ import { useLocation } from "react-router-dom";
 import {
   getModuleSidebarConfig,
   moduleExists,
+  getModuleNavigationForRole,
 } from "../config/moduleSidebarConfig";
+import { useAuth } from "./AuthContext";
 
 const DynamicSidebarContext = createContext();
 
@@ -19,12 +21,35 @@ export const useDynamicSidebar = () => {
 
 export const DynamicSidebarProvider = ({ children }) => {
   const location = useLocation();
+  const { user } = useAuth();
   const [currentModule, setCurrentModule] = useState(null);
   const [moduleSidebarItems, setModuleSidebarItems] = useState([]);
   const [isModuleView, setIsModuleView] = useState(false);
   const [isModuleLoading, setIsModuleLoading] = useState(false);
   const [previousModule, setPreviousModule] = useState(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Get user role level for filtering
+  const getUserRoleLevel = () => {
+    if (!user) return 300;
+
+    const roleValue = user.role?.name || user.role;
+
+    switch (roleValue) {
+      case "SUPER_ADMIN":
+        return 1000;
+      case "HOD":
+        return 700;
+      case "MANAGER":
+        return 600;
+      case "STAFF":
+        return 300;
+      case "VIEWER":
+        return 100;
+      default:
+        return 300;
+    }
+  };
 
   const startModuleLoading = () => {
     setIsModuleLoading(true);
@@ -45,7 +70,11 @@ export const DynamicSidebarProvider = ({ children }) => {
     if (moduleIndex !== -1 && pathSegments[moduleIndex + 1]) {
       const moduleKey = pathSegments[moduleIndex + 1];
 
-      if (moduleExists(moduleKey)) {
+      const configKey = moduleKey.replace(/-([a-z])/g, (g) =>
+        g[1].toUpperCase()
+      );
+
+      if (moduleExists(configKey)) {
         if (currentModule !== moduleKey) {
           setPreviousModule(currentModule);
 
@@ -58,9 +87,24 @@ export const DynamicSidebarProvider = ({ children }) => {
               setCurrentModule(moduleKey);
               setIsModuleView(true);
 
-              const moduleConfig = getModuleSidebarConfig(moduleKey);
+              const moduleConfig = getModuleSidebarConfig(configKey);
               if (moduleConfig) {
-                setModuleSidebarItems(moduleConfig.sections || []);
+                const roleLevel = getUserRoleLevel();
+                const filteredSections = getModuleNavigationForRole(
+                  configKey,
+                  roleLevel
+                );
+                console.log("🔍 [DynamicSidebar] Module:", configKey);
+                console.log("🔍 [DynamicSidebar] User Role Level:", roleLevel);
+                console.log(
+                  "🔍 [DynamicSidebar] All Sections:",
+                  moduleConfig.sections
+                );
+                console.log(
+                  "🔍 [DynamicSidebar] Filtered Sections:",
+                  filteredSections
+                );
+                setModuleSidebarItems(filteredSections);
               }
 
               if (!isInitialLoad) {
@@ -105,7 +149,10 @@ export const DynamicSidebarProvider = ({ children }) => {
 
   const getCurrentModuleInfo = () => {
     if (!currentModule) return null;
-    return getModuleSidebarConfig(currentModule);
+    const configKey = currentModule.replace(/-([a-z])/g, (g) =>
+      g[1].toUpperCase()
+    );
+    return getModuleSidebarConfig(configKey);
   };
 
   const isInModuleView = () => {
@@ -117,7 +164,9 @@ export const DynamicSidebarProvider = ({ children }) => {
   };
 
   const switchToModule = (moduleKey) => {
-    if (moduleExists(moduleKey)) {
+    const configKey = moduleKey.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+
+    if (moduleExists(configKey)) {
       setPreviousModule(currentModule);
       startModuleLoading();
 
@@ -125,9 +174,14 @@ export const DynamicSidebarProvider = ({ children }) => {
         setCurrentModule(moduleKey);
         setIsModuleView(true);
 
-        const moduleConfig = getModuleSidebarConfig(moduleKey);
+        const moduleConfig = getModuleSidebarConfig(configKey);
         if (moduleConfig) {
-          setModuleSidebarItems(moduleConfig.sections || []);
+          const roleLevel = getUserRoleLevel();
+          const filteredSections = getModuleNavigationForRole(
+            configKey,
+            roleLevel
+          );
+          setModuleSidebarItems(filteredSections);
         }
 
         stopModuleLoading();

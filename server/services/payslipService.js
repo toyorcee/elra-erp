@@ -3,6 +3,7 @@ import autoTable from "jspdf-autotable";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import Payslip from "../models/Payslip.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,6 +46,326 @@ class PayslipService {
       };
     } catch (error) {
       console.error("❌ [PAYSLIP SERVICE] Error generating PDF:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save payslip to database
+   */
+  async savePayslipToDatabase(
+    payrollData,
+    employeeData,
+    payslipFile,
+    createdBy
+  ) {
+    try {
+      // Handle both name formats (firstName/lastName vs name)
+      const employeeName =
+        employeeData.firstName && employeeData.lastName
+          ? `${employeeData.firstName} ${employeeData.lastName}`
+          : employeeData.name || "Unknown Employee";
+
+      const payroll = payrollData.payrolls[0];
+
+      if (!employeeData || (!employeeData._id && !employeeData.id)) {
+        throw new Error(
+          `Invalid employee data: ${JSON.stringify(employeeData)}`
+        );
+      }
+
+      const baseSalary =
+        typeof payroll.baseSalary === "object"
+          ? payroll.baseSalary.effectiveBaseSalary
+          : payroll.baseSalary || 0;
+
+      const grossSalary = payroll.summary?.grossPay || payroll.grossSalary || 0;
+      const netSalary = payroll.summary?.netPay || payroll.netSalary || 0;
+      const totalDeductions =
+        payroll.summary?.totalDeductions || payroll.totalDeductions || 0;
+      const taxableIncome =
+        payroll.summary?.taxableIncome || payroll.taxableIncome || 0;
+
+      const paye = payroll.deductions?.paye || payroll.paye || 0;
+
+      let pension = 0;
+      let nhis = 0;
+
+      const voluntaryDeductions = payroll.voluntaryDeductions || [];
+      voluntaryDeductions.forEach((item) => {
+        if (item.category === "pension") {
+          pension = item.amount;
+        } else if (item.category === "nhis") {
+          nhis = item.amount;
+        }
+      });
+
+      // If not found in voluntaryDeductions, check in deductions.items
+      if (pension === 0 || nhis === 0) {
+        const deductionsItems = payroll.deductions?.items || [];
+        deductionsItems.forEach((item) => {
+          if (item.category === "pension" && pension === 0) {
+            pension = item.amount;
+          } else if (item.category === "nhis" && nhis === 0) {
+            nhis = item.amount;
+          }
+        });
+      }
+
+      // Fallback to direct values if not found in items
+      const fallbackPension =
+        payroll.deductions?.pension || payroll.pension || 0;
+      const fallbackNhis = payroll.deductions?.nhis || payroll.nhis || 0;
+
+      pension = pension || fallbackPension;
+      nhis = nhis || fallbackNhis;
+
+      // Map payroll items to payslip format (fixing type field)
+      const mapPayrollItems = (items) => {
+        return items.map((item) => ({
+          name: item.name,
+          amount: item.amount,
+          type: item.calculationType === "percentage" ? "percentage" : "fixed",
+        }));
+      };
+
+      const personalAllowances = mapPayrollItems(
+        payroll.allowances?.items || payroll.personalAllowances || []
+      );
+      const personalBonuses = mapPayrollItems(
+        payroll.bonuses?.items || payroll.personalBonuses || []
+      );
+      const mappedVoluntaryDeductions = mapPayrollItems(
+        payroll.deductions?.items || payroll.voluntaryDeductions || []
+      );
+
+      const nonTaxableAllowances =
+        payroll.allowances?.nonTaxable || payroll.nonTaxableAllowances || 0;
+
+      const payslipData = {
+        payrollId: payrollData.payrollId,
+        employee: employeeData._id || employeeData.id,
+        period: {
+          month: payrollData.period.month,
+          year: payrollData.period.year,
+          monthName: payrollData.period.monthName,
+          frequency: payrollData.period.frequency || "monthly",
+        },
+        scope: payrollData.scope.type || payrollData.scope,
+        baseSalary: baseSalary,
+        grossSalary: grossSalary,
+        netSalary: netSalary,
+        totalDeductions: totalDeductions,
+        taxableIncome: taxableIncome,
+        nonTaxableAllowances: nonTaxableAllowances,
+        paye: paye,
+        pension: pension,
+        nhis: nhis,
+        personalAllowances: personalAllowances,
+        personalBonuses: personalBonuses,
+        voluntaryDeductions: mappedVoluntaryDeductions,
+        summary: {
+          grossPay: grossSalary,
+          netPay: netSalary,
+          totalDeductions: totalDeductions,
+          taxableIncome: taxableIncome,
+        },
+        payslipFile: {
+          fileName: payslipFile.fileName,
+          filePath: payslipFile.filePath,
+          fileUrl: payslipFile.url,
+        },
+        status: "generated",
+        createdBy: createdBy,
+        processedBy: createdBy,
+      };
+
+      const payslip = new Payslip(payslipData);
+      await payslip.save();
+
+      return payslip;
+    } catch (error) {
+      console.error(
+        "❌ [PAYSLIP SERVICE] Error saving payslip to database:",
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Get payslips by filters
+   */
+  async getPayslipsByFilters(filters = {}) {
+    try {
+      let query = { isActive: true };
+
+      // Apply filters
+      if (filters.month && filters.month !== "all") {
+        query["period.month"] = parseInt(filters.month);
+      }
+
+      if (filters.year && filters.year !== "all") {
+        query["period.year"] = parseInt(filters.year);
+      }
+
+      if (filters.scope && filters.scope !== "all") {
+        query.scope = filters.scope;
+      }
+
+      if (filters.frequency && filters.frequency !== "all") {
+        query["period.frequency"] = filters.frequency;
+      }
+
+      if (filters.status && filters.status !== "all") {
+        query.status = filters.status;
+      }
+
+      if (filters.department && filters.department !== "all") {
+        // This will need to be handled with population
+        query["employee.department"] = filters.department;
+      }
+
+      // Build population options
+      const populateOptions = [
+        {
+          path: "employee",
+          select: "firstName lastName employeeId email avatar department role",
+          populate: [
+            {
+              path: "department",
+              select: "name code",
+            },
+            {
+              path: "role",
+              select: "name level description",
+            },
+          ],
+        },
+        {
+          path: "payrollId",
+          select: "month year scope frequency",
+        },
+        {
+          path: "createdBy",
+          select: "firstName lastName",
+        },
+      ];
+
+      // Handle search term
+      if (filters.searchTerm) {
+        const searchRegex = { $regex: filters.searchTerm, $options: "i" };
+        query.$or = [
+          { "employee.firstName": searchRegex },
+          { "employee.lastName": searchRegex },
+          { "employee.employeeId": searchRegex },
+        ];
+      }
+
+      // Handle employee ID filter
+      if (filters.employeeId) {
+        query["employee.employeeId"] = {
+          $regex: filters.employeeId,
+          $options: "i",
+        };
+      }
+
+      // Handle employee name filter
+      if (filters.employeeName) {
+        query.$or = [
+          {
+            "employee.firstName": {
+              $regex: filters.employeeName,
+              $options: "i",
+            },
+          },
+          {
+            "employee.lastName": {
+              $regex: filters.employeeName,
+              $options: "i",
+            },
+          },
+        ];
+      }
+
+      const payslips = await Payslip.find(query)
+        .populate(populateOptions)
+        .sort({ createdAt: -1 });
+
+      return payslips;
+    } catch (error) {
+      console.error(
+        "❌ [PAYSLIP SERVICE] Error getting payslips by filters:",
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Get payslip by ID
+   */
+  async getPayslipById(payslipId) {
+    try {
+      const payslip = await Payslip.findById(payslipId)
+        .populate({
+          path: "employee",
+          select: "firstName lastName employeeId email avatar department role",
+          populate: [
+            {
+              path: "department",
+              select: "name code",
+            },
+            {
+              path: "role",
+              select: "name level description",
+            },
+          ],
+        })
+        .populate("payrollId")
+        .populate("createdBy", "firstName lastName");
+
+      return payslip;
+    } catch (error) {
+      console.error("❌ [PAYSLIP SERVICE] Error getting payslip by ID:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark payslip as viewed
+   */
+  async markPayslipAsViewed(payslipId) {
+    try {
+      const payslip = await Payslip.findById(payslipId);
+      if (payslip) {
+        await payslip.markAsViewed();
+      }
+      return payslip;
+    } catch (error) {
+      console.error(
+        "❌ [PAYSLIP SERVICE] Error marking payslip as viewed:",
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Mark payslip as downloaded
+   */
+  async markPayslipAsDownloaded(payslipId) {
+    try {
+      const payslip = await Payslip.findById(payslipId);
+      if (payslip) {
+        await payslip.markAsDownloaded();
+      }
+      return payslip;
+    } catch (error) {
+      console.error(
+        "❌ [PAYSLIP SERVICE] Error marking payslip as downloaded:",
+        error
+      );
       throw error;
     }
   }
@@ -122,12 +443,13 @@ class PayslipService {
 
     // Employee Details
     doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100); // Dark gray
-    doc.text(
-      `Employee: ${employeeData.firstName} ${employeeData.lastName}`,
-      20,
-      startY
-    );
+    doc.setTextColor(100, 100, 100);
+    const employeeName =
+      employeeData.firstName && employeeData.lastName
+        ? `${employeeData.firstName} ${employeeData.lastName}`
+        : employeeData.name || "Unknown Employee";
+
+    doc.text(`Employee: ${employeeName}`, 20, startY);
     doc.text(`Employee ID: ${employeeData.employeeId}`, 20, startY + 7);
 
     let departmentName = "N/A";
@@ -183,13 +505,21 @@ class PayslipService {
     // Use ELRA green color
     const elraGreen = [13, 100, 73];
 
-    // Earnings Table
-    const earningsData = [
-      ["Basic Salary", this.formatCurrency(payroll.baseSalary)],
-    ];
+    // Get base salary - handle both object and number formats
+    const baseSalary =
+      typeof payroll.baseSalary === "object"
+        ? payroll.baseSalary.effectiveBaseSalary ||
+          payroll.baseSalary.actualBaseSalary ||
+          0
+        : payroll.baseSalary || 0;
 
-    // Personal Allowances - try multiple possible field names
-    const allowances = payroll.personalAllowances || payroll.allowances || [];
+    const earningsData = [["Basic Salary", this.formatCurrency(baseSalary)]];
+
+    const allowances =
+      payroll.allowances?.items ||
+      payroll.personalAllowances ||
+      payroll.allowances ||
+      [];
     if (allowances && allowances.length > 0) {
       allowances.forEach((allowance) => {
         earningsData.push([
@@ -199,8 +529,11 @@ class PayslipService {
       });
     }
 
-    // Personal Bonuses - try multiple possible field names
-    const bonuses = payroll.personalBonuses || payroll.bonuses || [];
+    const bonuses =
+      payroll.bonuses?.items ||
+      payroll.personalBonuses ||
+      payroll.bonuses ||
+      [];
     if (bonuses && bonuses.length > 0) {
       bonuses.forEach((bonus) => {
         earningsData.push([bonus.name, this.formatCurrency(bonus.amount)]);
@@ -248,27 +581,45 @@ class PayslipService {
     // Deductions Table
     const deductionsData = [];
 
-    // Statutory Deductions
-    if (payroll.paye > 0) {
-      deductionsData.push(["PAYE Tax", this.formatCurrency(payroll.paye)]);
+    // Statutory Deductions - get from deductions object
+    const paye = payroll.deductions?.paye || payroll.paye || 0;
+    const pension = payroll.deductions?.pension || payroll.pension || 0;
+    const nhis = payroll.deductions?.nhis || payroll.nhis || 0;
+
+    if (paye > 0) {
+      deductionsData.push(["PAYE Tax", this.formatCurrency(paye)]);
     }
 
-    if (payroll.pension > 0) {
-      deductionsData.push([
-        "Pension (8%)",
-        this.formatCurrency(payroll.pension),
-      ]);
+    if (pension > 0) {
+      deductionsData.push(["Pension (8%)", this.formatCurrency(pension)]);
     }
 
-    if (payroll.nhis > 0) {
-      deductionsData.push(["NHIS (5%)", this.formatCurrency(payroll.nhis)]);
+    if (nhis > 0) {
+      deductionsData.push(["NHIS (5%)", this.formatCurrency(nhis)]);
     }
 
-    // Voluntary Deductions - try multiple possible field names
     const voluntaryDeductions =
-      payroll.voluntaryDeductions || payroll.deductions || [];
+      payroll.deductions?.items ||
+      payroll.voluntaryDeductions ||
+      payroll.deductions ||
+      [];
     if (voluntaryDeductions && voluntaryDeductions.length > 0) {
-      voluntaryDeductions.forEach((deduction) => {
+      const nonStatutoryDeductions = voluntaryDeductions.filter((deduction) => {
+        const category = deduction.category?.toLowerCase();
+        const name = deduction.name?.toLowerCase();
+
+        return !(
+          category === "pension" ||
+          category === "nhis" ||
+          category === "paye" ||
+          name?.includes("pension") ||
+          name?.includes("nhis") ||
+          name?.includes("paye") ||
+          name?.includes("tax")
+        );
+      });
+
+      nonStatutoryDeductions.forEach((deduction) => {
         deductionsData.push([
           deduction.name,
           this.formatCurrency(deduction.amount),
@@ -314,11 +665,16 @@ class PayslipService {
     // Use ELRA green color
     const elraGreen = [13, 100, 73];
 
-    // Summary Table
+    // Summary Table - get from summary object
+    const grossPay = payroll.summary?.grossPay || payroll.grossSalary || 0;
+    const totalDeductions =
+      payroll.summary?.totalDeductions || payroll.totalDeductions || 0;
+    const netPay = payroll.summary?.netPay || payroll.netSalary || 0;
+
     const summaryData = [
-      ["Total Earnings", this.formatCurrency(payroll.grossSalary)],
-      ["Total Deductions", this.formatCurrency(payroll.totalDeductions)],
-      ["Net Pay", this.formatCurrency(payroll.netSalary)],
+      ["Total Earnings", this.formatCurrency(grossPay)],
+      ["Total Deductions", this.formatCurrency(totalDeductions)],
+      ["Net Pay", this.formatCurrency(netPay)],
     ];
 
     autoTable(doc, {
@@ -386,9 +742,8 @@ class PayslipService {
 
       const notificationService = new NotificationService();
 
-      // Send in-app notification
       await notificationService.createNotification({
-        recipient: employeeData._id,
+        recipient: employeeData._id || employeeData.id,
         type: "PAYSLIP_GENERATED",
         title: "Payslip Available",
         message: `Your payslip for ${payrollData.period.monthName} ${payrollData.period.year} is now available.`,
@@ -397,16 +752,50 @@ class PayslipService {
           payrollId: payrollData.payrollId,
           period: payrollData.period,
           payslipUrl: payslipFile.url,
-          actionUrl: `/dashboard/payslips/${payrollData.payrollId}`,
+          actionUrl: `/dashboard/modules/self-service/payslips`,
         },
       });
 
       // Send email with payslip attachment
+      const employeeName =
+        employeeData.firstName && employeeData.lastName
+          ? `${employeeData.firstName} ${employeeData.lastName}`
+          : employeeData.name || "Unknown Employee";
+
+      // Get employee email - try from employeeData first, then fetch from database
+      let employeeEmail = employeeData.email;
+      if (!employeeEmail) {
+        try {
+          const User = (await import("../models/User.js")).default;
+          const user = await User.findById(
+            employeeData._id || employeeData.id
+          ).select("email");
+          employeeEmail = user?.email;
+        } catch (fetchError) {
+          console.error(
+            "❌ [PAYSLIP SERVICE] Failed to fetch email from database:",
+            fetchError
+          );
+        }
+      }
+
+      if (!employeeEmail) {
+        throw new Error(
+          `No email found for employee ${employeeName} (ID: ${
+            employeeData._id || employeeData.id
+          })`
+        );
+      }
+
+      const payroll = payrollData.payrolls[0];
+      const netPay =
+        payroll.summary?.netPay || payroll.netSalary || payroll.netPay || 0;
+
       await emailService.sendPayslipEmail({
-        to: employeeData.email,
-        employeeName: `${employeeData.firstName} ${employeeData.lastName}`,
+        to: employeeEmail,
+        employeeName: employeeName,
         period: `${payrollData.period.monthName} ${payrollData.period.year}`,
-        netPay: payrollData.payrolls[0].netSalary,
+        netPay: netPay,
         payslipPath: payslipFile.filePath,
         payslipFileName: payslipFile.fileName,
       });

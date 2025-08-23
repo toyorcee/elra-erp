@@ -34,12 +34,26 @@ class PayrollService {
     markAsUsed = false
   ) {
     try {
+      const Payroll = (await import("../models/Payroll.js")).default;
+      const existingPayroll = await Payroll.findOne({
+        $or: [
+          { employee: employeeId, month: month, year: year },
+          { "payrolls.employee": employeeId, month: month, year: year },
+        ],
+      });
+
+      if (existingPayroll) {
+        throw new Error(
+          `Payroll already exists for employee ${employeeId} for period ${month}/${year}. Cannot process duplicate payroll.`
+        );
+      }
+
       // 1. Get employee data with role mappings
       const employee = await User.findById(employeeId)
         .populate("department", "name code")
         .populate("role", "name level")
         .select(
-          "firstName lastName employeeId department role yearsOfService salaryStep avatar"
+          "firstName lastName employeeId email department role yearsOfService salaryStep avatar"
         );
 
       if (!employee) {

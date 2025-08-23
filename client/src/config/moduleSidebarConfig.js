@@ -2,6 +2,88 @@
 // This file defines the sidebar items that appear when a specific module is selected
 
 export const moduleSidebarConfig = {
+  // ===== SELF-SERVICE MODULE =====
+  selfService: {
+    label: "Self-Service",
+    icon: "UserIcon",
+    path: "/dashboard/modules/self-service",
+    color: "text-[var(--elra-primary)]",
+    bgColor: "bg-[var(--elra-secondary-3)]",
+    borderColor: "border-[var(--elra-primary)]",
+    sections: [
+      {
+        title: "Personal",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "My Payslips",
+            icon: "DocumentTextIcon",
+            path: "/dashboard/modules/self-service/payslips",
+            required: { minLevel: 300 },
+            description: "View and download your personal payslips",
+          },
+          {
+            label: "My Documents",
+            icon: "DocumentIcon",
+            path: "/dashboard/modules/self-service/documents",
+            required: { minLevel: 300 },
+            description: "View, upload, and scan documents with OCR processing",
+          },
+          {
+            label: "My Projects",
+            icon: "FolderIcon",
+            path: "/dashboard/modules/self-service/projects",
+            required: { minLevel: 300 },
+            description: "View projects assigned to you",
+          },
+          {
+            label: "My Leave Requests",
+            icon: "ClipboardDocumentListIcon",
+            path: "/dashboard/modules/self-service/leave-requests",
+            required: { minLevel: 300 },
+            description: "View your leave and other requests",
+          },
+        ],
+      },
+      {
+        title: "Support & Requests",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Submit Ticket",
+            icon: "TicketIcon",
+            path: "/dashboard/modules/self-service/tickets",
+            required: { minLevel: 300 },
+            description: "Submit support tickets and service requests",
+          },
+          {
+            label: "My Tickets",
+            icon: "ClipboardDocumentListIcon",
+            path: "/dashboard/modules/self-service/my-tickets",
+            required: { minLevel: 300 },
+            description: "View and track your support tickets",
+          },
+          {
+            label: "IT Support",
+            icon: "Cog6ToothIcon",
+            path: "/dashboard/modules/self-service/it-support",
+            required: { minLevel: 300 },
+            description: "Request IT support and technical assistance",
+          },
+          {
+            label: "Equipment Requests",
+            icon: "CubeIcon",
+            path: "/dashboard/modules/self-service/equipment",
+            required: { minLevel: 300 },
+            description: "Request office equipment and supplies",
+          },
+        ],
+      },
+    ],
+  },
+
   // ===== HR MANAGEMENT MODULE =====
   hr: {
     label: "HR Management",
@@ -28,7 +110,7 @@ export const moduleSidebarConfig = {
       {
         title: "Employee Lifecycle",
         collapsible: true,
-        defaultExpanded: true,
+        defaultExpanded: false,
         items: [
           {
             label: "Onboarding Management",
@@ -198,11 +280,11 @@ export const moduleSidebarConfig = {
             description: "Process monthly salary payments",
           },
           {
-            label: "Pay Slips",
+            label: "Pay Slips Management",
             icon: "DocumentIcon",
             path: "/dashboard/modules/payroll/payslips",
-            required: { minLevel: 300 },
-            description: "View and download pay slips",
+            required: { minLevel: 600 },
+            description: "View and manage all pay slips across departments",
           },
           {
             label: "Payroll Reports",
@@ -216,133 +298,319 @@ export const moduleSidebarConfig = {
     ],
   },
 
-  // ===== PROCUREMENT MODULE =====
-  procurement: {
-    label: "Procurement",
-    icon: "ShoppingCartIcon",
-    path: "/dashboard/modules/procurement",
-    color: "text-purple-600",
-    bgColor: "bg-purple-50",
-    borderColor: "border-purple-200",
+  // ===== PROJECT MANAGEMENT MODULE =====
+  projects: {
+    label: "Project Management",
+    icon: "FolderIcon",
+    path: "/dashboard/modules/projects",
+    color: "text-[var(--elra-primary)]",
+    bgColor: "bg-[var(--elra-secondary-3)]",
+    borderColor: "border-[var(--elra-primary)]",
     sections: [
       {
-        title: "Purchase Management",
+        title: "Project Operations",
+        collapsible: true,
+        defaultExpanded: false,
         items: [
           {
-            label: "Purchase Requests",
-            icon: "DocumentTextIcon",
-            path: "/dashboard/modules/procurement/requests",
-            required: { minLevel: 300 },
-            description: "Create and manage purchase requests",
+            label: "All Projects",
+            icon: "FolderIcon",
+            path: "/dashboard/modules/projects/list",
+            required: { minLevel: 600 },
+            description: "View and manage all projects",
           },
           {
-            label: "Purchase Orders",
-            icon: "DocumentIcon",
-            path: "/dashboard/modules/procurement/orders",
-            required: { minLevel: 600 },
-            description: "Generate and track purchase orders",
-          },
-          {
-            label: "Approval Workflows",
-            icon: "CheckCircleIcon",
-            path: "/dashboard/modules/procurement/approvals",
-            required: { minLevel: 600 },
-            description: "Manage approval processes",
+            label: "Approval Dashboard",
+            icon: "CheckIcon",
+            path: "/dashboard/modules/projects/approvals",
+            required: { minLevel: 700 },
+            description: "Review and approve project requests",
           },
         ],
       },
       {
-        title: "Vendor Management",
+        title: "Team & Resources",
+        collapsible: true,
+        defaultExpanded: false,
         items: [
           {
-            label: "Vendor Directory",
-            icon: "BuildingStorefrontIcon",
-            path: "/dashboard/modules/procurement/vendors",
+            label: "Project Teams",
+            icon: "UserGroupIcon",
+            path: "/dashboard/modules/projects/teams",
             required: { minLevel: 600 },
-            description: "Manage supplier information",
+            description: "Manage project teams and assignments",
           },
           {
-            label: "Vendor Evaluation",
-            icon: "StarIcon",
-            path: "/dashboard/modules/procurement/vendors/evaluation",
+            label: "Resource Allocation",
+            icon: "CogIcon",
+            path: "/dashboard/modules/projects/resources",
             required: { minLevel: 600 },
-            description: "Evaluate vendor performance",
-          },
-          {
-            label: "Contract Management",
-            icon: "DocumentTextIcon",
-            path: "/dashboard/modules/procurement/contracts",
-            required: { minLevel: 600 },
-            description: "Manage vendor contracts",
+            description: "Manage resource allocation",
           },
         ],
       },
       {
-        title: "Procurement Analytics",
+        title: "Analytics & Reports",
+        collapsible: true,
+        defaultExpanded: false,
         items: [
           {
-            label: "Spend Analysis",
+            label: "Project Analytics",
             icon: "ChartBarIcon",
-            path: "/dashboard/modules/procurement/analytics/spend",
+            path: "/dashboard/modules/projects/analytics",
             required: { minLevel: 600 },
-            description: "Analyze procurement spending",
+            description: "Project performance analytics and insights",
           },
           {
-            label: "Cost Reports",
-            icon: "DocumentTextIcon",
-            path: "/dashboard/modules/procurement/reports",
+            label: "Progress Tracking",
+            icon: "ChartBarIcon",
+            path: "/dashboard/modules/projects/progress",
             required: { minLevel: 600 },
-            description: "Generate cost reports",
+            description: "Monitor project progress",
           },
           {
-            label: "Budget Tracking",
-            icon: "ChartPieIcon",
-            path: "/dashboard/modules/procurement/budget",
+            label: "Project Reports",
+            icon: "DocumentChartBarIcon",
+            path: "/dashboard/modules/projects/reports",
             required: { minLevel: 600 },
-            description: "Track procurement budgets",
+            description: "Generate project reports and summaries",
           },
         ],
       },
     ],
   },
 
-  // ===== FINANCE MODULE =====
-  finance: {
-    label: "Finance",
-    icon: "CalculatorIcon",
-    path: "/dashboard/modules/finance",
-    color: "text-amber-600",
-    bgColor: "bg-amber-50",
-    borderColor: "border-amber-200",
+  // ===== TASK MANAGEMENT MODULE =====
+  tasks: {
+    label: "Task Management",
+    icon: "ClipboardDocumentListIcon",
+    path: "/dashboard/modules/tasks",
+    color: "text-[var(--elra-primary)]",
+    bgColor: "bg-[var(--elra-secondary-3)]",
+    borderColor: "border-[var(--elra-primary)]",
     sections: [
       {
-        title: "Financial Management",
+        title: "Task Operations",
+        collapsible: true,
+        defaultExpanded: false,
         items: [
           {
-            label: "General Ledger",
-            icon: "BookOpenIcon",
-            path: "/dashboard/modules/finance/ledger",
+            label: "Task List",
+            icon: "ListBulletIcon",
+            path: "/dashboard/modules/tasks/list",
             required: { minLevel: 600 },
-            description: "Manage general ledger accounts",
+            description: "View and manage all tasks",
           },
           {
-            label: "Accounts Payable",
-            icon: "MinusCircleIcon",
-            path: "/dashboard/modules/finance/payable",
+            label: "Task Analytics",
+            icon: "ChartBarIcon",
+            path: "/dashboard/modules/tasks/analytics",
             required: { minLevel: 600 },
-            description: "Manage accounts payable",
+            description: "Task performance analytics and insights",
           },
           {
-            label: "Accounts Receivable",
-            icon: "PlusCircleIcon",
-            path: "/dashboard/modules/finance/receivable",
+            label: "Task Reports",
+            icon: "DocumentChartBarIcon",
+            path: "/dashboard/modules/tasks/reports",
             required: { minLevel: 600 },
-            description: "Manage accounts receivable",
+            description: "Generate task reports and summaries",
           },
         ],
       },
       {
-        title: "Budgeting & Planning",
+        title: "Task Management",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Task Assignments",
+            icon: "UserGroupIcon",
+            path: "/dashboard/modules/tasks/assignments",
+            required: { minLevel: 600 },
+            description: "Manage task assignments and workload",
+          },
+          {
+            label: "Task Tracking",
+            icon: "ClockIcon",
+            path: "/dashboard/modules/tasks/tracking",
+            required: { minLevel: 600 },
+            description: "Track time spent on tasks",
+          },
+        ],
+      },
+    ],
+  },
+
+  // ===== INVENTORY MANAGEMENT MODULE =====
+  inventory: {
+    label: "Inventory Management",
+    icon: "CubeIcon",
+    path: "/dashboard/modules/inventory",
+    color: "text-[var(--elra-primary)]",
+    bgColor: "bg-[var(--elra-secondary-3)]",
+    borderColor: "border-[var(--elra-primary)]",
+    sections: [
+      {
+        title: "Stock Management",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Inventory List",
+            icon: "ListBulletIcon",
+            path: "/dashboard/modules/inventory/list",
+            required: { minLevel: 600 },
+            description: "View and manage all inventory items",
+          },
+          {
+            label: "Available Items",
+            icon: "CheckCircleIcon",
+            path: "/dashboard/modules/inventory/available",
+            required: { minLevel: 600 },
+            description: "View available items for lease",
+          },
+          {
+            label: "Inventory Reports",
+            icon: "DocumentChartBarIcon",
+            path: "/dashboard/modules/inventory/reports",
+            required: { minLevel: 600 },
+            description: "Generate inventory reports and analytics",
+          },
+        ],
+      },
+      {
+        title: "Maintenance & Operations",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Maintenance Schedule",
+            icon: "WrenchScrewdriverIcon",
+            path: "/dashboard/modules/inventory/maintenance",
+            required: { minLevel: 600 },
+            description: "Manage equipment maintenance schedules",
+          },
+          {
+            label: "Asset Tracking",
+            icon: "TagIcon",
+            path: "/dashboard/modules/inventory/assets",
+            required: { minLevel: 600 },
+            description: "Track company assets",
+          },
+        ],
+      },
+    ],
+  },
+
+  // ===== PROCUREMENT MODULE =====
+  procurement: {
+    label: "Procurement",
+    icon: "ShoppingCartIcon",
+    path: "/dashboard/modules/procurement",
+    color: "text-[var(--elra-primary)]",
+    bgColor: "bg-[var(--elra-secondary-3)]",
+    borderColor: "border-[var(--elra-primary)]",
+    sections: [
+      {
+        title: "Purchase Management",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Purchase Orders",
+            icon: "ShoppingBagIcon",
+            path: "/dashboard/modules/procurement/orders",
+            required: { minLevel: 600 },
+            description: "Create and manage purchase orders",
+          },
+          {
+            label: "Pending Approvals",
+            icon: "ExclamationTriangleIcon",
+            path: "/dashboard/modules/procurement/approvals",
+            required: { minLevel: 600 },
+            description: "Review and approve pending requests",
+          },
+          {
+            label: "Procurement Reports",
+            icon: "DocumentChartBarIcon",
+            path: "/dashboard/modules/procurement/reports",
+            required: { minLevel: 600 },
+            description: "Generate procurement reports and analytics",
+          },
+        ],
+      },
+      {
+        title: "Supplier Management",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Supplier Management",
+            icon: "BuildingStorefrontIcon",
+            path: "/dashboard/modules/procurement/suppliers",
+            required: { minLevel: 600 },
+            description: "Manage suppliers and vendor relationships",
+          },
+          {
+            label: "Vendor Directory",
+            icon: "BuildingOfficeIcon",
+            path: "/dashboard/modules/procurement/vendors",
+            required: { minLevel: 600 },
+            description: "View vendor directory and information",
+          },
+        ],
+      },
+    ],
+  },
+
+  // ===== FINANCE MANAGEMENT MODULE =====
+  finance: {
+    label: "Finance Management",
+    icon: "CalculatorIcon",
+    path: "/dashboard/modules/finance",
+    color: "text-[var(--elra-primary)]",
+    bgColor: "bg-[var(--elra-secondary-3)]",
+    borderColor: "border-[var(--elra-primary)]",
+    sections: [
+      {
+        title: "Financial Operations",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Financial Transactions",
+            icon: "CurrencyDollarIcon",
+            path: "/dashboard/modules/finance/transactions",
+            required: { minLevel: 600 },
+            description: "View and manage financial transactions",
+          },
+          {
+            label: "Revenue Management",
+            icon: "ArrowTrendingUpIcon",
+            path: "/dashboard/modules/finance/revenue",
+            required: { minLevel: 600 },
+            description: "Track and manage revenue streams",
+          },
+          {
+            label: "Expense Management",
+            icon: "ArrowTrendingDownIcon",
+            path: "/dashboard/modules/finance/expenses",
+            required: { minLevel: 600 },
+            description: "Track and manage expenses",
+          },
+          {
+            label: "Financial Reports",
+            icon: "DocumentChartBarIcon",
+            path: "/dashboard/modules/finance/reports",
+            required: { minLevel: 600 },
+            description: "Generate financial reports and analytics",
+          },
+        ],
+      },
+      {
+        title: "Financial Planning",
+        collapsible: true,
+        defaultExpanded: false,
         items: [
           {
             label: "Budget Management",
@@ -352,44 +620,11 @@ export const moduleSidebarConfig = {
             description: "Create and manage budgets",
           },
           {
-            label: "Financial Planning",
-            icon: "ChartPieIcon",
-            path: "/dashboard/modules/finance/planning",
-            required: { minLevel: 600 },
-            description: "Financial planning and forecasting",
-          },
-          {
-            label: "Cost Centers",
-            icon: "BuildingOfficeIcon",
-            path: "/dashboard/modules/finance/cost-centers",
-            required: { minLevel: 600 },
-            description: "Manage cost center allocations",
-          },
-        ],
-      },
-      {
-        title: "Financial Reporting",
-        items: [
-          {
-            label: "Financial Statements",
-            icon: "DocumentTextIcon",
-            path: "/dashboard/modules/finance/statements",
-            required: { minLevel: 600 },
-            description: "Generate financial statements",
-          },
-          {
             label: "Cash Flow Analysis",
             icon: "ChartBarIcon",
             path: "/dashboard/modules/finance/cash-flow",
             required: { minLevel: 600 },
             description: "Analyze cash flow patterns",
-          },
-          {
-            label: "Audit Trails",
-            icon: "DocumentMagnifyingGlassIcon",
-            path: "/dashboard/modules/finance/audit",
-            required: { minLevel: 700 },
-            description: "Track financial transactions",
           },
         ],
       },
@@ -485,373 +720,6 @@ export const moduleSidebarConfig = {
       },
     ],
   },
-
-  // ===== PROJECTS MODULE =====
-  projects: {
-    label: "Projects",
-    icon: "FolderIcon",
-    path: "/dashboard/modules/projects",
-    color: "text-orange-600",
-    bgColor: "bg-orange-50",
-    borderColor: "border-orange-200",
-    sections: [
-      {
-        title: "Project Management",
-        items: [
-          {
-            label: "Project Planning",
-            icon: "ClipboardDocumentListIcon",
-            path: "/dashboard/modules/projects/planning",
-            required: { minLevel: 600 },
-            description: "Plan and define project scope",
-          },
-          {
-            label: "Task Management",
-            icon: "CheckCircleIcon",
-            path: "/dashboard/modules/projects/tasks",
-            required: { minLevel: 300 },
-            description: "Manage project tasks and assignments",
-          },
-          {
-            label: "Project Dashboard",
-            icon: "ChartBarIcon",
-            path: "/dashboard/modules/projects/dashboard",
-            required: { minLevel: 300 },
-            description: "View project overview and progress",
-          },
-        ],
-      },
-      {
-        title: "Team & Resources",
-        items: [
-          {
-            label: "Team Assignment",
-            icon: "UsersIcon",
-            path: "/dashboard/modules/projects/teams",
-            required: { minLevel: 600 },
-            description: "Assign team members to projects",
-          },
-          {
-            label: "Resource Allocation",
-            icon: "CogIcon",
-            path: "/dashboard/modules/projects/resources",
-            required: { minLevel: 600 },
-            description: "Manage resource allocation",
-          },
-          {
-            label: "Time Tracking",
-            icon: "ClockIcon",
-            path: "/dashboard/modules/projects/time",
-            required: { minLevel: 300 },
-            description: "Track time spent on projects",
-          },
-        ],
-      },
-      {
-        title: "Project Analytics",
-        items: [
-          {
-            label: "Progress Tracking",
-            icon: "ChartBarIcon",
-            path: "/dashboard/modules/projects/progress",
-            required: { minLevel: 600 },
-            description: "Monitor project progress",
-          },
-          {
-            label: "Project Reports",
-            icon: "DocumentTextIcon",
-            path: "/dashboard/modules/projects/reports",
-            required: { minLevel: 600 },
-            description: "Generate project reports",
-          },
-          {
-            label: "Milestone Management",
-            icon: "FlagIcon",
-            path: "/dashboard/modules/projects/milestones",
-            required: { minLevel: 600 },
-            description: "Track project milestones",
-          },
-        ],
-      },
-    ],
-  },
-
-  // ===== INVENTORY MODULE =====
-  inventory: {
-    label: "Inventory",
-    icon: "CubeIcon",
-    path: "/dashboard/modules/inventory",
-    color: "text-red-600",
-    bgColor: "bg-red-50",
-    borderColor: "border-red-200",
-    sections: [
-      {
-        title: "Stock Management",
-        items: [
-          {
-            label: "Stock Overview",
-            icon: "CubeIcon",
-            path: "/dashboard/modules/inventory/stock",
-            required: { minLevel: 300 },
-            description: "View current stock levels",
-          },
-          {
-            label: "Stock Alerts",
-            icon: "ExclamationTriangleIcon",
-            path: "/dashboard/modules/inventory/alerts",
-            required: { minLevel: 600 },
-            description: "Manage low stock alerts",
-          },
-          {
-            label: "Stock Transfers",
-            icon: "ArrowPathIcon",
-            path: "/dashboard/modules/inventory/transfers",
-            required: { minLevel: 600 },
-            description: "Handle stock transfers",
-          },
-        ],
-      },
-      {
-        title: "Asset Management",
-        items: [
-          {
-            label: "Asset Tracking",
-            icon: "TagIcon",
-            path: "/dashboard/modules/inventory/assets",
-            required: { minLevel: 600 },
-            description: "Track company assets",
-          },
-          {
-            label: "Asset Maintenance",
-            icon: "WrenchScrewdriverIcon",
-            path: "/dashboard/modules/inventory/maintenance",
-            required: { minLevel: 600 },
-            description: "Schedule asset maintenance",
-          },
-          {
-            label: "Asset Reports",
-            icon: "DocumentTextIcon",
-            path: "/dashboard/modules/inventory/asset-reports",
-            required: { minLevel: 600 },
-            description: "Generate asset reports",
-          },
-        ],
-      },
-      {
-        title: "Warehouse Operations",
-        items: [
-          {
-            label: "Warehouse Management",
-            icon: "BuildingOfficeIcon",
-            path: "/dashboard/modules/inventory/warehouses",
-            required: { minLevel: 600 },
-            description: "Manage warehouse locations",
-          },
-          {
-            label: "Inventory Reports",
-            icon: "ChartBarIcon",
-            path: "/dashboard/modules/inventory/reports",
-            required: { minLevel: 600 },
-            description: "Generate inventory reports",
-          },
-          {
-            label: "Stock Counts",
-            icon: "ClipboardDocumentCheckIcon",
-            path: "/dashboard/modules/inventory/counts",
-            required: { minLevel: 600 },
-            description: "Conduct stock counts",
-          },
-        ],
-      },
-    ],
-  },
-
-  // ===== CUSTOMER CARE MODULE =====
-  "customer-care": {
-    label: "Customer Care",
-    icon: "SupportIcon",
-    path: "/dashboard/modules/customer-care",
-    color: "text-teal-600",
-    bgColor: "bg-teal-50",
-    borderColor: "border-teal-200",
-    sections: [
-      {
-        title: "Support Management",
-        items: [
-          {
-            label: "Support Tickets",
-            icon: "TicketIcon",
-            path: "/dashboard/modules/customer-care/tickets",
-            required: { minLevel: 300 },
-            description: "Manage customer support tickets",
-          },
-          {
-            label: "Service Requests",
-            icon: "ClipboardDocumentListIcon",
-            path: "/dashboard/modules/customer-care/requests",
-            required: { minLevel: 300 },
-            description: "Handle service requests",
-          },
-          {
-            label: "Customer Database",
-            icon: "UsersIcon",
-            path: "/dashboard/modules/customer-care/customers",
-            required: { minLevel: 600 },
-            description: "Manage customer information",
-          },
-        ],
-      },
-      {
-        title: "Knowledge & Resources",
-        items: [
-          {
-            label: "Knowledge Base",
-            icon: "BookOpenIcon",
-            path: "/dashboard/modules/customer-care/knowledge",
-            required: { minLevel: 600 },
-            description: "Maintain knowledge base",
-          },
-          {
-            label: "FAQ Management",
-            icon: "QuestionMarkCircleIcon",
-            path: "/dashboard/modules/customer-care/faqs",
-            required: { minLevel: 600 },
-            description: "Manage frequently asked questions",
-          },
-          {
-            label: "Training Materials",
-            icon: "AcademicCapIcon",
-            path: "/dashboard/modules/customer-care/training",
-            required: { minLevel: 600 },
-            description: "Access training materials",
-          },
-        ],
-      },
-      {
-        title: "Customer Analytics",
-        items: [
-          {
-            label: "Customer Reports",
-            icon: "ChartBarIcon",
-            path: "/dashboard/modules/customer-care/reports",
-            required: { minLevel: 600 },
-            description: "Generate customer reports",
-          },
-          {
-            label: "SLA Management",
-            icon: "ClockIcon",
-            path: "/dashboard/modules/customer-care/sla",
-            required: { minLevel: 600 },
-            description: "Manage service level agreements",
-          },
-          {
-            label: "Feedback Management",
-            icon: "ChatBubbleLeftRightIcon",
-            path: "/dashboard/modules/customer-care/feedback",
-            required: { minLevel: 600 },
-            description: "Collect and analyze feedback",
-          },
-        ],
-      },
-    ],
-  },
-
-  // ===== DOCUMENT MANAGEMENT MODULE =====
-  documents: {
-    label: "Document Management",
-    icon: "DocumentTextIcon",
-    path: "/dashboard/modules/documents",
-    color: "text-purple-600",
-    bgColor: "bg-purple-50",
-    borderColor: "border-purple-200",
-    sections: [
-      {
-        title: "Document Operations",
-        items: [
-          {
-            label: "Upload Documents",
-            icon: "ArrowUpTrayIcon",
-            path: "/dashboard/modules/documents/upload",
-            required: { minLevel: 300 },
-            description: "Upload new documents to the system",
-          },
-          {
-            label: "Scan Documents",
-            icon: "DocumentMagnifyingGlassIcon",
-            path: "/dashboard/modules/documents/scan",
-            required: { minLevel: 300 },
-            description: "Scan and digitize physical documents",
-          },
-          {
-            label: "My Documents",
-            icon: "DocumentTextIcon",
-            path: "/dashboard/modules/documents/my-documents",
-            required: { minLevel: 300 },
-            description: "View and manage your documents",
-          },
-          {
-            label: "Document Archive",
-            icon: "ArchiveBoxIcon",
-            path: "/dashboard/modules/documents/archive",
-            required: { minLevel: 600 },
-            description: "Access archived documents",
-          },
-        ],
-      },
-      {
-        title: "Document Management",
-        items: [
-          {
-            label: "Document Workflows",
-            icon: "ClipboardDocumentCheckIcon",
-            path: "/dashboard/modules/documents/workflows",
-            required: { minLevel: 300 },
-            description: "Manage document approval workflows",
-          },
-          {
-            label: "Document Templates",
-            icon: "DocumentDuplicateIcon",
-            path: "/dashboard/modules/documents/templates",
-            required: { minLevel: 600 },
-            description: "Create and manage document templates",
-          },
-          {
-            label: "Document Categories",
-            icon: "FolderIcon",
-            path: "/dashboard/modules/documents/categories",
-            required: { minLevel: 600 },
-            description: "Organize documents by categories",
-          },
-        ],
-      },
-      {
-        title: "Document Analytics",
-        items: [
-          {
-            label: "Document Reports",
-            icon: "ChartBarIcon",
-            path: "/dashboard/modules/documents/reports",
-            required: { minLevel: 600 },
-            description: "Generate document analytics and reports",
-          },
-          {
-            label: "Document Search",
-            icon: "MagnifyingGlassIcon",
-            path: "/dashboard/modules/documents/search",
-            required: { minLevel: 300 },
-            description: "Advanced document search and filtering",
-          },
-          {
-            label: "Document Statistics",
-            icon: "ChartPieIcon",
-            path: "/dashboard/modules/documents/statistics",
-            required: { minLevel: 600 },
-            description: "View document usage statistics",
-          },
-        ],
-      },
-    ],
-  },
 };
 
 // Helper function to get module sidebar configuration
@@ -879,7 +747,9 @@ export const getModuleNavigationForRole = (moduleKey, roleLevel) => {
   moduleConfig.sections.forEach((section) => {
     const sectionItems = section.items.filter((item) => {
       // SUPER_ADMIN (1000) has access to everything
-      if (roleLevel === 1000) return true;
+      if (roleLevel === 1000) {
+        return true;
+      }
 
       // Check minimum level requirement
       if (item.required.minLevel && roleLevel < item.required.minLevel) {
@@ -896,6 +766,5 @@ export const getModuleNavigationForRole = (moduleKey, roleLevel) => {
       });
     }
   });
-
   return accessibleItems;
 };

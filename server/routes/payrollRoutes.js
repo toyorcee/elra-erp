@@ -9,16 +9,25 @@ import {
   getEmployeePayrollBreakdown,
   resendPayslips,
   getPayslips,
+  searchPayslips,
   viewPayslip,
   downloadPayslip,
   resendPayslip,
+  getAllPayslips,
+  getPersonalPayslips,
 } from "../controllers/payrollController.js";
 import { protect, checkPayrollAccess } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// Apply authentication and authorization middleware to all routes
+// Apply authentication middleware to all routes
 router.use(protect);
+
+router.get("/personal-payslips", getPersonalPayslips);
+router.get("/payslips/:payrollId/view/:employeeId", viewPayslip);
+router.get("/payslips/:payrollId/download/:employeeId", downloadPayslip);
+
+// Apply payroll access restrictions to admin routes only
 router.use(checkPayrollAccess);
 
 // Payroll processing routes
@@ -34,9 +43,10 @@ router.get("/breakdown/:employeeId", getEmployeePayrollBreakdown);
 router.post("/resend-payslips", resendPayslips);
 
 // New payslip routes
+router.get("/search-payslips", searchPayslips);
+router.get("/payslips", getAllPayslips);
 router.get("/payslips/:payrollId", getPayslips);
-router.get("/payslips/:payrollId/view/:employeeId", viewPayslip);
-router.get("/payslips/:payrollId/download/:employeeId", downloadPayslip);
+
 router.post("/payslips/:payrollId/resend/:employeeId", resendPayslip);
 
 export default router;

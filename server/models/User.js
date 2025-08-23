@@ -118,6 +118,24 @@ const userSchema = new mongoose.Schema(
         ],
       },
     ],
+    moduleAccess: [
+      {
+        module: {
+          type: String,
+          required: true,
+        },
+        permissions: [
+          {
+            type: String,
+            enum: ["view", "create", "edit", "delete", "approve", "admin"],
+          },
+        ],
+        _id: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Module",
+        },
+      },
+    ],
     refreshTokens: [
       {
         token: String,
@@ -181,6 +199,45 @@ const userSchema = new mongoose.Schema(
       city: String,
       state: String,
       postalCode: String,
+    },
+    // Additional profile fields
+    dateOfBirth: {
+      type: String,
+      trim: true,
+    },
+    bio: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+    },
+    skills: {
+      type: String,
+      trim: true,
+    },
+    certifications: {
+      type: String,
+      trim: true,
+    },
+    workExperience: {
+      type: String,
+      trim: true,
+    },
+    education: {
+      type: String,
+      trim: true,
+    },
+    // Address fields (individual for easier access)
+    city: {
+      type: String,
+      trim: true,
+    },
+    state: {
+      type: String,
+      trim: true,
+    },
+    zipCode: {
+      type: String,
+      trim: true,
     },
     emergencyContact: {
       name: String,

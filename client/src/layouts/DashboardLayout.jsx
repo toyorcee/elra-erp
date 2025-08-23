@@ -251,12 +251,27 @@ const DashboardLayout = () => {
                           <h3 className="text-sm font-semibold text-[var(--elra-text-primary)]">
                             Unread Messages
                           </h3>
-                          <button
-                            onClick={() => setShowUnreadMessagesDropdown(false)}
-                            className="text-[var(--elra-text-muted)] hover:text-[var(--elra-text-primary)]"
-                          >
-                            ×
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setShowUnreadMessagesDropdown(false);
+                                setShowMessageDropdown(true);
+                              }}
+                              className="flex items-center gap-1 text-xs text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] font-medium transition-colors"
+                              title="Open Full Chat"
+                            >
+                              <ChatBubbleLeftRightIcon className="w-3 h-3" />
+                              Chat
+                            </button>
+                            <button
+                              onClick={() =>
+                                setShowUnreadMessagesDropdown(false)
+                              }
+                              className="text-[var(--elra-text-muted)] hover:text-[var(--elra-text-primary)]"
+                            >
+                              ×
+                            </button>
+                          </div>
                         </div>
                       </div>
 

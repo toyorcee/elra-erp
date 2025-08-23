@@ -19,6 +19,10 @@ export { default as LogoutConfirmationModal } from "./LogoutConfirmationModal";
 export { default as PasswordChangeModal } from "./PasswordChangeModal";
 export { default as SendInviteButton } from "./SendInviteButton";
 
+// User Selection Components
+export { default as UserSearchSelect } from "./UserSearchSelect";
+export { default as UserMultiSelect } from "./UserMultiSelect";
+
 // ERP Shared Components (commented out until created)
 // export { default as ERPCard } from "./ERPCard";
 // export { default as ERPModuleGrid } from "./ERPModuleGrid";

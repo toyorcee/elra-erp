@@ -874,17 +874,35 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                   disabled={
                     loading ||
                     processingStatus === "previewing" ||
+                    processingStatus === "previewed" ||
+                    processingStatus === "processing" ||
+                    processingStatus === "completed" ||
                     loadingData ||
                     (formData.scope === "department" && !formData.scopeId) ||
                     (formData.scope === "individual" &&
                       selectedEmployees.length === 0)
                   }
-                  className="w-full px-4 py-2 text-sm font-medium text-white bg-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors disabled:opacity-50 flex items-center justify-center"
+                  className={`w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center ${
+                    processingStatus === "previewed" ||
+                    processingStatus === "completed"
+                      ? "text-gray-500 bg-gray-100 cursor-not-allowed"
+                      : "text-white bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)]"
+                  }`}
                 >
                   {processingStatus === "previewing" ? (
                     <>
                       <HiRefresh className="w-4 h-4 mr-2 animate-spin" />
                       Generating Preview...
+                    </>
+                  ) : processingStatus === "processing" ? (
+                    <>
+                      <HiRefresh className="w-4 h-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : processingStatus === "completed" ? (
+                    <>
+                      <HiCheckCircle className="w-4 h-4 mr-2" />
+                      Payroll Processed
                     </>
                   ) : loadingData ? (
                     <>
@@ -903,11 +921,14 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                   disabled={
                     loading ||
                     processingStatus === "processing" ||
+                    processingStatus === "completed" ||
                     !previewData ||
                     processingStatus !== "previewed"
                   }
                   className={`w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center ${
-                    processingStatus === "previewed" && previewData
+                    processingStatus === "completed"
+                      ? "text-gray-500 bg-gray-100 cursor-not-allowed"
+                      : processingStatus === "previewed" && previewData
                       ? "text-white bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)]"
                       : "text-gray-700 bg-gray-100 hover:bg-gray-200"
                   }`}
@@ -916,6 +937,11 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                     <>
                       <HiRefresh className="w-4 h-4 mr-2 animate-spin" />
                       Processing...
+                    </>
+                  ) : processingStatus === "completed" ? (
+                    <>
+                      <HiCheckCircle className="w-4 h-4 mr-2" />
+                      Payroll Processed
                     </>
                   ) : (
                     <>

@@ -43,8 +43,11 @@ import {
   XMarkIcon,
   UserIcon,
   CheckCircleIcon,
+  StarIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import { userModulesAPI } from "../../services/userModules.js";
+import { getModulesForUser } from "../../config/sidebarConfig.js";
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
@@ -92,100 +95,160 @@ const Dashboard = () => {
   };
 
   const getAccessibleModules = () => {
-    const allModules = [
-      {
+    const sidebarModules = getModulesForUser(user);
+
+    const filteredModules =
+      roleLevel === 300
+        ? sidebarModules.filter((module) => {
+            const moduleKey = module.path.split("/").pop();
+            return ["self-service", "documents", "customer-care"].includes(
+              moduleKey
+            );
+          })
+        : sidebarModules;
+
+    const moduleMap = {
+      "self-service": {
+        key: "self-service",
+        label: "Self-Service",
+        icon: UserIcon,
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-[var(--elra-secondary-3)]",
+        borderColor: "border-[var(--elra-border-primary)]",
+        description: "Personal services and self-management tools",
+      },
+      hr: {
         key: "hr",
-        label: "Human Resources",
+        label: "HR Management",
         icon: UsersIcon,
         color: "text-[var(--elra-primary)]",
         bgColor: "bg-[var(--elra-secondary-3)]",
         borderColor: "border-[var(--elra-border-primary)]",
-        minLevel: 400,
-        description: "Manage employees, recruitment, and HR processes",
+        description: "Employee records and HR processes",
       },
-      {
+      payroll: {
         key: "payroll",
-        label: "Payroll",
+        label: "Payroll Management",
         icon: CurrencyDollarIcon,
         color: "text-[var(--elra-primary)]",
         bgColor: "bg-[var(--elra-secondary-3)]",
         borderColor: "border-[var(--elra-border-primary)]",
-        minLevel: 600,
-        description: "Handle payroll processing and salary management",
+        description: "Employee payroll processing and management",
       },
-      {
+      finance: {
+        key: "finance",
+        label: "Financial Management",
+        icon: CalculatorIcon,
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-[var(--elra-secondary-3)]",
+        borderColor: "border-[var(--elra-border-primary)]",
+        description: "Financial reporting and analysis",
+      },
+      procurement: {
         key: "procurement",
         label: "Procurement",
         icon: ShoppingCartIcon,
         color: "text-[var(--elra-primary)]",
         bgColor: "bg-[var(--elra-secondary-3)]",
         borderColor: "border-[var(--elra-border-primary)]",
-        minLevel: 600,
-        description: "Manage purchasing and supplier relationships",
+        description: "Purchase requisitions and vendor management",
       },
-      {
-        key: "finance",
-        label: "Finance",
-        icon: CalculatorIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        minLevel: 600,
-        description: "Financial management and accounting",
-      },
-      {
-        key: "communication",
-        label: "Communication",
-        icon: ChatBubbleLeftRightIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        minLevel: 400,
-        description: "Internal and external communication tools",
-      },
-      {
-        key: "projects",
-        label: "Projects",
-        icon: FolderIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        minLevel: 400,
-        description: "Project management and task tracking",
-      },
-      {
-        key: "inventory",
-        label: "Inventory",
-        icon: CubeIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        minLevel: 300,
-        description: "Stock management and asset tracking",
-      },
-      {
-        key: "customer-care",
-        label: "Customer Care",
-        icon: PhoneIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        minLevel: 300,
-        description: "Customer support and service management",
-      },
-      {
+      documents: {
         key: "documents",
         label: "Document Management",
         icon: DocumentTextIcon,
         color: "text-[var(--elra-primary)]",
         bgColor: "bg-[var(--elra-secondary-3)]",
         borderColor: "border-[var(--elra-border-primary)]",
-        minLevel: 300,
         description: "Document storage, sharing and workflow",
       },
-    ];
+      projects: {
+        key: "projects",
+        label: "Project Management",
+        icon: FolderIcon,
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-[var(--elra-secondary-3)]",
+        borderColor: "border-[var(--elra-border-primary)]",
+        description: "Project planning and task management",
+      },
+      inventory: {
+        key: "inventory",
+        label: "Inventory Management",
+        icon: CubeIcon,
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-[var(--elra-secondary-3)]",
+        borderColor: "border-[var(--elra-border-primary)]",
+        description: "Stock management and asset tracking",
+      },
+      "customer-care": {
+        key: "customer-care",
+        label: "Customer Care",
+        icon: PhoneIcon,
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-[var(--elra-secondary-3)]",
+        borderColor: "border-[var(--elra-border-primary)]",
+        description:
+          "Customer support, ticket management, and service requests",
+      },
 
-    return allModules.filter((module) => hasAccess(module.minLevel));
+      it: {
+        key: "it",
+        label: "IT Management",
+        icon: CogIcon,
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-[var(--elra-secondary-3)]",
+        borderColor: "border-[var(--elra-border-primary)]",
+        description: "IT infrastructure and technical support management",
+      },
+      operations: {
+        key: "operations",
+        label: "Operations Management",
+        icon: CogIcon,
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-[var(--elra-secondary-3)]",
+        borderColor: "border-[var(--elra-border-primary)]",
+        description: "Business operations and process management",
+      },
+      sales: {
+        key: "sales",
+        label: "Sales & Marketing",
+        icon: ChartBarIcon,
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-[var(--elra-secondary-3)]",
+        borderColor: "border-[var(--elra-border-primary)]",
+        description: "Sales, marketing and customer acquisition",
+      },
+
+      legal: {
+        key: "legal",
+        label: "Legal & Compliance",
+        icon: ShieldCheckIcon,
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-[var(--elra-secondary-3)]",
+        borderColor: "border-[var(--elra-border-primary)]",
+        description: "Legal affairs and regulatory compliance",
+      },
+
+      "system-admin": {
+        key: "system-admin",
+        label: "System Administration",
+        icon: CogIcon,
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-[var(--elra-secondary-3)]",
+        borderColor: "border-[var(--elra-border-primary)]",
+        description: "System administration and management",
+      },
+    };
+
+    return filteredModules
+      .filter((module) => module.section === "erp")
+      .map((module) => {
+        const path = module.path;
+        const moduleKey = path.split("/").pop();
+        const mappedModule = moduleMap[moduleKey];
+        return mappedModule;
+      })
+      .filter(Boolean);
   };
 
   const accessibleModules = getAccessibleModules();
@@ -194,12 +257,11 @@ const Dashboard = () => {
     if (!authLoading && user) {
       const timer = setTimeout(() => {
         setIsLoading(false);
-      }, 200); // Reduced from 500ms to 200ms for better responsiveness
+      }, 200);
       return () => clearTimeout(timer);
     }
   }, [authLoading, user]);
 
-  // Update current time every second
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -208,7 +270,6 @@ const Dashboard = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Add keyboard shortcuts for navigation
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.ctrlKey || event.metaKey) {
@@ -271,7 +332,26 @@ const Dashboard = () => {
       if (currentModule !== module.key) {
         startModuleLoading();
         setTimeout(() => {
-          navigate(`/dashboard/modules/${module.key}`);
+          const firstChildPages = {
+            "self-service": "/dashboard/modules/self-service/payslips",
+            documents: "/dashboard/modules/documents",
+            "customer-care": "/dashboard/modules/customer-care",
+            hr: "/dashboard/modules/hr/employees",
+            payroll: "/dashboard/modules/payroll/processing",
+            finance: "/dashboard/modules/finance/transactions",
+            inventory: "/dashboard/modules/inventory/list",
+            procurement: "/dashboard/modules/procurement/orders",
+            projects: "/dashboard/modules/projects/list",
+            it: "/dashboard/modules/it",
+            operations: "/dashboard/modules/operations",
+            sales: "/dashboard/modules/sales",
+            legal: "/dashboard/modules/legal",
+            "system-admin": "/dashboard/modules/system-admin",
+          };
+
+          const targetPath =
+            firstChildPages[module.key] || `/dashboard/modules/${module.key}`;
+          navigate(targetPath);
         }, 100);
       }
     };
@@ -809,14 +889,342 @@ const Dashboard = () => {
           bgColor: "bg-[var(--elra-secondary-3)]",
         },
       ],
+      projects: [
+        {
+          label: "Active Projects",
+          value: "18",
+          icon: FolderIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Completed",
+          value: "45",
+          icon: CheckIcon,
+          color: "text-green-600",
+          bgColor: "bg-green-50",
+        },
+        {
+          label: "On Hold",
+          value: "3",
+          icon: ClockIcon,
+          color: "text-yellow-600",
+          bgColor: "bg-yellow-50",
+        },
+        {
+          label: "Total Budget",
+          value: "$1.2M",
+          icon: CurrencyDollarIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+      ],
+      tasks: [
+        {
+          label: "Active Tasks",
+          value: "67",
+          icon: ClipboardDocumentListIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Completed",
+          value: "234",
+          icon: CheckIcon,
+          color: "text-green-600",
+          bgColor: "bg-green-50",
+        },
+        {
+          label: "Overdue",
+          value: "8",
+          icon: ExclamationTriangleIcon,
+          color: "text-red-600",
+          bgColor: "bg-red-50",
+        },
+        {
+          label: "Assigned",
+          value: "45",
+          icon: UserIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+      ],
+      inventory: [
+        {
+          label: "Total Items",
+          value: "1,247",
+          icon: CubeIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Available",
+          value: "892",
+          icon: CheckCircleIcon,
+          color: "text-green-600",
+          bgColor: "bg-green-50",
+        },
+        {
+          label: "Leased",
+          value: "298",
+          icon: CurrencyDollarIcon,
+          color: "text-blue-600",
+          bgColor: "bg-blue-50",
+        },
+        {
+          label: "Maintenance",
+          value: "57",
+          icon: ClockIcon,
+          color: "text-orange-600",
+          bgColor: "bg-orange-50",
+        },
+      ],
+      procurement: [
+        {
+          label: "Purchase Orders",
+          value: "156",
+          icon: ShoppingCartIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Pending Approval",
+          value: "23",
+          icon: ClockIcon,
+          color: "text-yellow-600",
+          bgColor: "bg-yellow-50",
+        },
+        {
+          label: "Delivered",
+          value: "89",
+          icon: CheckIcon,
+          color: "text-green-600",
+          bgColor: "bg-green-50",
+        },
+        {
+          label: "Total Value",
+          value: "$890K",
+          icon: CurrencyDollarIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+      ],
+      "self-service": [
+        {
+          label: "My Payslips",
+          value: "12",
+          icon: DocumentTextIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "My Documents",
+          value: "8",
+          icon: DocumentTextIcon,
+          color: "text-green-600",
+          bgColor: "bg-green-50",
+        },
+        {
+          label: "My Tickets",
+          value: "3",
+          icon: ClipboardDocumentListIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "My Requests",
+          value: "5",
+          icon: ClockIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+      ],
+      it: [
+        {
+          label: "Active Tickets",
+          value: "24",
+          icon: ClipboardDocumentListIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Resolved",
+          value: "156",
+          icon: CheckIcon,
+          color: "text-green-600",
+          bgColor: "bg-green-50",
+        },
+        {
+          label: "Pending",
+          value: "8",
+          icon: ClockIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Systems",
+          value: "12",
+          icon: CogIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+      ],
+      operations: [
+        {
+          label: "Active Processes",
+          value: "18",
+          icon: CogIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Completed",
+          value: "89",
+          icon: CheckIcon,
+          color: "text-green-600",
+          bgColor: "bg-green-50",
+        },
+        {
+          label: "Efficiency",
+          value: "94%",
+          icon: ArrowTrendingUpIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Resources",
+          value: "32",
+          icon: UsersIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+      ],
+      sales: [
+        {
+          label: "Revenue",
+          value: "$1.2M",
+          icon: ArrowTrendingUpIcon,
+          color: "text-green-600",
+          bgColor: "bg-green-50",
+        },
+        {
+          label: "Leads",
+          value: "156",
+          icon: UserPlusIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Conversions",
+          value: "23",
+          icon: CheckIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Pipeline",
+          value: "$890K",
+          icon: ChartBarIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+      ],
+      "customer-care": [
+        {
+          label: "Open Tickets",
+          value: "45",
+          icon: ClipboardDocumentListIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Resolved",
+          value: "234",
+          icon: CheckIcon,
+          color: "text-green-600",
+          bgColor: "bg-green-50",
+        },
+        {
+          label: "Satisfaction",
+          value: "4.8/5",
+          icon: StarIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Response Time",
+          value: "2.3h",
+          icon: ClockIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+      ],
+      legal: [
+        {
+          label: "Active Cases",
+          value: "12",
+          icon: DocumentTextIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Compliance",
+          value: "98%",
+          icon: ShieldCheckIcon,
+          color: "text-green-600",
+          bgColor: "bg-green-50",
+        },
+        {
+          label: "Contracts",
+          value: "45",
+          icon: DocumentTextIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Risk Level",
+          value: "Low",
+          icon: ShieldCheckIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+      ],
+      "system-admin": [
+        {
+          label: "Active Users",
+          value: "156",
+          icon: UsersIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "System Health",
+          value: "99.9%",
+          icon: CheckIcon,
+          color: "text-green-600",
+          bgColor: "bg-green-50",
+        },
+        {
+          label: "Backups",
+          value: "24",
+          icon: CogIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Security",
+          value: "A+",
+          icon: ShieldCheckIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+      ],
     };
 
-    return stats[moduleKey] || stats.hr;
+    return stats[moduleKey] || [];
   };
 
-  // Get module-specific quick actions
   const getModuleQuickActions = (moduleKey) => {
-    // For HR module, use real data from API
     if (moduleKey === "hr" && hrDashboardData?.quickActions) {
       return hrDashboardData.quickActions.map((action) => ({
         label: action.title,

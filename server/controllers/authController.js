@@ -1516,11 +1516,18 @@ export const getUserModules = async (req, res) => {
     console.log("🔍 [getUserModules] User role:", user.role?.name);
     console.log("🔍 [getUserModules] User department:", user.department?.name);
     console.log("🔍 [getUserModules] User moduleAccess:", user.moduleAccess);
+    console.log(
+      "🔍 [getUserModules] Role moduleAccess:",
+      user.role?.moduleAccess
+    );
 
-    if (user.moduleAccess && user.moduleAccess.length > 0) {
+    // Use role.moduleAccess instead of user.moduleAccess
+    const moduleAccessList = user.role?.moduleAccess || [];
+
+    if (moduleAccessList.length > 0) {
       const Module = (await import("../models/Module.js")).default;
 
-      for (const moduleAccess of user.moduleAccess) {
+      for (const moduleAccess of moduleAccessList) {
         console.log(
           `🔍 [getUserModules] Checking module: ${moduleAccess.module}`
         );
@@ -1577,7 +1584,27 @@ export const getUserModules = async (req, res) => {
         }
       }
     } else {
-      console.log("❌ [getUserModules] No role or moduleAccess found");
+      console.log("❌ [getUserModules] No role moduleAccess found");
+
+      // For SUPER_ADMIN, return all modules if no moduleAccess is configured
+      if (user.role?.name === "SUPER_ADMIN") {
+        console.log(
+          "🔍 [getUserModules] SUPER_ADMIN detected, returning all modules"
+        );
+        const Module = (await import("../models/Module.js")).default;
+        const allModules = await Module.find({ isActive: true }).sort({
+          order: 1,
+        });
+
+        availableModules = allModules.map((module) => ({
+          ...module.toObject(),
+          permissions: ["view", "create", "edit", "delete", "approve", "admin"],
+        }));
+
+        console.log(
+          `✅ [getUserModules] SUPER_ADMIN: Found ${availableModules.length} modules`
+        );
+      }
     }
 
     // Sort modules by order

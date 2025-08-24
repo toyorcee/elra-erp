@@ -70,12 +70,18 @@ export const DynamicSidebarProvider = ({ children }) => {
     if (moduleIndex !== -1 && pathSegments[moduleIndex + 1]) {
       const moduleKey = pathSegments[moduleIndex + 1];
 
-      const configKey = moduleKey.replace(/-([a-z])/g, (g) =>
+      // Handle both underscores and hyphens in module names
+      let normalizedModuleKey = moduleKey;
+      if (moduleKey.includes("_")) {
+        normalizedModuleKey = moduleKey.replace(/_/g, "-");
+      }
+
+      const configKey = normalizedModuleKey.replace(/-([a-z])/g, (g) =>
         g[1].toUpperCase()
       );
 
       if (moduleExists(configKey)) {
-        if (currentModule !== moduleKey) {
+        if (currentModule !== normalizedModuleKey) {
           setPreviousModule(currentModule);
 
           if (!isInitialLoad) {
@@ -84,7 +90,7 @@ export const DynamicSidebarProvider = ({ children }) => {
 
           setTimeout(
             () => {
-              setCurrentModule(moduleKey);
+              setCurrentModule(normalizedModuleKey);
               setIsModuleView(true);
 
               const moduleConfig = getModuleSidebarConfig(configKey);
@@ -93,16 +99,6 @@ export const DynamicSidebarProvider = ({ children }) => {
                 const filteredSections = getModuleNavigationForRole(
                   configKey,
                   roleLevel
-                );
-                console.log("🔍 [DynamicSidebar] Module:", configKey);
-                console.log("🔍 [DynamicSidebar] User Role Level:", roleLevel);
-                console.log(
-                  "🔍 [DynamicSidebar] All Sections:",
-                  moduleConfig.sections
-                );
-                console.log(
-                  "🔍 [DynamicSidebar] Filtered Sections:",
-                  filteredSections
                 );
                 setModuleSidebarItems(filteredSections);
               }
@@ -222,5 +218,3 @@ export const DynamicSidebarProvider = ({ children }) => {
     </DynamicSidebarContext.Provider>
   );
 };
-
-export default DynamicSidebarContext;

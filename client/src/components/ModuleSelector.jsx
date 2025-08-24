@@ -34,7 +34,7 @@ const allModules = [
     title: "Human Resources",
     description: "Employee management, recruitment, and HR workflows",
     icon: "FaUsers",
-    path: "/dashboard/hr",
+    path: "/dashboard/modules/hr",
     isReady: true,
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF", "VIEWER"],
     processFlow: {
@@ -68,7 +68,7 @@ const allModules = [
     title: "Payroll Management",
     description: "Salary processing, benefits, and payroll reports",
     icon: "FaMoneyCheckAlt",
-    path: "/dashboard/payroll",
+    path: "/dashboard/modules/payroll",
     isReady: true,
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
     processFlow: {
@@ -102,7 +102,7 @@ const allModules = [
     title: "Procurement",
     description: "Purchase orders, vendor management, and inventory",
     icon: "FaShoppingCart",
-    path: "/dashboard/procurement",
+    path: "/dashboard/modules/procurement",
     isReady: true,
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
     processFlow: {
@@ -136,7 +136,7 @@ const allModules = [
     title: "Accounting",
     description: "Financial management, expenses, and reporting",
     icon: "FaChartLine",
-    path: "/dashboard/accounts",
+    path: "/dashboard/modules/finance",
     isReady: true,
 
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
@@ -171,7 +171,7 @@ const allModules = [
     title: "Communication",
     description: "Internal messaging, announcements, and collaboration",
     icon: "FaComments",
-    path: "/dashboard/communication",
+    path: "/dashboard/modules/operations",
     isReady: true,
 
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF", "VIEWER"],
@@ -206,7 +206,7 @@ const allModules = [
     title: "Customer Care",
     description: "Customer support, ticket management, and service requests",
     icon: "FaHeadset",
-    path: "/dashboard/customer-care",
+    path: "/dashboard/modules/customer-care",
     isReady: true,
 
     requiredRoles: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF"],
@@ -253,11 +253,9 @@ function ModuleSelector() {
 
   // Fetch all modules (for everyone to see)
   React.useEffect(() => {
-    console.log("🔍 [ModuleSelector] useEffect triggered, user:", user);
     const fetchModules = async () => {
       try {
         setLoadingModules(true);
-        console.log("🔍 [ModuleSelector] Fetching all modules...");
 
         if (user) {
           // For authenticated users, fetch their specific modules
@@ -266,14 +264,6 @@ function ModuleSelector() {
             response.data
           );
           setUserModules(transformedModules);
-          console.log(
-            "✅ [ModuleSelector] User modules loaded:",
-            transformedModules.length
-          );
-          console.log(
-            "📦 [ModuleSelector] Transformed modules:",
-            transformedModules
-          );
         } else {
           // For unauthenticated users, fetch all available modules
           const response = await userModulesAPI.getAllModules();
@@ -281,14 +271,6 @@ function ModuleSelector() {
             response.data
           );
           setUserModules(transformedModules);
-          console.log(
-            "✅ [ModuleSelector] All modules loaded:",
-            transformedModules.length
-          );
-          console.log(
-            "📦 [ModuleSelector] Transformed modules:",
-            transformedModules
-          );
         }
       } catch (error) {
         console.error("❌ [ModuleSelector] Error fetching modules:", error);
@@ -382,25 +364,37 @@ function ModuleSelector() {
   };
 
   const handleModuleClick = (module) => {
-    console.log("🔍 [ModuleSelector] Module clicked:", module);
-
     if (!user) {
-      // Store the intended destination and redirect to login
       localStorage.setItem("redirectAfterLogin", module.path);
       navigate("/login");
       return;
     }
 
-    // For authenticated users, they can access any module that's shown to them
-    // Navigate directly to the module dashboard
+    // Define first child routes for each module
+    const firstChildPages = {
+      "self-service": "/dashboard/modules/self-service/payslips",
+      documents: "/dashboard/modules/documents",
+      "customer-care": "/dashboard/modules/customer-care",
+      hr: "/dashboard/modules/hr/invitation",
+      payroll: "/dashboard/modules/payroll/salary-grades",
+      finance: "/dashboard/modules/finance/transactions",
+      inventory: "/dashboard/modules/inventory/list",
+      procurement: "/dashboard/modules/procurement/orders",
+      projects: "/dashboard/modules/projects/list",
+      it: "/dashboard/modules/it",
+      operations: "/dashboard/modules/operations",
+      sales: "/dashboard/modules/sales",
+      legal: "/dashboard/modules/legal",
+      "system-admin": "/dashboard/modules/system-admin",
+    };
 
-    // Navigate to the module dashboard
-    console.log("🚀 [ModuleSelector] Navigating to:", module.path);
-    navigate(module.path);
+    const moduleKey = module.path.split("/").pop();
+
+    const targetPath = firstChildPages[moduleKey] || module.path;
+    navigate(targetPath);
   };
 
   const handleLogin = () => {
-    // Always redirect to modules page first after login
     localStorage.setItem("redirectAfterLogin", "/modules");
     setShowModal(false);
     navigate("/login");
@@ -408,7 +402,6 @@ function ModuleSelector() {
 
   const handleExploreMore = () => {
     setShowModal(false);
-    // Continue exploring modules
   };
 
   const variants = {

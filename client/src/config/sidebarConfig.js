@@ -19,6 +19,16 @@ export const sidebarConfig = [
     required: { minLevel: 0 },
     section: "erp",
     badge: "Personal",
+    departments: ["all"], // Universal access
+  },
+  {
+    label: "Customer Care",
+    icon: "HiOutlineChatBubbleLeftRight",
+    path: "/dashboard/modules/customer-care",
+    required: { minLevel: 0 },
+    section: "erp",
+    badge: "Support",
+    departments: ["all"], // Universal access
   },
   {
     label: "HR Management",
@@ -27,6 +37,7 @@ export const sidebarConfig = [
     required: { minLevel: 300 },
     section: "erp",
     badge: "HR",
+    departments: ["Human Resources", "HR", "Personnel"], // HR departments only
   },
   {
     label: "Finance Management",
@@ -35,6 +46,12 @@ export const sidebarConfig = [
     required: { minLevel: 300 },
     section: "erp",
     badge: "Finance",
+    departments: [
+      "Finance & Accounting",
+      "Finance",
+      "Accounting",
+      "Financial Services",
+    ], // Finance departments only
   },
   {
     label: "IT Management",
@@ -43,6 +60,7 @@ export const sidebarConfig = [
     required: { minLevel: 300 },
     section: "erp",
     badge: "IT",
+    departments: ["IT", "Information Technology", "Technology"], // IT departments only
   },
   {
     label: "Operations Management",
@@ -51,6 +69,7 @@ export const sidebarConfig = [
     required: { minLevel: 300 },
     section: "erp",
     badge: "Ops",
+    departments: ["Operations", "Production", "Manufacturing", "Finance"], // Operations and finance departments
   },
   {
     label: "Sales & Marketing",
@@ -59,6 +78,7 @@ export const sidebarConfig = [
     required: { minLevel: 300 },
     section: "erp",
     badge: "Sales",
+    departments: ["Sales", "Marketing", "Business Development"], // Sales departments only
   },
   {
     label: "Legal & Compliance",
@@ -67,6 +87,7 @@ export const sidebarConfig = [
     required: { minLevel: 300 },
     section: "erp",
     badge: "Legal",
+    departments: ["Legal", "Compliance", "Risk Management"], // Legal departments only
   },
   {
     label: "System Administration",
@@ -75,6 +96,7 @@ export const sidebarConfig = [
     required: { minLevel: 700 },
     section: "erp",
     badge: "Admin",
+    departments: ["System Administration", "IT", "Information Technology"], // System admin and IT departments
   },
   {
     label: "Payroll Management",
@@ -83,6 +105,13 @@ export const sidebarConfig = [
     required: { minLevel: 700 },
     section: "erp",
     badge: "Payroll",
+    departments: [
+      "Finance & Accounting",
+      "Finance",
+      "Accounting",
+      "Payroll",
+      "HR",
+    ], // Finance and HR departments
   },
   {
     label: "Document Management",
@@ -91,6 +120,7 @@ export const sidebarConfig = [
     required: { minLevel: 0 },
     section: "erp",
     badge: "Docs",
+    departments: ["all"], // Universal access
   },
   {
     label: "Procurement",
@@ -99,6 +129,13 @@ export const sidebarConfig = [
     required: { minLevel: 600 },
     section: "erp",
     badge: "Proc",
+    departments: [
+      "Finance & Accounting",
+      "Finance",
+      "Procurement",
+      "Supply Chain",
+      "Operations",
+    ], // Finance and operations departments
   },
   {
     label: "Project Management",
@@ -107,6 +144,7 @@ export const sidebarConfig = [
     required: { minLevel: 600 },
     section: "erp",
     badge: "Proj",
+    departments: ["all"], // Cross-functional - all departments can access
   },
   {
     label: "Inventory Management",
@@ -115,6 +153,14 @@ export const sidebarConfig = [
     required: { minLevel: 600 },
     section: "erp",
     badge: "Inv",
+    departments: [
+      "Operations",
+      "Production",
+      "Manufacturing",
+      "Finance & Accounting",
+      "Finance",
+      "Procurement",
+    ], // Operations and finance departments
   },
 
   // ===== SYSTEM MANAGEMENT =====
@@ -339,7 +385,7 @@ export const getNavigationForRole = (
         };
 
         const expectedModuleCode = pathToModuleMap[moduleKey];
-      
+
         const hasAccess = access.module === expectedModuleCode;
         return hasAccess;
       });
@@ -369,13 +415,20 @@ export const getNavigationForRole = (
     }
 
     // Check department access
-    if (item.departments && !item.departments.includes("all")) {
-      if (!userDepartment) {
-        return item.departments.includes("all");
+    if (item.departments) {
+      // If item has "all" departments, allow access
+      if (item.departments.includes("all")) {
+        return true;
       }
 
-      if (userRoleConfig.canAccessAllDepartments) {
+      // If no user department, deny access (except for "all" which we already handled)
+      if (!userDepartment) {
         return false;
+      }
+
+      // Super admin can access all departments
+      if (roleLevel === 1000) {
+        return true;
       }
 
       // Check if user's department is in the allowed departments
@@ -500,14 +553,6 @@ export const getModulesForUser = (user) => {
       badge: "Personal",
     },
     {
-      label: "Document Management",
-      icon: "HiOutlineDocumentText",
-      path: "/dashboard/modules/documents",
-      required: { minLevel: 0 },
-      section: "erp",
-      badge: "Docs",
-    },
-    {
       label: "Customer Care",
       icon: "HiOutlinePhone",
       path: "/dashboard/modules/customer-care",
@@ -517,168 +562,170 @@ export const getModulesForUser = (user) => {
     },
   ];
 
-  // Department-specific modules
-  const departmentModules = [];
-
-  switch (departmentName) {
-    case "Human Resources":
-      departmentModules.push({
-        label: "HR Management",
-        icon: "HiOutlineUsers",
-        path: "/dashboard/modules/hr",
-        required: { minLevel: 300 },
-        section: "erp",
-        badge: "HR",
-      });
-      if (roleLevel >= 700) {
-        departmentModules.push({
-          label: "Payroll Management",
-          icon: "HiOutlineCurrencyDollar",
-          path: "/dashboard/modules/payroll",
-          required: { minLevel: 700 },
-          section: "erp",
-          badge: "Payroll",
-        });
-      }
-      break;
-
-    case "Finance & Accounting":
-      departmentModules.push({
+  // Department-specific modules mapping
+  const departmentModuleMapping = {
+    "Finance & Accounting": [
+      {
         label: "Finance Management",
         icon: "HiOutlineCalculator",
         path: "/dashboard/modules/finance",
         required: { minLevel: 300 },
         section: "erp",
         badge: "Finance",
-      });
-      departmentModules.push({
+      },
+      {
         label: "Procurement",
         icon: "HiOutlineShoppingCart",
         path: "/dashboard/modules/procurement",
         required: { minLevel: 600 },
         section: "erp",
         badge: "Proc",
-      });
-      if (roleLevel >= 700) {
-        departmentModules.push({
-          label: "Payroll Management",
-          icon: "HiOutlineCurrencyDollar",
-          path: "/dashboard/modules/payroll",
-          required: { minLevel: 700 },
-          section: "erp",
-          badge: "Payroll",
-        });
-      }
-      break;
-
-    case "Information Technology":
-      departmentModules.push({
-        label: "IT Management",
-        icon: "HiOutlineCog6Tooth",
-        path: "/dashboard/modules/it",
-        required: { minLevel: 300 },
+      },
+      {
+        label: "Payroll Management",
+        icon: "HiOutlineCurrencyDollar",
+        path: "/dashboard/modules/payroll",
+        required: { minLevel: 700 },
         section: "erp",
-        badge: "IT",
-      });
-      if (roleLevel >= 700) {
-        departmentModules.push({
-          label: "System Administration",
-          icon: "HiOutlineCog6Tooth",
-          path: "/dashboard/modules/system-admin",
-          required: { minLevel: 700 },
-          section: "erp",
-          badge: "Admin",
-        });
-      }
-      break;
-
-    case "Operations":
-      departmentModules.push({
-        label: "Operations Management",
-        icon: "HiOutlineCog",
-        path: "/dashboard/modules/operations",
-        required: { minLevel: 300 },
-        section: "erp",
-        badge: "Ops",
-      });
-      departmentModules.push({
+        badge: "Payroll",
+      },
+      {
         label: "Project Management",
         icon: "HiOutlineFolder",
         path: "/dashboard/modules/projects",
         required: { minLevel: 600 },
         section: "erp",
         badge: "Proj",
-      });
-      departmentModules.push({
+      },
+      {
         label: "Inventory Management",
         icon: "HiOutlineCube",
         path: "/dashboard/modules/inventory",
         required: { minLevel: 600 },
         section: "erp",
         badge: "Inv",
-      });
-      break;
-
-    case "Sales & Marketing":
-      departmentModules.push({
-        label: "Sales & Marketing",
-        icon: "HiOutlineChartBar",
-        path: "/dashboard/modules/sales",
+      },
+    ],
+    "Human Resources": [
+      {
+        label: "HR Management",
+        icon: "HiOutlineUsers",
+        path: "/dashboard/modules/hr",
         required: { minLevel: 300 },
         section: "erp",
-        badge: "Sales",
-      });
-      break;
-
-    case "Legal & Compliance":
-      departmentModules.push({
-        label: "Legal & Compliance",
-        icon: "HiOutlineShieldCheck",
-        path: "/dashboard/modules/legal",
+        badge: "HR",
+      },
+      {
+        label: "Payroll Management",
+        icon: "HiOutlineCurrencyDollar",
+        path: "/dashboard/modules/payroll",
+        required: { minLevel: 700 },
+        section: "erp",
+        badge: "Payroll",
+      },
+    ],
+    "Information Technology": [
+      {
+        label: "IT Management",
+        icon: "HiOutlineCog6Tooth",
+        path: "/dashboard/modules/it",
         required: { minLevel: 300 },
         section: "erp",
-        badge: "Legal",
-      });
-      if (roleLevel >= 700) {
-        departmentModules.push({
-          label: "System Administration",
-          icon: "HiOutlineCog6Tooth",
-          path: "/dashboard/modules/system-admin",
-          required: { minLevel: 700 },
-          section: "erp",
-          badge: "Admin",
-        });
-      }
-      break;
-
-    case "Executive Office":
-      if (roleLevel >= 700) {
-        departmentModules.push({
-          label: "System Administration",
-          icon: "HiOutlineCog6Tooth",
-          path: "/dashboard/modules/system-admin",
-          required: { minLevel: 700 },
-          section: "erp",
-          badge: "Admin",
-        });
-      }
-      break;
-
-    case "System Administration":
-      departmentModules.push({
+        badge: "IT",
+      },
+      {
         label: "System Administration",
         icon: "HiOutlineCog6Tooth",
         path: "/dashboard/modules/system-admin",
         required: { minLevel: 700 },
         section: "erp",
         badge: "Admin",
-      });
-      break;
-  }
+      },
+    ],
+    Operations: [
+      {
+        label: "Operations Management",
+        icon: "HiOutlineCog",
+        path: "/dashboard/modules/operations",
+        required: { minLevel: 300 },
+        section: "erp",
+        badge: "Ops",
+      },
+      {
+        label: "Project Management",
+        icon: "HiOutlineFolder",
+        path: "/dashboard/modules/projects",
+        required: { minLevel: 600 },
+        section: "erp",
+        badge: "Proj",
+      },
+      {
+        label: "Inventory Management",
+        icon: "HiOutlineCube",
+        path: "/dashboard/modules/inventory",
+        required: { minLevel: 600 },
+        section: "erp",
+        badge: "Inv",
+      },
+    ],
+    "Sales & Marketing": [
+      {
+        label: "Sales & Marketing",
+        icon: "HiOutlineChartBar",
+        path: "/dashboard/modules/sales",
+        required: { minLevel: 300 },
+        section: "erp",
+        badge: "Sales",
+      },
+    ],
+    "Legal & Compliance": [
+      {
+        label: "Legal & Compliance",
+        icon: "HiOutlineShieldCheck",
+        path: "/dashboard/modules/legal",
+        required: { minLevel: 300 },
+        section: "erp",
+        badge: "Legal",
+      },
+    ],
+    "Customer Service": [
+      // Customer Care is already in baseModules
+    ],
+    "Executive Office": [
+      {
+        label: "System Administration",
+        icon: "HiOutlineCog6Tooth",
+        path: "/dashboard/modules/system-admin",
+        required: { minLevel: 700 },
+        section: "erp",
+        badge: "Admin",
+      },
+    ],
+    "System Administration": [
+      {
+        label: "System Administration",
+        icon: "HiOutlineCog6Tooth",
+        path: "/dashboard/modules/system-admin",
+        required: { minLevel: 700 },
+        section: "erp",
+        badge: "Admin",
+      },
+    ],
+  };
 
+  // Get department-specific modules
+  const departmentModules = departmentModuleMapping[departmentName] || [];
+
+  // Filter modules based on role level
+  const filteredDepartmentModules = departmentModules.filter((module) => {
+    return roleLevel >= module.required.minLevel;
+  });
+
+  // SUPER_ADMIN gets access to everything
   if (roleLevel === 1000) {
     return sidebarConfig;
   }
 
-  return [...baseModules, ...departmentModules];
+  // Return base modules + department-specific modules
+  return [...baseModules, ...filteredDepartmentModules];
 };

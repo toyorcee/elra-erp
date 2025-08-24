@@ -29,10 +29,15 @@ const projectSchema = new mongoose.Schema(
       enum: [
         "planning",
         "pending_approval",
+        "pending_department_approval",
+        "pending_finance_approval",
+        "pending_executive_approval",
+        "approved",
         "active",
         "on_hold",
         "completed",
         "cancelled",
+        "rejected",
       ],
       default: "planning",
       required: true,
@@ -72,6 +77,18 @@ const projectSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // Budget Approval Thresholds
+    budgetThreshold: {
+      type: String,
+      enum: [
+        "hod_auto_approve",
+        "department_approval",
+        "finance_approval",
+        "executive_approval",
+      ],
+      default: "hod_auto_approve",
+    },
+
     // Project Team
     projectManager: {
       type: mongoose.Schema.Types.ObjectId,
@@ -102,6 +119,8 @@ const projectSchema = new mongoose.Schema(
             "analyst",
             "tester",
             "consultant",
+            "manager",
+            "coordinator",
             "other",
           ],
         },
@@ -143,6 +162,11 @@ const projectSchema = new mongoose.Schema(
         "other",
       ],
     },
+    customCategory: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+    },
     tags: [
       {
         type: String,
@@ -157,6 +181,89 @@ const projectSchema = new mongoose.Schema(
       max: 100,
       default: 0,
     },
+
+    // Approval Workflow
+    approvalChain: [
+      {
+        level: {
+          type: String,
+          enum: ["hod", "department", "finance", "executive"],
+          required: true,
+        },
+        approver: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        department: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Department",
+        },
+        status: {
+          type: String,
+          enum: ["pending", "approved", "rejected", "skipped"],
+          default: "pending",
+        },
+        comments: {
+          type: String,
+          trim: true,
+        },
+        approvedAt: {
+          type: Date,
+        },
+        required: {
+          type: Boolean,
+          default: true,
+        },
+      },
+    ],
+
+    // Documents for Project Approval
+    requiredDocuments: [
+      {
+        documentType: {
+          type: String,
+          enum: [
+            "project_proposal",
+            "budget_breakdown",
+            "technical_specifications",
+            "risk_assessment",
+            "timeline_detailed",
+            "team_structure",
+            "vendor_quotes",
+            "legal_review",
+            "financial_analysis",
+            "other",
+          ],
+          required: true,
+        },
+        documentId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Document",
+        },
+        fileName: {
+          type: String,
+          trim: true,
+        },
+        fileUrl: {
+          type: String,
+        },
+        isRequired: {
+          type: Boolean,
+          default: true,
+        },
+        isSubmitted: {
+          type: Boolean,
+          default: false,
+        },
+        submittedAt: {
+          type: Date,
+        },
+        submittedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+      },
+    ],
 
     // Project Notes
     notes: [
@@ -234,10 +341,50 @@ projectSchema.virtual("isOverdue").get(function () {
 projectSchema.pre("save", async function (next) {
   try {
     if (!this.code) {
-      const count = await this.constructor.countDocuments({ isActive: true });
+      // Department-based project numbering
       const currentYear = new Date().getFullYear();
-      this.code = `PRJ${currentYear}${String(count + 1).padStart(4, "0")}`;
+
+      // Get department prefix
+      const department = await mongoose
+        .model("Department")
+        .findById(this.department);
+      const deptPrefix = department
+        ? department.name.substring(0, 3).toUpperCase()
+        : "PRJ";
+
+      // Count projects for this department in current year
+      const count = await this.constructor.countDocuments({
+        department: this.department,
+        createdAt: {
+          $gte: new Date(currentYear, 0, 1),
+          $lt: new Date(currentYear + 1, 0, 1),
+        },
+        isActive: true,
+      });
+
+      this.code = `${deptPrefix}${currentYear}${String(count + 1).padStart(
+        4,
+        "0"
+      )}`;
     }
+
+    // Set budget threshold based on budget amount
+    if (this.budget && !this.budgetThreshold) {
+      if (this.budget <= 1000000) {
+        // 1M NGN
+        this.budgetThreshold = "hod_auto_approve";
+      } else if (this.budget <= 5000000) {
+        // 5M NGN
+        this.budgetThreshold = "department_approval";
+      } else if (this.budget <= 25000000) {
+        // 25M NGN
+        this.budgetThreshold = "finance_approval";
+      } else {
+        // Above 25M NGN
+        this.budgetThreshold = "executive_approval";
+      }
+    }
+
     next();
   } catch (error) {
     next(error);
@@ -351,7 +498,309 @@ projectSchema.methods.getSummary = function () {
     teamSize: activeTeamMembers,
     startDate: this.startDate,
     endDate: this.endDate,
+    budgetThreshold: this.budgetThreshold,
   };
+};
+
+// Instance method to generate approval chain with smart cross-department routing
+projectSchema.methods.generateApprovalChain = async function () {
+  const approvalChain = [];
+
+  // HOD approval (always first)
+  approvalChain.push({
+    level: "hod",
+    department: this.department,
+    status: "pending",
+    required: true,
+  });
+
+  // Get the project creator's department name
+  const projectDept = await mongoose
+    .model("Department")
+    .findById(this.department);
+  const projectDeptName = projectDept ? projectDept.name : "Unknown";
+
+  console.log(`🏢 [APPROVAL] Project Department: ${projectDeptName}`);
+  console.log(`💰 [APPROVAL] Project Budget: ${this.budget}`);
+
+  // Smart cross-department routing based on budget and creator department
+  if (this.budget <= 1000000) {
+    // ≤ 1M: HOD auto-approves, no additional approvals needed
+    console.log("✅ [APPROVAL] Budget ≤ 1M - HOD auto-approval only");
+  } else if (this.budget <= 5000000) {
+    // 1M - 5M: Smart routing based on creator department
+    if (projectDeptName === "Finance & Accounting") {
+      // Finance HOD → Executive (skip department approval)
+      console.log("📋 [APPROVAL] Finance HOD → Executive (1M-5M)");
+      const execDept = await mongoose
+        .model("Department")
+        .findOne({ name: "Executive Office" });
+      if (execDept) {
+        approvalChain.push({
+          level: "executive",
+          department: execDept._id,
+          status: "pending",
+          required: true,
+        });
+      }
+    } else {
+      // All other HODs → Finance → Executive
+      console.log("📋 [APPROVAL] Other HOD → Finance → Executive (1M-5M)");
+      const financeDept = await mongoose
+        .model("Department")
+        .findOne({ name: "Finance & Accounting" });
+      if (financeDept) {
+        approvalChain.push({
+          level: "finance",
+          department: financeDept._id,
+          status: "pending",
+          required: true,
+        });
+      }
+      const execDept = await mongoose
+        .model("Department")
+        .findOne({ name: "Executive Office" });
+      if (execDept) {
+        approvalChain.push({
+          level: "executive",
+          department: execDept._id,
+          status: "pending",
+          required: true,
+        });
+      }
+    }
+  } else if (this.budget <= 25000000) {
+    // 5M - 25M: Smart routing based on creator department
+    if (projectDeptName === "Finance & Accounting") {
+      // Finance HOD → Executive (skip department approval)
+      console.log("💰 [APPROVAL] Finance HOD → Executive (5M-25M)");
+      const execDept = await mongoose
+        .model("Department")
+        .findOne({ name: "Executive Office" });
+      if (execDept) {
+        approvalChain.push({
+          level: "executive",
+          department: execDept._id,
+          status: "pending",
+          required: true,
+        });
+      }
+    } else {
+      // All other HODs → Finance → Executive
+      console.log("💰 [APPROVAL] Other HOD → Finance → Executive (5M-25M)");
+      const financeDept = await mongoose
+        .model("Department")
+        .findOne({ name: "Finance & Accounting" });
+      if (financeDept) {
+        approvalChain.push({
+          level: "finance",
+          department: financeDept._id,
+          status: "pending",
+          required: true,
+        });
+      }
+      const execDept = await mongoose
+        .model("Department")
+        .findOne({ name: "Executive Office" });
+      if (execDept) {
+        approvalChain.push({
+          level: "executive",
+          department: execDept._id,
+          status: "pending",
+          required: true,
+        });
+      }
+    }
+  } else {
+    // > 25M: Smart routing based on creator department
+    if (projectDeptName === "Finance & Accounting") {
+      // Finance HOD → Executive (skip department approval)
+      console.log("👔 [APPROVAL] Finance HOD → Executive (>25M)");
+      const execDept = await mongoose
+        .model("Department")
+        .findOne({ name: "Executive Office" });
+      if (execDept) {
+        approvalChain.push({
+          level: "executive",
+          department: execDept._id,
+          status: "pending",
+          required: true,
+        });
+      }
+    } else if (projectDeptName === "Executive Office") {
+      // Executive HOD → Finance → Self-approval
+      console.log(
+        "👔 [APPROVAL] Executive HOD → Finance → Self-approval (>25M)"
+      );
+      const financeDept = await mongoose
+        .model("Department")
+        .findOne({ name: "Finance & Accounting" });
+      if (financeDept) {
+        approvalChain.push({
+          level: "finance",
+          department: financeDept._id,
+          status: "pending",
+          required: true,
+        });
+      }
+      // Self-approval step
+      approvalChain.push({
+        level: "executive",
+        department: this.department,
+        status: "pending",
+        required: true,
+      });
+    } else {
+      // All other HODs → Finance → Executive
+      console.log("👔 [APPROVAL] Other HOD → Finance → Executive (>25M)");
+      const financeDept = await mongoose
+        .model("Department")
+        .findOne({ name: "Finance & Accounting" });
+      if (financeDept) {
+        approvalChain.push({
+          level: "finance",
+          department: financeDept._id,
+          status: "pending",
+          required: true,
+        });
+      }
+      const execDept = await mongoose
+        .model("Department")
+        .findOne({ name: "Executive Office" });
+      if (execDept) {
+        approvalChain.push({
+          level: "executive",
+          department: execDept._id,
+          status: "pending",
+          required: true,
+        });
+      }
+    }
+  }
+
+  this.approvalChain = approvalChain;
+  await this.save();
+
+  console.log(
+    `🎯 [APPROVAL] Generated chain with ${approvalChain.length} levels:`
+  );
+  approvalChain.forEach((step, index) => {
+    console.log(`   Level ${index + 1}: ${step.level} (${step.department})`);
+  });
+
+  return approvalChain;
+};
+
+// Instance method to approve project
+projectSchema.methods.approveProject = async function (
+  approverId,
+  level,
+  comments = ""
+) {
+  const approvalStep = this.approvalChain.find(
+    (step) => step.level === level && step.status === "pending"
+  );
+
+  if (!approvalStep) {
+    throw new Error(`No pending approval found for level: ${level}`);
+  }
+
+  approvalStep.status = "approved";
+  approvalStep.approver = approverId;
+  approvalStep.comments = comments;
+  approvalStep.approvedAt = new Date();
+
+  // Check if all required approvals are complete
+  const pendingApprovals = this.approvalChain.filter(
+    (step) => step.required && step.status === "pending"
+  );
+
+  if (pendingApprovals.length === 0) {
+    this.status = "approved";
+  } else {
+    // Set status based on next pending approval
+    const nextApproval = pendingApprovals[0];
+    switch (nextApproval.level) {
+      case "department":
+        this.status = "pending_department_approval";
+        break;
+      case "finance":
+        this.status = "pending_finance_approval";
+        break;
+      case "executive":
+        this.status = "pending_executive_approval";
+        break;
+    }
+  }
+
+  await this.save();
+  return this;
+};
+
+// Instance method to reject project
+projectSchema.methods.rejectProject = async function (
+  rejecterId,
+  level,
+  comments = ""
+) {
+  const approvalStep = this.approvalChain.find(
+    (step) => step.level === level && step.status === "pending"
+  );
+
+  if (!approvalStep) {
+    throw new Error(`No pending approval found for level: ${level}`);
+  }
+
+  approvalStep.status = "rejected";
+  approvalStep.approver = rejecterId;
+  approvalStep.comments = comments;
+  approvalStep.approvedAt = new Date();
+
+  this.status = "rejected";
+  await this.save();
+  return this;
+};
+
+// Instance method to add required document
+projectSchema.methods.addRequiredDocument = async function (
+  documentType,
+  documentId,
+  fileName,
+  fileUrl,
+  submittedBy
+) {
+  const existingDoc = this.requiredDocuments.find(
+    (doc) => doc.documentType === documentType
+  );
+
+  if (existingDoc) {
+    existingDoc.documentId = documentId;
+    existingDoc.fileName = fileName;
+    existingDoc.fileUrl = fileUrl;
+    existingDoc.isSubmitted = true;
+    existingDoc.submittedAt = new Date();
+    existingDoc.submittedBy = submittedBy;
+  } else {
+    this.requiredDocuments.push({
+      documentType,
+      documentId,
+      fileName,
+      fileUrl,
+      isSubmitted: true,
+      submittedAt: new Date(),
+      submittedBy,
+    });
+  }
+
+  await this.save();
+  return this;
+};
+
+// Instance method to check if all required documents are submitted
+projectSchema.methods.checkDocumentsComplete = function () {
+  const requiredDocs = this.requiredDocuments.filter((doc) => doc.isRequired);
+  const submittedDocs = requiredDocs.filter((doc) => doc.isSubmitted);
+  return requiredDocs.length === submittedDocs.length;
 };
 
 const Project = mongoose.model("Project", projectSchema);

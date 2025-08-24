@@ -122,7 +122,7 @@ const Login = () => {
       </div>
 
       <div className="w-full lg:w-1/2 lg:ml-[50%] flex items-center justify-center px-6 py-8 relative overflow-y-auto">
-        <div className="absolute top-8 left-8 z-20">
+        <div className="absolute top-8 left-8 z-20 hidden lg:block">
           <ELRALogo size="lg" />
         </div>
 

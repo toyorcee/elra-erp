@@ -121,13 +121,6 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
   );
   const roleInfo = getRoleInfo(userRoleLevel);
 
-  console.log("🔍 [Sidebar] User:", user);
-  console.log("🔍 [Sidebar] User Role Level:", userRoleLevel);
-  console.log("🔍 [Sidebar] User Department:", userDepartment);
-  console.log("🔍 [Sidebar] User Permissions:", userPermissions);
-  console.log("🔍 [Sidebar] User Module Access:", userModuleAccess);
-  console.log("🔍 [Sidebar] Navigation Items:", navigation);
-
   const handleMouseEnter = () => {
     if (!isMobile && !isOpen && !isPinned) {
       setIsHovered(true);
@@ -559,19 +552,6 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
 
             {/* Other sections */}
             {(() => {
-              console.log("🔍 [Sidebar] ERP Modules Section:", sections.erp);
-              console.log(
-                "🔍 [Sidebar] ERP Modules Count:",
-                sections.erp.length
-              );
-              console.log(
-                "🔍 [Sidebar] ERP Modules Details:",
-                sections.erp.map((item) => ({
-                  label: item.label,
-                  path: item.path,
-                  section: item.section,
-                }))
-              );
               return renderSection("erp", "ERP Modules", sections.erp);
             })()}
 

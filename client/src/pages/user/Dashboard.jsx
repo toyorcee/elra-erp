@@ -47,7 +47,7 @@ import {
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import { userModulesAPI } from "../../services/userModules.js";
-import { getModulesForUser } from "../../config/sidebarConfig.js";
+import { getNavigationForRole } from "../../config/sidebarConfig.js";
 
 const Dashboard = () => {
   const { user, loading: authLoading } = useAuth();
@@ -59,12 +59,14 @@ const Dashboard = () => {
     startModuleLoading,
   } = useDynamicSidebar();
   const { module } = useParams();
+
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isModulesCollapsed, setIsModulesCollapsed] = useState(false);
   const [hrDashboardData, setHrDashboardData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [backendModules, setBackendModules] = useState([]);
   const [showAllActivities, setShowAllActivities] = useState(false);
 
   const getUserRoleLevel = () => {
@@ -94,159 +96,207 @@ const Dashboard = () => {
     return roleLevel >= minLevel;
   };
 
+  // Module configuration map for beautiful styling
+  const moduleMap = {
+    "self-service": {
+      key: "self-service",
+      label: "Self-Service",
+      icon: UserIcon,
+      color: "text-[var(--elra-primary)]",
+      bgColor: "bg-gradient-to-br from-blue-50 to-blue-100",
+      borderColor: "border-transparent",
+      description: "Personal services and self-management tools",
+    },
+    hr: {
+      key: "hr",
+      label: "HR Management",
+      icon: UsersIcon,
+      color: "text-[var(--elra-primary)]",
+      bgColor: "bg-gradient-to-br from-purple-50 to-purple-100",
+      borderColor: "border-transparent",
+      description: "Employee records and HR processes",
+    },
+    payroll: {
+      key: "payroll",
+      label: "Payroll Management",
+      icon: CurrencyDollarIcon,
+      color: "text-[var(--elra-primary)]",
+      bgColor: "bg-gradient-to-br from-green-50 to-green-100",
+      borderColor: "border-transparent",
+      description: "Employee payroll processing and management",
+    },
+    finance: {
+      key: "finance",
+      label: "Financial Management",
+      icon: CalculatorIcon,
+      color: "text-[var(--elra-primary)]",
+      bgColor: "bg-gradient-to-br from-emerald-50 to-emerald-100",
+      borderColor: "border-transparent",
+      description: "Financial reporting and analysis",
+    },
+    procurement: {
+      key: "procurement",
+      label: "Procurement",
+      icon: ShoppingCartIcon,
+      color: "text-[var(--elra-primary)]",
+      bgColor: "bg-gradient-to-br from-orange-50 to-orange-100",
+      borderColor: "border-transparent",
+      description: "Purchase requisitions and vendor management",
+    },
+    documents: {
+      key: "documents",
+      label: "Document Management",
+      icon: DocumentTextIcon,
+      color: "text-[var(--elra-primary)]",
+      bgColor: "bg-gradient-to-br from-slate-50 to-slate-100",
+      borderColor: "border-transparent",
+      description: "Document storage, sharing and workflow",
+    },
+    projects: {
+      key: "projects",
+      label: "Project Management",
+      icon: FolderIcon,
+      color: "text-[var(--elra-primary)]",
+      bgColor: "bg-gradient-to-br from-indigo-50 to-indigo-100",
+      borderColor: "border-transparent",
+      description: "Project planning and task management",
+    },
+    inventory: {
+      key: "inventory",
+      label: "Inventory Management",
+      icon: CubeIcon,
+      color: "text-[var(--elra-primary)]",
+      bgColor: "bg-gradient-to-br from-cyan-50 to-cyan-100",
+      borderColor: "border-transparent",
+      description: "Stock management and asset tracking",
+    },
+    "customer-care": {
+      key: "customer-care",
+      label: "Customer Care",
+      icon: PhoneIcon,
+      color: "text-[var(--elra-primary)]",
+      bgColor: "bg-gradient-to-br from-pink-50 to-pink-100",
+      borderColor: "border-transparent",
+      description: "Customer support, ticket management, and service requests",
+    },
+    it: {
+      key: "it",
+      label: "IT Management",
+      icon: CogIcon,
+      color: "text-[var(--elra-primary)]",
+      bgColor: "bg-gradient-to-br from-gray-50 to-gray-100",
+      borderColor: "border-transparent",
+      description: "IT infrastructure and technical support management",
+    },
+    operations: {
+      key: "operations",
+      label: "Operations Management",
+      icon: CogIcon,
+      color: "text-[var(--elra-primary)]",
+      bgColor: "bg-gradient-to-br from-teal-50 to-teal-100",
+      borderColor: "border-transparent",
+      description: "Business operations and process management",
+    },
+    sales: {
+      key: "sales",
+      label: "Sales & Marketing",
+      icon: ChartBarIcon,
+      color: "text-[var(--elra-primary)]",
+      bgColor: "bg-gradient-to-br from-rose-50 to-rose-100",
+      borderColor: "border-transparent",
+      description: "Sales, marketing and customer acquisition",
+    },
+    legal: {
+      key: "legal",
+      label: "Legal & Compliance",
+      icon: ShieldCheckIcon,
+      color: "text-[var(--elra-primary)]",
+      bgColor: "bg-gradient-to-br from-amber-50 to-amber-100",
+      borderColor: "border-transparent",
+      description: "Legal affairs and regulatory compliance",
+    },
+    "system-admin": {
+      key: "system-admin",
+      label: "System Administration",
+      icon: CogIcon,
+      color: "text-[var(--elra-primary)]",
+      bgColor: "bg-gradient-to-br from-violet-50 to-violet-100",
+      borderColor: "border-transparent",
+      description: "System administration and management",
+    },
+  };
+
+  // Fetch backend modules
+  const fetchBackendModules = async () => {
+    try {
+      const response = await userModulesAPI.getUserModules();
+      if (response.success && response.data) {
+        setBackendModules(response.data);
+        console.log(
+          "✅ [Dashboard] Backend modules loaded:",
+          response.data.length
+        );
+      }
+    } catch (error) {
+      console.error("❌ [Dashboard] Error fetching backend modules:", error);
+    }
+  };
+
   const getAccessibleModules = () => {
-    const sidebarModules = getModulesForUser(user);
+    // Use backend API data if available, otherwise fall back to frontend filtering
+    if (backendModules && backendModules.length > 0) {
+      // Use backend API data
+      return backendModules
+        .map((module) => {
+          const moduleKey = module.code.toLowerCase().replace(/_/g, "-");
+          const mappedModule = moduleMap[moduleKey];
 
-    const filteredModules =
-      roleLevel === 300
-        ? sidebarModules.filter((module) => {
-            const moduleKey = module.path.split("/").pop();
-            return ["self-service", "documents", "customer-care"].includes(
-              moduleKey
-            );
-          })
-        : sidebarModules;
+          if (mappedModule) {
+            return {
+              ...mappedModule,
+              path: `/dashboard/modules/${moduleKey}`,
+              section: "erp",
+              required: { minLevel: module.requiredRoleLevel || 300 },
+              badge: module.name.split(" ")[0],
+              permissions: module.permissions,
+            };
+          }
+          return null;
+        })
+        .filter(Boolean);
+    }
 
-    const moduleMap = {
-      "self-service": {
-        key: "self-service",
-        label: "Self-Service",
-        icon: UserIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        description: "Personal services and self-management tools",
-      },
-      hr: {
-        key: "hr",
-        label: "HR Management",
-        icon: UsersIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        description: "Employee records and HR processes",
-      },
-      payroll: {
-        key: "payroll",
-        label: "Payroll Management",
-        icon: CurrencyDollarIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        description: "Employee payroll processing and management",
-      },
-      finance: {
-        key: "finance",
-        label: "Financial Management",
-        icon: CalculatorIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        description: "Financial reporting and analysis",
-      },
-      procurement: {
-        key: "procurement",
-        label: "Procurement",
-        icon: ShoppingCartIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        description: "Purchase requisitions and vendor management",
-      },
-      documents: {
-        key: "documents",
-        label: "Document Management",
-        icon: DocumentTextIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        description: "Document storage, sharing and workflow",
-      },
-      projects: {
-        key: "projects",
-        label: "Project Management",
-        icon: FolderIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        description: "Project planning and task management",
-      },
-      inventory: {
-        key: "inventory",
-        label: "Inventory Management",
-        icon: CubeIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        description: "Stock management and asset tracking",
-      },
-      "customer-care": {
-        key: "customer-care",
-        label: "Customer Care",
-        icon: PhoneIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        description:
-          "Customer support, ticket management, and service requests",
-      },
+    // Fallback to frontend filtering
+    const userRoleLevel = user?.role?.level || user?.roleLevel || 300;
+    const userDepartment = user?.department?.name || null;
+    const userPermissions = user?.permissions || [];
+    const userModuleAccess = user?.moduleAccess || [];
 
-      it: {
-        key: "it",
-        label: "IT Management",
-        icon: CogIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        description: "IT infrastructure and technical support management",
-      },
-      operations: {
-        key: "operations",
-        label: "Operations Management",
-        icon: CogIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        description: "Business operations and process management",
-      },
-      sales: {
-        key: "sales",
-        label: "Sales & Marketing",
-        icon: ChartBarIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        description: "Sales, marketing and customer acquisition",
-      },
+    const navigation = getNavigationForRole(
+      userRoleLevel,
+      userDepartment,
+      userPermissions,
+      userModuleAccess
+    );
 
-      legal: {
-        key: "legal",
-        label: "Legal & Compliance",
-        icon: ShieldCheckIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        description: "Legal affairs and regulatory compliance",
-      },
+    const erpModules = navigation.filter((item) => item.section === "erp");
 
-      "system-admin": {
-        key: "system-admin",
-        label: "System Administration",
-        icon: CogIcon,
-        color: "text-[var(--elra-primary)]",
-        bgColor: "bg-[var(--elra-secondary-3)]",
-        borderColor: "border-[var(--elra-border-primary)]",
-        description: "System administration and management",
-      },
-    };
-
-    return filteredModules
-      .filter((module) => module.section === "erp")
+    return erpModules
       .map((module) => {
         const path = module.path;
         const moduleKey = path.split("/").pop();
         const mappedModule = moduleMap[moduleKey];
-        return mappedModule;
+
+        if (mappedModule) {
+          return {
+            ...mappedModule,
+            path: module.path,
+            section: module.section,
+            required: module.required,
+            badge: module.badge,
+          };
+        }
+        return null;
       })
       .filter(Boolean);
   };
@@ -261,6 +311,13 @@ const Dashboard = () => {
       return () => clearTimeout(timer);
     }
   }, [authLoading, user]);
+
+  // Fetch backend modules when user is available
+  useEffect(() => {
+    if (user && !authLoading) {
+      fetchBackendModules();
+    }
+  }, [user, authLoading]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -300,24 +357,14 @@ const Dashboard = () => {
   const fetchHRDashboardData = async () => {
     try {
       setLoading(true);
-      console.log("🔄 [Dashboard] Fetching HR dashboard data...");
 
       const response = await userModulesAPI.dashboard.getHRDashboardData();
 
       if (response.success) {
-        console.log(
-          "✅ [Dashboard] HR dashboard data received:",
-          response.data
-        );
         setHrDashboardData(response.data);
       } else {
-        console.error(
-          "❌ [Dashboard] Failed to fetch HR dashboard data:",
-          response.message
-        );
       }
     } catch (error) {
-      console.error("❌ [Dashboard] Error fetching HR dashboard data:", error);
     } finally {
       setLoading(false);
     }
@@ -336,8 +383,8 @@ const Dashboard = () => {
             "self-service": "/dashboard/modules/self-service/payslips",
             documents: "/dashboard/modules/documents",
             "customer-care": "/dashboard/modules/customer-care",
-            hr: "/dashboard/modules/hr/employees",
-            payroll: "/dashboard/modules/payroll/processing",
+            hr: "/dashboard/modules/hr/invitation",
+            payroll: "/dashboard/modules/payroll/salary-grades",
             finance: "/dashboard/modules/finance/transactions",
             inventory: "/dashboard/modules/inventory/list",
             procurement: "/dashboard/modules/procurement/orders",
@@ -359,17 +406,19 @@ const Dashboard = () => {
     return (
       <div
         key={module.key}
-        className={`relative group cursor-pointer transition-all duration-300 transform hover:scale-105 hover:shadow-xl ${
+        className={`relative group cursor-pointer transition-all duration-300 transform hover:scale-105 hover:shadow-2xl ${
           isActive
-            ? "bg-[var(--elra-primary)] text-white shadow-xl border-[var(--elra-primary)]"
-            : `${module.bgColor} ${module.borderColor}`
-        } border-2 rounded-2xl p-6`}
+            ? "bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white shadow-2xl border-[var(--elra-primary)]"
+            : `${module.bgColor} ${module.borderColor} hover:shadow-lg`
+        } border-0 rounded-2xl p-6 shadow-md`}
         onClick={handleModuleClick}
       >
         <div className="flex items-center mb-4">
           <div
-            className={`p-3 rounded-xl ${
-              isActive ? "bg-white/20" : `${module.bgColor} ${module.color}`
+            className={`p-3 rounded-xl transition-all duration-300 ${
+              isActive
+                ? "bg-white/20 shadow-lg"
+                : "bg-white/80 shadow-md group-hover:shadow-lg group-hover:bg-white"
             }`}
           >
             <IconComponent
@@ -403,11 +452,11 @@ const Dashboard = () => {
             {isActive ? "Currently active" : "Click to access"}
           </span>
           <div
-            className={`p-2 rounded-lg ${
+            className={`p-2 rounded-lg transition-all duration-200 ${
               isActive
                 ? "bg-white/20 text-white"
-                : `${module.bgColor} ${module.color}`
-            } opacity-0 group-hover:opacity-100 transition-opacity duration-200`}
+                : "bg-white/80 text-[var(--elra-primary)] shadow-md"
+            } opacity-0 group-hover:opacity-100 group-hover:scale-110`}
           >
             <ArrowTrendingUpIcon className="h-4 w-4" />
           </div>
@@ -419,7 +468,11 @@ const Dashboard = () => {
   // Render dynamic module dashboard content
   const renderDynamicModuleDashboard = () => {
     const moduleInfo = getCurrentModuleInfo();
-    const currentModuleData = accessibleModules.find((m) => m.key === module);
+
+    // Find the current module data by matching the path or key
+    const currentModuleData = accessibleModules.find(
+      (m) => m.key === module || m.path.includes(`/${module}`)
+    );
 
     if (!currentModuleData) {
       return (

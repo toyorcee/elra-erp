@@ -188,10 +188,7 @@ const AppRoutes = () => {
         />
         <Route path="modules/payroll/payslips" element={<PaySlips />} />
 
-        <Route
-          path="modules/self-service"
-          element={<Navigate to="modules/self-service/payslips" replace />}
-        />
+        {/* Self-Service Module routes are handled by the dynamic route above */}
         <Route path="modules/self-service/payslips" element={<MyPayslips />} />
         <Route
           path="modules/self-service/projects"

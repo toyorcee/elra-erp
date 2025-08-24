@@ -1,31 +1,30 @@
 import mongoose from "mongoose";
-import documentClassifications, {
-  categories,
-  documentTypes,
-  documentStatuses,
-  priorityLevels,
-} from "../constants/documentClassifications.js";
 
 const documentSchema = new mongoose.Schema(
   {
+    // Basic Document Information
     title: {
       type: String,
       required: true,
       trim: true,
+      maxlength: 200,
     },
     description: {
       type: String,
       trim: true,
+      maxlength: 500,
     },
-    filename: {
+    fileName: {
       type: String,
       required: true,
+      trim: true,
     },
-    originalName: {
+    originalFileName: {
       type: String,
       required: true,
+      trim: true,
     },
-    filePath: {
+    fileUrl: {
       type: String,
       required: true,
     },
@@ -37,92 +36,51 @@ const documentSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+
+    // Document Type and Category
     documentType: {
       type: String,
-      enum: documentTypes,
+      enum: [
+        "project_proposal",
+        "budget_breakdown",
+        "technical_specifications",
+        "risk_assessment",
+        "timeline_detailed",
+        "team_structure",
+        "vendor_quotes",
+        "legal_review",
+        "financial_analysis",
+        "contract",
+        "invoice",
+        "receipt",
+        "policy",
+        "procedure",
+        "report",
+        "other",
+      ],
       required: true,
-      validate: {
-        validator: function (value) {
-          return documentClassifications[this.category]?.includes(value);
-        },
-        message: function (props) {
-          return `Document type '${props.value}' is not valid for category '${this.category}'.`;
-        },
-      },
     },
     category: {
       type: String,
-      enum: categories,
-      required: true,
+      enum: [
+        "project",
+        "financial",
+        "legal",
+        "technical",
+        "administrative",
+        "other",
+      ],
+      default: "other",
     },
-    priority: {
-      type: String,
-      enum: priorityLevels.map((p) => p.value),
-      default: "Medium",
-    },
+
+    // Document Status
     status: {
       type: String,
-      enum: documentStatuses.map((s) => s.value),
-      default: "DRAFT",
+      enum: ["draft", "pending_review", "approved", "rejected", "archived"],
+      default: "draft",
     },
-    reference: {
-      type: String,
-      unique: true,
-      required: true,
-    },
-    uploadedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    department: {
-      type: String,
-      enum: [
-        "CLAIMS",
-        "UNDERWRITE",
-        "REGIONAL",
-        "COMPLIANCE",
-        "FINANCE",
-        "HR",
-        "IT",
-        "EXECUTIVE",
-        "External",
-      ],
-      required: false,
-    },
-    // Workflow tracking
-    currentApprover: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
-    approvalChain: [
-      {
-        level: {
-          type: Number,
-          required: true,
-        },
-        approver: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-        status: {
-          type: String,
-          enum: ["PENDING", "APPROVED", "REJECTED", "DELEGATED"],
-          default: "PENDING",
-        },
-        comments: String,
-        actionDate: Date,
-        deadline: Date,
-      },
-    ],
-    // Document metadata
-    tags: [String],
-    keywords: [String],
-    expiryDate: Date,
-    isConfidential: {
-      type: Boolean,
-      default: false,
-    },
+
+    // Document Versioning
     version: {
       type: Number,
       default: 1,
@@ -130,285 +88,297 @@ const documentSchema = new mongoose.Schema(
     previousVersions: [
       {
         version: Number,
-        filename: String,
-        uploadedBy: {
+        fileUrl: String,
+        fileName: String,
+        updatedAt: Date,
+        updatedBy: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "User",
         },
-        uploadedAt: Date,
       },
     ],
-    // Access control
-    permissions: [
-      {
-        userId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-        permission: {
-          type: String,
-          enum: ["view", "edit", "approve", "delete", "share"],
-        },
-        grantedBy: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-        grantedAt: Date,
-      },
-    ],
-    // Audit trail
-    auditTrail: [
-      {
-        action: {
-          type: String,
-          enum: [
-            "UPLOADED",
-            "VIEWED",
-            "EDITED",
-            "APPROVED",
-            "REJECTED",
-            "SHARED",
-            "ARCHIVED",
-            "DELETED",
-          ],
-        },
-        userId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-        timestamp: {
-          type: Date,
-          default: Date.now,
-        },
-        details: String,
-        ipAddress: String,
-      },
-    ],
-    // Nigerian-specific fields
-    organization: {
-      type: String,
-      trim: true,
+
+    // Document Access and Permissions
+    isPublic: {
+      type: Boolean,
+      default: false,
     },
-    regulatoryCompliance: [
+    allowedDepartments: [
       {
-        regulation: String,
-        complianceStatus: {
-          type: String,
-          enum: ["COMPLIANT", "NON_COMPLIANT", "PENDING_REVIEW"],
-        },
-        reviewDate: Date,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Department",
       },
     ],
+    allowedRoles: [
+      {
+        type: String,
+        enum: ["SUPER_ADMIN", "HOD", "MANAGER", "STAFF", "VIEWER"],
+      },
+    ],
+
+    // Document Review and Approval
+    reviewStatus: {
+      type: String,
+      enum: ["pending", "in_review", "approved", "rejected"],
+      default: "pending",
+    },
+    reviewers: [
+      {
+        reviewer: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        status: {
+          type: String,
+          enum: ["pending", "approved", "rejected"],
+          default: "pending",
+        },
+        comments: {
+          type: String,
+          trim: true,
+        },
+        reviewedAt: {
+          type: Date,
+        },
+        required: {
+          type: Boolean,
+          default: true,
+        },
+      },
+    ],
+
+    // Document Tags and Metadata
+    tags: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    metadata: {
+      type: Map,
+      of: String,
+    },
+
+    // Related Entities
+    project: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+    },
+    department: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Department",
+    },
+
+    // Audit Fields
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    approvedAt: {
+      type: Date,
+    },
+
     isActive: {
       type: Boolean,
       default: true,
     },
-
-    ocrData: {
-      extractedText: {
-        type: String,
-        default: "",
-      },
-      confidence: {
-        type: Number,
-        min: 0,
-        max: 100,
-        default: 0,
-      },
-      documentType: {
-        type: String,
-        default: "",
-      },
-      keywords: [
-        {
-          type: String,
-          trim: true,
-        },
-      ],
-      dateReferences: [
-        {
-          type: String,
-          trim: true,
-        },
-      ],
-      organizationReferences: [
-        {
-          type: String,
-          trim: true,
-        },
-      ],
-      monetaryValues: [
-        {
-          type: String,
-          trim: true,
-        },
-      ],
-      ocrLanguage: {
-        type: String,
-        default: "eng",
-      },
-    },
-
-    // Scanning and archiving metadata
-    scanMetadata: {
-      scannerId: String,
-      resolution: Number,
-      format: String,
-      scanDate: Date,
-      originalDocumentDate: Date,
-      archiveLocation: String,
-      boxNumber: Number,
-      folderNumber: Number,
-      archiveReference: String,
-      physicalLocation: String,
-      notes: String,
-    },
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
 
-// Pre-save middleware to generate reference
-documentSchema.pre("save", function (next) {
-  if (this.isNew && !this.reference) {
-    this.reference = this.generateReference();
-  }
-  next();
+// Indexes for better performance
+documentSchema.index({ documentType: 1 });
+documentSchema.index({ status: 1 });
+documentSchema.index({ project: 1 });
+documentSchema.index({ department: 1 });
+documentSchema.index({ createdBy: 1 });
+documentSchema.index({ "reviewers.reviewer": 1 });
+
+// Virtual for document access URL
+documentSchema.virtual("accessUrl").get(function () {
+  return this.fileUrl;
 });
 
-// Instance method to generate document reference
-documentSchema.methods.generateReference = function () {
-  const timestamp = Date.now();
-  const random = Math.floor(Math.random() * 1000);
-  const prefix = this.category.substring(0, 3).toUpperCase();
-  return `${prefix}-${timestamp}-${random}`;
+// Virtual for document size in human readable format
+documentSchema.virtual("fileSizeFormatted").get(function () {
+  if (this.fileSize < 1024) return `${this.fileSize} B`;
+  if (this.fileSize < 1024 * 1024)
+    return `${(this.fileSize / 1024).toFixed(1)} KB`;
+  if (this.fileSize < 1024 * 1024 * 1024)
+    return `${(this.fileSize / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(this.fileSize / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+});
+
+// Pre-save middleware to handle versioning
+documentSchema.pre("save", async function (next) {
+  try {
+    if (this.isModified("fileUrl") && !this.isNew) {
+      // Store previous version
+      this.previousVersions.push({
+        version: this.version,
+        fileUrl: this.fileUrl,
+        fileName: this.fileName,
+        updatedAt: new Date(),
+        updatedBy: this.updatedBy,
+      });
+      this.version += 1;
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Static method to get documents by type
+documentSchema.statics.getByType = function (documentType) {
+  return this.find({ documentType, isActive: true })
+    .populate("createdBy", "firstName lastName email")
+    .populate("department", "name")
+    .sort({ createdAt: -1 });
 };
 
-// Instance method to add to audit trail
-documentSchema.methods.addAuditEntry = function (
-  action,
-  userId,
-  details = "",
-  ipAddress = ""
+// Static method to get documents by project
+documentSchema.statics.getByProject = function (projectId) {
+  return this.find({ project: projectId, isActive: true })
+    .populate("createdBy", "firstName lastName email")
+    .populate("reviewers.reviewer", "firstName lastName email")
+    .sort({ createdAt: -1 });
+};
+
+// Static method to get documents pending review
+documentSchema.statics.getPendingReview = function (reviewerId) {
+  return this.find({
+    "reviewers.reviewer": reviewerId,
+    "reviewers.status": "pending",
+    isActive: true,
+  })
+    .populate("createdBy", "firstName lastName email")
+    .populate("project", "name code")
+    .sort({ createdAt: -1 });
+};
+
+// Instance method to add reviewer
+documentSchema.methods.addReviewer = async function (
+  reviewerId,
+  required = true
 ) {
-  this.auditTrail.push({
-    action,
-    userId,
-    details,
-    ipAddress,
-    timestamp: new Date(),
-  });
-};
-
-// Instance method to check if user can access document
-documentSchema.methods.canAccess = function (user) {
-  // Document owner can always access
-  if (this.uploadedBy.equals(user._id)) return true;
-
-  // Check specific permissions
-  const userPermission = this.permissions.find((p) =>
-    p.userId.equals(user._id)
-  );
-  if (userPermission) return true;
-
-  // Check role-based access
-  if (user.role.level >= 80) return true; // Manager and above
-
-  // Check department access
-  if (user.department === this.department) {
-    if (user.role.level >= 50) return true; // Staff and above
-  }
-
-  return false;
-};
-
-// Instance method to get next approver
-documentSchema.methods.getNextApprover = function () {
-  const pendingApproval = this.approvalChain.find(
-    (approval) => approval.status === "PENDING"
+  const existingReviewer = this.reviewers.find(
+    (r) => r.reviewer.toString() === reviewerId.toString()
   );
 
-  if (pendingApproval) {
-    return pendingApproval.approver;
+  if (!existingReviewer) {
+    this.reviewers.push({
+      reviewer: reviewerId,
+      status: "pending",
+      required,
+    });
+    await this.save();
   }
 
-  return null;
+  return this;
 };
 
 // Instance method to approve document
-documentSchema.methods.approve = function (userId, comments = "") {
-  const pendingApproval = this.approvalChain.find(
-    (approval) => approval.status === "PENDING"
+documentSchema.methods.approveDocument = async function (
+  reviewerId,
+  comments = ""
+) {
+  const reviewer = this.reviewers.find(
+    (r) => r.reviewer.toString() === reviewerId.toString()
   );
 
-  if (pendingApproval) {
-    pendingApproval.status = "APPROVED";
-    pendingApproval.comments = comments;
-    pendingApproval.actionDate = new Date();
-
-    // Check if this was the final approval
-    const remainingApprovals = this.approvalChain.filter(
-      (approval) => approval.status === "PENDING"
-    );
-
-    if (remainingApprovals.length === 0) {
-      this.status = "APPROVED";
-    }
-
-    this.addAuditEntry("APPROVED", userId, comments);
+  if (!reviewer) {
+    throw new Error("Reviewer not found");
   }
+
+  reviewer.status = "approved";
+  reviewer.comments = comments;
+  reviewer.reviewedAt = new Date();
+
+  // Check if all required reviewers have approved
+  const requiredReviewers = this.reviewers.filter((r) => r.required);
+  const approvedReviewers = requiredReviewers.filter(
+    (r) => r.status === "approved"
+  );
+
+  if (approvedReviewers.length === requiredReviewers.length) {
+    this.status = "approved";
+    this.reviewStatus = "approved";
+    this.approvedBy = reviewerId;
+    this.approvedAt = new Date();
+  } else {
+    this.reviewStatus = "in_review";
+  }
+
+  await this.save();
+  return this;
 };
 
 // Instance method to reject document
-documentSchema.methods.reject = function (userId, comments = "") {
-  const pendingApproval = this.approvalChain.find(
-    (approval) => approval.status === "PENDING"
+documentSchema.methods.rejectDocument = async function (
+  reviewerId,
+  comments = ""
+) {
+  const reviewer = this.reviewers.find(
+    (r) => r.reviewer.toString() === reviewerId.toString()
   );
 
-  if (pendingApproval) {
-    pendingApproval.status = "REJECTED";
-    pendingApproval.comments = comments;
-    pendingApproval.actionDate = new Date();
-    this.status = "REJECTED";
-
-    this.addAuditEntry("REJECTED", userId, comments);
+  if (!reviewer) {
+    throw new Error("Reviewer not found");
   }
+
+  reviewer.status = "rejected";
+  reviewer.comments = comments;
+  reviewer.reviewedAt = new Date();
+
+  this.status = "rejected";
+  this.reviewStatus = "rejected";
+
+  await this.save();
+  return this;
 };
 
-// Static method to find documents by status
-documentSchema.statics.findByStatus = function (status) {
-  return this.find({ status, isActive: true }).populate(
-    "uploadedBy currentApprover"
-  );
-};
+// Instance method to check if user has access
+documentSchema.methods.hasAccess = function (user) {
+  // Public documents
+  if (this.isPublic) return true;
 
-// Static method to find documents by category
-documentSchema.statics.findByCategory = function (category) {
-  return this.find({ category, isActive: true }).populate(
-    "uploadedBy currentApprover"
-  );
-};
+  // Document creator
+  if (this.createdBy.toString() === user._id.toString()) return true;
 
-// Static method to find documents by department
-documentSchema.statics.findByDepartment = function (department) {
-  return this.find({ department, isActive: true }).populate(
-    "uploadedBy currentApprover"
-  );
-};
+  // Super admin
+  if (user.role.level >= 1000) return true;
 
-// Static method to find documents pending approval
-documentSchema.statics.findPendingApproval = function () {
-  return this.find({
-    status: { $in: ["SUBMITTED", "UNDER_REVIEW"] },
-    isActive: true,
-  }).populate("uploadedBy currentApprover");
-};
+  // Department access
+  if (this.allowedDepartments.length > 0) {
+    const hasDepartmentAccess = this.allowedDepartments.some(
+      (dept) => dept.toString() === user.department?._id.toString()
+    );
+    if (!hasDepartmentAccess) return false;
+  }
 
-// Index for better search performance
-documentSchema.index({ title: "text", description: "text", tags: "text" });
-documentSchema.index({ status: 1, category: 1 });
-documentSchema.index({ uploadedBy: 1, createdAt: -1 });
+  // Role access
+  if (this.allowedRoles.length > 0) {
+    const hasRoleAccess = this.allowedRoles.includes(user.role.name);
+    if (!hasRoleAccess) return false;
+  }
+
+  return true;
+};
 
 const Document = mongoose.model("Document", documentSchema);
 

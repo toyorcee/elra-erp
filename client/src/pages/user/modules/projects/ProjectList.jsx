@@ -51,6 +51,7 @@ const ProjectList = () => {
     budget: "",
     projectManager: "",
     category: "",
+    customCategory: "",
     status: "planning",
     priority: "medium",
     teamName: "",
@@ -64,6 +65,61 @@ const ProjectList = () => {
   const [showEditConfirm, setShowEditConfirm] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState(null);
   const [projectToEdit, setProjectToEdit] = useState(null);
+
+  const getApprovalLevelText = (budget) => {
+    const numBudget = parseFormattedNumber(budget);
+    if (!numBudget || numBudget <= 0) return null;
+
+    // Super Admin - always auto-approved
+    if (user.role.level === 1000) {
+      return {
+        text: "👑 Auto-approved by Super Admin",
+        color: "text-purple-600",
+      };
+    }
+
+    if (numBudget <= 1000000) {
+      return { text: "✅ Auto-approved by HOD", color: "text-green-600" };
+    } else if (numBudget <= 5000000) {
+      if (user.department?.name === "Finance & Accounting") {
+        return {
+          text: "📋 Direct to Executive Approval",
+          color: "text-blue-600",
+        };
+      } else {
+        return {
+          text: "📋 Finance → Executive Approval",
+          color: "text-blue-600",
+        };
+      }
+    } else if (numBudget <= 25000000) {
+      if (user.department?.name === "Finance & Accounting") {
+        return {
+          text: "💰 Direct to Executive Approval",
+          color: "text-orange-600",
+        };
+      } else {
+        return {
+          text: "💰 Finance → Executive Approval",
+          color: "text-orange-600",
+        };
+      }
+    } else {
+      if (user.department?.name === "Finance & Accounting") {
+        return {
+          text: "👔 Direct to Executive Approval",
+          color: "text-red-600",
+        };
+      } else if (user.department?.name === "Executive Office") {
+        return { text: "👔 Finance → Self-approval", color: "text-red-600" };
+      } else {
+        return {
+          text: "👔 Finance → Executive Approval",
+          color: "text-red-600",
+        };
+      }
+    }
+  };
 
   if (!user || user.role.level < 700) {
     return (
@@ -96,7 +152,7 @@ const ProjectList = () => {
       { value: "system_maintenance", label: "System Maintenance" },
       { value: "consulting", label: "Consulting" },
       { value: "training", label: "Training" },
-      { value: "other", label: "Other" },
+      { value: "other", label: "Other (Custom Category)" },
     ];
 
     // Super Admin can see all categories
@@ -271,6 +327,10 @@ const ProjectList = () => {
 
     if (!formData.category) {
       errors.push("Category is required");
+    }
+
+    if (formData.category === "other" && !formData.customCategory?.trim()) {
+      errors.push("Custom category name is required when selecting 'Other'");
     }
 
     if (!formData.startDate) {
@@ -794,6 +854,27 @@ const ProjectList = () => {
                     </p>
                   )}
                 </div>
+                {formData.category === "other" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Custom Category <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.customCategory}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          customCategory: e.target.value,
+                        })
+                      }
+                      placeholder="Enter custom category name"
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                      required
+                      disabled={submitting}
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Start Date <span className="text-red-500">*</span>
@@ -842,6 +923,15 @@ const ProjectList = () => {
                     required
                     disabled={submitting}
                   />
+                  {formData.budget && getApprovalLevelText(formData.budget) && (
+                    <p
+                      className={`mt-2 text-sm font-medium ${
+                        getApprovalLevelText(formData.budget).color
+                      }`}
+                    >
+                      {getApprovalLevelText(formData.budget).text}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">

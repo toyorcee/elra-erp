@@ -3,7 +3,7 @@ import api from "./api";
 // Document upload with approval workflow
 export const uploadDocument = async (formData) => {
   try {
-    const response = await api.post("/api/documents/upload", formData, {
+    const response = await api.post("/documents/upload", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
@@ -17,7 +17,7 @@ export const uploadDocument = async (formData) => {
 // Get user's documents
 export const getUserDocuments = async (filters = {}) => {
   try {
-    const response = await api.get("/api/documents/my-documents", {
+    const response = await api.get("/documents/my-documents", {
       params: filters,
     });
     return response.data;
@@ -29,7 +29,7 @@ export const getUserDocuments = async (filters = {}) => {
 // Get document by ID
 export const getDocumentById = async (documentId) => {
   try {
-    const response = await api.get(`/api/documents/${documentId}`);
+    const response = await api.get(`/documents/${documentId}`);
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
@@ -39,7 +39,7 @@ export const getDocumentById = async (documentId) => {
 // Update document
 export const updateDocument = async (documentId, updateData) => {
   try {
-    const response = await api.put(`/api/documents/${documentId}`, updateData);
+    const response = await api.put(`/documents/${documentId}`, updateData);
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
@@ -49,7 +49,7 @@ export const updateDocument = async (documentId, updateData) => {
 // Delete document
 export const deleteDocument = async (documentId) => {
   try {
-    const response = await api.delete(`/api/documents/${documentId}`);
+    const response = await api.delete(`/documents/${documentId}`);
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
@@ -59,7 +59,7 @@ export const deleteDocument = async (documentId) => {
 // Download document
 export const downloadDocument = async (documentId) => {
   try {
-    const response = await api.get(`/api/documents/${documentId}/download`, {
+    const response = await api.get(`/documents/${documentId}/download`, {
       responseType: "blob",
     });
     return response.data;
@@ -71,7 +71,7 @@ export const downloadDocument = async (documentId) => {
 // Get document metadata
 export const getDocumentMetadata = async (documentId) => {
   try {
-    const response = await api.get(`/api/documents/${documentId}/metadata`);
+    const response = await api.get(`/documents/${documentId}/metadata`);
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
@@ -81,7 +81,7 @@ export const getDocumentMetadata = async (documentId) => {
 // Process OCR for document
 export const processOCR = async (documentId) => {
   try {
-    const response = await api.post(`/api/documents/${documentId}/ocr`);
+    const response = await api.post(`/documents/${documentId}/ocr`);
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
@@ -91,7 +91,7 @@ export const processOCR = async (documentId) => {
 // Search documents
 export const searchDocuments = async (searchParams) => {
   try {
-    const response = await api.get("/api/documents/search", {
+    const response = await api.get("/documents/search", {
       params: searchParams,
     });
     return response.data;
@@ -103,7 +103,7 @@ export const searchDocuments = async (searchParams) => {
 // Get document categories
 export const getDocumentCategories = async () => {
   try {
-    const response = await api.get("/api/documents/categories");
+    const response = await api.get("/documents/categories");
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
@@ -113,7 +113,7 @@ export const getDocumentCategories = async () => {
 // Get document types
 export const getDocumentTypes = async () => {
   try {
-    const response = await api.get("/api/documents/types");
+    const response = await api.get("/documents/types");
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
@@ -123,7 +123,7 @@ export const getDocumentTypes = async () => {
 // Get document statistics
 export const getDocumentStats = async () => {
   try {
-    const response = await api.get("/api/documents/stats");
+    const response = await api.get("/documents/stats");
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
@@ -133,7 +133,7 @@ export const getDocumentStats = async () => {
 // Get pending approvals for documents
 export const getPendingDocumentApprovals = async () => {
   try {
-    const response = await api.get("/api/documents/pending-approvals");
+    const response = await api.get("/documents/pending-approvals");
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
@@ -143,7 +143,7 @@ export const getPendingDocumentApprovals = async () => {
 // Approve document
 export const approveDocument = async (documentId, comments = "") => {
   try {
-    const response = await api.post(`/api/documents/${documentId}/approve`, {
+    const response = await api.post(`/documents/${documentId}/approve`, {
       comments,
     });
     return response.data;
@@ -155,7 +155,7 @@ export const approveDocument = async (documentId, comments = "") => {
 // Reject document
 export const rejectDocument = async (documentId, comments = "") => {
   try {
-    const response = await api.post(`/api/documents/${documentId}/reject`, {
+    const response = await api.post(`/documents/${documentId}/reject`, {
       comments,
     });
     return response.data;
@@ -167,9 +167,7 @@ export const rejectDocument = async (documentId, comments = "") => {
 // Get document approval history
 export const getDocumentApprovalHistory = async (documentId) => {
   try {
-    const response = await api.get(
-      `/api/documents/${documentId}/approval-history`
-    );
+    const response = await api.get(`/documents/${documentId}/approval-history`);
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
@@ -179,7 +177,7 @@ export const getDocumentApprovalHistory = async (documentId) => {
 // Share document with users
 export const shareDocument = async (documentId, userIds, permissions) => {
   try {
-    const response = await api.post(`/api/documents/${documentId}/share`, {
+    const response = await api.post(`/documents/${documentId}/share`, {
       userIds,
       permissions,
     });
@@ -192,7 +190,7 @@ export const shareDocument = async (documentId, userIds, permissions) => {
 // Get shared documents
 export const getSharedDocuments = async () => {
   try {
-    const response = await api.get("/api/documents/shared");
+    const response = await api.get("/documents/shared");
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
@@ -202,7 +200,7 @@ export const getSharedDocuments = async () => {
 // Archive document
 export const archiveDocument = async (documentId) => {
   try {
-    const response = await api.post(`/api/documents/${documentId}/archive`);
+    const response = await api.post(`/documents/${documentId}/archive`);
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
@@ -212,7 +210,7 @@ export const archiveDocument = async (documentId) => {
 // Restore archived document
 export const restoreDocument = async (documentId) => {
   try {
-    const response = await api.post(`/api/documents/${documentId}/restore`);
+    const response = await api.post(`/documents/${documentId}/restore`);
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
@@ -222,7 +220,7 @@ export const restoreDocument = async (documentId) => {
 // Get archived documents
 export const getArchivedDocuments = async (filters = {}) => {
   try {
-    const response = await api.get("/api/documents/archived", {
+    const response = await api.get("/documents/archived", {
       params: filters,
     });
     return response.data;
@@ -234,7 +232,7 @@ export const getArchivedDocuments = async (filters = {}) => {
 // Bulk operations
 export const bulkDeleteDocuments = async (documentIds) => {
   try {
-    const response = await api.post("/api/documents/bulk-delete", {
+    const response = await api.post("/documents/bulk-delete", {
       documentIds,
     });
     return response.data;
@@ -245,7 +243,7 @@ export const bulkDeleteDocuments = async (documentIds) => {
 
 export const bulkArchiveDocuments = async (documentIds) => {
   try {
-    const response = await api.post("/api/documents/bulk-archive", {
+    const response = await api.post("/documents/bulk-archive", {
       documentIds,
     });
     return response.data;
@@ -256,7 +254,7 @@ export const bulkArchiveDocuments = async (documentIds) => {
 
 export const bulkShareDocuments = async (documentIds, userIds, permissions) => {
   try {
-    const response = await api.post("/api/documents/bulk-share", {
+    const response = await api.post("/documents/bulk-share", {
       documentIds,
       userIds,
       permissions,
@@ -277,7 +275,6 @@ export const getDocumentWorkflowStatus = (document) => {
 };
 
 export const canUserApproveDocument = (user, document) => {
-  // Check if user is in the approval chain
   const pendingApproval = document.approvalChain?.find(
     (approval) => approval.status === "PENDING"
   );
@@ -321,4 +318,56 @@ export const getFileIcon = (mimeType) => {
   if (mimeType.includes("powerpoint") || mimeType.includes("presentation"))
     return "HiPresentationChartLine";
   return "HiDocument";
+};
+
+// Scanning services
+export const detectScanners = async () => {
+  try {
+    const response = await api.get("/scanning/scanners");
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const scanDocument = async (scannerId, options = {}) => {
+  try {
+    const response = await api.post("/scanning/scan", {
+      scannerId,
+      options,
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const processScannedDocument = async (scanResult, metadata) => {
+  try {
+    const response = await api.post("/scanning/process", {
+      scanResult,
+      metadata,
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+// Document replacement/update
+export const replaceDocument = async (documentId, formData) => {
+  try {
+    const response = await api.put(
+      `/documents/${documentId}/replace`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
 };

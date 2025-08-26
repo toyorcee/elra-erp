@@ -7,6 +7,8 @@ import {
   ArrowPathIcon,
   XMarkIcon,
   FolderIcon,
+  UsersIcon,
+  EyeIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../../context/AuthContext";
@@ -54,7 +56,6 @@ const ProjectList = () => {
     customCategory: "",
     status: "planning",
     priority: "medium",
-    teamName: "",
   });
 
   const [nextProjectCode, setNextProjectCode] = useState("");
@@ -65,6 +66,8 @@ const ProjectList = () => {
   const [showEditConfirm, setShowEditConfirm] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState(null);
   const [projectToEdit, setProjectToEdit] = useState(null);
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [selectedProjectForTeam, setSelectedProjectForTeam] = useState(null);
 
   const getApprovalLevelText = (budget) => {
     const numBudget = parseFormattedNumber(budget);
@@ -73,48 +76,48 @@ const ProjectList = () => {
     // Super Admin - always auto-approved
     if (user.role.level === 1000) {
       return {
-        text: "👑 Auto-approved by Super Admin",
+        text: "Auto-approved by Super Admin",
         color: "text-purple-600",
       };
     }
 
     if (numBudget <= 1000000) {
-      return { text: "✅ Auto-approved by HOD", color: "text-green-600" };
+      return { text: "Auto-approved by HOD", color: "text-green-600" };
     } else if (numBudget <= 5000000) {
       if (user.department?.name === "Finance & Accounting") {
         return {
-          text: "📋 Direct to Executive Approval",
+          text: "Direct to Executive Approval",
           color: "text-blue-600",
         };
       } else {
         return {
-          text: "📋 Finance → Executive Approval",
+          text: "Finance → Executive Approval",
           color: "text-blue-600",
         };
       }
     } else if (numBudget <= 25000000) {
       if (user.department?.name === "Finance & Accounting") {
         return {
-          text: "💰 Direct to Executive Approval",
+          text: "Direct to Executive Approval",
           color: "text-orange-600",
         };
       } else {
         return {
-          text: "💰 Finance → Executive Approval",
+          text: "Finance → Executive Approval",
           color: "text-orange-600",
         };
       }
     } else {
       if (user.department?.name === "Finance & Accounting") {
         return {
-          text: "👔 Direct to Executive Approval",
+          text: "Direct to Executive Approval",
           color: "text-red-600",
         };
       } else if (user.department?.name === "Executive Office") {
-        return { text: "👔 Finance → Self-approval", color: "text-red-600" };
+        return { text: "Finance → Executive Final", color: "text-red-600" };
       } else {
         return {
-          text: "👔 Finance → Executive Approval",
+          text: "Finance → Executive Approval",
           color: "text-red-600",
         };
       }
@@ -136,7 +139,8 @@ const ProjectList = () => {
     );
   }
 
-  // Project categories from backend model - filtered by user's department
+  // Project categories for ELRA - All departments can create all types of projects
+  // ELRA is a regulatory authority overseeing all equipment leasing categories
   const getProjectCategories = () => {
     const allCategories = [
       { value: "all", label: "All Categories" },
@@ -155,40 +159,7 @@ const ProjectList = () => {
       { value: "other", label: "Other (Custom Category)" },
     ];
 
-    // Super Admin can see all categories
-    if (user.role.level >= 1000) {
-      return allCategories;
-    }
-
-    // Department-based categories
-    const departmentCategoryMap = {
-      Operations: [
-        "equipment_lease",
-        "software_development",
-        "system_maintenance",
-      ],
-      "Sales & Marketing": ["vehicle_lease", "consulting", "training"],
-      "Information Technology": [
-        "property_lease",
-        "software_development",
-        "system_maintenance",
-      ],
-      "Finance & Accounting": ["financial_lease", "consulting", "training"],
-      "Human Resources": ["training_equipment_lease", "consulting", "training"],
-      "Legal & Compliance": ["compliance_lease", "consulting"],
-      "Customer Service": ["service_equipment_lease", "consulting", "training"],
-      "Executive Office": ["strategic_lease", "consulting", "training"],
-    };
-
-    const userDepartment = user.department?.name;
-    const allowedCategories = departmentCategoryMap[userDepartment] || [];
-
-    return [
-      { value: "all", label: "All Categories" },
-      ...allCategories.filter(
-        (cat) => cat.value === "all" || allowedCategories.includes(cat.value)
-      ),
-    ];
+    return allCategories;
   };
 
   const projectCategories = getProjectCategories();
@@ -200,7 +171,43 @@ const ProjectList = () => {
       label: "Planning",
       color: "bg-gray-100 text-gray-800",
     },
-    { value: "active", label: "Active", color: "bg-blue-100 text-blue-800" },
+    {
+      value: "pending_approval",
+      label: "Pending Approval",
+      color: "bg-yellow-100 text-yellow-800",
+    },
+    {
+      value: "pending_department_approval",
+      label: "Pending Department Approval",
+      color: "bg-orange-100 text-orange-800",
+    },
+    {
+      value: "pending_finance_approval",
+      label: "Pending Finance Approval",
+      color: "bg-purple-100 text-purple-800",
+    },
+    {
+      value: "pending_executive_approval",
+      label: "Pending Executive Approval",
+      color: "bg-indigo-100 text-indigo-800",
+    },
+    {
+      value: "approved",
+      label: "Approved",
+      color:
+        "bg-[var(--elra-primary)] bg-opacity-20 text-[var(--elra-primary)]",
+    },
+    {
+      value: "implementation",
+      label: "Implementation",
+      color: "bg-blue-100 text-blue-800",
+    },
+    {
+      value: "active",
+      label: "Active",
+      color:
+        "bg-[var(--elra-primary)] bg-opacity-20 text-[var(--elra-primary)]",
+    },
     {
       value: "on_hold",
       label: "On Hold",
@@ -209,11 +216,17 @@ const ProjectList = () => {
     {
       value: "completed",
       label: "Completed",
-      color: "bg-green-100 text-green-800",
+      color:
+        "bg-[var(--elra-primary)] bg-opacity-20 text-[var(--elra-primary)]",
     },
     {
       value: "cancelled",
       label: "Cancelled",
+      color: "bg-red-100 text-red-800",
+    },
+    {
+      value: "rejected",
+      label: "Rejected",
       color: "bg-red-100 text-red-800",
     },
   ];
@@ -268,7 +281,6 @@ const ProjectList = () => {
       category: "",
       status: "planning",
       priority: "medium",
-      teamName: "",
     });
     setIsEditMode(false);
     setSelectedProject(null);
@@ -304,7 +316,6 @@ const ProjectList = () => {
       category: project.category || "",
       status: project.status || "planning",
       priority: project.priority || "medium",
-      teamName: project.teamName || "",
     });
     console.log(
       "🔍 [EDIT] Form data set with manager ID:",
@@ -316,6 +327,16 @@ const ProjectList = () => {
   const closeModal = () => {
     setShowModal(false);
     resetForm();
+  };
+
+  const handleViewTeamMembers = (project) => {
+    setSelectedProjectForTeam(project);
+    setShowTeamModal(true);
+  };
+
+  const closeTeamModal = () => {
+    setShowTeamModal(false);
+    setSelectedProjectForTeam(null);
   };
 
   const validateForm = () => {
@@ -399,7 +420,47 @@ const ProjectList = () => {
 
       const response = await createProject(submitData);
       if (response.success) {
-        toast.success("Project created successfully");
+        // Dynamic toast based on approval level
+        const budget = parseFormattedNumber(submitData.budget);
+        let approvalMessage = "Awaiting approval.";
+
+        if (user.role.level === 1000) {
+          approvalMessage = "Auto-approved by Super Admin!";
+        } else if (budget <= 1000000) {
+          approvalMessage = "Auto-approved by HOD!";
+        } else if (budget <= 5000000) {
+          if (user.department?.name === "Finance & Accounting") {
+            approvalMessage = "Sent to Executive for approval.";
+          } else {
+            approvalMessage = "Sent to Finance → Executive for approval.";
+          }
+        } else if (budget <= 25000000) {
+          if (user.department?.name === "Finance & Accounting") {
+            approvalMessage = "Sent to Executive for approval.";
+          } else {
+            approvalMessage = "Sent to Finance → Executive for approval.";
+          }
+        } else {
+          if (user.department?.name === "Finance & Accounting") {
+            approvalMessage = "Sent to Executive for approval.";
+          } else if (user.department?.name === "Executive Office") {
+            approvalMessage = "Sent to Finance for approval.";
+          } else {
+            approvalMessage = "Sent to Finance → Executive for approval.";
+          }
+        }
+
+        toast.success(
+          `✅ Project "${submitData.name}" created successfully! ${approvalMessage}`,
+          {
+            position: "top-right",
+            autoClose: 5000,
+            hideProgressBar: false,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+          }
+        );
         loadProjects();
         closeModal();
       } else {
@@ -424,7 +485,14 @@ const ProjectList = () => {
 
       const response = await updateProject(selectedProject._id, submitData);
       if (response.success) {
-        toast.success("Project updated successfully");
+        toast.success(`✅ Project "${submitData.name}" updated successfully!`, {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+        });
         loadProjects();
         closeModal();
       } else {
@@ -518,89 +586,120 @@ const ProjectList = () => {
       header: "Project",
       accessor: "name",
       renderer: (project) => (
-        <div className="flex items-center">
-          <FolderIcon className="h-5 w-5 text-blue-500 mr-2" />
-          <div>
-            <div className="font-medium text-gray-900">{project.name}</div>
-            <div className="text-sm text-gray-500">{project.code}</div>
+        <div className="flex items-center min-w-0 max-w-xs">
+          <FolderIcon className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div
+              className="font-medium text-gray-900 truncate"
+              title={project.name}
+            >
+              {project.name.length > 25
+                ? `${project.name.slice(0, 25)}...`
+                : project.name}
+            </div>
+            <div
+              className="text-sm text-gray-500 truncate"
+              title={project.code}
+            >
+              {project.code}
+            </div>
           </div>
         </div>
       ),
     },
     {
-      header: "Project Manager",
+      header: "Manager",
       accessor: "projectManager",
       renderer: (project) => (
-        <div className="text-sm">
-          <div className="font-medium text-gray-900">
-            {project.projectManager?.firstName}{" "}
+        <div className="text-sm min-w-0 max-w-24">
+          <div
+            className="font-medium text-gray-900 truncate"
+            title={`${project.projectManager?.firstName} ${project.projectManager?.lastName}`}
+          >
+            {project.projectManager?.firstName?.charAt(0)}.{" "}
             {project.projectManager?.lastName}
           </div>
-          <div className="text-gray-500">{project.projectManager?.email}</div>
         </div>
       ),
     },
     {
-      header: "Team Name",
-      accessor: "teamName",
+      header: "Team",
+      accessor: "teamMembers",
       renderer: (project) => (
-        <div className="text-sm">
-          <div className="font-medium text-gray-900">
-            {project.teamName || `${project.name} Team`}
+        <div className="text-sm min-w-0 max-w-20">
+          <div className="font-medium text-gray-900 truncate">
+            {project.enhancedTeamMembers?.length || 0} members
           </div>
-          <div className="text-gray-500">Team Tag</div>
         </div>
       ),
-    },
-    {
-      header: "Department",
-      accessor: "department",
-      renderer: (project) => (
-        <div className="text-sm">
-          <div className="font-medium text-gray-900">
-            {project.department?.name || "Not Assigned"}
-          </div>
-          <div className="text-gray-500">Department</div>
-        </div>
-      ),
-    },
-    {
-      header: "Category",
-      accessor: "category",
-      renderer: (project) => {
-        const category = projectCategories.find(
-          (c) => c.value === project.category
-        );
-        return (
-          <span className="text-sm text-gray-600">
-            {category?.label || project.category?.replace(/_/g, " ")}
-          </span>
-        );
-      },
     },
     {
       header: "Budget",
       accessor: "budget",
       renderer: (project) => (
-        <span className="font-medium text-gray-900">
+        <span className="font-medium text-gray-900 max-w-28">
           {formatCurrency(project.budget)}
         </span>
       ),
     },
     {
-      header: "Timeline",
-      accessor: "startDate",
+      header: "Status",
+      accessor: "status",
       renderer: (project) => (
-        <div className="text-sm">
-          <div className="text-gray-900">{formatDate(project.startDate)}</div>
-          <div className="text-gray-500">to {formatDate(project.endDate)}</div>
+        <div className="max-w-32 cursor-pointer">
+          {getStatusBadge(project.status)}
         </div>
       ),
     },
     {
-      header: "Status",
-      accessor: "status",
-      renderer: (project) => getStatusBadge(project.status),
+      header: "Actions",
+      accessor: "actions",
+      align: "center",
+      renderer: (project) => (
+        <div className="flex items-center justify-center space-x-1 w-32">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              openDetailsModal(project);
+            }}
+            className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+            title="View Details"
+          >
+            <EyeIcon className="h-4 w-4" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleViewTeamMembers(project);
+            }}
+            className="p-2 text-[var(--elra-primary)] rounded-lg transition-colors cursor-pointer"
+            title="View Team Members"
+          >
+            <UsersIcon className="h-4 w-4" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              openEditModal(project);
+            }}
+            className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
+            title="Edit Project"
+          >
+            <PencilIcon className="h-4 w-4" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setProjectToDelete(project);
+              setShowDeleteConfirm(true);
+            }}
+            className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+            title="Delete Project"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        </div>
+      ),
     },
   ];
 
@@ -625,7 +724,7 @@ const ProjectList = () => {
                 ? "Manage and track all projects across all departments"
                 : `Manage and track projects for ${
                     user.department?.name || "your department"
-                  } - Only leasing projects allowed`}
+                  } - ELRA regulatory authority oversees all equipment categories`}
             </p>
           </div>
           <button
@@ -732,31 +831,33 @@ const ProjectList = () => {
         </div>
 
         {/* Projects Table */}
-        <DataTable
-          data={projects}
-          columns={columns}
-          loading={loading}
-          onRowClick={openDetailsModal}
-          actions={{
-            showEdit: true,
-            showDelete: true,
-            onEdit: openEditModal,
-            onDelete: handleDelete,
-          }}
-          emptyState={{
-            icon: <FolderIcon className="h-12 w-12 text-white" />,
-            title: "No projects found",
-            description: "Get started by creating your first project",
-            actionButton: (
-              <button
-                onClick={openCreateModal}
-                className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors"
-              >
-                Create Project
-              </button>
-            ),
-          }}
-        />
+        <div className="overflow-x-auto">
+          <DataTable
+            data={projects}
+            columns={columns}
+            loading={loading}
+            onRowClick={openDetailsModal}
+            rowClassName="cursor-pointer hover:bg-gray-50 transition-colors"
+            actions={{
+              showEdit: false,
+              showDelete: false,
+              showToggle: false,
+            }}
+            emptyState={{
+              icon: <FolderIcon className="h-12 w-12 text-white" />,
+              title: "No projects found",
+              description: "Get started by creating your first project",
+              actionButton: (
+                <button
+                  onClick={openCreateModal}
+                  className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors"
+                >
+                  Create Project
+                </button>
+              ),
+            }}
+          />
+        </div>
       </div>
 
       {/* Unified Create/Edit Modal */}
@@ -810,21 +911,7 @@ const ProjectList = () => {
                     disabled={submitting}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Team Name/Tag
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.teamName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, teamName: e.target.value })
-                    }
-                    placeholder="Enter team name or tag (optional)"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                    disabled={submitting}
-                  />
-                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Category <span className="text-red-500">*</span>
@@ -840,19 +927,13 @@ const ProjectList = () => {
                   >
                     <option value="">Select Category</option>
                     {projectCategories
-                      .filter((cat) => cat.value !== "all") // Exclude "All Categories" from form
+                      .filter((cat) => cat.value !== "all")
                       .map((category) => (
                         <option key={category.value} value={category.value}>
                           {category.label}
                         </option>
                       ))}
                   </select>
-                  {user.role.level < 1000 && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Available categories for {user.department?.name}{" "}
-                      department
-                    </p>
-                  )}
                 </div>
                 {formData.category === "other" && (
                   <div>
@@ -992,6 +1073,10 @@ const ProjectList = () => {
                   className="w-full"
                   currentUser={user}
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  HODs can assign themselves or other managers as project
+                  managers
+                </p>
               </div>
               <div className="mt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1097,11 +1182,12 @@ const ProjectList = () => {
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
-                          Team Name/Tag
+                          Team Members
                         </label>
                         <p className="text-gray-900 font-medium">
-                          {selectedProjectDetails.teamName ||
-                            `${selectedProjectDetails.name} Team`}
+                          {selectedProjectDetails.enhancedTeamMembers?.length ||
+                            0}{" "}
+                          members
                         </p>
                       </div>
                     </div>
@@ -1301,46 +1387,6 @@ const ProjectList = () => {
                         </div>
                       </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-2">
-                        Team Members
-                      </label>
-                      <div className="text-gray-900">
-                        {selectedProjectDetails.teamMembers?.length > 0 ? (
-                          <div className="space-y-2">
-                            {selectedProjectDetails.teamMembers.map(
-                              (member, index) => (
-                                <div
-                                  key={index}
-                                  className="flex items-center space-x-2 bg-white p-2 rounded-lg border border-gray-100"
-                                >
-                                  <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center">
-                                    <span className="text-purple-600 font-semibold text-xs">
-                                      {member.user?.firstName
-                                        ?.charAt(0)
-                                        ?.toUpperCase()}
-                                    </span>
-                                  </div>
-                                  <span className="font-medium text-sm">
-                                    {member.user?.firstName}{" "}
-                                    {member.user?.lastName}
-                                  </span>
-                                  <span className="text-purple-600 text-xs font-medium bg-purple-50 px-2 py-1 rounded-full">
-                                    {member.role}
-                                  </span>
-                                </div>
-                              )
-                            )}
-                          </div>
-                        ) : (
-                          <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                            <p className="text-gray-500 text-sm text-center">
-                              No team members assigned
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -1457,6 +1503,116 @@ const ProjectList = () => {
                   Update Project
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Team Members View Modal */}
+      {showTeamModal && selectedProjectForTeam && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg shadow-lg border border-gray-200">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                <UsersIcon className="h-6 w-6 text-blue-600 mr-2" />
+                Team Members
+              </h2>
+              <button
+                onClick={closeTeamModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Project: {selectedProjectForTeam.name}
+              </h3>
+              <p className="text-sm text-gray-500">
+                Code: {selectedProjectForTeam.code}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-[var(--elra-primary)] p-4 rounded-lg border border-[var(--elra-primary)]">
+                <h4 className="font-medium text-white mb-3">
+                  Current Team Members (
+                  {selectedProjectForTeam.enhancedTeamMembers?.length || 0})
+                </h4>
+                {selectedProjectForTeam.enhancedTeamMembers &&
+                selectedProjectForTeam.enhancedTeamMembers.length > 0 ? (
+                  <div className="space-y-3">
+                    {selectedProjectForTeam.enhancedTeamMembers.map(
+                      (member, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center space-x-3 p-3 bg-white rounded-lg border border-blue-200"
+                        >
+                          <div className="w-10 h-10 bg-[var(--elra-primary)] rounded-full flex items-center justify-center">
+                            <span className="text-white font-semibold text-sm">
+                              {member.user?.firstName?.charAt(0)}
+                              {member.user?.lastName?.charAt(0)}
+                            </span>
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900 flex items-center">
+                              {member.user?.firstName} {member.user?.lastName}
+                              {member.role === "project_manager" && (
+                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--elra-primary)] text-white">
+                                  PM
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {member.role.replace(/_/g, " ")} •{" "}
+                              {member.user?.department?.name}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              {member.allocationPercentage}% allocation
+                            </p>
+                          </div>
+                          <div className="flex items-center">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--elra-primary)] text-white">
+                              {member.status}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <UsersIcon className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-500">
+                      No team members assigned yet.
+                    </p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Team members can be added from the Teams page.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-[var(--elra-primary)] p-4 rounded-lg border border-[var(--elra-primary)]">
+                <h4 className="font-medium text-white mb-2">
+                  💡 Team Management
+                </h4>
+                <p className="text-sm text-white">
+                  To add or remove team members, please use the dedicated{" "}
+                  <span className="font-medium">Teams page</span> for
+                  comprehensive team management.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
+              <button
+                onClick={closeTeamModal}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

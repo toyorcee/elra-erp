@@ -13,6 +13,15 @@ import {
   addTeamMember,
   removeTeamMember,
   addProjectNote,
+  approveProject,
+  rejectProject,
+  triggerPostApprovalWorkflow,
+  getProjectWorkflowStatus,
+  getPendingApprovalProjects,
+  getProjectAuditTrail,
+  getMyProjectTasks,
+  getMyProjects,
+  updateTaskStatus,
 } from "../controllers/projectController.js";
 import { protect, checkRole } from "../middleware/auth.js";
 
@@ -100,6 +109,13 @@ router.get(
   getProjectsAvailableForTeams
 );
 
+// Self-service routes for project tasks (must come before /:id routes)
+router.get("/my-tasks", protect, getMyProjectTasks);
+router.get("/my-projects", protect, getMyProjects);
+
+// Pending approval projects - HOD+ only
+router.get("/pending-approval", checkRole(700), getPendingApprovalProjects);
+
 // Get project by ID - Viewer+
 router.get("/:id", checkRole(100), getProjectById);
 
@@ -118,5 +134,23 @@ router.delete("/:id/team/:userId", checkRole(600), removeTeamMember);
 
 // Notes routes - Manager+
 router.post("/:id/notes", checkRole(600), validateNote, addProjectNote);
+
+// Approval routes - HOD+
+router.post("/:id/approve", checkRole(700), approveProject);
+router.post("/:id/reject", checkRole(700), rejectProject);
+
+// Workflow routes - HOD+
+router.post(
+  "/:id/trigger-workflow",
+  checkRole(700),
+  triggerPostApprovalWorkflow
+);
+router.get("/:id/workflow-status", checkRole(700), getProjectWorkflowStatus);
+
+// Audit routes - HOD+
+router.get("/:id/audit-trail", checkRole(700), getProjectAuditTrail);
+
+// Task status update
+router.put("/tasks/:id/status", protect, updateTaskStatus);
 
 export default router;

@@ -2,6 +2,22 @@ import TeamMember from "../models/TeamMember.js";
 import Project from "../models/Project.js";
 import User from "../models/User.js";
 
+// Helper function to get role display name
+const getRoleDisplayName = (role) => {
+  const roleMap = {
+    project_manager: "Project Manager",
+    team_lead: "Team Lead",
+    developer: "Developer",
+    designer: "Designer",
+    analyst: "Analyst",
+    tester: "Tester",
+    consultant: "Consultant",
+    support: "Support",
+    other: "Other",
+  };
+  return roleMap[role] || role;
+};
+
 // ============================================================================
 // TEAM MEMBER CONTROLLERS
 // ============================================================================
@@ -170,7 +186,7 @@ export const addTeamMember = async (req, res) => {
       projectId,
       userId,
       role,
-      allocationPercentage = 100,
+      allocationPercentage = 0,
       permissions = {},
     } = req.body;
     const currentUser = req.user;
@@ -235,6 +251,56 @@ export const addTeamMember = async (req, res) => {
       "firstName lastName email avatar department role"
     );
     await teamMember.populate("assignedBy", "firstName lastName");
+    await teamMember.populate(
+      "project",
+      "name code description startDate endDate status budget category"
+    );
+
+    // Send notification to the assigned team member
+    try {
+      const NotificationService = (
+        await import("../services/notificationService.js")
+      ).default;
+      const notificationService = new NotificationService();
+
+      await notificationService.createNotification({
+        recipient: userId,
+        type: "TEAM_MEMBER_ASSIGNED",
+        title: "You've Been Assigned to a Project",
+        message: `You have been assigned to project "${
+          teamMember.project.name
+        }" as a ${getRoleDisplayName(role)}.`,
+        priority: "high",
+        data: {
+          projectId: projectId,
+          projectName: teamMember.project.name,
+          projectCode: teamMember.project.code,
+          role: role,
+          roleDisplay: getRoleDisplayName(role),
+          allocationPercentage: allocationPercentage,
+          assignedBy: `${currentUser.firstName} ${currentUser.lastName}`,
+          assignedDate: teamMember.assignedDate,
+          projectDetails: {
+            description: teamMember.project.description,
+            startDate: teamMember.project.startDate,
+            endDate: teamMember.project.endDate,
+            status: teamMember.project.status,
+            budget: teamMember.project.budget,
+            category: teamMember.project.category,
+          },
+          actionUrl: `/dashboard/modules/self-service/projects`,
+        },
+      });
+
+      console.log(
+        `✅ [TEAM MEMBER] Notification sent to ${teamMember.user.firstName} ${teamMember.user.lastName} for project assignment`
+      );
+    } catch (notificationError) {
+      console.error(
+        "❌ [TEAM MEMBER] Failed to send notification:",
+        notificationError
+      );
+    }
 
     res.status(201).json({
       success: true,
@@ -294,6 +360,47 @@ export const updateTeamMember = async (req, res) => {
 
     await teamMember.save();
 
+    // Send notification to the team member about the update
+    try {
+      const NotificationService = (
+        await import("../services/notificationService.js")
+      ).default;
+      const notificationService = new NotificationService();
+
+      await notificationService.createNotification({
+        recipient: teamMember.user._id,
+        type: "TEAM_MEMBER_UPDATED",
+        title: "Project Assignment Updated",
+        message: `Your assignment to project "${teamMember.project.name}" has been updated.`,
+        priority: "medium",
+        data: {
+          projectId: teamMember.project._id,
+          projectName: teamMember.project.name,
+          projectCode: teamMember.project.code,
+          updatedBy: `${currentUser.firstName} ${currentUser.lastName}`,
+          updatedDate: new Date(),
+          changes: {
+            role: role || teamMember.role,
+            allocationPercentage:
+              allocationPercentage !== undefined
+                ? allocationPercentage
+                : teamMember.allocationPercentage,
+            status: status || teamMember.status,
+          },
+          actionUrl: `/dashboard/modules/self-service/projects`,
+        },
+      });
+
+      console.log(
+        `✅ [TEAM MEMBER] Notification sent to ${teamMember.user.firstName} ${teamMember.user.lastName} for assignment update`
+      );
+    } catch (notificationError) {
+      console.error(
+        "❌ [TEAM MEMBER] Failed to send update notification:",
+        notificationError
+      );
+    }
+
     res.status(200).json({
       success: true,
       message: "Team member updated successfully",
@@ -345,6 +452,39 @@ export const removeTeamMember = async (req, res) => {
     teamMember.isActive = false;
     teamMember.status = "removed";
     await teamMember.save();
+
+    // Send notification to the removed team member
+    try {
+      const NotificationService = (
+        await import("../services/notificationService.js")
+      ).default;
+      const notificationService = new NotificationService();
+
+      await notificationService.createNotification({
+        recipient: teamMember.user._id,
+        type: "TEAM_MEMBER_REMOVED",
+        title: "Project Assignment Removed",
+        message: `You have been removed from project "${teamMember.project.name}".`,
+        priority: "medium",
+        data: {
+          projectId: teamMember.project._id,
+          projectName: teamMember.project.name,
+          projectCode: teamMember.project.code,
+          removedBy: `${currentUser.firstName} ${currentUser.lastName}`,
+          removedDate: new Date(),
+          actionUrl: `/dashboard/modules/self-service/projects`,
+        },
+      });
+
+      console.log(
+        `✅ [TEAM MEMBER] Notification sent to ${teamMember.user.firstName} ${teamMember.user.lastName} for project removal`
+      );
+    } catch (notificationError) {
+      console.error(
+        "❌ [TEAM MEMBER] Failed to send removal notification:",
+        notificationError
+      );
+    }
 
     res.status(200).json({
       success: true,

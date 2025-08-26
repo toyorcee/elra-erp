@@ -64,6 +64,8 @@ import approvalRoutes from "./routes/approvals.js";
 import inventoryRoutes from "./routes/inventory.js";
 import procurementRoutes from "./routes/procurement.js";
 import financeRoutes from "./routes/finance.js";
+import documentApprovalRoutes from "./routes/documentApproval.js";
+import workflowTaskRoutes from "./routes/workflowTasks.js";
 
 const isValidObjectId = (id) => {
   return (
@@ -254,6 +256,8 @@ app.use("/api/approvals", approvalRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/procurement", procurementRoutes);
 app.use("/api/finance", financeRoutes);
+app.use("/api/document-approval", documentApprovalRoutes);
+app.use("/api/workflow-tasks", workflowTaskRoutes);
 
 const io = new SocketIOServer(httpServer, {
   cors: {

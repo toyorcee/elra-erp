@@ -16,6 +16,7 @@ import {
   fetchAvailableUsers,
   addTeamMemberNew,
   removeTeamMemberNew,
+  fetchProjects,
 } from "../../../../services/projectAPI";
 import { getUsers } from "../../../../services/users";
 import { useAuth } from "../../../../context/AuthContext";
@@ -54,7 +55,7 @@ const ProjectTeams = () => {
     projectId: "",
     selectedUsers: [],
     role: "developer",
-    allocationPercentage: 100,
+    allocationPercentage: 0,
   });
   const [selectedProjectManager, setSelectedProjectManager] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -73,6 +74,7 @@ const ProjectTeams = () => {
       setAllUsers(usersResponse.data || []);
 
       if (user.role.level >= 1000) {
+        // SUPER_ADMIN - use comprehensive endpoints
         const comprehensiveData = await fetchComprehensiveProjectData();
         const availableProjectsData = await fetchProjectsAvailableForTeams();
 
@@ -80,8 +82,43 @@ const ProjectTeams = () => {
         setAvailableProjects(availableProjectsData.data || []);
         setTeamMembers(comprehensiveData.data.teamMembers || []);
       } else {
+        // HOD and other roles - use regular endpoints with role-based filtering
+        const projectsData = await fetchProjects();
         const teamData = await fetchAllTeamMembers();
+
+        // Transform the data to match the expected format
+        setProjectData({
+          projects: projectsData.data || [],
+          teamMembers: teamData.data || [],
+          statistics: {
+            totalProjects: projectsData.data?.length || 0,
+            activeProjects:
+              projectsData.data?.filter((p) => p.status === "active")?.length ||
+              0,
+            completedProjects:
+              projectsData.data?.filter((p) => p.status === "completed")
+                ?.length || 0,
+            totalTeamMembers: teamData.data?.length || 0,
+          },
+        });
         setTeamMembers(teamData.data || []);
+
+        // For HODs, calculate available projects (projects without team members)
+        if (projectsData.data && teamData.data) {
+          const projectsWithMembers = new Set();
+          teamData.data.forEach((member) => {
+            const projectId =
+              typeof member.project === "object"
+                ? member.project._id
+                : member.project;
+            projectsWithMembers.add(projectId);
+          });
+
+          const availableProjectsForHOD = projectsData.data.filter(
+            (project) => !projectsWithMembers.has(project._id)
+          );
+          setAvailableProjects(availableProjectsForHOD);
+        }
       }
     } catch (error) {
       console.error("Error loading data:", error);
@@ -107,7 +144,9 @@ const ProjectTeams = () => {
   };
 
   const handleProjectChange = (projectId) => {
-    const selectedProject = availableProjects?.find((p) => p._id === projectId);
+    const projectsToSearch =
+      user.role.level >= 1000 ? availableProjects : projectData?.projects;
+    const selectedProject = projectsToSearch?.find((p) => p._id === projectId);
     setSelectedProjectManager(selectedProject?.projectManager || null);
 
     setNewMemberData((prev) => ({
@@ -147,7 +186,7 @@ const ProjectTeams = () => {
         projectId: "",
         selectedUsers: [],
         role: "developer",
-        allocationPercentage: 100,
+        allocationPercentage: 0,
       });
       setSelectedProjectManager(null);
       setShowAddMember(false);
@@ -323,12 +362,8 @@ const ProjectTeams = () => {
       accessor: "user",
       renderer: (member) => (
         <div className="flex items-center">
-          <div className="flex-shrink-0 h-10 w-10">
-            <img
-              className="h-10 w-10 rounded-full"
-              src={member.user?.avatar || "https://via.placeholder.com/40"}
-              alt=""
-            />
+          <div className="flex-shrink-0 h-10 w-10 relative">
+            {getAvatarDisplay(member.user)}
           </div>
           <div className="ml-4">
             <div className="text-sm font-medium text-gray-900 break-words">
@@ -487,9 +522,13 @@ const ProjectTeams = () => {
             <button
               onClick={() => {
                 setShowAddMember(true);
-                // Check if there are available projects
-                if (availableProjects?.length > 0) {
-                  const firstProject = availableProjects[0];
+                // Check if there are available projects based on user role
+                const projectsToCheck =
+                  user.role.level >= 1000
+                    ? availableProjects
+                    : projectData?.projects;
+                if (projectsToCheck?.length > 0) {
+                  const firstProject = projectsToCheck[0];
                   handleProjectChange(firstProject._id);
                   setShowEmptyState(false);
                 } else {
@@ -499,7 +538,7 @@ const ProjectTeams = () => {
               className="flex items-center px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors"
             >
               <PlusIcon className="h-5 w-5 mr-2" />
-              {user.role.level >= 1000 ? "Add Team Member" : "Add Team Member"}
+              Add Team Member
             </button>
           )}
         </div>
@@ -570,32 +609,42 @@ const ProjectTeams = () => {
                 }}
                 className="space-y-6"
               >
-                {availableProjects && availableProjects.length > 0 ? (
+                {(() => {
+                  const projectsToCheck =
+                    user.role.level >= 1000
+                      ? availableProjects
+                      : projectData?.projects;
+                  return projectsToCheck && projectsToCheck.length > 0;
+                })() ? (
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {user.role.level >= 1000 && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Project
-                          </label>
-                          <select
-                            value={newMemberData.projectId}
-                            onChange={(e) =>
-                              handleProjectChange(e.target.value)
-                            }
-                            disabled={isSubmitting}
-                            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
-                            required
-                          >
-                            <option value="">Select Project</option>
-                            {availableProjects.map((project) => (
-                              <option key={project._id} value={project._id}>
-                                {project.name} ({project.code})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Project
+                        </label>
+                        <select
+                          value={newMemberData.projectId}
+                          onChange={(e) => handleProjectChange(e.target.value)}
+                          disabled={isSubmitting}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
+                          required
+                        >
+                          <option value="">Select Project</option>
+                          {(() => {
+                            const projectsToShow =
+                              user.role.level >= 1000
+                                ? availableProjects
+                                : projectData?.projects;
+                            return (
+                              projectsToShow?.map((project) => (
+                                <option key={project._id} value={project._id}>
+                                  {project.name} ({project.code})
+                                </option>
+                              )) || []
+                            );
+                          })()}
+                        </select>
+                      </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -655,42 +704,57 @@ const ProjectTeams = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Select Employees
                       </label>
-                      <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
-                        <p className="text-sm text-blue-800">
+                      <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded-md">
+                        <p className="text-sm text-green-800">
                           <strong>Note:</strong> Check the boxes to select
                           multiple employees.
                         </p>
                       </div>
                       <div className="border border-gray-300 rounded-md p-4 max-h-60 overflow-y-auto">
-                        {allUsers.map((user) => (
-                          <div
-                            key={user._id}
-                            className="flex items-center space-x-3 py-2"
-                          >
-                            <input
-                              type="checkbox"
-                              id={user._id}
-                              checked={newMemberData.selectedUsers.includes(
-                                user._id
-                              )}
-                              onChange={() => handleEmployeeToggle(user._id)}
-                              disabled={isSubmitting}
-                              className="h-4 w-4 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                            />
-                            <label
-                              htmlFor={user._id}
-                              className="flex-1 cursor-pointer"
+                        {allUsers
+                          .filter((user) => {
+                            // Filter out the current user if they are the project manager
+                            if (
+                              selectedProjectManager &&
+                              selectedProjectManager._id === user._id
+                            ) {
+                              return false;
+                            }
+                            return true;
+                          })
+                          .map((user) => (
+                            <div
+                              key={user._id}
+                              className="flex items-center space-x-3 py-2"
                             >
-                              <div className="text-sm font-medium text-gray-900">
-                                {user.firstName} {user.lastName}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                {user.email} -{" "}
-                                {user.department?.name || "No Department"}
-                              </div>
-                            </label>
-                          </div>
-                        ))}
+                              <input
+                                type="checkbox"
+                                id={user._id}
+                                checked={newMemberData.selectedUsers.includes(
+                                  user._id
+                                )}
+                                onChange={() => handleEmployeeToggle(user._id)}
+                                disabled={isSubmitting}
+                                className="h-4 w-4 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                              />
+                              <label
+                                htmlFor={user._id}
+                                className="flex-1 cursor-pointer"
+                              >
+                                <div className="text-sm font-medium text-gray-900">
+                                  {user.firstName} {user.lastName}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  {user.email} -{" "}
+                                  {user.department?.name || "No Department"}
+                                </div>
+                                <div className="text-xs text-gray-400 mt-1">
+                                  Role: {user.role?.name || "No Role"} • Level:{" "}
+                                  {user.role?.level || "N/A"}
+                                </div>
+                              </label>
+                            </div>
+                          ))}
                       </div>
                       {newMemberData.selectedUsers.length > 0 && (
                         <p className="text-sm text-gray-600 mt-1">
@@ -702,29 +766,93 @@ const ProjectTeams = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Allocation Percentage
+                        Work Allocation Percentage
                       </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={newMemberData.allocationPercentage}
-                        onChange={(e) => {
-                          const value =
-                            e.target.value === ""
-                              ? 0
-                              : parseInt(e.target.value) || 0;
-                          setNewMemberData((prev) => ({
-                            ...prev,
-                            allocationPercentage: value,
-                          }));
-                        }}
-                        disabled={isSubmitting}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
-                        required
-                      />
+                      <div className="mb-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                        <p className="text-sm text-green-800">
+                          <strong>What is Work Allocation?</strong>
+                          <br />
+                          This represents how much of the team member's time
+                          will be dedicated to this project.
+                        </p>
+                        <ul className="text-xs text-green-700 mt-2 space-y-1">
+                          <li>
+                            • <strong>100%</strong> = Full-time on this project
+                          </li>
+                          <li>
+                            • <strong>50%</strong> = Half-time (can work on
+                            other projects)
+                          </li>
+                          <li>
+                            • <strong>25%</strong> = Part-time involvement
+                          </li>
+                          <li>
+                            • <strong>0%</strong> = No time allocation
+                            (consultant/advisory role)
+                          </li>
+                        </ul>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={newMemberData.allocationPercentage || ""}
+                          onChange={(e) => {
+                            const value =
+                              e.target.value === ""
+                                ? 0
+                                : parseInt(e.target.value) || 0;
+                            setNewMemberData((prev) => ({
+                              ...prev,
+                              allocationPercentage: value,
+                            }));
+                          }}
+                          onBlur={(e) => {
+                            // Ensure value is set to 0 if empty
+                            if (e.target.value === "") {
+                              setNewMemberData((prev) => ({
+                                ...prev,
+                                allocationPercentage: 0,
+                              }));
+                            }
+                          }}
+                          disabled={isSubmitting}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 pr-8 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
+                          placeholder="0"
+                        />
+                        {newMemberData.allocationPercentage > 0 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setNewMemberData((prev) => ({
+                                ...prev,
+                                allocationPercentage: 0,
+                              }))
+                            }
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            disabled={isSubmitting}
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        Leave empty or set to 0 if no allocation needed
+                        <strong>Note:</strong> This helps with resource planning
+                        and workload management. Each team member can have their
+                        own allocation percentage.
                       </p>
                     </div>
 
@@ -740,11 +868,11 @@ const ProjectTeams = () => {
                       <button
                         type="submit"
                         disabled={isSubmitting}
-                        className="px-4 py-2 text-sm font-medium text-white bg-[var(--elra-primary)] rounded-md hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                        className="px-4 py-2 text-sm font-medium text-white bg-[var(--elra-primary)] rounded-md hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 cursor-pointer"
                       >
                         {isSubmitting ? (
                           <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin cursor-pointer"></div>
                             <span>Adding...</span>
                           </>
                         ) : (

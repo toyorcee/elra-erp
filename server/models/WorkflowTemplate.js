@@ -1,11 +1,6 @@
 import mongoose from "mongoose";
 
 const workflowTemplateSchema = new mongoose.Schema({
-  company: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Company",
-    required: true,
-  },
   name: {
     type: String,
     required: true,
@@ -19,12 +14,12 @@ const workflowTemplateSchema = new mongoose.Schema({
     type: String,
     required: true,
     enum: [
-      "insurance_policy",
-      "claims_document",
-      "financial_report",
-      "client_correspondence",
+      "project_workflow",
       "regulatory_compliance",
-      "underwriting_document",
+      "equipment_lease_registration",
+      "vehicle_lease_registration",
+      "financial_lease_registration",
+      "software_development_registration",
       "general",
     ],
   },
@@ -40,9 +35,10 @@ const workflowTemplateSchema = new mongoose.Schema({
       canSkip: { type: Boolean, default: false },
       autoApprove: { type: Boolean, default: false },
       conditions: {
-        amount: { type: Number },
-        documentType: [String],
-        department: [String],
+        projectCategory: { type: String },
+        minBudget: { type: Number },
+        maxBudget: { type: Number },
+        departments: [String],
         priority: {
           type: String,
           enum: ["low", "medium", "high", "critical"],
@@ -80,8 +76,8 @@ const workflowTemplateSchema = new mongoose.Schema({
 });
 
 // Index for efficient queries
-workflowTemplateSchema.index({ company: 1, documentType: 1 });
-workflowTemplateSchema.index({ company: 1, isActive: 1 });
+workflowTemplateSchema.index({ documentType: 1 });
+workflowTemplateSchema.index({ isActive: 1 });
 
 // Pre-save middleware to update timestamp
 workflowTemplateSchema.pre("save", function (next) {

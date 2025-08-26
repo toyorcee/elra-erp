@@ -176,6 +176,10 @@ const documentSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -192,6 +196,55 @@ const documentSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+
+    // OCR Processing Fields
+    ocrResults: {
+      type: Map,
+      of: mongoose.Schema.Types.Mixed,
+    },
+    lastProcessedAt: {
+      type: Date,
+    },
+    confidence: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+    extractedText: {
+      type: String,
+    },
+    keywords: [{
+      type: String,
+      trim: true,
+    }],
+    suggestedTitle: {
+      type: String,
+      trim: true,
+    },
+    suggestedDescription: {
+      type: String,
+      trim: true,
+    },
+    suggestedCategory: {
+      type: String,
+      enum: [
+        "project",
+        "financial",
+        "legal",
+        "technical",
+        "administrative",
+        "other",
+      ],
+    },
+    suggestedConfidentiality: {
+      type: String,
+      enum: ["public", "internal", "confidential", "restricted"],
+      default: "internal",
+    },
+    suggestedTags: [{
+      type: String,
+      trim: true,
+    }],
   },
   {
     timestamps: true,

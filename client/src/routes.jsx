@@ -33,6 +33,8 @@ import ITSupport from "./pages/user/modules/self-service/ITSupport";
 import EquipmentRequests from "./pages/user/modules/self-service/EquipmentRequests";
 import MyLeaveRequests from "./pages/user/modules/self-service/MyLeaveRequests";
 import MyDocuments from "./pages/user/modules/self-service/MyDocuments";
+import MyProjectTasks from "./pages/user/modules/self-service/MyProjectTasks";
+import MyProjects from "./pages/user/modules/self-service/MyProjects";
 import PayrollReports from "./pages/user/modules/payroll/PayrollReports";
 import Notifications from "./pages/shared/Notifications";
 import Settings from "./pages/shared/Settings";
@@ -51,6 +53,9 @@ import InventoryList from "./pages/user/modules/inventory/InventoryList";
 import AvailableItems from "./pages/user/modules/inventory/AvailableItems";
 import MaintenanceSchedule from "./pages/user/modules/inventory/MaintenanceSchedule";
 import InventoryReports from "./pages/user/modules/inventory/InventoryReports";
+import InventoryManagement from "./pages/user/modules/inventory/InventoryManagement";
+
+import AssetTracking from "./pages/user/modules/inventory/AssetTracking";
 import PurchaseOrders from "./pages/user/modules/procurement/PurchaseOrders";
 import PendingApprovals from "./pages/user/modules/procurement/PendingApprovals";
 import SupplierManagement from "./pages/user/modules/procurement/SupplierManagement";
@@ -190,10 +195,7 @@ const AppRoutes = () => {
 
         {/* Self-Service Module routes are handled by the dynamic route above */}
         <Route path="modules/self-service/payslips" element={<MyPayslips />} />
-        <Route
-          path="modules/self-service/projects"
-          element={<div>My Projects - Coming Soon</div>}
-        />
+        <Route path="modules/self-service/projects" element={<MyProjects />} />
         <Route
           path="modules/self-service/leave-requests"
           element={<MyLeaveRequests />}
@@ -208,6 +210,10 @@ const AppRoutes = () => {
         <Route
           path="modules/self-service/equipment"
           element={<EquipmentRequests />}
+        />
+        <Route
+          path="modules/self-service/project-tasks"
+          element={<MyProjectTasks />}
         />
         <Route path="modules/payroll/reports" element={<PayrollReports />} />
 
@@ -232,6 +238,7 @@ const AppRoutes = () => {
         <Route path="modules/tasks/analytics" element={<TaskAnalytics />} />
         <Route path="modules/tasks/assignments" element={<TaskAssignments />} />
         <Route path="modules/tasks/reports" element={<TaskReports />} />
+        <Route path="modules/inventory" element={<InventoryManagement />} />
         <Route path="modules/inventory/list" element={<InventoryList />} />
         <Route
           path="modules/inventory/available"
@@ -245,6 +252,8 @@ const AppRoutes = () => {
           path="modules/inventory/reports"
           element={<InventoryReports />}
         />
+
+        <Route path="modules/inventory/assets" element={<AssetTracking />} />
         <Route path="modules/procurement/orders" element={<PurchaseOrders />} />
         <Route
           path="modules/procurement/approvals"

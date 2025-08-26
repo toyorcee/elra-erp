@@ -1,11 +1,18 @@
+import mongoose from "mongoose";
 import Project from "../models/Project.js";
 import Task from "../models/Task.js";
 import User from "../models/User.js";
 import Department from "../models/Department.js";
 import TeamMember from "../models/TeamMember.js";
 import Document from "../models/Document.js";
+import DocumentTemplate from "../models/DocumentTemplate.js";
+import Approval from "../models/Approval.js";
 import { checkDepartmentAccess } from "../middleware/auth.js";
 import NotificationService from "../services/notificationService.js";
+import ProjectAuditService from "../services/projectAuditService.js";
+
+// Create notification service instance
+const notificationService = new NotificationService();
 
 // Helper function to format currency
 const formatCurrency = (amount, currency = "NGN") => {
@@ -61,67 +68,36 @@ const generateNextProjectCode = async (departmentId) => {
   }
 };
 
-// Helper function to determine budget threshold
-const getBudgetThreshold = (budget) => {
+// Helper function to determine budget threshold (department-aware)
+const getBudgetThreshold = (budget, departmentName) => {
   if (budget <= 1000000) return "hod_auto_approve";
-  if (budget <= 5000000) return "department_approval";
-  if (budget <= 25000000) return "finance_approval";
+  if (budget <= 5000000) {
+    // For Finance department, skip finance approval
+    if (departmentName === "Finance & Accounting") {
+      return "executive_approval";
+    }
+    return "department_approval";
+  }
+  if (budget <= 25000000) {
+    // For Finance department, skip finance approval
+    if (departmentName === "Finance & Accounting") {
+      return "executive_approval";
+    }
+    return "finance_approval";
+  }
   return "executive_approval";
 };
 
 // Helper function to send notifications
 const sendProjectNotification = async (req, notificationData) => {
   try {
-    const notificationService = req.app.get("notificationService");
-    if (notificationService) {
-      await notificationService.createNotification(notificationData);
-      console.log(
-        `📧 [NOTIFICATION] Sent: ${notificationData.type} to ${notificationData.recipient}`
-      );
-    } else {
-      console.log("⚠️ [NOTIFICATION] Notification service not available");
-    }
+    await notificationService.createNotification(notificationData);
+    console.log(
+      `📧 [NOTIFICATION] Sent: ${notificationData.type} to ${notificationData.recipient}`
+    );
   } catch (error) {
     console.error("❌ [NOTIFICATION] Error sending notification:", error);
   }
-};
-
-// Helper function to get required documents based on project type and budget
-const getRequiredDocuments = (category, budget) => {
-  const baseDocuments = [
-    { documentType: "project_proposal", isRequired: true },
-    { documentType: "budget_breakdown", isRequired: true },
-  ];
-
-  // Add category-specific documents
-  if (category.includes("lease")) {
-    baseDocuments.push({ documentType: "vendor_quotes", isRequired: true });
-    baseDocuments.push({ documentType: "legal_review", isRequired: true });
-  }
-
-  if (
-    category === "software_development" ||
-    category === "system_maintenance"
-  ) {
-    baseDocuments.push({
-      documentType: "technical_specifications",
-      isRequired: true,
-    });
-  }
-
-  // Add budget-based documents
-  if (budget > 5000000) {
-    baseDocuments.push({
-      documentType: "financial_analysis",
-      isRequired: true,
-    });
-  }
-
-  if (budget > 10000000) {
-    baseDocuments.push({ documentType: "risk_assessment", isRequired: true });
-  }
-
-  return baseDocuments;
 };
 
 // ============================================================================
@@ -192,6 +168,7 @@ export const getAllProjects = async (req, res) => {
         { department: currentUser.department._id },
         { projectManager: currentUser._id },
         { "teamMembers.user": currentUser._id },
+        { createdBy: currentUser._id },
       ];
 
       console.log(
@@ -229,6 +206,7 @@ export const getAllProjects = async (req, res) => {
       .populate("projectManager", "firstName lastName email avatar")
       .populate("teamMembers.user", "firstName lastName email")
       .populate("createdBy", "firstName lastName")
+      .populate("department", "name code")
       .sort({ createdAt: -1 });
 
     // Enhance projects with team members from new TeamMember model
@@ -349,7 +327,7 @@ export const createProject = async (req, res) => {
     }
 
     const requiredFields = [
-      "title",
+      "name",
       "description",
       "category",
       "budget",
@@ -405,68 +383,39 @@ export const createProject = async (req, res) => {
       });
     }
 
-    console.log("🔍 [PROJECT] Validating department-category mapping...");
+    console.log(
+      "🔍 [PROJECT] ELRA Regulatory Authority - All departments can create any project type"
+    );
     console.log(`   User Department: ${currentUser.department?.name}`);
     console.log(`   Requested Category: ${req.body.category}`);
-
-    const departmentCategoryMap = {
-      Operations: [
-        "equipment_lease",
-        "software_development",
-        "system_maintenance",
-      ],
-      "Sales & Marketing": ["vehicle_lease", "consulting", "training"],
-      "Information Technology": [
-        "property_lease",
-        "software_development",
-        "system_maintenance",
-      ],
-      "Finance & Accounting": ["financial_lease", "consulting"],
-      "Human Resources": ["training_equipment_lease", "training", "consulting"],
-      "Legal & Compliance": ["compliance_lease", "consulting"],
-      "Customer Service": ["service_equipment_lease", "training"],
-      "Executive Office": ["strategic_lease", "consulting", "other"],
-    };
-
-    const userDepartment = currentUser.department?.name;
-    const projectCategory = req.body.category;
-
-    if (userDepartment && departmentCategoryMap[userDepartment]) {
-      const allowedCategories = departmentCategoryMap[userDepartment];
-      console.log(
-        `   Allowed Categories for ${userDepartment}: ${allowedCategories.join(
-          ", "
-        )}`
-      );
-
-      if (!allowedCategories.includes(projectCategory)) {
-        console.log(
-          `   ❌ [PROJECT] Category validation failed: ${projectCategory} not allowed for ${userDepartment}`
-        );
-        return res.status(400).json({
-          success: false,
-          message: `Invalid project category for ${userDepartment} department. Allowed categories: ${allowedCategories.join(
-            ", "
-          )}`,
-        });
-      }
-      console.log(
-        `   ✅ [PROJECT] Category validation passed: ${projectCategory} is allowed for ${userDepartment}`
-      );
-    } else {
-      console.log(
-        `   ⚠️ [PROJECT] No department mapping found for: ${userDepartment}`
-      );
-    }
+    console.log(
+      "   ✅ [PROJECT] ELRA allows all departments to create any project category"
+    );
 
     // Set budget threshold based on budget amount
-    const budgetThreshold = getBudgetThreshold(req.body.budget);
-
-    // Get required documents for this project
-    const requiredDocuments = getRequiredDocuments(
-      req.body.category,
-      req.body.budget
+    const budgetThreshold = getBudgetThreshold(
+      req.body.budget,
+      currentUser.department?.name
     );
+
+    // Get required documents for this project using DocumentTemplate with dynamic triggers
+    const documentTemplates = await DocumentTemplate.getTemplatesForProject(
+      req.body.category,
+      req.body.budget,
+      currentUser.role?.name || "HOD",
+      budgetThreshold === "hod_auto_approve"
+        ? "department"
+        : budgetThreshold === "finance_approval"
+        ? "finance"
+        : "executive"
+    );
+
+    // Map templates to required documents format expected by Project model
+    const requiredDocuments = documentTemplates.map((template) => ({
+      documentType: template.templateType,
+      isRequired: template.triggers?.isRequired !== false,
+      isSubmitted: false,
+    }));
 
     // Super Admin auto-approval logic
     let projectStatus = "pending_approval";
@@ -477,6 +426,7 @@ export const createProject = async (req, res) => {
       projectStatus = "approved";
       console.log("✅ [PROJECTS] HOD auto-approval for budget ≤ 1M");
     }
+    // Note: Finance HOD projects > 1M will go through normal approval chain (Executive approval)
 
     const projectData = {
       ...req.body,
@@ -496,38 +446,123 @@ export const createProject = async (req, res) => {
 
     const project = new Project(projectData);
 
-    // Generate approval chain if not auto-approved
     if (projectStatus === "pending_approval") {
       await project.generateApprovalChain();
 
+      if (project.approvalChain && project.approvalChain.length > 0) {
+        const hodStep = project.approvalChain[0];
+        if (hodStep.level === "hod" && hodStep.status === "pending") {
+          if (
+            currentUser.role.level === 700 &&
+            currentUser.department &&
+            currentUser.department._id.toString() ===
+              hodStep.department.toString()
+          ) {
+            console.log(
+              "✅ [AUTO-APPROVE] Auto-approving HOD step for project creator"
+            );
+
+            hodStep.status = "approved";
+            hodStep.approver = currentUser._id;
+            hodStep.comments = "Auto-approved by project creator (HOD)";
+            hodStep.approvedAt = new Date();
+
+            const nextPendingStep = project.approvalChain.find(
+              (step) => step.status === "pending"
+            );
+            if (nextPendingStep) {
+              switch (nextPendingStep.level) {
+                case "finance":
+                  project.status = "pending_finance_approval";
+                  break;
+                case "executive":
+                  project.status = "pending_executive_approval";
+                  break;
+                default:
+                  project.status = "pending_approval";
+              }
+            } else {
+              // All approvals complete
+              project.status = "approved";
+            }
+
+            await project.save();
+            console.log(
+              "✅ [AUTO-APPROVE] HOD step auto-approved successfully"
+            );
+          }
+        }
+      }
+
       // Send smart notifications to the next approver in the chain
-      if (project.approvalChain && project.approvalChain.length > 1) {
-        const nextApproval = project.approvalChain[1]; // Skip HOD (index 0), get next approver
+      if (project.approvalChain && project.approvalChain.length > 0) {
+        // Find the next pending approval step
+        const nextApproval = project.approvalChain.find(
+          (step) => step.status === "pending"
+        );
         if (nextApproval && nextApproval.department) {
           try {
-            // Find the appropriate approver for this department and level
             let approverQuery = {};
 
+            console.log(
+              `🔍 [DEBUG] Next approval level: ${nextApproval.level}`
+            );
+
             if (nextApproval.level === "finance") {
-              // Find Finance HOD
-              approverQuery = {
-                "role.name": "HOD",
-                "department.name": "Finance & Accounting",
-              };
+              // Find Finance HOD by department ObjectId
+              console.log("🔍 [DEBUG] Looking for Finance HOD...");
+              const financeDept = await mongoose
+                .model("Department")
+                .findOne({ name: "Finance & Accounting" });
+              const hodRole = await mongoose
+                .model("Role")
+                .findOne({ name: "HOD" });
+
+              if (financeDept && hodRole) {
+                approverQuery = {
+                  role: hodRole._id,
+                  department: financeDept._id,
+                };
+                console.log(
+                  `🔍 [DEBUG] Finance HOD query: role=${hodRole._id}, dept=${financeDept._id}`
+                );
+              }
             } else if (nextApproval.level === "executive") {
-              // Find Executive HOD
-              approverQuery = {
-                "role.name": "HOD",
-                "department.name": "Executive Office",
-              };
+              // Find Executive HOD by department ObjectId
+              console.log("🔍 [DEBUG] Looking for Executive HOD...");
+              const execDept = await mongoose
+                .model("Department")
+                .findOne({ name: "Executive Office" });
+              const hodRole = await mongoose
+                .model("Role")
+                .findOne({ name: "HOD" });
+
+              if (execDept && hodRole) {
+                approverQuery = {
+                  role: hodRole._id,
+                  department: execDept._id,
+                };
+                console.log(
+                  `🔍 [DEBUG] Executive HOD query: role=${hodRole._id}, dept=${execDept._id}`
+                );
+              }
             }
+
+            console.log("🔍 [DEBUG] Checking for approvers...");
+            console.log("🔍 [DEBUG] Approver query:", approverQuery);
 
             if (Object.keys(approverQuery).length > 0) {
               const approver = await User.findOne(approverQuery).populate(
                 "department"
               );
+              console.log(
+                "🔍 [DEBUG] Found approver:",
+                approver ? `${approver.firstName} ${approver.lastName}` : "None"
+              );
+
               if (approver) {
-                await sendProjectNotification(req, {
+                // Notify approver
+                await notificationService.createNotification({
                   recipient: approver._id,
                   type: "project_approval_required",
                   title: "Project Approval Required",
@@ -536,6 +571,7 @@ export const createProject = async (req, res) => {
                   } approval for project: ${project.name} (${formatCurrency(
                     project.budget
                   )})`,
+                  priority: "high",
                   data: {
                     projectId: project._id,
                     projectName: project.name,
@@ -543,6 +579,7 @@ export const createProject = async (req, res) => {
                     amount: project.budget,
                     creatorDepartment: currentUser.department?.name,
                     creatorName: `${currentUser.firstName} ${currentUser.lastName}`,
+                    actionUrl: "/dashboard/modules/projects",
                   },
                 });
                 console.log(
@@ -550,11 +587,12 @@ export const createProject = async (req, res) => {
                 );
 
                 // Notify the project creator that their project has been sent for approval
-                await sendProjectNotification(req, {
+                await notificationService.createNotification({
                   recipient: currentUser._id,
                   type: "project_sent_for_approval",
                   title: "Project Sent for Approval",
                   message: `Your project "${project.name}" has been sent for ${nextApproval.level} approval to ${approver.department?.name}`,
+                  priority: "medium",
                   data: {
                     projectId: project._id,
                     projectName: project.name,
@@ -563,6 +601,7 @@ export const createProject = async (req, res) => {
                     approverDepartment: approver.department?.name,
                     approverName: `${approver.firstName} ${approver.lastName}`,
                     estimatedApprovalTime: "2-3 business days",
+                    actionUrl: "/dashboard/modules/projects",
                   },
                 });
                 console.log(
@@ -582,10 +621,49 @@ export const createProject = async (req, res) => {
       console.log(
         "🚀 [PROJECTS] Skipping approval chain - Project auto-approved"
       );
+      console.log("🔍 [DEBUG] About to send auto-approval notification...");
+
+      // Notify the project creator that their project was auto-approved
+      try {
+        await notificationService.createNotification({
+          recipient: currentUser._id,
+          type: "project_auto_approved",
+          title: "Project Auto-Approved",
+          message: `Your project "${project.name}" has been automatically approved and is ready for implementation.`,
+          priority: "medium",
+          data: {
+            projectId: project._id,
+            projectName: project.name,
+            amount: project.budget,
+            approvalType: "auto",
+            nextSteps: "Project is ready for implementation phase",
+            actionUrl: "/dashboard/modules/projects",
+          },
+        });
+        console.log(
+          `📧 [CREATOR NOTIFICATION] Sent auto-approval notification to ${currentUser.firstName} ${currentUser.lastName}`
+        );
+      } catch (notifError) {
+        console.error(
+          "❌ [AUTO-APPROVAL NOTIFICATION] Error sending notification:",
+          notifError
+        );
+      }
     }
+
+    // Set the user for audit logging
+    project._createdBy = currentUser;
 
     await project.save();
 
+    // Audit logging for project creation
+    try {
+      await ProjectAuditService.logProjectCreated(project, currentUser);
+    } catch (error) {
+      console.error("❌ [AUDIT] Error logging project creation:", error);
+    }
+
+    // Auto-assign project manager to team members if project manager is selected
     if (project.projectManager) {
       try {
         const teamMember = new TeamMember({
@@ -634,19 +712,38 @@ export const createProject = async (req, res) => {
         console.log(`   Department: ${currentUser.department?.name}`);
         console.log(`   Email: ${currentUser.email}`);
 
-        const approvalChain = await generateApprovalChain(
-          "project_creation",
-          currentUser.department?._id,
-          project.budget
-        );
+        const projectApprovalChain = project.approvalChain;
+
+        const approvalChain = projectApprovalChain.map((step, index) => {
+          let levelNumber = index + 1;
+          let role = "DEPARTMENT_MANAGER";
+
+          if (step.level === "hod") {
+            levelNumber = 1;
+            role = "DEPARTMENT_MANAGER";
+          } else if (step.level === "finance") {
+            levelNumber = 2;
+            role = "DEPARTMENT_APPROVER";
+          } else if (step.level === "executive") {
+            levelNumber = 3;
+            role = "EXECUTIVE_APPROVER";
+          }
+
+          return {
+            level: levelNumber,
+            role: role,
+            department: step.department,
+            status: step.status || "pending",
+            required: step.required || true,
+            approver: step.approver || null,
+          };
+        });
 
         console.log("📋 [APPROVAL] Generated Approval Chain:");
         console.log(`   Total Levels: ${approvalChain.length}`);
         approvalChain.forEach((level, index) => {
           console.log(
-            `   Level ${index + 1}: ${level.role} (Level ${
-              level.departmentLevel
-            })`
+            `   Level ${index + 1}: ${level.role} (Level ${level.level})`
           );
           if (level.approver) {
             console.log(
@@ -690,13 +787,8 @@ export const createProject = async (req, res) => {
 
         // Send notification to first approver
         try {
-          const notificationController = req.app.get("notificationController");
-          if (
-            notificationController &&
-            approvalChain.length > 0 &&
-            approvalChain[0].approver
-          ) {
-            await notificationController.createNotification({
+          if (approvalChain.length > 0 && approvalChain[0].approver) {
+            await notificationService.createNotification({
               recipient: approvalChain[0].approver,
               type: "approval_required",
               title: "Project Approval Required",
@@ -722,7 +814,6 @@ export const createProject = async (req, res) => {
           );
         }
 
-        // Project status is already set correctly earlier in the function
         console.log(`📋 [APPROVAL] Project status: ${project.status}`);
 
         console.log("🎯 [APPROVAL] Approval workflow completed successfully");
@@ -730,12 +821,103 @@ export const createProject = async (req, res) => {
       } catch (error) {
         console.error("❌ [APPROVAL] Error creating approval request:", error);
         console.error("❌ [APPROVAL] Error details:", error.message);
-        // Don't fail the project creation if approval creation fails
       }
     } else {
       console.log(
         "👑 [APPROVAL] Skipping approval creation - Super Admin auto-approval"
       );
+    }
+
+    // Create required documents for the project
+    try {
+      console.log("📄 [DOCUMENTS] Creating required documents for project");
+      console.log(`   Project: ${project.name} (${project.code})`);
+      console.log(`   Required Documents: ${documentTemplates?.length || 0}`);
+
+      if (documentTemplates && documentTemplates.length > 0) {
+        const createdDocuments = [];
+
+        for (const template of documentTemplates) {
+          const generatedDoc = await template.generateDocument(
+            project,
+            currentUser
+          );
+
+          // Map template category to Document model category
+          const mapCategory = (templateCategory) => {
+            switch (templateCategory) {
+              case "financial_document":
+                return "financial";
+              case "legal_document":
+                return "legal";
+              case "technical_document":
+                return "technical";
+              case "administrative_document":
+                return "administrative";
+              case "project_document":
+                return "project";
+              default:
+                return "other";
+            }
+          };
+
+          const document = new Document({
+            title: generatedDoc.title,
+            documentType: template.templateType,
+            category: mapCategory(template.category),
+            project: project._id,
+            department: currentUser.department?._id,
+            createdBy: currentUser._id,
+            status: "draft",
+            fileName: `${template.templateType}_${project.code}.docx`,
+            originalFileName: `${template.templateType}_${project.code}.docx`,
+            fileUrl: `/documents/generated/${template.templateType}_${project.code}.docx`,
+            fileSize: 1024, // Default size for generated documents
+            mimeType:
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            description: `Required document for project ${project.code}: ${template.name}`,
+            metadata: {
+              projectCode: project.code,
+              projectCategory: project.category,
+              projectBudget: project.budget,
+              templateId: template._id,
+              templateVersion: template.version,
+              generatedContent: generatedDoc.content,
+            },
+          });
+
+          await document.save();
+          createdDocuments.push(document);
+
+          console.log(`   ✅ Created: ${document.title}`);
+        }
+
+        console.log(
+          `📄 [DOCUMENTS] Successfully created ${createdDocuments.length} documents`
+        );
+
+        // Log document creation in audit
+        try {
+          await ProjectAuditService.logDocumentCreated(
+            project,
+            currentUser,
+            createdDocuments.length
+          );
+        } catch (auditError) {
+          console.error(
+            "❌ [AUDIT] Error logging document creation:",
+            auditError
+          );
+        }
+      } else {
+        console.log("📄 [DOCUMENTS] No required documents for this project");
+      }
+    } catch (docError) {
+      console.error(
+        "❌ [DOCUMENTS] Error creating project documents:",
+        docError
+      );
+      // Don't fail the project creation if document creation fails
     }
 
     // Populate the created project
@@ -1308,6 +1490,37 @@ export const approveProject = async (req, res) => {
     // Approve the project
     await project.approveProject(currentUser._id, level, comments);
 
+    // Audit logging for project approval
+    try {
+      await ProjectAuditService.logProjectApproved(
+        project,
+        currentUser,
+        level,
+        comments
+      );
+    } catch (error) {
+      console.error("❌ [AUDIT] Error logging project approval:", error);
+    }
+
+    // Check if this was the final approval and trigger post-approval workflow
+    if (project.status === "approved") {
+      console.log(
+        "🎯 [APPROVAL] Final approval received - triggering post-approval workflow"
+      );
+      try {
+        await project.triggerPostApprovalWorkflow(currentUser._id);
+        console.log(
+          "✅ [APPROVAL] Post-approval workflow triggered successfully"
+        );
+      } catch (workflowError) {
+        console.error(
+          "❌ [APPROVAL] Error triggering post-approval workflow:",
+          workflowError
+        );
+        // Don't fail the approval if workflow fails
+      }
+    }
+
     // Send notification to project creator
     await sendProjectNotification(req, {
       recipient: project.createdBy,
@@ -1373,6 +1586,18 @@ export const rejectProject = async (req, res) => {
     // Reject the project
     await project.rejectProject(currentUser._id, level, comments);
 
+    // Audit logging for project rejection
+    try {
+      await ProjectAuditService.logProjectRejected(
+        project,
+        currentUser,
+        level,
+        comments
+      );
+    } catch (error) {
+      console.error("❌ [AUDIT] Error logging project rejection:", error);
+    }
+
     // Send notification to project creator
     await sendProjectNotification(req, {
       recipient: project.createdBy,
@@ -1404,6 +1629,130 @@ export const rejectProject = async (req, res) => {
   }
 };
 
+// @desc    Trigger post-approval workflow for a project
+// @route   POST /api/projects/:id/trigger-workflow
+// @access  Private (HOD+)
+export const triggerPostApprovalWorkflow = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUser = req.user;
+
+    const project = await Project.findById(id);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    // Check if project is approved
+    if (project.status !== "approved") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Project must be approved before triggering post-approval workflow",
+      });
+    }
+
+    // Check if workflow has already been triggered
+    if (
+      project.workflowPhase !== "planning" &&
+      project.workflowPhase !== "approval"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Post-approval workflow has already been triggered for this project",
+      });
+    }
+
+    // Trigger the post-approval workflow
+    await project.triggerPostApprovalWorkflow(currentUser._id);
+
+    // Audit logging for workflow trigger
+    try {
+      await ProjectAuditService.logWorkflowTriggered(
+        project,
+        currentUser,
+        "implementation"
+      );
+    } catch (error) {
+      console.error("❌ [AUDIT] Error logging workflow trigger:", error);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Post-approval workflow triggered successfully",
+      data: {
+        projectId: project._id,
+        projectName: project.name,
+        workflowPhase: project.workflowPhase,
+        workflowStep: project.workflowStep,
+        workflowTriggers: project.workflowTriggers,
+      },
+    });
+  } catch (error) {
+    console.error("Error triggering post-approval workflow:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to trigger post-approval workflow",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get project workflow status
+// @route   GET /api/projects/:id/workflow-status
+// @access  Private (HOD+)
+export const getProjectWorkflowStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUser = req.user;
+
+    const project = await Project.findById(id)
+      .populate("projectManager", "firstName lastName email")
+      .populate("createdBy", "firstName lastName");
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    // Check access permissions
+    const hasAccess = await checkProjectAccess(currentUser, project);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. You don't have permission to view this project.",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        projectId: project._id,
+        projectName: project.name,
+        status: project.status,
+        workflowPhase: project.workflowPhase,
+        workflowStep: project.workflowStep,
+        workflowTriggers: project.workflowTriggers,
+        workflowHistory: project.workflowHistory,
+        isAutoGenerated: project.isAutoGenerated,
+      },
+    });
+  } catch (error) {
+    console.error("Error getting project workflow status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get project workflow status",
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Get projects pending approval
 // @route   GET /api/projects/pending-approval
 // @access  Private (Approvers)
@@ -1422,22 +1771,17 @@ export const getPendingApprovalProjects = async (req, res) => {
       isActive: true,
     };
 
-    // Filter based on user's approval level
-    if (currentUser.role.level >= 700) {
-      // HOD can see all pending approvals
-    } else if (currentUser.role.level >= 600) {
-      // Manager can see department level approvals
-      query["approvalChain.level"] = "department";
-    } else if (currentUser.department?.name === "Finance & Accounting") {
-      // Finance can see finance level approvals
-      query["approvalChain.level"] = "finance";
-    } else if (currentUser.department?.name === "Executive Office") {
-      // Executive can see executive level approvals
-      query["approvalChain.level"] = "executive";
+    if (currentUser.role.level >= 1000) {
+      console.log(
+        "🔍 [PROJECT APPROVALS] Super Admin - showing all pending approvals"
+      );
+    } else if (currentUser.role.level >= 700) {
+      console.log("🔍 [PROJECT APPROVALS] HOD - showing all pending approvals");
     } else {
       return res.status(403).json({
         success: false,
-        message: "Access denied. No approval permissions.",
+        message:
+          "Access denied. HOD level (700) or higher required for approval access.",
       });
     }
 
@@ -1457,6 +1801,191 @@ export const getPendingApprovalProjects = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to get pending approval projects",
+    });
+  }
+};
+
+// @desc    Get project audit trail
+// @route   GET /api/projects/:id/audit-trail
+// @access  Private (HOD+)
+export const getProjectAuditTrail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUser = req.user;
+
+    const project = await Project.findById(id);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    // Check access permissions
+    const hasAccess = await checkProjectAccess(currentUser, project);
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. You don't have permission to view this project's audit trail.",
+      });
+    }
+
+    // Get audit trail
+    const auditTrail = await ProjectAuditService.getProjectAuditTrail(
+      project._id
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        projectId: project._id,
+        projectName: project.name,
+        projectCode: project.code,
+        auditTrail: auditTrail,
+      },
+    });
+  } catch (error) {
+    console.error("Error getting project audit trail:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get project audit trail",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get my project tasks
+// @route   GET /api/projects/my-tasks
+// @access  Private
+export const getMyProjectTasks = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    // Find tasks assigned to the current user
+    const tasks = await Task.find({
+      assignedTo: currentUser._id,
+      isActive: true,
+    })
+      .populate("project", "name code category budget department")
+      .populate("assignedTo", "firstName lastName email")
+      .populate("createdBy", "firstName lastName email")
+      .sort({ dueDate: 1 });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        tasks: tasks,
+        totalTasks: tasks.length,
+        pendingTasks: tasks.filter((t) => t.status === "pending").length,
+        completedTasks: tasks.filter((t) => t.status === "completed").length,
+        overdueTasks: tasks.filter((t) => t.status === "overdue").length,
+      },
+    });
+  } catch (error) {
+    console.error("Error getting my project tasks:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get project tasks",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get my projects
+// @route   GET /api/projects/my-projects
+// @access  Private
+export const getMyProjects = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    // Find projects where user is a team member or creator
+    const projects = await Project.find({
+      $or: [
+        { createdBy: currentUser._id },
+        { "teamMembers.user": currentUser._id },
+      ],
+      isActive: true,
+    })
+      .populate("department", "name code")
+      .populate("createdBy", "firstName lastName email")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        projects: projects,
+        totalProjects: projects.length,
+      },
+    });
+  } catch (error) {
+    console.error("Error getting my projects:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get projects",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Update task status
+// @route   PUT /api/projects/tasks/:id/status
+// @access  Private
+export const updateTaskStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const currentUser = req.user;
+
+    const task = await Task.findById(id);
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        message: "Task not found",
+      });
+    }
+
+    // Check if user is assigned to this task
+    if (task.assignedTo.toString() !== currentUser._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to update this task",
+      });
+    }
+
+    const oldStatus = task.status;
+    task.status = status;
+    task.updatedAt = new Date();
+
+    await task.save();
+
+    // Log the status change
+    try {
+      await ProjectAuditService.logTaskStatusChanged(
+        task,
+        currentUser,
+        oldStatus,
+        status
+      );
+    } catch (error) {
+      console.error("Error logging task status change:", error);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Task status updated successfully",
+      data: {
+        task: task,
+        oldStatus: oldStatus,
+        newStatus: status,
+      },
+    });
+  } catch (error) {
+    console.error("Error updating task status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update task status",
+      error: error.message,
     });
   }
 };

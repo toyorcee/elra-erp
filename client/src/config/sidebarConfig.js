@@ -62,15 +62,7 @@ export const sidebarConfig = [
     badge: "IT",
     departments: ["IT", "Information Technology", "Technology"], // IT departments only
   },
-  {
-    label: "Operations Management",
-    icon: "HiOutlineCog",
-    path: "/dashboard/modules/operations",
-    required: { minLevel: 300 },
-    section: "erp",
-    badge: "Ops",
-    departments: ["Operations", "Production", "Manufacturing", "Finance"], // Operations and finance departments
-  },
+
   {
     label: "Sales & Marketing",
     icon: "HiOutlineChartBar",
@@ -153,14 +145,7 @@ export const sidebarConfig = [
     required: { minLevel: 600 },
     section: "erp",
     badge: "Inv",
-    departments: [
-      "Operations",
-      "Production",
-      "Manufacturing",
-      "Finance & Accounting",
-      "Finance",
-      "Procurement",
-    ], // Operations and finance departments
+    departments: ["Operations", "Production", "Manufacturing"], // Operations department only
   },
 
   // ===== SYSTEM MANAGEMENT =====
@@ -643,14 +628,6 @@ export const getModulesForUser = (user) => {
       },
     ],
     Operations: [
-      {
-        label: "Operations Management",
-        icon: "HiOutlineCog",
-        path: "/dashboard/modules/operations",
-        required: { minLevel: 300 },
-        section: "erp",
-        badge: "Ops",
-      },
       {
         label: "Project Management",
         icon: "HiOutlineFolder",

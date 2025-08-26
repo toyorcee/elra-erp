@@ -27,8 +27,8 @@ const taskSchema = new mongoose.Schema(
     // Task Status and Priority
     status: {
       type: String,
-      enum: ["todo", "in_progress", "review", "completed", "cancelled"],
-      default: "todo",
+      enum: ["pending", "in_progress", "completed", "overdue", "cancelled"],
+      default: "pending",
       required: true,
     },
     priority: {
@@ -69,6 +69,16 @@ const taskSchema = new mongoose.Schema(
     assignedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+      required: true,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    project: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
       required: true,
     },
     assignedDate: {

@@ -16,13 +16,15 @@ import NotificationService from "../services/notificationService.js";
 import OCRService from "../services/ocrService.js";
 import SearchService from "../services/searchService.js";
 import ApprovalLevel from "../models/ApprovalLevel.js";
+import Project from "../models/Project.js";
+import ProjectDocumentService from "../services/projectDocumentService.js";
+import ProjectAuditService from "../services/projectAuditService.js";
 
 // Smart function to determine document status
 const determineDocumentStatus = async (currentUser, category, department) => {
   try {
-    // Check if any approval workflows are configured for this company
+    // Check if any approval workflows are configured for ELRA
     const approvalWorkflows = await ApprovalLevel.find({
-      company: currentUser.company?._id || currentUser.company,
       isActive: true,
     });
 
@@ -141,21 +143,19 @@ export const uploadDocument = async (req, res) => {
 
       console.log("🔍 [documentController] Starting OCR processing...");
       try {
-        const ocrResult = await OCRService.processDocument(
-          req.file.path,
-          req.file.mimetype,
-          { language: "eng" }
-        );
+        const ocrResult = await OCRService.processDocument(req.file.path, {
+          language: "eng",
+        });
 
         console.log("📊 [documentController] OCR result:", {
           success: ocrResult.success,
-          confidence: ocrResult.metadata?.confidence,
-          documentType: ocrResult.metadata?.documentType,
-          keywordsCount: ocrResult.metadata?.keywords?.length || 0,
+          confidence: ocrResult.confidence,
+          documentType: ocrResult.documentType,
+          keywordsCount: ocrResult.keywords?.length || 0,
         });
 
         if (ocrResult.success) {
-          ocrMetadata = ocrResult.metadata;
+          ocrMetadata = ocrResult;
           extractedText = ocrResult.extractedText;
 
           // Auto-classify document type if not provided
@@ -168,8 +168,8 @@ export const uploadDocument = async (req, res) => {
           }
 
           // Auto-extract tags from keywords
-          if (!tags && ocrMetadata.keywords) {
-            tags = ocrMetadata.keywords.slice(0, 5).join(",");
+          if (!tags && ocrMetadata.suggestedTags) {
+            tags = ocrMetadata.suggestedTags.slice(0, 5).join(",");
             console.log("🏷️ [documentController] Auto-extracted tags:", tags);
           }
         }
@@ -180,12 +180,11 @@ export const uploadDocument = async (req, res) => {
         );
       }
 
-      // Generate company-specific reference number
-      const companyCode = currentUser.company?.code || "COMP";
-      const reference = await generateDocRef(companyCode, currentUser._id);
+      // Generate ELRA-specific reference number
+      const reference = await generateDocRef("ELRA", currentUser._id);
 
       console.log(
-        `[documentController] Generated reference: ${reference} for company: ${companyCode}`
+        `[documentController] Generated reference: ${reference} for ELRA`
       );
 
       const metadata = createDocumentMetadata(
@@ -208,7 +207,6 @@ export const uploadDocument = async (req, res) => {
         priority: priority || "Medium",
         tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
         uploadedBy: currentUser._id,
-        company: currentUser.company?._id || currentUser.company,
         reference: reference,
         // Smart status determination based on approval workflow
         status: await determineDocumentStatus(
@@ -219,21 +217,23 @@ export const uploadDocument = async (req, res) => {
         // Enhanced metadata from OCR
         ocrData: {
           extractedText,
-          confidence: ocrMetadata.confidence || 0,
-          documentType: ocrMetadata.documentType,
-          keywords: ocrMetadata.keywords || [],
-          dateReferences: ocrMetadata.dateReferences || [],
-          organizationReferences: ocrMetadata.organizationReferences || [],
-          monetaryValues: ocrMetadata.monetaryValues || [],
+          confidence: ocrMetadata?.confidence || 0,
+          documentType: ocrMetadata?.documentType,
+          keywords: ocrMetadata?.keywords || [],
+          suggestedTitle: ocrMetadata?.suggestedTitle,
+          suggestedDescription: ocrMetadata?.suggestedDescription,
+          suggestedCategory: ocrMetadata?.suggestedCategory,
+          suggestedConfidentiality: ocrMetadata?.suggestedConfidentiality,
+          suggestedTags: ocrMetadata?.suggestedTags || [],
           processingDate: new Date(),
-          language: ocrMetadata.language || "eng",
+          language: "eng",
         },
         // Document classification based on OCR
         classification: {
-          autoClassified: !!ocrMetadata.documentType,
-          confidence: ocrMetadata.confidence || 0,
-          suggestedCategory: ocrMetadata.suggestedCategory,
-          suggestedTags: ocrMetadata.keywords || [],
+          autoClassified: !!ocrMetadata?.documentType,
+          confidence: ocrMetadata?.confidence || 0,
+          suggestedCategory: ocrMetadata?.suggestedCategory,
+          suggestedTags: ocrMetadata?.suggestedTags || [],
         },
       };
       // Auto-assign user's department if not provided
@@ -243,14 +243,6 @@ export const uploadDocument = async (req, res) => {
         docData.department = currentUser.department.code;
       }
       const document = new Document(docData);
-
-      // Add audit entry
-      document.addAuditEntry(
-        "UPLOADED",
-        currentUser._id,
-        "Document uploaded",
-        req.ip
-      );
 
       console.log("💾 [documentController] Saving document to database:", {
         title: document.title,
@@ -349,7 +341,7 @@ export const uploadDocument = async (req, res) => {
             currentUser._id,
             document.title,
             ocrMetadata.confidence,
-            ocrMetadata.keywords || []
+            ocrMetadata.suggestedTags || []
           );
           console.log(
             "✅ [documentController] OCR notification sent successfully"
@@ -528,8 +520,10 @@ export const getAllDocuments = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const documents = await Document.find(query)
-      .populate("uploadedBy", "name email")
-      .populate("currentApprover", "name email")
+      .populate("uploadedBy", "firstName lastName email")
+      .populate("currentApprover", "firstName lastName email")
+      .populate("project", "name code category budget")
+      .populate("department", "name")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -555,16 +549,461 @@ export const getAllDocuments = async (req, res) => {
   }
 };
 
-// Get document by ID
+// @desc    Get user's documents (my-documents endpoint)
+// @route   GET /api/documents/my-documents
+// @access  Private
+export const getMyDocuments = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const {
+      status,
+      category,
+      search,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+      page = 1,
+      limit = 20,
+    } = req.query;
+
+    console.log(
+      "📄 [getMyDocuments] Fetching documents for user:",
+      currentUser._id
+    );
+    console.log("📄 [getMyDocuments] Filters:", {
+      status,
+      category,
+      search,
+      sortBy,
+      sortOrder,
+    });
+
+    let query = {
+      isActive: true,
+      $or: [
+        { createdBy: currentUser._id },
+        { uploadedBy: currentUser._id },
+        { isPublic: true },
+      ],
+    };
+
+    if (currentUser.role.level >= 600) {
+      const userProjects = await Project.find({
+        $or: [
+          { projectManager: currentUser._id },
+          { "teamMembers.user": currentUser._id },
+          { createdBy: currentUser._id },
+        ],
+      }).select("_id");
+
+      if (userProjects.length > 0) {
+        const projectIds = userProjects.map((p) => p._id);
+        query.$or.push({ project: { $in: projectIds } });
+        console.log(
+          `📄 [getMyDocuments] Found ${userProjects.length} user projects:`,
+          projectIds
+        );
+      }
+
+      console.log(`📄 [getMyDocuments] User ID: ${currentUser._id}`);
+    }
+
+    // Apply filters
+    if (status && status !== "all") {
+      query.status = status;
+    }
+
+    if (category && category !== "all") {
+      query.category = category;
+    }
+
+    // Apply search
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { "metadata.generatedContent": { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // Build sort object
+    const sortObject = {};
+    sortObject[sortBy] = sortOrder === "desc" ? -1 : 1;
+
+    const skip = (page - 1) * limit;
+
+    console.log(
+      "📄 [getMyDocuments] Final query:",
+      JSON.stringify(query, null, 2)
+    );
+
+    const documents = await Document.find(query)
+      .populate("uploadedBy", "firstName lastName email")
+      .populate("createdBy", "firstName lastName email")
+      .populate("project", "name code category budget status")
+      .populate("department", "name")
+      .sort(sortObject)
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Document.countDocuments(query);
+
+    console.log(
+      `📄 [getMyDocuments] Found ${documents.length} documents out of ${total} total`
+    );
+
+    // Transform documents for frontend
+    const transformedDocuments = documents.map((doc) => ({
+      id: doc._id,
+      title: doc.title,
+      description: doc.description,
+      fileName: doc.fileName,
+      originalFileName: doc.originalFileName,
+      fileSize: doc.fileSize,
+      mimeType: doc.mimeType,
+      documentType: doc.documentType,
+      category: doc.category,
+      status: doc.status,
+      isRequired: doc.isRequired,
+      isPublic: doc.isPublic,
+      version: doc.version,
+      project: doc.project
+        ? {
+            id: doc.project._id,
+            name: doc.project.name,
+            code: doc.project.code,
+            category: doc.project.category,
+            budget: doc.project.budget,
+            status: doc.project.status,
+          }
+        : null,
+      department: doc.department
+        ? {
+            id: doc.department._id,
+            name: doc.department.name,
+          }
+        : null,
+      uploadedBy: doc.uploadedBy
+        ? {
+            id: doc.uploadedBy._id,
+            name: `${doc.uploadedBy.firstName} ${doc.uploadedBy.lastName}`,
+            email: doc.uploadedBy.email,
+          }
+        : null,
+      createdBy: doc.createdBy
+        ? {
+            id: doc.createdBy._id,
+            name: `${doc.createdBy.firstName} ${doc.createdBy.lastName}`,
+            email: doc.createdBy.email,
+          }
+        : null,
+      metadata: doc.metadata,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
+    }));
+
+    res.json({
+      success: true,
+      data: transformedDocuments,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("❌ [getMyDocuments] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch your documents",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get project documents
+// @route   GET /api/documents/project/:projectId
+// @access  Private (HOD+)
+export const getProjectDocuments = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const currentUser = req.user;
+
+    // Check if project exists and user has access
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    // Get documents for the project
+    const documents = await ProjectDocumentService.getProjectDocuments(
+      projectId
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        projectId: project._id,
+        projectName: project.name,
+        projectCode: project.code,
+        documents: documents,
+        totalDocuments: documents.length,
+      },
+    });
+  } catch (error) {
+    console.error("Error getting project documents:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get project documents",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get documents pending approval for current user
+// @route   GET /api/documents/pending-approval
+// @access  Private (HOD+)
+export const getPendingApprovalDocuments = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    const documents = await ProjectDocumentService.getPendingApprovalDocuments(
+      currentUser._id
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        documents: documents,
+        totalPending: documents.length,
+      },
+    });
+  } catch (error) {
+    console.error("Error getting pending approval documents:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get pending approval documents",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Approve a document
+// @route   POST /api/documents/:id/approve
+// @access  Private (HOD+)
+export const approveDocument = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { comments } = req.body;
+    const currentUser = req.user;
+
+    const document = await Document.findById(id);
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found",
+      });
+    }
+
+    // Check if user is a reviewer for this document
+    const isReviewer = document.reviewers.some(
+      (reviewer) => reviewer.reviewer.toString() === currentUser._id.toString()
+    );
+
+    if (!isReviewer) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to approve this document",
+      });
+    }
+
+    // Approve the document
+    const updatedDocument = await ProjectDocumentService.approveDocument(
+      id,
+      currentUser._id,
+      comments
+    );
+
+    // Audit logging
+    try {
+      await ProjectAuditService.logDocumentApproved(
+        document,
+        currentUser,
+        comments
+      );
+    } catch (error) {
+      console.error("❌ [AUDIT] Error logging document approval:", error);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Document approved successfully",
+      data: updatedDocument,
+    });
+  } catch (error) {
+    console.error("Error approving document:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to approve document",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Reject a document
+// @route   POST /api/documents/:id/reject
+// @access  Private (HOD+)
+export const rejectDocument = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { comments } = req.body;
+    const currentUser = req.user;
+
+    const document = await Document.findById(id);
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found",
+      });
+    }
+
+    // Check if user is a reviewer for this document
+    const isReviewer = document.reviewers.some(
+      (reviewer) => reviewer.reviewer.toString() === currentUser._id.toString()
+    );
+
+    if (!isReviewer) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to reject this document",
+      });
+    }
+
+    // Reject the document
+    const updatedDocument = await ProjectDocumentService.rejectDocument(
+      id,
+      currentUser._id,
+      comments
+    );
+
+    // Audit logging
+    try {
+      await ProjectAuditService.logDocumentRejected(
+        document,
+        currentUser,
+        comments
+      );
+    } catch (error) {
+      console.error("❌ [AUDIT] Error logging document rejection:", error);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Document rejected successfully",
+      data: updatedDocument,
+    });
+  } catch (error) {
+    console.error("Error rejecting document:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reject document",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Process document with OCR
+// @route   POST /api/documents/:id/ocr
+// @access  Private
+export const processDocumentWithOCR = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUser = req.user;
+
+    console.log("🔍 [OCR] Processing document with OCR:", id);
+
+    // Find the document
+    const document = await Document.findById(id);
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found",
+      });
+    }
+
+    // Check if user has permission to process this document
+    if (document.createdBy.toString() !== currentUser._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to process this document",
+      });
+    }
+
+    // Process document with OCR
+    const ocrResult = await OCRService.processDocument(document.fileUrl, {
+      enableTextExtraction: true,
+      enableCategorization: true,
+      enableKeywordDetection: true,
+      enableConfidenceScoring: true,
+    });
+
+    console.log("✅ [OCR] Document processed successfully:", {
+      documentId: id,
+      confidence: ocrResult.confidence,
+      keywordsCount: ocrResult.keywords?.length || 0,
+    });
+
+    // Update document with OCR results
+    document.ocrResults = ocrResult;
+    document.lastProcessedAt = new Date();
+    await document.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Document processed with OCR successfully",
+      data: {
+        documentId: document._id,
+        ocrResults: ocrResult,
+        suggestedTitle: ocrResult.suggestedTitle,
+        suggestedDescription: ocrResult.suggestedDescription,
+        suggestedCategory: ocrResult.suggestedCategory,
+        suggestedConfidentiality: ocrResult.suggestedConfidentiality,
+        suggestedTags: ocrResult.suggestedTags,
+        confidence: ocrResult.confidence,
+        extractedText: ocrResult.extractedText,
+        keywords: ocrResult.keywords,
+      },
+    });
+  } catch (error) {
+    console.error("❌ [OCR] Error processing document with OCR:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to process document with OCR",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get document details with approval status
+// @route   GET /api/documents/:id
+// @access  Private (HOD+)
 export const getDocumentById = async (req, res) => {
   try {
     const { id } = req.params;
     const currentUser = req.user;
 
     const document = await Document.findById(id)
-      .populate("uploadedBy", "name email department")
-      .populate("currentApprover", "name email")
-      .populate("approvalChain.approver", "name email role");
+      .populate("project", "name code category budget")
+      .populate("createdBy", "firstName lastName email")
+      .populate(
+        "reviewers.reviewer",
+        "firstName lastName email role department"
+      )
+      .populate("approvedBy", "firstName lastName email")
+      .populate("department", "name");
 
     if (!document) {
       return res.status(404).json({
@@ -573,66 +1012,44 @@ export const getDocumentById = async (req, res) => {
       });
     }
 
-    // Check if user can access this document
-    if (!document.canAccess(currentUser)) {
+    // Check if user has access to this document
+    const hasAccess =
+      document.isPublic ||
+      document.createdBy._id.toString() === currentUser._id.toString() ||
+      document.reviewers.some(
+        (reviewer) =>
+          reviewer.reviewer._id.toString() === currentUser._id.toString()
+      ) ||
+      currentUser.role.level >= 1000; // SUPER_ADMIN
+
+    if (!hasAccess) {
       return res.status(403).json({
         success: false,
-        message: "You do not have permission to view this document",
+        message: "You don't have permission to view this document",
       });
     }
 
-    // Add view audit entry
-    document.addAuditEntry(
-      "VIEWED",
-      currentUser._id,
-      "Document viewed",
-      req.ip
-    );
-    await document.save();
-
-    // Log document view
-    await AuditService.logDocumentAction(
-      currentUser._id,
-      "DOCUMENT_VIEWED",
-      document._id,
-      {
-        documentTitle: document.title,
-        documentType: document.documentType,
-        category: document.category,
-        priority: document.priority,
-        status: document.status,
-        ipAddress: req.ip,
-        userAgent: req.get("User-Agent"),
-      }
-    );
-
-    const normalizedFilePath = document.filePath.replace(/\\/g, "/");
-    const fileUrl = `${
-      process.env.BASE_URL || "http://localhost:5000"
-    }/${normalizedFilePath}`;
-
-    res.json({
+    res.status(200).json({
       success: true,
-      data: {
-        ...document.toObject(),
-        fileUrl,
-      },
+      data: document,
     });
   } catch (error) {
-    console.error("Get document by ID error:", error);
+    console.error("Error getting document:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch document",
+      message: "Failed to get document",
+      error: error.message,
     });
   }
 };
 
-// Submit document for approval
-export const submitForApproval = async (req, res) => {
+// @desc    Update document
+// @route   PUT /api/documents/:id
+// @access  Private (HOD+)
+export const updateDocument = async (req, res) => {
   try {
     const { id } = req.params;
     const currentUser = req.user;
-    const { approvers } = req.body; // Array of user IDs for approval chain
 
     const document = await Document.findById(id);
     if (!document) {
@@ -642,287 +1059,53 @@ export const submitForApproval = async (req, res) => {
       });
     }
 
-    // Check if user owns the document
-    if (!document.uploadedBy.equals(currentUser._id)) {
+    // Check if user can edit this document
+    const canEdit =
+      document.createdBy.toString() === currentUser._id.toString() ||
+      currentUser.role.level >= 1000; // SUPER_ADMIN
+
+    if (!canEdit) {
       return res.status(403).json({
         success: false,
-        message: "You can only submit your own documents for approval",
+        message: "You don't have permission to edit this document",
       });
     }
 
-    // Validate approvers
-    if (!approvers || approvers.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "At least one approver is required",
-      });
-    }
-
-    // Build approval chain
-    const approvalChain = [];
-    for (let i = 0; i < approvers.length; i++) {
-      const approver = await User.findById(approvers[i]);
-      if (!approver) {
-        return res.status(400).json({
-          success: false,
-          message: `Approver ${approvers[i]} not found`,
-        });
-      }
-
-      approvalChain.push({
-        level: i + 1,
-        approver: approver._id,
-        status: "PENDING",
-        deadline: new Date(Date.now() + (i + 1) * 24 * 60 * 60 * 1000), // 24 hours per level
-      });
-    }
-
-    document.approvalChain = approvalChain;
-    document.currentApprover = approvers[0];
-    document.status = "SUBMITTED";
-
-    // Add audit entry
-    document.addAuditEntry(
-      "SUBMITTED",
-      currentUser._id,
-      "Document submitted for approval",
-      req.ip
-    );
-
-    await document.save();
-
-    // Log document submission for approval
-    await AuditService.logDocumentAction(
-      currentUser._id,
-      "DOCUMENT_UPDATED",
-      document._id,
+    // Update document
+    const updatedDocument = await Document.findByIdAndUpdate(
+      id,
       {
-        documentTitle: document.title,
-        documentType: document.documentType,
-        category: document.category,
-        priority: document.priority,
-        previousStatus: "DRAFT",
-        newStatus: document.status,
-        ipAddress: req.ip,
-        userAgent: req.get("User-Agent"),
-      }
-    );
-
-    await document.populate("currentApprover", "name email");
-
-    res.json({
-      success: true,
-      message: "Document submitted for approval",
-      data: {
-        id: document._id,
-        status: document.status,
-        currentApprover: document.currentApprover.name,
-        approvalChain: document.approvalChain.length,
+        ...req.body,
+        updatedBy: currentUser._id,
       },
-    });
-  } catch (error) {
-    console.error("Submit for approval error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to submit document for approval",
-    });
-  }
-};
+      { new: true, runValidators: true }
+    )
+      .populate("project", "name code category budget")
+      .populate("createdBy", "firstName lastName email")
+      .populate(
+        "reviewers.reviewer",
+        "firstName lastName email role department"
+      )
+      .populate("department", "name");
 
-// Approve document
-export const approveDocument = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const currentUser = req.user;
-    const { comments } = req.body;
-
-    const document = await Document.findById(id);
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: "Document not found",
-      });
-    }
-
-    // Check if user is the current approver
-    if (!document.currentApprover.equals(currentUser._id)) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not the current approver for this document",
-      });
-    }
-
-    // Check if user has permission to approve
-    if (!hasPermission(currentUser, "document.approve")) {
-      return res.status(403).json({
-        success: false,
-        message: "You do not have permission to approve documents",
-      });
-    }
-
-    // Approve the document
-    document.approve(currentUser._id, comments);
-
-    // Check if there are more approvals needed
-    const nextApprover = document.getNextApprover();
-    if (nextApprover) {
-      document.currentApprover = nextApprover;
-      document.status = "UNDER_REVIEW";
-    } else {
-      document.status = "APPROVED";
-      document.currentApprover = null;
-    }
-
-    await document.save();
-
-    // Log document approval
-    await AuditService.logDocumentAction(
-      currentUser._id,
-      "DOCUMENT_APPROVED",
-      document._id,
-      {
-        documentTitle: document.title,
-        documentType: document.documentType,
-        category: document.category,
-        priority: document.priority,
-        previousStatus: "UNDER_REVIEW",
-        newStatus: document.status,
-        approvalComment: comments || "Approved",
-        ipAddress: req.ip,
-        userAgent: req.get("User-Agent"),
-      }
-    );
-
-    await document.populate("currentApprover", "name email");
-
-    res.json({
+    res.status(200).json({
       success: true,
-      message: "Document approved successfully",
-      data: {
-        id: document._id,
-        status: document.status,
-        currentApprover: document.currentApprover
-          ? document.currentApprover.name
-          : null,
-      },
+      message: "Document updated successfully",
+      data: updatedDocument,
     });
   } catch (error) {
-    console.error("Approve document error:", error);
+    console.error("Error updating document:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to approve document",
+      message: "Failed to update document",
+      error: error.message,
     });
   }
 };
 
-// Reject document
-export const rejectDocument = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const currentUser = req.user;
-    const { comments } = req.body;
-
-    const document = await Document.findById(id);
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: "Document not found",
-      });
-    }
-
-    // Check if user is the current approver
-    if (!document.currentApprover.equals(currentUser._id)) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not the current approver for this document",
-      });
-    }
-
-    // Check if user has permission to reject
-    if (!hasPermission(currentUser, "document.reject")) {
-      return res.status(403).json({
-        success: false,
-        message: "You do not have permission to reject documents",
-      });
-    }
-
-    // Reject the document
-    document.reject(currentUser._id, comments);
-
-    await document.save();
-
-    // Log document rejection
-    await AuditService.logDocumentAction(
-      currentUser._id,
-      "DOCUMENT_REJECTED",
-      document._id,
-      {
-        documentTitle: document.title,
-        documentType: document.documentType,
-        category: document.category,
-        priority: document.priority,
-        previousStatus: "UNDER_REVIEW",
-        newStatus: document.status,
-        approvalComment: comments || "Rejected",
-        ipAddress: req.ip,
-        userAgent: req.get("User-Agent"),
-      }
-    );
-
-    res.json({
-      success: true,
-      message: "Document rejected successfully",
-      data: {
-        id: document._id,
-        status: document.status,
-      },
-    });
-  } catch (error) {
-    console.error("Reject document error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to reject document",
-    });
-  }
-};
-
-// Get documents pending approval
-export const getPendingApprovals = async (req, res) => {
-  try {
-    const currentUser = req.user;
-
-    // Check if user has permission to approve documents
-    if (!hasPermission(currentUser, "document.approve")) {
-      return res.status(403).json({
-        success: false,
-        message: "You do not have permission to approve documents",
-      });
-    }
-
-    const documents = await Document.find({
-      currentApprover: currentUser._id,
-      status: { $in: ["SUBMITTED", "UNDER_REVIEW"] },
-      isActive: true,
-    })
-      .populate("uploadedBy", "name email department")
-      .populate("approvalChain.approver", "name email")
-      .sort({ createdAt: -1 });
-
-    res.json({
-      success: true,
-      data: documents,
-      count: documents.length,
-    });
-  } catch (error) {
-    console.error("Get pending approvals error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch pending approvals",
-    });
-  }
-};
-
-// Delete document (soft delete)
+// @desc    Delete document
+// @route   DELETE /api/documents/:id
+// @access  Private (HOD+)
 export const deleteDocument = async (req, res) => {
   try {
     const { id } = req.params;
@@ -937,51 +1120,97 @@ export const deleteDocument = async (req, res) => {
     }
 
     // Check if user can delete this document
-    if (
-      !document.uploadedBy.equals(currentUser._id) &&
-      !hasPermission(currentUser, "document.delete")
-    ) {
+    const canDelete =
+      document.createdBy.toString() === currentUser._id.toString() ||
+      currentUser.role.level >= 1000; // SUPER_ADMIN
+
+    if (!canDelete) {
       return res.status(403).json({
         success: false,
-        message: "You do not have permission to delete this document",
+        message: "You don't have permission to delete this document",
       });
     }
 
     // Soft delete
     document.isActive = false;
-    document.addAuditEntry(
-      "DELETED",
-      currentUser._id,
-      "Document deleted",
-      req.ip
-    );
+    document.updatedBy = currentUser._id;
     await document.save();
 
-    // Log document deletion
-    await AuditService.logDocumentAction(
-      currentUser._id,
-      "DOCUMENT_DELETED",
-      document._id,
-      {
-        documentTitle: document.title,
-        documentType: document.documentType,
-        category: document.category,
-        priority: document.priority,
-        status: document.status,
-        ipAddress: req.ip,
-        userAgent: req.get("User-Agent"),
-      }
-    );
-
-    res.json({
+    res.status(200).json({
       success: true,
       message: "Document deleted successfully",
     });
   } catch (error) {
-    console.error("Delete document error:", error);
+    console.error("Error deleting document:", error);
     res.status(500).json({
       success: false,
       message: "Failed to delete document",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get document statistics
+// @route   GET /api/documents/stats
+// @access  Private (HOD+)
+export const getDocumentStats = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    // Get document statistics based on user role
+    let query = { isActive: true };
+
+    if (currentUser.role.level < 1000) {
+      // Non-SUPER_ADMIN users see only their documents or documents they can review
+      query.$or = [
+        { createdBy: currentUser._id },
+        { "reviewers.reviewer": currentUser._id },
+        { isPublic: true },
+      ];
+    }
+
+    const totalDocuments = await Document.countDocuments(query);
+    const pendingReview = await Document.countDocuments({
+      ...query,
+      reviewStatus: "pending",
+    });
+    const approvedDocuments = await Document.countDocuments({
+      ...query,
+      reviewStatus: "approved",
+    });
+    const rejectedDocuments = await Document.countDocuments({
+      ...query,
+      reviewStatus: "rejected",
+    });
+
+    // Get documents by category
+    const categoryStats = await Document.aggregate([
+      { $match: query },
+      {
+        $group: {
+          _id: "$category",
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalDocuments,
+        pendingReview,
+        approvedDocuments,
+        rejectedDocuments,
+        categoryStats,
+      },
+    });
+  } catch (error) {
+    console.error("Error getting document stats:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get document statistics",
+      error: error.message,
     });
   }
 };
@@ -1178,95 +1407,6 @@ export const getSearchSuggestions = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to get search suggestions",
-    });
-  }
-};
-
-// Update document (edit)
-export const updateDocument = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const currentUser = req.user;
-    const updates = req.body;
-
-    // Find document
-    const document = await Document.findById(id);
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: "Document not found",
-      });
-    }
-
-    // Only allow edit if not approved
-    if (document.status === "APPROVED" || document.status === "FINALIZED") {
-      return res.status(400).json({
-        success: false,
-        message: "Cannot edit an approved or finalized document",
-      });
-    }
-
-    // Check if user can edit (uploader, admin, or has permission)
-    if (
-      !document.uploadedBy.equals(currentUser._id) &&
-      !hasPermission(currentUser, "document.edit")
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "You do not have permission to edit this document",
-      });
-    }
-
-    // Allowed fields to update
-    const allowedFields = [
-      "title",
-      "description",
-      "category",
-      "priority",
-      "tags",
-      "department",
-    ];
-    allowedFields.forEach((field) => {
-      if (updates[field] !== undefined) {
-        document[field] = updates[field];
-      }
-    });
-
-    // Add audit entry
-    document.addAuditEntry(
-      "EDITED",
-      currentUser._id,
-      "Document edited",
-      req.ip
-    );
-    await document.save();
-
-    // Log document edit
-    await AuditService.logDocumentAction(
-      currentUser._id,
-      "DOCUMENT_EDITED",
-      document._id,
-      {
-        documentTitle: document.title,
-        documentType: document.documentType,
-        category: document.category,
-        priority: document.priority,
-        status: document.status,
-        ipAddress: req.ip,
-        userAgent: req.get("User-Agent"),
-      }
-    );
-
-    res.json({
-      success: true,
-      message: "Document updated successfully",
-      data: document,
-    });
-  } catch (error) {
-    console.error("Update document error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update document",
     });
   }
 };

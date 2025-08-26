@@ -17,10 +17,6 @@ import {
 import { authAPI, handleApiError } from "../../services/api";
 import ELRALogo from "../../components/ELRALogo";
 import { GradientSpinner } from "../../components/common";
-import loginImage from "../../assets/login.jpg";
-import signupImage from "../../assets/signup.jpg";
-import hero1Image from "../../assets/hero1.jpg";
-import hero2Image from "../../assets/hero2.jpg";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
@@ -205,10 +201,7 @@ const ForgotPassword = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
               >
-                Reset{" "}
-                <span className="bg-gradient-to-r from-purple-400 to-teal-400 bg-clip-text text-transparent">
-                  Password
-                </span>
+                Reset <span className="text-white">Password</span>
               </motion.h1>
 
               <motion.p
@@ -228,8 +221,8 @@ const ForgotPassword = () => {
                     icon: <HiShieldCheck className="w-6 h-6" />,
                     title: "Secure Reset",
                     description: "Encrypted link with automatic expiration",
-                    color: "from-purple-500/20 to-purple-600/20",
-                    iconColor: "text-purple-400",
+                    color: "from-white/20 to-white/30",
+                    iconColor: "text-white",
                   },
                   {
                     icon: <HiMail className="w-6 h-6" />,
@@ -242,19 +235,19 @@ const ForgotPassword = () => {
                     icon: <HiKey className="w-6 h-6" />,
                     title: "Easy Recovery",
                     description: "Simple step-by-step password reset",
-                    color: "from-purple-500/20 to-teal-500/20",
-                    iconColor: "text-purple-400",
+                    color: "from-white/20 to-teal-500/20",
+                    iconColor: "text-white",
                   },
                 ].map((feature, index) => (
                   <motion.div
                     key={index}
-                    className="flex items-center space-x-4 p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10"
+                    className="flex items-center space-x-4 p-4 rounded-2xl bg-[var(--elra-primary)]/5 backdrop-blur-sm border border-[var(--elra-primary)]/10"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.5 + index * 0.1 }}
                     whileHover={{
                       scale: 1.02,
-                      backgroundColor: "rgba(255, 255, 255, 0.1)",
+                      backgroundColor: "rgba(34, 197, 94, 0.1)",
                     }}
                   >
                     <div
@@ -263,10 +256,10 @@ const ForgotPassword = () => {
                       {feature.icon}
                     </div>
                     <div>
-                      <h3 className="text-white font-semibold text-lg">
+                      <h3 className="text-[var(--elra-primary)] font-semibold text-lg">
                         {feature.title}
                       </h3>
-                      <p className="text-white/70 text-sm">
+                      <p className="text-gray-600 text-sm">
                         {feature.description}
                       </p>
                     </div>
@@ -343,7 +336,7 @@ const ForgotPassword = () => {
                   >
                     <Link
                       to="/login"
-                      className="w-full bg-gradient-to-r from-purple-600 to-teal-600 hover:from-purple-700 hover:to-teal-700 text-white py-4 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25 flex items-center justify-center space-x-2"
+                      className="w-full bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] hover:from-[var(--elra-primary-dark)] hover:to-[var(--elra-primary)] text-white py-4 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[var(--elra-primary)]/25 flex items-center justify-center space-x-2"
                     >
                       <HiArrowLeft className="w-5 h-5" />
                       <span>Back to Login</span>
@@ -379,15 +372,15 @@ const ForgotPassword = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-900 via-green-800 to-emerald-900 relative overflow-hidden">
+    <div className="min-h-screen bg-white relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="fixed inset-0">
         {/* Gradient Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-green-900 via-green-800 to-emerald-900" />
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-white" />
 
         {/* Animated Circles */}
         <motion.div
-          className="absolute top-20 left-20 w-72 h-72 bg-green-500/10 rounded-full blur-3xl"
+          className="absolute top-20 left-20 w-72 h-72 bg-[var(--elra-primary)]/5 rounded-full blur-3xl"
           animate={{
             scale: [1, 1.2, 1],
             opacity: [0.3, 0.6, 0.3],
@@ -399,7 +392,7 @@ const ForgotPassword = () => {
           }}
         />
         <motion.div
-          className="absolute bottom-20 right-20 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl"
+          className="absolute bottom-20 right-20 w-96 h-96 bg-[var(--elra-primary)]/5 rounded-full blur-3xl"
           animate={{
             scale: [1.2, 1, 1.2],
             opacity: [0.4, 0.7, 0.4],
@@ -451,24 +444,22 @@ const ForgotPassword = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <ELRALogo variant="light" size="lg" />
+              <ELRALogo size="lg" />
             </motion.div>
 
             {/* Main Heading */}
             <motion.h1
-              className="text-5xl font-bold text-white mb-6 leading-tight"
+              className="text-5xl font-bold text-[var(--elra-primary)] mb-6 leading-tight"
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
               Forgot{" "}
-              <span className="bg-gradient-to-r from-purple-400 to-teal-400 bg-clip-text text-transparent">
-                Password?
-              </span>
+              <span className="text-[var(--elra-primary)]">Password?</span>
             </motion.h1>
 
             <motion.p
-              className="text-xl text-white/80 mb-12 leading-relaxed"
+              className="text-sm text-gray-600 mb-12 leading-relaxed"
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
@@ -484,33 +475,36 @@ const ForgotPassword = () => {
                   icon: <HiShieldCheck className="w-6 h-6" />,
                   title: "Secure Reset",
                   description: "Bank-level encryption for your reset link",
-                  color: "from-purple-500/20 to-purple-600/20",
-                  iconColor: "text-purple-400",
+                  color:
+                    "from-[var(--elra-primary)]/20 to-[var(--elra-primary)]/30",
+                  iconColor: "text-[var(--elra-primary)]",
                 },
                 {
                   icon: <HiMail className="w-6 h-6" />,
                   title: "Instant Delivery",
                   description: "Receive your reset link immediately",
-                  color: "from-teal-500/20 to-teal-600/20",
-                  iconColor: "text-teal-400",
+                  color:
+                    "from-[var(--elra-primary)]/20 to-[var(--elra-primary)]/30",
+                  iconColor: "text-[var(--elra-primary)]",
                 },
                 {
                   icon: <HiKey className="w-6 h-6" />,
                   title: "Easy Recovery",
                   description: "Simple step-by-step password reset process",
-                  color: "from-purple-500/20 to-teal-500/20",
-                  iconColor: "text-purple-400",
+                  color:
+                    "from-[var(--elra-primary)]/20 to-[var(--elra-primary)]/30",
+                  iconColor: "text-[var(--elra-primary)]",
                 },
               ].map((feature, index) => (
                 <motion.div
                   key={index}
-                  className="flex items-center space-x-4 p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10"
+                  className="flex items-center space-x-4 p-4 rounded-2xl bg-[var(--elra-primary)]/5 backdrop-blur-sm border border-[var(--elra-primary)]/10"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.5 + index * 0.1 }}
                   whileHover={{
                     scale: 1.02,
-                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                    backgroundColor: "rgba(34, 197, 94, 0.1)",
                   }}
                 >
                   <div
@@ -519,10 +513,10 @@ const ForgotPassword = () => {
                     {feature.icon}
                   </div>
                   <div>
-                    <h3 className="text-white font-semibold text-lg">
+                    <h3 className="text-[var(--elra-primary)] font-semibold text-lg">
                       {feature.title}
                     </h3>
-                    <p className="text-white/70 text-sm">
+                    <p className="text-gray-600 text-sm">
                       {feature.description}
                     </p>
                   </div>
@@ -550,20 +544,22 @@ const ForgotPassword = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <ELRALogo variant="light" size="md" className="mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-white">Forgot Password</h2>
+              <ELRALogo size="md" className="mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-[var(--elra-primary)]">
+                Forgot Password
+              </h2>
             </motion.div>
 
             {/* Form Card */}
             <motion.div
-              className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-8 shadow-2xl"
+              className="bg-white backdrop-blur-xl border border-gray-200 rounded-3xl p-8 shadow-2xl"
               variants={fadeInVariants}
             >
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-white mb-2">
+              <div className="text-center mb-8 mt-32">
+                <h2 className="text-3xl font-bold text-[var(--elra-primary)] mb-2">
                   Reset Password
                 </h2>
-                <p className="text-white/70">
+                <p className="text-gray-600">
                   Enter your email to receive a reset link
                 </p>
               </div>
@@ -574,7 +570,7 @@ const ForgotPassword = () => {
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-red-500/10 border border-red-400/30 text-red-400 px-4 py-3 rounded-xl text-sm text-center backdrop-blur-sm"
+                    className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm text-center"
                   >
                     {error}
                   </motion.div>
@@ -584,27 +580,27 @@ const ForgotPassword = () => {
                 <motion.div variants={fadeInVariants}>
                   <label
                     htmlFor="email"
-                    className="block text-sm font-medium text-white/90 mb-3"
+                    className="block text-sm font-medium text-gray-700 mb-3"
                   >
                     Email Address
                   </label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <HiMail className="h-5 w-5 text-white/50 group-focus-within:text-purple-400 transition-colors" />
+                      <HiMail className="h-5 w-5 text-gray-400 group-focus-within:text-[var(--elra-primary)] transition-colors" />
                     </div>
                     <input
                       type="email"
                       id="email"
                       value={email}
                       onChange={handleEmailChange}
-                      className={`w-full pl-12 pr-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400 backdrop-blur-sm transition-all duration-300 ${
-                        emailError ? "border-red-400/50" : ""
+                      className={`w-full pl-12 pr-4 py-4 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-300 ${
+                        emailError ? "border-red-400" : ""
                       }`}
                       placeholder="Enter your email address"
                     />
                   </div>
                   {emailError && (
-                    <p className="mt-2 text-sm text-red-400">{emailError}</p>
+                    <p className="mt-2 text-sm text-red-600">{emailError}</p>
                   )}
                 </motion.div>
 
@@ -612,7 +608,7 @@ const ForgotPassword = () => {
                 <motion.button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-purple-600 to-teal-600 hover:from-purple-700 hover:to-teal-700 text-white py-4 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-2"
+                  className="w-full bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] hover:from-[var(--elra-primary-dark)] hover:to-[var(--elra-primary)] text-white py-4 px-6 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-[var(--elra-primary)]/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center space-x-2"
                   variants={fadeInVariants}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -631,7 +627,7 @@ const ForgotPassword = () => {
                 <motion.div variants={fadeInVariants} className="text-center">
                   <Link
                     to="/login"
-                    className="text-sm text-teal-400 hover:text-teal-300 transition-colors duration-300"
+                    className="text-sm text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-colors duration-300"
                   >
                     ← Back to Login
                   </Link>
@@ -646,7 +642,7 @@ const ForgotPassword = () => {
               animate={{ opacity: 1 }}
               transition={{ delay: 0.8 }}
             >
-              <p className="text-white/50 text-sm">
+              <p className="text-gray-500 text-sm">
                 © {new Date().getFullYear()} ELRA - Equipment Leasing
                 Registration Authority
               </p>

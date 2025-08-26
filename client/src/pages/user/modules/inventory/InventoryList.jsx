@@ -10,7 +10,13 @@ import {
   CalendarIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../../../context/AuthContext";
-import { fetchInventory, createInventory, updateInventory, deleteInventory } from "../../../../services/inventoryAPI.js";
+import {
+  fetchInventory,
+  createInventory,
+  updateInventory,
+  deleteInventory,
+  fetchWorkflowTasks,
+} from "../../../../services/inventoryAPI.js";
 import { toast } from "react-toastify";
 import DataTable from "../../../../components/common/DataTable";
 
@@ -27,6 +33,9 @@ const InventoryList = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [workflowTasks, setWorkflowTasks] = useState([]);
+  const [selectedProject, setSelectedProject] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -37,6 +46,7 @@ const InventoryList = () => {
     leasePrice: "",
     location: "",
     serialNumber: "",
+    project: "",
   });
 
   // Access control - only Manager+ can access
@@ -44,8 +54,12 @@ const InventoryList = () => {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h2>
-          <p className="text-gray-600">You don't have permission to access Inventory List.</p>
+          <h2 className="text-2xl font-bold text-red-600 mb-4">
+            Access Denied
+          </h2>
+          <p className="text-gray-600">
+            You don't have permission to access Inventory List.
+          </p>
         </div>
       </div>
     );
@@ -61,15 +75,27 @@ const InventoryList = () => {
 
   const inventoryStatuses = [
     { value: "all", label: "All Statuses" },
-    { value: "available", label: "Available", color: "bg-green-100 text-green-800" },
+    {
+      value: "available",
+      label: "Available",
+      color: "bg-green-100 text-green-800",
+    },
     { value: "leased", label: "Leased", color: "bg-blue-100 text-blue-800" },
-    { value: "maintenance", label: "Under Maintenance", color: "bg-orange-100 text-orange-800" },
+    {
+      value: "maintenance",
+      label: "Under Maintenance",
+      color: "bg-orange-100 text-orange-800",
+    },
     { value: "retired", label: "Retired", color: "bg-red-100 text-red-800" },
   ];
 
   const inventoryConditions = [
     { value: "all", label: "All Conditions" },
-    { value: "excellent", label: "Excellent", color: "bg-green-100 text-green-800" },
+    {
+      value: "excellent",
+      label: "Excellent",
+      color: "bg-green-100 text-green-800",
+    },
     { value: "good", label: "Good", color: "bg-blue-100 text-blue-800" },
     { value: "fair", label: "Fair", color: "bg-yellow-100 text-yellow-800" },
     { value: "poor", label: "Poor", color: "bg-red-100 text-red-800" },
@@ -77,7 +103,10 @@ const InventoryList = () => {
 
   useEffect(() => {
     loadInventory();
-  }, []);
+    if (user.department?.name === "Operations") {
+      loadWorkflowTasks();
+    }
+  }, [user.department?.name]);
 
   const loadInventory = async () => {
     setLoading(true);
@@ -96,19 +125,51 @@ const InventoryList = () => {
     }
   };
 
+  const loadWorkflowTasks = async () => {
+    try {
+      const response = await fetchWorkflowTasks();
+      if (response.success) {
+        setWorkflowTasks(response.data?.tasks || []);
+      }
+    } catch (error) {
+      console.error("Error fetching workflow tasks:", error);
+    }
+  };
+
+  // Get unique projects from workflow tasks
+  const getProjectsFromTasks = () => {
+    const projectMap = new Map();
+    workflowTasks.forEach((task) => {
+      if (task.project && !projectMap.has(task.project._id)) {
+        projectMap.set(task.project._id, task.project);
+      }
+    });
+    return Array.from(projectMap.values());
+  };
+
   const getStatusBadge = (status) => {
-    const statusConfig = inventoryStatuses.find(s => s.value === status);
+    const statusConfig = inventoryStatuses.find((s) => s.value === status);
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusConfig?.color || 'bg-gray-100 text-gray-800'}`}>
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${
+          statusConfig?.color || "bg-gray-100 text-gray-800"
+        }`}
+      >
         {statusConfig?.label || status}
       </span>
     );
   };
 
   const getConditionBadge = (condition) => {
-    const conditionConfig = inventoryConditions.find(c => c.value === condition);
+    const conditionConfig = inventoryConditions.find(
+      (c) => c.value === condition
+    );
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${conditionConfig?.color || 'bg-gray-100 text-gray-800'}`}>
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${
+          conditionConfig?.color || "bg-gray-100 text-gray-800"
+        }`}
+      >
         {conditionConfig?.label || condition}
       </span>
     );
@@ -154,7 +215,18 @@ const InventoryList = () => {
       header: "Location",
       accessor: "location",
       cell: (item) => (
-        <span className="text-sm text-gray-900">{item.location || "Not specified"}</span>
+        <span className="text-sm text-gray-900">
+          {item.location || "Not specified"}
+        </span>
+      ),
+    },
+    {
+      header: "Project",
+      accessor: "project",
+      cell: (item) => (
+        <span className="text-sm text-gray-900">
+          {item.project?.name || "Not assigned"}
+        </span>
       ),
     },
     {
@@ -175,6 +247,7 @@ const InventoryList = () => {
                 leasePrice: item.leasePrice,
                 location: item.location,
                 serialNumber: item.serialNumber,
+                project: item.project?._id || "",
               });
               setShowEditModal(true);
             }}
@@ -195,8 +268,56 @@ const InventoryList = () => {
     },
   ];
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      let response;
+      if (showCreateModal) {
+        response = await createInventory(formData);
+        if (response.success) {
+          toast.success("Inventory item created successfully");
+          setShowCreateModal(false);
+        } else {
+          toast.error(response.message || "Failed to create inventory item");
+        }
+      } else {
+        response = await updateInventory(selectedItem._id, formData);
+        if (response.success) {
+          toast.success("Inventory item updated successfully");
+          setShowEditModal(false);
+        } else {
+          toast.error(response.message || "Failed to update inventory item");
+        }
+      }
+
+      if (response.success) {
+        setFormData({
+          name: "",
+          description: "",
+          category: "",
+          condition: "good",
+          status: "available",
+          purchasePrice: "",
+          leasePrice: "",
+          location: "",
+          serialNumber: "",
+          project: "",
+        });
+        loadInventory();
+      }
+    } catch (error) {
+      console.error("Error saving inventory item:", error);
+      toast.error("Error saving inventory item");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleDeleteItem = async (itemId) => {
-    if (!window.confirm("Are you sure you want to delete this inventory item?")) {
+    if (
+      !window.confirm("Are you sure you want to delete this inventory item?")
+    ) {
       return;
     }
 
@@ -227,8 +348,23 @@ const InventoryList = () => {
       <div className="mb-8">
         <div className="flex justify-between items-center mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Inventory List</h1>
-            <p className="text-gray-600">Manage all leaseable items and equipment</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Inventory List
+            </h1>
+            <p className="text-gray-600">
+              Manage all leaseable items and equipment
+            </p>
+            {user.department?.name === "Operations" &&
+              workflowTasks.length > 0 && (
+                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>Workflow Context:</strong> You have{" "}
+                    {workflowTasks.filter((t) => t.status === "pending").length}{" "}
+                    pending inventory tasks for {getProjectsFromTasks().length}{" "}
+                    approved project(s)
+                  </p>
+                </div>
+              )}
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
@@ -243,10 +379,14 @@ const InventoryList = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Status
+              </label>
               <select
                 value={filters.status}
-                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                onChange={(e) =>
+                  setFilters({ ...filters, status: e.target.value })
+                }
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
               >
                 {inventoryStatuses.map((status) => (
@@ -257,10 +397,14 @@ const InventoryList = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Category
+              </label>
               <select
                 value={filters.category}
-                onChange={(e) => setFilters({ ...filters, category: e.target.value })}
+                onChange={(e) =>
+                  setFilters({ ...filters, category: e.target.value })
+                }
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
               >
                 {inventoryCategories.map((category) => (
@@ -271,7 +415,9 @@ const InventoryList = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Search
+              </label>
               <input
                 type="text"
                 placeholder="Search inventory..."
@@ -293,6 +439,295 @@ const InventoryList = () => {
           />
         </div>
       </div>
+
+      {/* Create/Edit Modal */}
+      {(showCreateModal || showEditModal) && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">
+                {showCreateModal
+                  ? "Create New Inventory Item"
+                  : "Edit Inventory Item"}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setShowEditModal(false);
+                  setFormData({
+                    name: "",
+                    description: "",
+                    category: "",
+                    condition: "good",
+                    status: "available",
+                    purchasePrice: "",
+                    leasePrice: "",
+                    location: "",
+                    serialNumber: "",
+                    project: "",
+                  });
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Project Selection (only for Operations department) */}
+                {user.department?.name === "Operations" &&
+                  getProjectsFromTasks().length > 0 && (
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Associated Project
+                      </label>
+                      <select
+                        value={formData.project}
+                        onChange={(e) =>
+                          setFormData({ ...formData, project: e.target.value })
+                        }
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                      >
+                        <option value="">Select Project (Optional)</option>
+                        {getProjectsFromTasks().map((project) => (
+                          <option key={project._id} value={project._id}>
+                            {project.name} - {project.category}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Link this inventory item to a specific project
+                      </p>
+                    </div>
+                  )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Item Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                    placeholder="e.g., CAT320 Excavator"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Category *
+                  </label>
+                  <select
+                    required
+                    value={formData.category}
+                    onChange={(e) =>
+                      setFormData({ ...formData, category: e.target.value })
+                    }
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                  >
+                    <option value="">Select Category</option>
+                    <option value="construction">Construction Equipment</option>
+                    <option value="it">IT Equipment</option>
+                    <option value="office">Office Equipment</option>
+                    <option value="vehicles">Vehicles</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Serial Number
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.serialNumber}
+                    onChange={(e) =>
+                      setFormData({ ...formData, serialNumber: e.target.value })
+                    }
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                    placeholder="e.g., SN-2025-001"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Location
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.location}
+                    onChange={(e) =>
+                      setFormData({ ...formData, location: e.target.value })
+                    }
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                    placeholder="e.g., Warehouse A-15"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Purchase Price
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.purchasePrice}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        purchasePrice: e.target.value,
+                      })
+                    }
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                    placeholder="₦0.00"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Lease Price *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.leasePrice}
+                    onChange={(e) =>
+                      setFormData({ ...formData, leasePrice: e.target.value })
+                    }
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                    placeholder="₦0.00"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Condition
+                  </label>
+                  <select
+                    value={formData.condition}
+                    onChange={(e) =>
+                      setFormData({ ...formData, condition: e.target.value })
+                    }
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                  >
+                    <option value="excellent">Excellent</option>
+                    <option value="good">Good</option>
+                    <option value="fair">Fair</option>
+                    <option value="poor">Poor</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) =>
+                      setFormData({ ...formData, status: e.target.value })
+                    }
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                  >
+                    <option value="available">Available</option>
+                    <option value="leased">Leased</option>
+                    <option value="maintenance">Under Maintenance</option>
+                    <option value="retired">Retired</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                  rows={3}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                  placeholder="Detailed description of the equipment..."
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setShowEditModal(false);
+                    setFormData({
+                      name: "",
+                      description: "",
+                      category: "",
+                      condition: "good",
+                      status: "available",
+                      purchasePrice: "",
+                      leasePrice: "",
+                      location: "",
+                      serialNumber: "",
+                      project: "",
+                    });
+                  }}
+                  disabled={submitting}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-md hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  {submitting && (
+                    <svg
+                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                  )}
+                  {submitting
+                    ? "Saving..."
+                    : showCreateModal
+                    ? "Create Item"
+                    : "Update Item"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

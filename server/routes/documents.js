@@ -2,11 +2,10 @@ import express from "express";
 import {
   uploadDocument,
   getAllDocuments,
+  getMyDocuments,
   getDocumentById,
-  submitForApproval,
   approveDocument,
   rejectDocument,
-  getPendingApprovals,
   deleteDocument,
   searchDocuments,
   updateDocument,
@@ -16,6 +15,10 @@ import {
   getSearchSuggestions,
   getDocumentMetadata,
   processOCR,
+  getProjectDocuments,
+  getPendingApprovalDocuments,
+  getDocumentStats,
+  processDocumentWithOCR,
 } from "../controllers/documentController.js";
 import { protect } from "../middleware/auth.js";
 
@@ -26,19 +29,23 @@ router.use(protect);
 
 // Document routes
 router.get("/metadata", getDocumentMetadata);
+router.get("/stats", getDocumentStats);
 router.post("/ocr", processOCR);
 router.post("/upload", uploadDocument);
 router.get("/", getAllDocuments);
+router.get("/my-documents", getMyDocuments);
 router.get("/search", searchDocuments);
 router.get("/search/fulltext", fullTextSearch);
 router.get("/search/metadata", metadataSearch);
 router.get("/search/suggestions", getSearchSuggestions);
+router.get("/pending-approval", getPendingApprovalDocuments);
+router.get("/project/:projectId", getProjectDocuments);
 router.get("/:id/similar", findSimilarDocuments);
-router.get("/pending-approvals", getPendingApprovals);
 router.get("/:id", getDocumentById);
-router.post("/:id/submit", submitForApproval);
+
 router.post("/:id/approve", approveDocument);
 router.post("/:id/reject", rejectDocument);
+router.post("/:id/ocr", processDocumentWithOCR);
 router.put("/:id", updateDocument);
 router.delete("/:id", deleteDocument);
 

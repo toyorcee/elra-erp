@@ -50,6 +50,7 @@ export const getAllInventory = async (req, res) => {
     const inventory = await Inventory.find(query)
       .populate("assignedTo", "firstName lastName email")
       .populate("createdBy", "firstName lastName")
+      .populate("project", "name category")
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -138,6 +139,7 @@ export const createInventory = async (req, res) => {
 
     // Populate the created inventory
     await inventory.populate("createdBy", "firstName lastName");
+    await inventory.populate("project", "name category");
 
     res.status(201).json({
       success: true,
@@ -189,7 +191,8 @@ export const updateInventory = async (req, res) => {
       { new: true, runValidators: true }
     )
       .populate("assignedTo", "firstName lastName email")
-      .populate("createdBy", "firstName lastName");
+      .populate("createdBy", "firstName lastName")
+      .populate("project", "name category");
 
     res.status(200).json({
       success: true,

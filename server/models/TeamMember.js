@@ -76,7 +76,7 @@ const teamMemberSchema = new mongoose.Schema(
       type: Number,
       min: 0,
       max: 100,
-      default: 100,
+      default: 0,
     },
 
     // Performance Tracking

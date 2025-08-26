@@ -487,6 +487,17 @@ export const checkDocumentAccess = checkDepartmentAccess({
     "Access denied. Only HOD (700) and Super Admin (1000) can manage documents.",
 });
 
+// Specific middleware for workflow tasks
+export const checkWorkflowAccess = checkDepartmentAccess({
+  allowSuperAdmin: true,
+  allowHOD: true,
+  minLevel: 700, // HOD level minimum
+  resourceField: "department",
+  userDepartmentField: "department",
+  errorMessage:
+    "Access denied. Only HOD (700) and Super Admin (1000) can manage workflow tasks.",
+});
+
 // Specific middleware for any other module
 export const checkModuleAccess = (moduleName) =>
   checkDepartmentAccess({

@@ -527,7 +527,10 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                   <p className="text-sm font-semibold text-gray-900 truncate">
                     {user?.firstName} {user?.lastName}
                   </p>
-                  <p className="text-xs text-[var(--elra-primary)] font-medium">
+                  <p className="text-sm  text-[var(--elra-primary)] font-semibold truncate">
+                    {user?.department?.name || "Department"}
+                  </p>
+                  <p className="text-xs text-gray-900 font-medium">
                     {typeof roleInfo?.title === "string"
                       ? roleInfo.title
                       : "Staff"}

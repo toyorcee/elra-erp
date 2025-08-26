@@ -283,6 +283,12 @@ const inventorySchema = new mongoose.Schema(
       },
     ],
 
+    // Project Association
+    project: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+    },
+
     // Audit Fields
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

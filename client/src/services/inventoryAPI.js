@@ -69,7 +69,11 @@ export const getInventoryById = async (id) => {
 // Create new inventory item
 export const createInventory = async (inventoryData) => {
   try {
-    const response = await api.post("/inventory", inventoryData);
+    const dataToSend = {
+      ...inventoryData,
+      project: inventoryData.project || undefined,
+    };
+    const response = await api.post("/inventory", dataToSend);
     return response.data;
   } catch (error) {
     console.error("Error creating inventory item:", error);
@@ -80,7 +84,12 @@ export const createInventory = async (inventoryData) => {
 // Update inventory item
 export const updateInventory = async (id, inventoryData) => {
   try {
-    const response = await api.put(`/inventory/${id}`, inventoryData);
+    // Ensure project field is included if present
+    const dataToSend = {
+      ...inventoryData,
+      project: inventoryData.project || undefined,
+    };
+    const response = await api.put(`/inventory/${id}`, dataToSend);
     return response.data;
   } catch (error) {
     console.error("Error updating inventory item:", error);
@@ -136,6 +145,17 @@ export const updateInventoryStatus = async (inventoryId, status) => {
     return response.data;
   } catch (error) {
     console.error("Error updating inventory status:", error);
+    throw error;
+  }
+};
+
+// Get workflow tasks for operations
+export const fetchWorkflowTasks = async () => {
+  try {
+    const response = await api.get("/workflow-tasks/operations");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching workflow tasks:", error);
     throw error;
   }
 };

@@ -17,6 +17,19 @@ const auditLogSchema = new mongoose.Schema(
       department: String,
     },
 
+    // Project-specific fields (for project-related actions)
+    projectId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+    },
+    projectDetails: {
+      name: String,
+      code: String,
+      category: String,
+      budget: Number,
+      department: String,
+    },
+
     // Action details
     action: {
       type: String,
@@ -91,6 +104,26 @@ const auditLogSchema = new mongoose.Schema(
         "PAYROLL_BONUS_APPLIED",
         "PAYROLL_DEDUCTION_APPLIED",
 
+        // Project actions
+        "PROJECT_CREATED",
+        "PROJECT_UPDATED",
+        "PROJECT_DELETED",
+        "PROJECT_APPROVED",
+        "PROJECT_REJECTED",
+        "PROJECT_WORKFLOW_TRIGGERED",
+        "PROJECT_PHASE_CHANGED",
+        "PROJECT_INVENTORY_CREATED",
+        "PROJECT_PROCUREMENT_INITIATED",
+        "PROJECT_FINANCIAL_SETUP",
+        "PROJECT_TASKS_CREATED",
+        "PROJECT_COMPLETED",
+        "PROJECT_TEAM_MEMBER_ADDED",
+        "PROJECT_TEAM_MEMBER_REMOVED",
+        "PROJECT_BUDGET_UPDATED",
+        "PROJECT_STATUS_CHANGED",
+        "PROJECT_TASK_STATUS_CHANGED",
+        "DOCUMENT_CREATED",
+
         // Security actions
         "LOGIN_ATTEMPT",
         "PERMISSION_DENIED",
@@ -115,6 +148,9 @@ const auditLogSchema = new mongoose.Schema(
         "PAYROLL",
         "PERSONAL_ALLOWANCE",
         "PERSONAL_BONUS",
+        "PROJECT",
+        "WORKFLOW_TEMPLATE",
+        "TASK",
       ],
     },
 
@@ -136,6 +172,9 @@ const auditLogSchema = new mongoose.Schema(
         "Payroll",
         "PersonalAllowance",
         "PersonalBonus",
+        "Project",
+        "WorkflowTemplate",
+        "Task",
       ],
     },
 

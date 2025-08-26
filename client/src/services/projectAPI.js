@@ -11,6 +11,17 @@ export const fetchProjects = async (params = {}) => {
   }
 };
 
+// Get my projects
+export const fetchMyProjects = async () => {
+  try {
+    const response = await api.get("/projects/my-projects");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching my projects:", error);
+    throw error;
+  }
+};
+
 // Get project statistics
 export const fetchProjectStats = async () => {
   try {
@@ -131,6 +142,17 @@ export const addProjectNote = async (projectId, noteData) => {
     return response.data;
   } catch (error) {
     console.error("Error adding project note:", error);
+    throw error;
+  }
+};
+
+// Get projects pending approval
+export const fetchPendingProjectApprovals = async () => {
+  try {
+    const response = await api.get("/projects/pending-approval");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching pending project approvals:", error);
     throw error;
   }
 };

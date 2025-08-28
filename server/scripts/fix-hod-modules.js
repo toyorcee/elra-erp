@@ -128,33 +128,21 @@ const fixAllUserModules = async () => {
         },
       },
       "Executive Office": {
-        modules: [
-          "SELF_SERVICE",
-          "CUSTOMER_CARE",
-          "PROJECTS",
-          "SYSTEM_ADMIN",
-          "COMMUNICATION",
-        ],
+        modules: ["SELF_SERVICE", "CUSTOMER_CARE", "PROJECTS", "COMMUNICATION"],
         permissions: {
           HOD: ["view", "create", "edit", "delete", "approve"],
           MANAGER: ["view", "edit", "approve"], // Managers approve what Staff creates
-          STAFF: ["view"], // Staff can only view System Admin records
-          VIEWER: ["view"], // Viewers can only view System Admin records
+          STAFF: ["view"], // Staff can only view department records
+          VIEWER: ["view"], // Viewers can only view department records
         },
       },
       "Information Technology": {
-        modules: [
-          "SELF_SERVICE",
-          "CUSTOMER_CARE",
-          "PROJECTS",
-          "SYSTEM_ADMIN",
-          "COMMUNICATION",
-        ],
+        modules: ["SELF_SERVICE", "CUSTOMER_CARE", "PROJECTS", "COMMUNICATION"],
         permissions: {
           HOD: ["view", "create", "edit", "delete", "approve"],
           MANAGER: ["view", "edit", "approve"], // Managers approve what Staff creates
-          STAFF: ["view"], // Staff can only view System Admin records
-          VIEWER: ["view"], // Viewers can only view System Admin records
+          STAFF: ["view"], // Staff can only view department records
+          VIEWER: ["view"], // Viewers can only view department records
         },
       },
       "Customer Service": {
@@ -167,18 +155,9 @@ const fixAllUserModules = async () => {
         },
       },
       "System Administration": {
-        modules: [
-          "SELF_SERVICE",
-          "CUSTOMER_CARE",
-          "PROJECTS",
-          "SYSTEM_ADMIN",
-          "COMMUNICATION",
-        ],
+        modules: ["SELF_SERVICE", "CUSTOMER_CARE", "PROJECTS", "COMMUNICATION"],
         permissions: {
-          HOD: ["view", "create", "edit", "delete", "approve"],
-          MANAGER: ["view", "edit", "approve"], // Managers approve what Staff creates
-          STAFF: ["view"], // Staff can only view System Admin records
-          VIEWER: ["view"], // Viewers can only view System Admin records
+          SUPER_ADMIN: ["view", "create", "edit", "delete", "approve"],
         },
       },
     };

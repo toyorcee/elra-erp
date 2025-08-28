@@ -346,6 +346,287 @@ userSchema.pre("validate", async function (next) {
   next();
 });
 
+// Pre-save hook to assign module access based on department and role
+userSchema.pre("save", async function (next) {
+  // Only assign module access if this is a new user (no moduleAccess yet)
+  if (this.isNew && (!this.moduleAccess || this.moduleAccess.length === 0)) {
+    try {
+      // Get role and department details
+      let roleDoc = this.role;
+      let departmentDoc = this.department;
+
+      if (roleDoc && roleDoc.name === undefined) {
+        const Role = mongoose.model("Role");
+        roleDoc = await Role.findById(this.role);
+      }
+
+      if (departmentDoc && departmentDoc.name === undefined) {
+        const Department = mongoose.model("Department");
+        departmentDoc = await Department.findById(this.department);
+      }
+
+      if (!roleDoc || !departmentDoc) {
+        console.log(
+          "⚠️ Cannot assign module access - missing role or department"
+        );
+        return next();
+      }
+
+      // Define department-specific module access with role-based permissions
+      const departmentModuleConfig = {
+        "Human Resources": {
+          modules: [
+            "SELF_SERVICE",
+            "CUSTOMER_CARE",
+            "PROJECTS",
+            "HR",
+            "PAYROLL",
+            "COMMUNICATION",
+          ],
+          permissions: {
+            HOD: ["view", "create", "edit", "delete", "approve"],
+            MANAGER: ["view", "edit", "approve"],
+            STAFF: ["view"],
+            VIEWER: ["view"],
+          },
+        },
+        "Legal & Compliance": {
+          modules: [
+            "SELF_SERVICE",
+            "CUSTOMER_CARE",
+            "PROJECTS",
+            "LEGAL",
+            "COMMUNICATION",
+          ],
+          permissions: {
+            HOD: ["view", "create", "edit", "delete", "approve"],
+            MANAGER: ["view", "edit", "approve"],
+            STAFF: ["view"],
+            VIEWER: ["view"],
+          },
+        },
+        "Finance & Accounting": {
+          modules: [
+            "SELF_SERVICE",
+            "CUSTOMER_CARE",
+            "PROJECTS",
+            "FINANCE",
+            "PAYROLL",
+            "COMMUNICATION",
+          ],
+          permissions: {
+            HOD: ["view", "create", "edit", "delete", "approve"],
+            MANAGER: ["view", "edit", "approve"],
+            STAFF: ["view"],
+            VIEWER: ["view"],
+          },
+        },
+        Operations: {
+          modules: [
+            "SELF_SERVICE",
+            "CUSTOMER_CARE",
+            "PROJECTS",
+            "INVENTORY",
+            "COMMUNICATION",
+          ],
+          permissions: {
+            HOD: ["view", "create", "edit", "delete", "approve"],
+            MANAGER: ["view", "edit", "approve"],
+            STAFF: ["view"],
+            VIEWER: ["view"],
+          },
+        },
+        Procurement: {
+          modules: [
+            "SELF_SERVICE",
+            "CUSTOMER_CARE",
+            "PROJECTS",
+            "PROCUREMENT",
+            "COMMUNICATION",
+          ],
+          permissions: {
+            HOD: ["view", "create", "edit", "delete", "approve"],
+            MANAGER: ["view", "edit", "approve"],
+            STAFF: ["view"],
+            VIEWER: ["view"],
+          },
+        },
+        "Sales & Marketing": {
+          modules: [
+            "SELF_SERVICE",
+            "CUSTOMER_CARE",
+            "PROJECTS",
+            "SALES",
+            "COMMUNICATION",
+          ],
+          permissions: {
+            HOD: ["view", "create", "edit", "delete", "approve"],
+            MANAGER: ["view", "edit", "approve"],
+            STAFF: ["view"],
+            VIEWER: ["view"],
+          },
+        },
+        "Executive Office": {
+          modules: [
+            "SELF_SERVICE",
+            "CUSTOMER_CARE",
+            "PROJECTS",
+            "COMMUNICATION",
+          ],
+          permissions: {
+            HOD: ["view", "create", "edit", "delete", "approve"],
+            MANAGER: ["view", "edit", "approve"],
+            STAFF: ["view"],
+            VIEWER: ["view"],
+          },
+        },
+        "Information Technology": {
+          modules: [
+            "SELF_SERVICE",
+            "CUSTOMER_CARE",
+            "PROJECTS",
+            "COMMUNICATION",
+          ],
+          permissions: {
+            HOD: ["view", "create", "edit", "delete", "approve"],
+            MANAGER: ["view", "edit", "approve"],
+            STAFF: ["view"],
+            VIEWER: ["view"],
+          },
+        },
+        "Customer Service": {
+          modules: [
+            "SELF_SERVICE",
+            "CUSTOMER_CARE",
+            "PROJECTS",
+            "COMMUNICATION",
+          ],
+          permissions: {
+            HOD: ["view", "create", "edit", "delete", "approve"],
+            MANAGER: ["view", "edit", "approve"],
+            STAFF: ["view"],
+            VIEWER: ["view"],
+          },
+        },
+        "System Administration": {
+          modules: [
+            "SELF_SERVICE",
+            "CUSTOMER_CARE",
+            "PROJECTS",
+            "COMMUNICATION",
+          ],
+          permissions: {
+            HOD: ["view", "create", "edit", "delete", "approve"],
+            MANAGER: ["view", "edit", "approve"],
+            STAFF: ["view"],
+            VIEWER: ["view"],
+          },
+        },
+      };
+
+      const config = departmentModuleConfig[departmentDoc.name];
+      if (!config) {
+        console.log(
+          `⚠️ No module config found for department: ${departmentDoc.name}`
+        );
+        return next();
+      }
+
+      const permissions = config.permissions[roleDoc.name];
+      if (!permissions) {
+        console.log(
+          `⚠️ No permissions found for role: ${roleDoc.name} in department: ${departmentDoc.name}`
+        );
+        return next();
+      }
+
+      // Create module access array for this user's department and role
+      const userModuleAccess = config.modules
+        .map((module) => {
+          // SUPER_ADMIN gets all modules with admin permissions
+          if (roleDoc.name === "SUPER_ADMIN") {
+            return {
+              module: module,
+              permissions: [
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "approve",
+                "admin",
+              ],
+              _id: new mongoose.Types.ObjectId(),
+            };
+          }
+
+          // Special handling for PROJECTS module - all users except VIEWER can create personal projects
+          if (module === "PROJECTS") {
+            if (roleDoc.name === "VIEWER") {
+              return {
+                module: module,
+                permissions: ["view"],
+                _id: new mongoose.Types.ObjectId(),
+              };
+            }
+            return {
+              module: module,
+              permissions: ["view", "create"],
+              _id: new mongoose.Types.ObjectId(),
+            };
+          }
+
+          // Special handling for SELF_SERVICE, CUSTOMER_CARE, COMMUNICATION - Staff can create
+          if (
+            ["SELF_SERVICE", "CUSTOMER_CARE", "COMMUNICATION"].includes(module)
+          ) {
+            if (roleDoc.name === "VIEWER" && module === "SELF_SERVICE") {
+              return {
+                module: module,
+                permissions: ["view"],
+                _id: new mongoose.Types.ObjectId(),
+              };
+            }
+            return {
+              module: module,
+              permissions: ["view", "create"],
+              _id: new mongoose.Types.ObjectId(),
+            };
+          }
+
+          return {
+            module: module,
+            permissions: permissions,
+            _id: new mongoose.Types.ObjectId(),
+          };
+        })
+        .filter(Boolean); // Remove null entries (SYSTEM_ADMIN for non-SUPER_ADMIN)
+
+      // Add SYSTEM_ADMIN module specifically for SUPER_ADMIN users
+      if (roleDoc.name === "SUPER_ADMIN") {
+        userModuleAccess.push({
+          module: "SYSTEM_ADMIN",
+          permissions: ["view", "create", "edit", "delete", "approve", "admin"],
+          _id: new mongoose.Types.ObjectId(),
+        });
+      }
+
+      this.moduleAccess = userModuleAccess;
+
+      console.log(`✅ Assigned module access to new user: ${this.email}`);
+      console.log(`   Department: ${departmentDoc.name}`);
+      console.log(`   Role: ${roleDoc.name}`);
+      console.log(
+        `   Modules: ${userModuleAccess.map((m) => m.module).join(", ")}`
+      );
+    } catch (error) {
+      console.error("❌ Error assigning module access:", error);
+      // Don't fail the save, just log the error
+    }
+  }
+
+  next();
+});
+
 // Instance method to compare password
 userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);

@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 import ProjectAuditService from "../services/projectAuditService.js";
 import ProjectDocumentService from "../services/projectDocumentService.js";
-import WorkflowTemplateService from "../services/workflowTemplateService.js";
 
 const projectSchema = new mongoose.Schema(
   {
@@ -146,31 +145,203 @@ const projectSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Project Categories (relevant for leasing business)
+    // Project Categories - Professional & Wide (Common for Internal & External)
     category: {
       type: String,
       required: true,
       enum: [
-        "equipment_lease",
-        "vehicle_lease",
-        "property_lease",
-        "financial_lease",
-        "training_equipment_lease",
-        "compliance_lease",
-        "service_equipment_lease",
-        "strategic_lease",
+        // SOFTWARE & TECHNOLOGY
         "software_development",
         "system_maintenance",
-        "consulting",
-        "training",
+        "infrastructure_upgrade",
+        "digital_transformation",
+        "data_management",
+        "security_enhancement",
+        "process_automation",
+        "integration_project",
+
+        // EQUIPMENT & FACILITIES
+        "equipment_purchase",
+        "equipment_lease",
+        "facility_improvement",
+        "infrastructure_development",
+        "equipment_maintenance",
+
+        // TRAINING & DEVELOPMENT
+        "training_program",
+        "capacity_building",
+        "skill_development",
+        "professional_development",
+        "industry_training",
+
+        // CONSULTING & SERVICES
+        "consulting_service",
+        "advisory_service",
+        "technical_support",
+        "implementation_service",
+
+        // REGULATORY & COMPLIANCE
+        "regulatory_compliance",
+        "compliance_audit",
+        "regulatory_enforcement",
+        "policy_development",
+        "standards_implementation",
+
+        // MONITORING & OVERSIGHT
+        "monitoring_system",
+        "oversight_program",
+        "verification_service",
+        "inspection_program",
+
+        // FINANCIAL & ADMINISTRATIVE
+        "financial_management",
+        "budget_optimization",
+        "cost_reduction",
+        "administrative_improvement",
+
+        // MARKETPLACE & EXCHANGE
+        "marketplace_development",
+        "exchange_platform",
+        "trading_system",
+        "market_analysis",
+
+        // PUBLIC & COMMUNICATION
+        "public_awareness",
+        "communication_campaign",
+        "stakeholder_engagement",
+        "public_relations",
+
+        // RESEARCH & ANALYSIS
+        "research_project",
+        "market_research",
+        "feasibility_study",
+        "impact_assessment",
+
+        // OTHER
         "other",
       ],
     },
-    customCategory: {
+
+    // Project Scope (Personal, Departmental, External)
+    projectScope: {
       type: String,
-      trim: true,
-      maxlength: 100,
+      enum: ["personal", "departmental", "external"],
+      required: true,
+      default: "personal",
     },
+
+    // External Project Details (if applicable)
+    externalProjectDetails: {
+      targetIndustry: {
+        type: String,
+        enum: [
+          "leasing_companies",
+          "equipment_owners",
+          "financial_institutions",
+          "government_agencies",
+          "other",
+        ],
+      },
+      complianceType: {
+        type: String,
+        enum: [
+          "equipment_registration",
+          "safety_compliance",
+          "financial_compliance",
+          "operational_compliance",
+          "other",
+        ],
+      },
+      affectedCompanies: {
+        type: Number,
+        min: 0,
+      },
+      regulatoryImpact: {
+        type: String,
+        enum: ["low", "medium", "high", "critical"],
+      },
+    },
+
+    // Equipment Requirements
+    equipmentRequirements: [
+      {
+        name: {
+          type: String,
+          required: true,
+          trim: true,
+          maxlength: 200,
+        },
+        description: {
+          type: String,
+          trim: true,
+          maxlength: 500,
+        },
+        category: {
+          type: String,
+          enum: [
+            "construction_equipment",
+            "office_equipment",
+            "medical_equipment",
+            "agricultural_equipment",
+            "industrial_equipment",
+            "passenger_vehicle",
+            "commercial_vehicle",
+            "construction_vehicle",
+            "agricultural_vehicle",
+            "office_space",
+            "warehouse",
+            "residential",
+            "commercial_space",
+            "furniture",
+            "electronics",
+            "tools",
+            "other",
+          ],
+          required: true,
+        },
+        quantity: {
+          type: Number,
+          required: true,
+          min: 1,
+          default: 1,
+        },
+        estimatedCost: {
+          type: Number,
+          min: 0,
+          default: 0,
+        },
+        specifications: {
+          brand: String,
+          model: String,
+          year: Number,
+          capacity: String,
+          power: String,
+          dimensions: String,
+          weight: String,
+          additionalSpecs: String,
+        },
+        priority: {
+          type: String,
+          enum: ["low", "medium", "high", "critical"],
+          default: "medium",
+        },
+        isRequired: {
+          type: Boolean,
+          default: true,
+        },
+        specifications: {
+          brand: String,
+          model: String,
+          year: Number,
+          capacity: String,
+          power: String,
+          dimensions: String,
+          weight: String,
+          additionalSpecs: String,
+        },
+        notes: String,
+      },
+    ],
 
     // Project Progress
     progress: {
@@ -203,8 +374,32 @@ const projectSchema = new mongoose.Schema(
     },
     workflowTriggers: {
       inventoryCreated: { type: Boolean, default: false },
+      inventoryCompleted: { type: Boolean, default: false },
       procurementInitiated: { type: Boolean, default: false },
-      financialSetup: { type: Boolean, default: false },
+      procurementCompleted: { type: Boolean, default: false },
+      regulatoryComplianceInitiated: { type: Boolean, default: false },
+      regulatoryComplianceCompleted: { type: Boolean, default: false },
+      regulatoryComplianceInitiatedAt: { type: Date },
+      regulatoryComplianceInitiatedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      regulatoryComplianceCompletedAt: { type: Date },
+      regulatoryComplianceCompletedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      complianceDetails: { type: mongoose.Schema.Types.Mixed },
+      inventoryCompletedAt: { type: Date },
+      inventoryCompletedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      procurementCompletedAt: { type: Date },
+      procurementCompletedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
     },
     workflowHistory: [
       {
@@ -226,7 +421,13 @@ const projectSchema = new mongoose.Schema(
       {
         level: {
           type: String,
-          enum: ["hod", "department", "finance", "executive"],
+          enum: [
+            "hod",
+            "department",
+            "finance",
+            "executive",
+            "legal_compliance",
+          ],
           required: true,
         },
         approver: {
@@ -311,7 +512,7 @@ const projectSchema = new mongoose.Schema(
           {
             level: {
               type: String,
-              enum: ["hod", "finance", "executive"],
+              enum: ["hod", "finance", "executive", "legal_compliance"],
               required: true,
             },
             approver: {
@@ -354,7 +555,7 @@ const projectSchema = new mongoose.Schema(
         // Current approval level
         currentApprovalLevel: {
           type: String,
-          enum: ["hod", "finance", "executive"],
+          enum: ["hod", "finance", "executive", "legal_compliance"],
           default: "hod",
         },
         // Track document modifications through approval chain
@@ -385,7 +586,7 @@ const projectSchema = new mongoose.Schema(
             },
             approvalLevel: {
               type: String,
-              enum: ["hod", "finance", "executive"],
+              enum: ["hod", "finance", "executive", "legal_compliance"],
             },
             comments: {
               type: String,
@@ -440,6 +641,20 @@ const projectSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+
+    // Finance Reimbursement Tracking
+    financeStatus: {
+      type: String,
+      enum: ["pending", "approved", "reimbursed", "rejected"],
+      default: "pending",
+    },
+    financeReimbursedAt: { type: Date },
+    financeReimbursedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    financeReimbursementAmount: { type: Number },
+    financeReimbursementNotes: { type: String },
   },
   {
     timestamps: true,
@@ -779,37 +994,270 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
     this.status = "implementation";
     await this.save();
 
-    // Phase 1: Inventory Integration
-    console.log("📦 [WORKFLOW] Phase 1: Inventory Integration");
-    await this.triggerInventoryCreation(triggeredByUser);
+    // Handle workflow based on project scope
+    if (this.projectScope === "external") {
+      // External projects: Always trigger inventory and procurement
+      console.log(
+        "🌐 [WORKFLOW] External project detected - triggering inventory and procurement"
+      );
 
-    // Phase 2: Procurement Automation
-    console.log("🛒 [WORKFLOW] Phase 2: Procurement Automation");
-    await this.triggerProcurementCreation(triggeredByUser);
+      console.log("📦 [WORKFLOW] Triggering Inventory for external project");
+      await this.triggerInventoryCreation(triggeredByUser);
 
-    // Phase 3: Financial Integration
-    console.log("💰 [WORKFLOW] Phase 3: Financial Integration");
-    await this.triggerFinancialSetup(triggeredByUser);
+      console.log("🛒 [WORKFLOW] Triggering Procurement for external project");
+      await this.triggerProcurementCreation(triggeredByUser);
 
-    // Phase 4: Document Creation for Regulatory Compliance
-    console.log("📄 [WORKFLOW] Phase 4: Creating Project Documents");
-    await this.createProjectDocuments(triggeredByUser);
+      console.log("✅ [WORKFLOW] External project workflow triggers completed");
+    } else if (this.projectScope === "departmental") {
+      // Departmental projects: No inventory/procurement triggers, go directly to implementation
+      console.log(
+        "🏢 [WORKFLOW] Departmental project detected - skipping inventory and procurement triggers"
+      );
+      console.log(
+        "💰 [WORKFLOW] Departmental project will be handled by finance reimbursement after implementation"
+      );
+    } else {
+      // Personal projects: No inventory/procurement triggers, go directly to implementation
+      console.log(
+        "👤 [WORKFLOW] Personal project detected - skipping inventory and procurement triggers"
+      );
+      console.log(
+        "💰 [WORKFLOW] Personal project will be handled by finance reimbursement after implementation"
+      );
+    }
 
-    // Phase 5: Task Creation for Execution
-    console.log("📋 [WORKFLOW] Phase 5: Creating Project Tasks");
-    await this.createProjectTasks(triggeredByUser);
+    // Save the project with updated workflow triggers
+    await this.save();
+    console.log("💾 [WORKFLOW] Project saved with updated workflow triggers");
+
+    // Notify Executive about the notifications sent to both parties
+    if (triggeredByUser) {
+      try {
+        const NotificationService = await import(
+          "../services/notificationService.js"
+        );
+        const notification = new NotificationService.default();
+
+        let notificationMessage = "";
+        let notificationsSent = {};
+
+        if (this.projectScope === "external") {
+          notificationMessage = `Project "${this.name}" approved! Inventory & procurement initiated.`;
+          notificationsSent.operationsHOD = "Inventory setup notification sent";
+          notificationsSent.procurementHOD =
+            "Procurement initiation notification sent";
+        } else if (this.projectScope === "departmental") {
+          notificationMessage = `Project "${this.name}" approved! Ready for implementation.`;
+          notificationsSent.financeReimbursement =
+            "Finance reimbursement will be handled after implementation";
+        } else {
+          notificationMessage = `Project "${this.name}" approved! Ready for implementation.`;
+          notificationsSent.financeReimbursement =
+            "Finance reimbursement will be handled after implementation";
+        }
+
+        console.log(
+          `📧 [WORKFLOW] Notifying Executive about project implementation...`
+        );
+        await notification.createNotification({
+          recipient: triggeredByUser,
+          type: "PROJECT_IMPLEMENTATION_READY",
+          title: "Project Implementation Ready",
+          message: notificationMessage,
+          priority: "medium",
+          data: {
+            projectId: this._id,
+            projectName: this.name,
+            projectCode: this.code,
+            budget: this.budget,
+            category: this.category,
+            projectScope: this.projectScope,
+            actionUrl: "/dashboard/modules/projects",
+            implementationPhase: "ready",
+            triggeredBy: triggeredByUser,
+            notificationsSent: notificationsSent,
+          },
+        });
+        console.log(
+          `✅ [WORKFLOW] Executive notified about notifications sent to both parties`
+        );
+      } catch (notifError) {
+        console.error(
+          "❌ [WORKFLOW] Error notifying Executive about notifications:",
+          notifError
+        );
+      }
+    }
 
     // Move to execution phase
     await this.progressWorkflow(
       "execution",
-      "tasks_created",
+      "implementation_ready",
       "auto",
       triggeredByUser,
       {
         projectCode: this.code,
-        taskCount: this.teamMembers.length * 3,
+        implementationPhase: "ready",
       }
     );
+
+    // Notify all stakeholders about workflow completion
+    try {
+      const NotificationService = await import(
+        "../services/notificationService.js"
+      );
+      const notification = new NotificationService.default();
+
+      // 1. Notify project creator
+      console.log(
+        `📧 [WORKFLOW] Sending notification to project creator: ${this.createdBy}`
+      );
+
+      // Create message based on project scope
+      let creatorMessage = "";
+      if (this.projectScope === "external") {
+        creatorMessage = `Project "${this.name}" approved! Inventory & procurement initiated.`;
+      } else if (this.projectScope === "departmental") {
+        creatorMessage = `Project "${this.name}" approved! Ready for implementation.`;
+      } else {
+        creatorMessage = `Project "${this.name}" approved! Ready for implementation.`;
+      }
+
+      await notification.createNotification({
+        recipient: this.createdBy,
+        type: "PROJECT_IMPLEMENTATION_READY",
+        title: "Project Implementation Ready",
+        message: creatorMessage,
+        priority: "high",
+        data: {
+          projectId: this._id,
+          projectName: this.name,
+          projectCode: this.code,
+          budget: this.budget,
+          category: this.category,
+          projectScope: this.projectScope,
+          actionUrl: "/dashboard/modules/projects",
+          implementationPhase: "ready",
+          triggeredBy: triggeredByUser ? triggeredByUser._id : null,
+        },
+      });
+      console.log(
+        `✅ [WORKFLOW] Notification sent to project creator successfully`
+      );
+
+      // 2. Notify Finance HOD (who approved earlier)
+      console.log(`📧 [WORKFLOW] Looking for Finance HOD to notify...`);
+      const financeDept = await mongoose.model("Department").findOne({
+        name: "Finance & Accounting",
+      });
+      if (financeDept) {
+        console.log(
+          `📧 [WORKFLOW] Found Finance department: ${financeDept.name}`
+        );
+        // Get HOD role ID for Finance query
+        const hodRoleForFinance = await mongoose
+          .model("Role")
+          .findOne({ name: "HOD" });
+        if (!hodRoleForFinance) {
+          console.log("❌ [WORKFLOW] HOD role not found in system");
+          return;
+        }
+
+        const financeHOD = await mongoose
+          .model("User")
+          .findOne({
+            department: financeDept._id,
+            role: hodRoleForFinance._id,
+            isActive: true,
+          })
+          .populate("role");
+
+        if (financeHOD) {
+          console.log(
+            `📧 [WORKFLOW] Found Finance HOD: ${financeHOD.firstName} ${financeHOD.lastName} (${financeHOD.email})`
+          );
+          console.log(
+            `📧 [WORKFLOW] Finance HOD ID: ${financeHOD._id}, Triggered By: ${
+              triggeredByUser?._id || triggeredByUser
+            }`
+          );
+
+          if (
+            financeHOD._id.toString() !==
+            (triggeredByUser?._id || triggeredByUser).toString()
+          ) {
+            console.log(
+              `📧 [WORKFLOW] Finance HOD is different from Executive HOD - sending notification`
+            );
+            await notification.createNotification({
+              recipient: financeHOD._id,
+              type: "PROJECT_IMPLEMENTATION_READY",
+              title: "Project Implementation Started",
+              message: `Project "${this.name}" (${this.code}) that you approved has been fully approved and is now in implementation phase. Inventory and procurement processes have been initiated.`,
+              priority: "medium",
+              data: {
+                projectId: this._id,
+                projectName: this.name,
+                projectCode: this.code,
+                budget: this.budget,
+                category: this.category,
+                actionUrl: "/dashboard/modules/projects",
+                implementationPhase: "ready",
+                triggeredBy: triggeredByUser ? triggeredByUser._id : null,
+              },
+            });
+            console.log(
+              `✅ [WORKFLOW] Notification sent to Finance HOD successfully`
+            );
+          } else {
+            console.log(
+              `⚠️ [WORKFLOW] Finance HOD is same as Executive HOD - skipping duplicate notification`
+            );
+          }
+        } else {
+          console.log(`⚠️ [WORKFLOW] No Finance HOD found`);
+        }
+      } else {
+        console.log(`⚠️ [WORKFLOW] Finance department not found`);
+      }
+
+      // 3. Notify Executive HOD (who just approved)
+      if (triggeredByUser && triggeredByUser._id) {
+        console.log(
+          `📧 [WORKFLOW] Sending notification to Executive HOD (who just approved): ${triggeredByUser.firstName} ${triggeredByUser.lastName}`
+        );
+        await notification.createNotification({
+          recipient: triggeredByUser._id,
+          type: "PROJECT_IMPLEMENTATION_READY",
+          title: "Project Implementation Initiated",
+          message: `Project "${this.name}" (${this.code}) that you just approved is now in implementation phase. Inventory and procurement processes have been initiated.`,
+          priority: "medium",
+          data: {
+            projectId: this._id,
+            projectName: this.name,
+            projectCode: this.code,
+            budget: this.budget,
+            category: this.category,
+            actionUrl: "/dashboard/modules/projects",
+            implementationPhase: "ready",
+            triggeredBy: triggeredByUser._id,
+          },
+        });
+        console.log(
+          `✅ [WORKFLOW] Notification sent to Executive HOD successfully`
+        );
+      } else {
+        console.log(
+          `⚠️ [WORKFLOW] No triggeredByUser provided - skipping Executive HOD notification`
+        );
+      }
+
+      console.log(
+        `📧 [WORKFLOW] Notifications sent to all stakeholders about implementation readiness`
+      );
+    } catch (notifError) {
+      console.error("❌ [WORKFLOW] Error sending notifications:", notifError);
+    }
 
     console.log("✅ [WORKFLOW] Post-approval workflow completed successfully");
     console.log("🚀 [WORKFLOW] ========================================");
@@ -833,21 +1281,261 @@ projectSchema.methods.triggerInventoryCreation = async function (
 
     // Mark inventory as created
     this.workflowTriggers.inventoryCreated = true;
-    await this.save();
 
-    // Audit logging for inventory creation
+    // Create standard inventory items for ANY project category
     if (triggeredByUser) {
       try {
+        await this.createStandardInventoryItems(triggeredByUser);
         await ProjectAuditService.logInventoryCreated(this, triggeredByUser);
       } catch (error) {
-        console.error("❌ [AUDIT] Error logging inventory creation:", error);
+        console.error(
+          "❌ [AUDIT] Error creating standard inventory items:",
+          error
+        );
       }
+    }
+
+    // Notify Operations HOD about inventory creation
+    try {
+      console.log(
+        `📧 [INVENTORY] Looking for Operations HOD to notify about inventory creation...`
+      );
+      const NotificationService = await import(
+        "../services/notificationService.js"
+      );
+      const notification = new NotificationService.default();
+
+      // Find Operations HOD
+      const operationsDept = await mongoose.model("Department").findOne({
+        name: "Operations",
+      });
+
+      if (operationsDept) {
+        console.log(
+          `📧 [INVENTORY] Found Operations department: ${operationsDept.name}`
+        );
+        const approverUsers = await mongoose
+          .model("User")
+          .find({
+            department: operationsDept._id,
+            "role.level": { $gte: 700 },
+          })
+          .populate("department")
+          .populate("role");
+
+        console.log(
+          `🔍 [INVENTORY] Found ${approverUsers.length} approver users in department ${operationsDept.name}`
+        );
+
+        if (approverUsers.length === 0) {
+          console.log(
+            `⚠️ [INVENTORY] No approver users found with role filter. Getting all users and filtering manually...`
+          );
+
+          const allDeptUsers = await mongoose
+            .model("User")
+            .find({
+              department: operationsDept._id,
+            })
+            .populate("role");
+
+          console.log(
+            `🔍 [INVENTORY] Total users in department: ${allDeptUsers.length}`
+          );
+
+          // Filter users manually based on role level
+          const manualFilteredUsers = allDeptUsers.filter((user) => {
+            const hasValidRole = user.role && user.role.level >= 700;
+            console.log(
+              `  ${user.firstName} ${user.lastName} - Role: ${user.role?.name} (Level: ${user.role?.level}) - Valid: ${hasValidRole}`
+            );
+            return hasValidRole;
+          });
+
+          console.log(
+            `🔍 [INVENTORY] Manual filtering found ${manualFilteredUsers.length} valid approvers`
+          );
+
+          // Use the manually filtered users
+          approverUsers.length = 0; // Clear the array
+          approverUsers.push(...manualFilteredUsers); // Add the filtered users
+        }
+
+        if (approverUsers.length > 0) {
+          const operationsHOD = approverUsers[0]; // Use the first HOD found
+          console.log(
+            `📧 [INVENTORY] Found Operations HOD: ${operationsHOD.firstName} ${operationsHOD.lastName} (${operationsHOD.email})`
+          );
+          console.log(
+            `📧 [INVENTORY] Sending inventory creation notification to Operations HOD...`
+          );
+
+          await notification.createNotification({
+            recipient: operationsHOD._id,
+            type: "INVENTORY_CREATION_REQUIRED",
+            title: "Inventory Creation Required",
+            message: `Project "${this.name}" (${this.code}) has been approved and requires inventory setup. Please review and create inventory items for this project.`,
+            priority: "high",
+            data: {
+              projectId: this._id,
+              projectName: this.name,
+              projectCode: this.code,
+              budget: this.budget,
+              category: this.category,
+              actionUrl: "/dashboard/modules/inventory",
+              triggeredBy: triggeredByUser ? triggeredByUser._id : null,
+            },
+          });
+
+          console.log(
+            `✅ [INVENTORY] Notification sent to Operations HOD: ${operationsHOD.firstName} ${operationsHOD.lastName} (${operationsHOD.email})`
+          );
+        } else {
+          console.log("⚠️ [INVENTORY] No Operations HOD found to notify");
+        }
+      } else {
+        console.log("⚠️ [INVENTORY] Operations department not found");
+      }
+    } catch (notifError) {
+      console.error("❌ [INVENTORY] Error sending notification:", notifError);
     }
 
     console.log("✅ [INVENTORY] Inventory creation triggered successfully");
     return true;
   } catch (error) {
     console.error("❌ [INVENTORY] Error creating inventory:", error);
+    throw error;
+  }
+};
+
+// Standardized method to create basic inventory items for ANY project category
+projectSchema.methods.createStandardInventoryItems = async function (
+  createdBy
+) {
+  try {
+    console.log(
+      `📦 [INVENTORY] Creating standard inventory items for project: ${this.code}`
+    );
+
+    const Inventory = mongoose.model("Inventory");
+
+    // Map project categories to inventory categories (matching Inventory.js enum exactly)
+    const getInventoryCategory = (projectCategory) => {
+      const categoryMap = {
+        // Equipment leases → Equipment categories
+        equipment_lease: "industrial_equipment",
+        vehicle_lease: "passenger_vehicle",
+        property_lease: "office_space",
+        financial_lease: "office_equipment",
+        training_equipment_lease: "office_equipment",
+        compliance_lease: "office_equipment",
+        service_equipment_lease: "industrial_equipment",
+        strategic_lease: "industrial_equipment",
+
+        // Development & IT → Electronics
+        software_development: "electronics",
+        system_maintenance: "electronics",
+
+        // Services → Office equipment
+        consulting: "office_equipment",
+        training: "office_equipment",
+
+        // Default
+        other: "other",
+      };
+
+      // Ensure we only return valid inventory categories from Inventory.js enum
+      const validInventoryCategories = [
+        "construction_equipment",
+        "office_equipment",
+        "medical_equipment",
+        "agricultural_equipment",
+        "industrial_equipment",
+        "passenger_vehicle",
+        "commercial_vehicle",
+        "construction_vehicle",
+        "agricultural_vehicle",
+        "office_space",
+        "warehouse",
+        "residential",
+        "commercial_space",
+        "furniture",
+        "electronics",
+        "tools",
+        "other",
+      ];
+
+      const mappedCategory = categoryMap[projectCategory] || "office_equipment";
+
+      // Validate that the mapped category exists in Inventory model
+      if (!validInventoryCategories.includes(mappedCategory)) {
+        console.warn(
+          `⚠️ [INVENTORY] Invalid category mapping: ${projectCategory} → ${mappedCategory}, using "office_equipment"`
+        );
+        return "office_equipment";
+      }
+
+      return mappedCategory;
+    };
+
+    const totalBudget = this.budget || 0;
+
+    console.log(
+      `💰 [INVENTORY] Project budget: ₦${totalBudget.toLocaleString()} - Operations HOD will allocate`
+    );
+    console.log(
+      `📦 [INVENTORY] Project category: ${
+        this.category
+      } → Inventory category: ${getInventoryCategory(this.category)}`
+    );
+
+    // Generate inventory code
+    const inventoryCount = await Inventory.countDocuments();
+    const inventoryCode = `INV${String(inventoryCount + 1).padStart(4, "0")}`;
+
+    const standardItems = [
+      {
+        name: `${this.name} - Project Inventory`,
+        description: `Complete inventory allocation for project: ${
+          this.name
+        } (Total Budget: ₦${totalBudget.toLocaleString()}) - Operations HOD to allocate`,
+        code: inventoryCode,
+        type: "equipment",
+        category: getInventoryCategory(this.category),
+        status: "available",
+        specifications: {
+          brand: "ELRA",
+          model: "Standard",
+          year: new Date().getFullYear(),
+          totalProjectBudget: totalBudget,
+          budgetAllocated: 0,
+          projectCategory: this.category,
+        },
+        purchasePrice: totalBudget,
+        currentValue: totalBudget,
+        location: "TBD",
+        project: this._id,
+        createdBy: createdBy._id,
+      },
+    ];
+
+    // Create the standard inventory items
+    const createdItems = await Inventory.insertMany(standardItems);
+
+    console.log(
+      `✅ [INVENTORY] Created ${
+        createdItems.length
+      } inventory item with ₦${totalBudget.toLocaleString()} budget for Operations HOD to allocate - Project: ${
+        this.code
+      }`
+    );
+
+    return createdItems;
+  } catch (error) {
+    console.error(
+      "❌ [INVENTORY] Error creating standard inventory items:",
+      error
+    );
     throw error;
   }
 };
@@ -862,23 +1550,93 @@ projectSchema.methods.triggerProcurementCreation = async function (
       this.code
     );
 
-    // Mark procurement as initiated
     this.workflowTriggers.procurementInitiated = true;
-    await this.save();
 
-    // Audit logging for procurement initiation
+    // Create standard procurement order for ANY project category
     if (triggeredByUser) {
       try {
+        await this.createStandardProcurementOrder(triggeredByUser);
         await ProjectAuditService.logProcurementInitiated(
           this,
           triggeredByUser
         );
       } catch (error) {
         console.error(
-          "❌ [AUDIT] Error logging procurement initiation:",
+          "❌ [AUDIT] Error creating standard procurement order:",
           error
         );
       }
+    }
+
+    try {
+      console.log(
+        `📧 [PROCUREMENT] Looking for Procurement HOD to notify about procurement initiation...`
+      );
+      const NotificationService = await import(
+        "../services/notificationService.js"
+      );
+      const notification = new NotificationService.default();
+
+      const procurementDept = await mongoose.model("Department").findOne({
+        name: "Procurement",
+      });
+
+      if (procurementDept) {
+        console.log(
+          `📧 [PROCUREMENT] Found Procurement department: ${procurementDept.name}`
+        );
+        // Get HOD role ID first
+        const hodRole = await mongoose.model("Role").findOne({ name: "HOD" });
+        if (!hodRole) {
+          console.log("❌ [PROCUREMENT] HOD role not found in system");
+          return;
+        }
+
+        const procurementHOD = await mongoose
+          .model("User")
+          .findOne({
+            department: procurementDept._id,
+            role: hodRole._id,
+            isActive: true,
+          })
+          .populate("role");
+
+        if (procurementHOD) {
+          console.log(
+            `📧 [PROCUREMENT] Found Procurement HOD: ${procurementHOD.firstName} ${procurementHOD.lastName} (${procurementHOD.email})`
+          );
+          console.log(
+            `📧 [PROCUREMENT] Sending procurement initiation notification to Procurement HOD...`
+          );
+
+          await notification.createNotification({
+            recipient: procurementHOD._id,
+            type: "PROCUREMENT_INITIATION_REQUIRED",
+            title: "Procurement Initiation Required",
+            message: `Project "${this.name}" (${this.code}) requires procurement setup. Please review and initiate procurement processes for this project.`,
+            priority: "high",
+            data: {
+              projectId: this._id,
+              projectName: this.name,
+              projectCode: this.code,
+              budget: this.budget,
+              category: this.category,
+              actionUrl: "/dashboard/modules/procurement",
+              triggeredBy: triggeredByUser ? triggeredByUser._id : null,
+            },
+          });
+
+          console.log(
+            `✅ [PROCUREMENT] Notification sent to Procurement HOD: ${procurementHOD.firstName} ${procurementHOD.lastName} (${procurementHOD.email})`
+          );
+        } else {
+          console.log("⚠️ [PROCUREMENT] No Procurement HOD found to notify");
+        }
+      } else {
+        console.log("⚠️ [PROCUREMENT] Procurement department not found");
+      }
+    } catch (notifError) {
+      console.error("❌ [PROCUREMENT] Error sending notification:", notifError);
     }
 
     console.log("✅ [PROCUREMENT] Procurement creation triggered successfully");
@@ -889,31 +1647,133 @@ projectSchema.methods.triggerProcurementCreation = async function (
   }
 };
 
-// Instance method to trigger financial setup
-projectSchema.methods.triggerFinancialSetup = async function (triggeredByUser) {
+// Standardized method to create basic procurement order for ANY project category
+projectSchema.methods.createStandardProcurementOrder = async function (
+  createdBy
+) {
   try {
     console.log(
-      "💰 [FINANCE] Setting up financial tracking for project:",
-      this.code
+      `🛒 [PROCUREMENT] Creating standard procurement order for project: ${this.code}`
     );
 
-    // Mark financial setup as complete
-    this.workflowTriggers.financialSetup = true;
-    await this.save();
+    const Procurement = mongoose.model("Procurement");
 
-    // Audit logging for financial setup
-    if (triggeredByUser) {
-      try {
-        await ProjectAuditService.logFinancialSetup(this, triggeredByUser);
-      } catch (error) {
-        console.error("❌ [AUDIT] Error logging financial setup:", error);
+    // Map project categories to procurement categories
+    const getProcurementCategory = (projectCategory) => {
+      const categoryMap = {
+        // Equipment leases → Equipment
+        equipment_lease: "equipment",
+        vehicle_lease: "vehicle",
+        property_lease: "property",
+        financial_lease: "equipment",
+        training_equipment_lease: "equipment",
+        compliance_lease: "equipment",
+        service_equipment_lease: "equipment",
+        strategic_lease: "equipment",
+
+        // Development & IT → Electronics
+        software_development: "electronics",
+        system_maintenance: "electronics",
+
+        // Services → Office supplies
+        consulting: "office_supplies",
+        training: "office_supplies",
+
+        // Default
+        other: "other",
+      };
+
+      // Ensure we only return valid procurement categories
+      const validProcurementCategories = [
+        "equipment",
+        "vehicle",
+        "property",
+        "furniture",
+        "electronics",
+        "office_supplies",
+        "maintenance_parts",
+        "other",
+      ];
+
+      const mappedCategory = categoryMap[projectCategory] || "equipment";
+
+      if (!validProcurementCategories.includes(mappedCategory)) {
+        console.warn(
+          `⚠️ [PROCUREMENT] Invalid category mapping: ${projectCategory} → ${mappedCategory}, using "equipment"`
+        );
+        return "equipment";
       }
-    }
 
-    console.log("✅ [FINANCE] Financial setup triggered successfully");
-    return true;
+      return mappedCategory;
+    };
+
+    const totalBudget = this.budget || 0;
+    const procurementCategory = getProcurementCategory(this.category);
+
+    console.log(
+      `🛒 [PROCUREMENT] Project category: ${this.category} → Procurement category: ${procurementCategory}`
+    );
+    console.log(
+      `💰 [PROCUREMENT] Project budget: ₦${totalBudget.toLocaleString()}`
+    );
+
+    // Generate PO number
+    const poCount = await Procurement.countDocuments();
+    const poNumber = `PO${String(poCount + 1).padStart(4, "0")}`;
+
+    // Create standard procurement order
+    const procurementOrder = new Procurement({
+      poNumber: poNumber,
+      title: `${this.name} - Procurement Order`,
+      description: `Standard procurement order for project: ${
+        this.name
+      } (Budget: ₦${totalBudget.toLocaleString()}) - Procurement HOD to process`,
+      status: "draft",
+      priority: "high",
+      supplier: {
+        name: "TBD - Procurement HOD to assign",
+        contactPerson: "TBD",
+        email: "tbd@supplier.com",
+        phone: "TBD",
+      },
+      items: [
+        {
+          name: `${this.name} - Project Items`,
+          description: `Procurement items for project: ${this.name}`,
+          quantity: 1,
+          unitPrice: totalBudget,
+          totalPrice: totalBudget,
+          category: procurementCategory,
+          specifications: {
+            brand: "TBD",
+            model: "TBD",
+            year: new Date().getFullYear(),
+          },
+        },
+      ],
+      subtotal: totalBudget,
+      tax: 0,
+      shipping: 0,
+      totalAmount: totalBudget,
+      relatedProject: this._id,
+      approvedBy: createdBy._id,
+      createdBy: createdBy._id,
+    });
+
+    const savedOrder = await procurementOrder.save();
+
+    console.log(
+      `✅ [PROCUREMENT] Created procurement order ${poNumber} with ₦${totalBudget.toLocaleString()} budget for project: ${
+        this.code
+      }`
+    );
+
+    return savedOrder;
   } catch (error) {
-    console.error("❌ [FINANCE] Error setting up financial tracking:", error);
+    console.error(
+      "❌ [PROCUREMENT] Error creating standard procurement order:",
+      error
+    );
     throw error;
   }
 };
@@ -975,8 +1835,8 @@ projectSchema.methods.createProjectTasks = async function (triggeredByUser) {
     // Get project team members
     const teamMembers = this.teamMembers || [];
 
-    // Define task templates based on project category
-    const taskTemplates = this.getTaskTemplatesByCategory();
+    // Use standardized workflow for ALL project categories
+    const taskTemplates = this.getStandardInventoryWorkflow();
 
     // Create tasks for each team member
     let totalTasksCreated = 0;
@@ -1009,63 +1869,33 @@ projectSchema.methods.createProjectTasks = async function (triggeredByUser) {
   }
 };
 
-// Helper method to get task templates by project category
-projectSchema.methods.getTaskTemplatesByCategory = function () {
-  const templates = {
-    equipment_lease: {
-      inventory: [
-        "Review equipment specifications",
-        "Verify equipment availability",
-        "Check maintenance requirements",
-      ],
-      procurement: [
-        "Review vendor quotes",
-        "Approve purchase orders",
-        "Track delivery timeline",
-      ],
-      finance: [
-        "Set up lease payment tracking",
-        "Monitor equipment costs",
-        "Generate lease reports",
-      ],
-    },
-    vehicle_lease: {
-      inventory: [
-        "Review vehicle specifications",
-        "Check vehicle availability",
-        "Verify insurance requirements",
-      ],
-      procurement: [
-        "Review lease agreements",
-        "Approve vehicle procurement",
-        "Track registration process",
-      ],
-      finance: [
-        "Set up vehicle payment tracking",
-        "Monitor insurance costs",
-        "Generate vehicle reports",
-      ],
-    },
-    software_development: {
-      inventory: [
-        "Review software requirements",
-        "Check development tools",
-        "Verify hosting requirements",
-      ],
-      procurement: [
-        "Review development licenses",
-        "Approve hosting services",
-        "Track deployment timeline",
-      ],
-      finance: [
-        "Set up development cost tracking",
-        "Monitor licensing costs",
-        "Generate project reports",
-      ],
-    },
+// Standardized inventory creation workflow for ALL project categories
+projectSchema.methods.getStandardInventoryWorkflow = function () {
+  // Universal inventory tasks that work for ANY project category
+  return {
+    inventory: [
+      "Review project requirements and specifications",
+      "Create inventory item records",
+      "Assign inventory codes and locations",
+      "Set up asset tracking and monitoring",
+      "Verify compliance and safety requirements",
+      "Complete inventory documentation",
+    ],
+    procurement: [
+      "Review vendor quotes and proposals",
+      "Approve purchase orders and contracts",
+      "Track delivery and installation timeline",
+      "Verify quality and specifications",
+      "Complete procurement documentation",
+    ],
+    finance: [
+      "Set up cost tracking and monitoring",
+      "Monitor budget utilization",
+      "Generate financial reports",
+      "Track payment schedules",
+      "Complete financial documentation",
+    ],
   };
-
-  return templates[this.category] || templates.equipment_lease;
 };
 
 // Helper method to generate tasks for a team member
@@ -1121,224 +1951,145 @@ projectSchema.methods.generateMemberTasks = function (member, templates) {
 projectSchema.methods.applyWorkflowTemplate = async function () {
   try {
     console.log(
-      "📋 [WORKFLOW TEMPLATE] Applying workflow template to project:",
+      "📋 [APPROVAL] Generating approval chain for project:",
       this.code
     );
 
-    // Get the project creator's department name
-    const projectDept = await mongoose
-      .model("Department")
-      .findById(this.department);
-    const projectDeptName = projectDept ? projectDept.name : "Unknown";
-
-    // Get appropriate workflow template
-    const template =
-      await WorkflowTemplateService.getWorkflowTemplateForProject(
-        this.category,
-        this.budget,
-        projectDeptName
-      );
-
-    // Apply the template to the project
-    const approvalChain =
-      await WorkflowTemplateService.applyWorkflowTemplateToProject(
-        this,
-        template,
-        this._createdBy
-      );
+    // Use the simple, direct approval chain generation
+    const approvalChain = await this.generateApprovalChain();
 
     console.log(
-      `✅ [WORKFLOW TEMPLATE] Applied template ${template.name} with ${approvalChain.length} approval steps`
+      `✅ [APPROVAL] Generated approval chain with ${approvalChain.length} steps`
     );
     return approvalChain;
   } catch (error) {
-    console.error(
-      "❌ [WORKFLOW TEMPLATE] Error applying workflow template:",
-      error
-    );
-    // Fallback to default approval chain if template fails
-    return await this.generateApprovalChain();
+    console.error("❌ [APPROVAL] Error generating approval chain:", error);
+    throw error;
   }
 };
 
-// Instance method to generate approval chain with smart cross-department routing
+// Instance method to generate approval chain based on project scope
 projectSchema.methods.generateApprovalChain = async function () {
   const approvalChain = [];
 
-  // HOD approval (always first)
-  approvalChain.push({
-    level: "hod",
-    department: this.department,
-    status: "pending",
-    required: true,
-  });
-
-  // Get the project creator's department name
-  const projectDept = await mongoose
-    .model("Department")
-    .findById(this.department);
-  const projectDeptName = projectDept ? projectDept.name : "Unknown";
-
-  console.log(`🏢 [APPROVAL] Project Department: ${projectDeptName}`);
+  console.log(`🏢 [APPROVAL] Project Scope: ${this.projectScope}`);
   console.log(`💰 [APPROVAL] Project Budget: ${this.budget}`);
 
-  // Smart cross-department routing based on budget and creator department
-  if (this.budget <= 1000000) {
-    // ≤ 1M: HOD auto-approves, no additional approvals needed
-    console.log("✅ [APPROVAL] Budget ≤ 1M - HOD auto-approval only");
-  } else if (this.budget <= 5000000) {
-    // 1M - 5M: Smart routing based on creator department
-    if (projectDeptName === "Finance & Accounting") {
-      // Finance HOD → Executive (skip Finance approval since it's their own department)
-      console.log("📋 [APPROVAL] Finance HOD → Executive (1M-5M)");
-      const execDept = await mongoose
-        .model("Department")
-        .findOne({ name: "Executive Office" });
-      if (execDept) {
-        approvalChain.push({
-          level: "executive",
-          department: execDept._id,
-          status: "pending",
-          required: true,
-        });
-      }
-    } else {
-      // All other HODs → Finance → Executive
-      console.log("📋 [APPROVAL] Other HOD → Finance → Executive (1M-5M)");
-      const financeDept = await mongoose
-        .model("Department")
-        .findOne({ name: "Finance & Accounting" });
-      if (financeDept) {
-        approvalChain.push({
-          level: "finance",
-          department: financeDept._id,
-          status: "pending",
-          required: true,
-        });
-      }
-      const execDept = await mongoose
-        .model("Department")
-        .findOne({ name: "Executive Office" });
-      if (execDept) {
-        approvalChain.push({
-          level: "executive",
-          department: execDept._id,
-          status: "pending",
-          required: true,
-        });
-      }
+  // Different approval chains based on project scope
+  if (this.projectScope === "personal") {
+    // Personal Project Workflow: Creator → Finance HOD → Executive HOD → Finance Reimbursement
+    console.log("👤 [APPROVAL] Personal Project Workflow");
+
+    // Finance HOD approval
+    const financeDept = await mongoose
+      .model("Department")
+      .findOne({ name: "Finance & Accounting" });
+    if (financeDept) {
+      approvalChain.push({
+        level: "finance",
+        department: financeDept._id,
+        status: "pending",
+        required: true,
+        type: "personal_reimbursement",
+      });
     }
-  } else if (this.budget <= 25000000) {
-    // 5M - 25M: Smart routing based on creator department
-    if (projectDeptName === "Finance & Accounting") {
-      // Finance HOD → Executive (skip Finance approval since it's their own department)
-      console.log("💰 [APPROVAL] Finance HOD → Executive (5M-25M)");
-      const execDept = await mongoose
-        .model("Department")
-        .findOne({ name: "Executive Office" });
-      if (execDept) {
-        approvalChain.push({
-          level: "executive",
-          department: execDept._id,
-          status: "pending",
-          required: true,
-        });
-      }
-    } else {
-      // All other HODs → Finance → Executive
-      console.log("💰 [APPROVAL] Other HOD → Finance → Executive (5M-25M)");
-      const financeDept = await mongoose
-        .model("Department")
-        .findOne({ name: "Finance & Accounting" });
-      if (financeDept) {
-        approvalChain.push({
-          level: "finance",
-          department: financeDept._id,
-          status: "pending",
-          required: true,
-        });
-      }
-      const execDept = await mongoose
-        .model("Department")
-        .findOne({ name: "Executive Office" });
-      if (execDept) {
-        approvalChain.push({
-          level: "executive",
-          department: execDept._id,
-          status: "pending",
-          required: true,
-        });
-      }
+
+    // Executive HOD approval
+    const execDept = await mongoose
+      .model("Department")
+      .findOne({ name: "Executive Office" });
+    if (execDept) {
+      approvalChain.push({
+        level: "executive",
+        department: execDept._id,
+        status: "pending",
+        required: true,
+        type: "personal_approval",
+      });
     }
-  } else {
-    // > 25M: Smart routing based on creator department
-    if (projectDeptName === "Finance & Accounting") {
-      // Finance HOD → Executive (skip Finance approval since it's their own department)
-      console.log("👔 [APPROVAL] Finance HOD → Executive (>25M)");
-      const execDept = await mongoose
-        .model("Department")
-        .findOne({ name: "Executive Office" });
-      if (execDept) {
-        approvalChain.push({
-          level: "executive",
-          department: execDept._id,
-          status: "pending",
-          required: true,
-        });
-      }
-    } else if (projectDeptName === "Executive Office") {
-      // Executive HOD → Finance → Executive (Final Approval)
-      console.log(
-        "👔 [APPROVAL] Executive HOD → Finance → Executive Final (>25M)"
-      );
-      const financeDept = await mongoose
-        .model("Department")
-        .findOne({ name: "Finance & Accounting" });
-      if (financeDept) {
-        approvalChain.push({
-          level: "finance",
-          department: financeDept._id,
-          status: "pending",
-          required: true,
-        });
-      }
-      // Executive final approval (different person than HOD)
-      const execDept = await mongoose
-        .model("Department")
-        .findOne({ name: "Executive Office" });
-      if (execDept) {
-        approvalChain.push({
-          level: "executive",
-          department: execDept._id,
-          status: "pending",
-          required: true,
-        });
-      }
-    } else {
-      // All other HODs → Finance → Executive
-      console.log("👔 [APPROVAL] Other HOD → Finance → Executive (>25M)");
-      const financeDept = await mongoose
-        .model("Department")
-        .findOne({ name: "Finance & Accounting" });
-      if (financeDept) {
-        approvalChain.push({
-          level: "finance",
-          department: financeDept._id,
-          status: "pending",
-          required: true,
-        });
-      }
-      const execDept = await mongoose
-        .model("Department")
-        .findOne({ name: "Executive Office" });
-      if (execDept) {
-        approvalChain.push({
-          level: "executive",
-          department: execDept._id,
-          status: "pending",
-          required: true,
-        });
-      }
+  } else if (this.projectScope === "departmental") {
+    console.log("🏢 [APPROVAL] Departmental Project Workflow");
+
+    // HOD approval (if creator is not HOD)
+    approvalChain.push({
+      level: "hod",
+      department: this.department,
+      status: "pending",
+      required: true,
+      type: "departmental_approval",
+    });
+
+    // Finance HOD approval
+    const financeDept = await mongoose
+      .model("Department")
+      .findOne({ name: "Finance & Accounting" });
+    if (financeDept) {
+      approvalChain.push({
+        level: "finance",
+        department: financeDept._id,
+        status: "pending",
+        required: true,
+        type: "departmental_finance",
+      });
+    }
+
+    // Executive HOD approval
+    const execDept = await mongoose
+      .model("Department")
+      .findOne({ name: "Executive Office" });
+    if (execDept) {
+      approvalChain.push({
+        level: "executive",
+        department: execDept._id,
+        status: "pending",
+        required: true,
+        type: "departmental_executive",
+      });
+    }
+  } else if (this.projectScope === "external") {
+    // External Project Workflow: HR HOD → Legal & Compliance → Executive → Finance → Implementation
+    console.log("🌐 [APPROVAL] External Project Workflow");
+
+    // Legal & Compliance approval (same department, one step)
+    const legalDept = await mongoose
+      .model("Department")
+      .findOne({ name: "Legal & Compliance" });
+    if (legalDept) {
+      approvalChain.push({
+        level: "legal_compliance",
+        department: legalDept._id,
+        status: "pending",
+        required: true,
+        type: "external_legal_compliance",
+      });
+    }
+
+    // Executive approval
+    const execDept = await mongoose
+      .model("Department")
+      .findOne({ name: "Executive Office" });
+    if (execDept) {
+      approvalChain.push({
+        level: "executive",
+        department: execDept._id,
+        status: "pending",
+        required: true,
+        type: "external_executive",
+      });
+    }
+
+    // Finance approval (LAST - for budget allocation and disbursement)
+    const financeDept = await mongoose
+      .model("Department")
+      .findOne({ name: "Finance & Accounting" });
+    if (financeDept) {
+      approvalChain.push({
+        level: "finance",
+        department: financeDept._id,
+        status: "pending",
+        required: true,
+        type: "external_finance",
+      });
     }
   }
 
@@ -1398,6 +2149,10 @@ projectSchema.methods.approveProject = async function (
   }
 
   await this.save();
+
+  // Update project progress automatically
+  await this.updateProgress();
+
   return this;
 };
 
@@ -1422,6 +2177,9 @@ projectSchema.methods.rejectProject = async function (
 
   this.status = "rejected";
   await this.save();
+
+  await this.updateProgress();
+
   return this;
 };
 
@@ -1465,6 +2223,443 @@ projectSchema.methods.checkDocumentsComplete = function () {
   const requiredDocs = this.requiredDocuments.filter((doc) => doc.isRequired);
   const submittedDocs = requiredDocs.filter((doc) => doc.isSubmitted);
   return requiredDocs.length === submittedDocs.length;
+};
+
+// Instance method to update project progress automatically
+projectSchema.methods.updateProgress = async function () {
+  let progress = 0;
+  let totalSteps = 0;
+
+  // 1. Document Submission Progress (25% weight)
+  if (this.requiredDocuments && this.requiredDocuments.length > 0) {
+    const submittedDocs = this.requiredDocuments.filter(
+      (doc) => doc.isSubmitted
+    ).length;
+    const docProgress = (submittedDocs / this.requiredDocuments.length) * 25;
+    progress += docProgress;
+    totalSteps += 25;
+  }
+
+  // 2. Approval Progress (35% weight)
+  if (this.approvalChain && this.approvalChain.length > 0) {
+    const approvedSteps = this.approvalChain.filter(
+      (step) => step.status === "approved"
+    ).length;
+    const approvalProgress = (approvedSteps / this.approvalChain.length) * 35;
+    progress += approvalProgress;
+    totalSteps += 35;
+  }
+
+  // 3. Workflow Progress (40% weight)
+  let workflowProgress = 0;
+  let workflowSteps = 0;
+
+  // Check if this is an internal or external project
+  const isInternalProject =
+    !this.category || !this.category.includes("external");
+
+  // Inventory creation and completion (20% for internal, 15% for external)
+  const inventoryWeight = isInternalProject ? 20 : 15;
+  if (this.workflowTriggers?.inventoryCreated) {
+    workflowProgress += inventoryWeight * 0.33; // 33% of weight for creation
+  }
+  if (this.workflowTriggers?.inventoryCompleted) {
+    workflowProgress += inventoryWeight * 0.67; // 67% of weight for completion
+  }
+  workflowSteps += inventoryWeight;
+
+  // Procurement initiation and completion (20% for internal, 15% for external)
+  const procurementWeight = isInternalProject ? 20 : 15;
+  if (this.workflowTriggers?.procurementInitiated) {
+    workflowProgress += procurementWeight * 0.33; // 33% of weight for initiation
+  }
+  if (this.workflowTriggers?.procurementCompleted) {
+    workflowProgress += procurementWeight * 0.67; // 67% of weight for completion
+  }
+  workflowSteps += procurementWeight;
+
+  // Regulatory compliance (10%) - Only for external projects
+  // For internal projects, this step is skipped
+  if (this.category && this.category.includes("external")) {
+    if (this.workflowTriggers?.regulatoryComplianceCompleted) {
+      workflowProgress += 10;
+    }
+    workflowSteps += 10;
+  } else {
+    // For internal projects, redistribute the 10% to inventory and procurement
+    // Inventory gets 5% extra, Procurement gets 5% extra
+    workflowSteps += 0; // No additional steps for internal projects
+  }
+
+  progress += (workflowProgress / workflowSteps) * 40;
+  totalSteps += 40;
+
+  // Calculate final progress
+  this.progress = totalSteps > 0 ? Math.round(progress) : 0;
+  await this.save();
+
+  console.log(
+    `📊 [PROGRESS] Project ${this.code} progress updated to ${this.progress}%`
+  );
+  return this.progress;
+};
+
+// Instance method to trigger regulatory compliance workflow
+projectSchema.methods.triggerRegulatoryCompliance = async function (
+  triggeredByUser
+) {
+  try {
+    console.log(
+      `📋 [REGULATORY] Starting regulatory compliance for project: ${this.name} (${this.code})`
+    );
+
+    // Update workflow triggers
+    this.workflowTriggers.regulatoryComplianceInitiated = true;
+    this.workflowTriggers.regulatoryComplianceInitiatedAt = new Date();
+    this.workflowTriggers.regulatoryComplianceInitiatedBy = triggeredByUser;
+
+    // Add to workflow history
+    this.workflowHistory.push({
+      phase: "regulatory_compliance",
+      action: "regulatory_compliance_initiated",
+      triggeredBy: "auto",
+      triggeredByUser: triggeredByUser,
+      metadata: {
+        projectCode: this.code,
+        category: this.category,
+        budget: this.budget,
+        complianceType:
+          this.category === "equipment_lease"
+            ? "equipment_registration"
+            : "general_compliance",
+      },
+      timestamp: new Date(),
+    });
+
+    // Update progress
+    await this.updateProgress();
+
+    // Notify Legal/Compliance HOD
+    try {
+      console.log(
+        `📧 [REGULATORY] Looking for Legal/Compliance HOD to notify...`
+      );
+      const NotificationService = await import(
+        "../services/notificationService.js"
+      );
+      const notification = new NotificationService.default();
+
+      // Find Legal/Compliance department
+      const legalDept = await mongoose.model("Department").findOne({
+        name: { $regex: /legal|compliance/i },
+      });
+
+      if (legalDept) {
+        console.log(
+          `📧 [REGULATORY] Found Legal/Compliance department: ${legalDept.name}`
+        );
+        const hodRoleForLegal = await mongoose
+          .model("Role")
+          .findOne({ name: "HOD" });
+        if (!hodRoleForLegal) {
+          console.log("❌ [REGULATORY] HOD role not found in system");
+          return;
+        }
+
+        const legalHOD = await mongoose
+          .model("User")
+          .findOne({
+            department: legalDept._id,
+            role: hodRoleForLegal._id,
+            isActive: true,
+          })
+          .populate("role");
+
+        if (legalHOD) {
+          console.log(
+            `📧 [REGULATORY] Found Legal HOD: ${legalHOD.firstName} ${legalHOD.lastName}`
+          );
+
+          await notification.createNotification({
+            recipient: legalHOD._id,
+            type: "REGULATORY_COMPLIANCE_REQUIRED",
+            title: "Regulatory Compliance Required",
+            message: `Project "${this.name}" (${this.code}) requires regulatory compliance review. Please verify equipment registration and regulatory requirements.`,
+            priority: "high",
+            data: {
+              projectId: this._id,
+              projectName: this.name,
+              projectCode: this.code,
+              category: this.category,
+              actionUrl: "/dashboard/modules/projects/approval-dashboard",
+              triggeredBy: triggeredByUser ? triggeredByUser._id : null,
+            },
+          });
+
+          console.log(
+            `✅ [REGULATORY] Notification sent to Legal HOD: ${legalHOD.firstName} ${legalHOD.lastName}`
+          );
+        } else {
+          console.log("⚠️ [REGULATORY] No Legal HOD found to notify");
+        }
+      } else {
+        console.log("⚠️ [REGULATORY] Legal/Compliance department not found");
+      }
+    } catch (notifError) {
+      console.error("❌ [REGULATORY] Error sending notification:", notifError);
+    }
+
+    await this.save();
+    console.log(
+      `✅ [REGULATORY] Regulatory compliance workflow triggered successfully for project: ${this.code}`
+    );
+
+    return this;
+  } catch (error) {
+    console.error(
+      "❌ [REGULATORY] Error triggering regulatory compliance:",
+      error
+    );
+    throw error;
+  }
+};
+
+// Instance method to complete regulatory compliance
+projectSchema.methods.completeRegulatoryCompliance = async function (
+  triggeredByUser,
+  complianceData = {}
+) {
+  try {
+    console.log(
+      `✅ [REGULATORY] Completing regulatory compliance for project: ${this.name} (${this.code})`
+    );
+
+    // Update workflow triggers
+    this.workflowTriggers.regulatoryComplianceCompleted = true;
+    this.workflowTriggers.regulatoryComplianceCompletedAt = new Date();
+    this.workflowTriggers.regulatoryComplianceCompletedBy = triggeredByUser;
+    this.workflowTriggers.complianceDetails = complianceData;
+
+    // Add to workflow history
+    this.workflowHistory.push({
+      phase: "regulatory_compliance",
+      action: "regulatory_compliance_completed",
+      triggeredBy: "manual",
+      triggeredByUser: triggeredByUser,
+      metadata: {
+        projectCode: this.code,
+        complianceData: complianceData,
+        completionNotes:
+          complianceData.notes || "Regulatory compliance completed",
+      },
+      timestamp: new Date(),
+    });
+
+    // Update progress
+    await this.updateProgress();
+
+    // Notify project creator and relevant stakeholders
+    try {
+      const NotificationService = await import(
+        "../services/notificationService.js"
+      );
+      const notification = new NotificationService.default();
+
+      // Notify project creator
+      await notification.createNotification({
+        recipient: this.createdBy,
+        type: "REGULATORY_COMPLIANCE_COMPLETED",
+        title: "Regulatory Compliance Completed",
+        message: `Regulatory compliance has been completed for project "${this.name}" (${this.code}). Project is ready for final implementation.`,
+        priority: "medium",
+        data: {
+          projectId: this._id,
+          projectName: this.name,
+          projectCode: this.code,
+          actionUrl: "/dashboard/modules/projects",
+        },
+      });
+
+      console.log(`✅ [REGULATORY] Notification sent to project creator`);
+    } catch (notifError) {
+      console.error(
+        "❌ [REGULATORY] Error sending completion notification:",
+        notifError
+      );
+    }
+
+    await this.save();
+    console.log(
+      `✅ [REGULATORY] Regulatory compliance completed successfully for project: ${this.code}`
+    );
+
+    return this;
+  } catch (error) {
+    console.error(
+      "❌ [REGULATORY] Error completing regulatory compliance:",
+      error
+    );
+    throw error;
+  }
+};
+
+// Instance method to mark inventory as completed
+projectSchema.methods.completeInventory = async function (triggeredByUser) {
+  try {
+    console.log(
+      `✅ [INVENTORY] Marking inventory as completed for project: ${this.name} (${this.code})`
+    );
+
+    // Update workflow triggers
+    this.workflowTriggers.inventoryCompleted = true;
+    this.workflowTriggers.inventoryCompletedAt = new Date();
+    this.workflowTriggers.inventoryCompletedBy = triggeredByUser;
+
+    // Add to workflow history
+    this.workflowHistory.push({
+      phase: "inventory",
+      action: "inventory_completed",
+      triggeredBy: "manual",
+      triggeredByUser: triggeredByUser,
+      metadata: {
+        projectCode: this.code,
+        completionNotes:
+          "Inventory allocation and setup completed by Operations HOD",
+      },
+      timestamp: new Date(),
+    });
+
+    // Update progress
+    await this.updateProgress();
+
+    // Check if both inventory and procurement are completed to trigger compliance review
+    await this.checkComplianceReadiness();
+
+    await this.save();
+    console.log(
+      `✅ [INVENTORY] Inventory completed successfully for project: ${this.code}`
+    );
+
+    return this;
+  } catch (error) {
+    console.error("❌ [INVENTORY] Error completing inventory:", error);
+    throw error;
+  }
+};
+
+// Instance method to mark procurement as completed
+projectSchema.methods.completeProcurement = async function (triggeredByUser) {
+  try {
+    console.log(
+      `✅ [PROCUREMENT] Marking procurement as completed for project: ${this.name} (${this.code})`
+    );
+
+    // Update workflow triggers
+    this.workflowTriggers.procurementCompleted = true;
+    this.workflowTriggers.procurementCompletedAt = new Date();
+    this.workflowTriggers.procurementCompletedBy = triggeredByUser;
+
+    // Add to workflow history
+    this.workflowHistory.push({
+      phase: "procurement",
+      action: "procurement_completed",
+      triggeredBy: "manual",
+      triggeredByUser: triggeredByUser,
+      metadata: {
+        projectCode: this.code,
+        completionNotes:
+          "Procurement order completed and items received by Procurement HOD",
+      },
+      timestamp: new Date(),
+    });
+
+    // Update progress
+    await this.updateProgress();
+
+    // Check if both inventory and procurement are completed to trigger compliance review
+    await this.checkComplianceReadiness();
+
+    await this.save();
+    console.log(
+      `✅ [PROCUREMENT] Procurement completed successfully for project: ${this.code}`
+    );
+
+    return this;
+  } catch (error) {
+    console.error("❌ [PROCUREMENT] Error completing procurement:", error);
+    throw error;
+  }
+};
+
+// Instance method to check if compliance review is ready
+projectSchema.methods.checkComplianceReadiness = async function () {
+  try {
+    const inventoryCompleted = this.workflowTriggers?.inventoryCompleted;
+    const procurementCompleted = this.workflowTriggers?.procurementCompleted;
+
+    if (inventoryCompleted && procurementCompleted) {
+      console.log(
+        `🎯 [COMPLIANCE] Both inventory and procurement completed for project: ${this.code} - Triggering compliance review`
+      );
+
+      // Notify Legal/Compliance HOD that both stages are ready for review
+      try {
+        const NotificationService = await import(
+          "../services/notificationService.js"
+        );
+        const notification = new NotificationService.default();
+
+        // Find Legal/Compliance department
+        const legalDept = await mongoose.model("Department").findOne({
+          name: { $regex: /legal|compliance/i },
+        });
+
+        if (legalDept) {
+          const legalHOD = await mongoose
+            .model("User")
+            .findOne({
+              department: legalDept._id,
+              "role.name": "HOD",
+              isActive: true,
+            })
+            .populate("role");
+
+          if (legalHOD) {
+            await notification.createNotification({
+              recipient: legalHOD._id,
+              type: "COMPLIANCE_REVIEW_REQUIRED",
+              title: "Compliance Review Required",
+              message: `Both inventory and procurement stages have been completed for project "${this.name}" (${this.code}). Legal/Compliance review is now required to proceed to 95% completion.`,
+              priority: "high",
+              data: {
+                projectId: this._id,
+                projectName: this.name,
+                projectCode: this.code,
+                actionUrl: "/dashboard/modules/projects",
+                inventoryCompleted: true,
+                procurementCompleted: true,
+                currentProgress: this.progress,
+              },
+            });
+
+            console.log(
+              `✅ [COMPLIANCE] Compliance review notification sent to Legal HOD: ${legalHOD.firstName} ${legalHOD.lastName}`
+            );
+          }
+        }
+      } catch (notifError) {
+        console.error(
+          "❌ [COMPLIANCE] Error sending compliance review notification:",
+          notifError
+        );
+      }
+    }
+  } catch (error) {
+    console.error(
+      "❌ [COMPLIANCE] Error checking compliance readiness:",
+      error
+    );
+  }
 };
 
 const Project = mongoose.model("Project", projectSchema);

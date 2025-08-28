@@ -621,6 +621,7 @@ export const login = async (req, res) => {
       department: user.department,
       role: user.role,
       permissions: user.role?.permissions || [],
+      moduleAccess: user.moduleAccess || [],
       isActive: user.isActive,
       lastLogin: user.lastLogin,
       createdAt: user.createdAt,
@@ -756,6 +757,7 @@ export const getMe = async (req, res) => {
       department: user.department,
       role: user.role,
       permissions: user.role?.permissions || [],
+      moduleAccess: user.moduleAccess || [], // Include user's individual moduleAccess
       isActive: user.isActive,
       lastLogin: user.lastLogin,
       createdAt: user.createdAt,
@@ -1521,8 +1523,7 @@ export const getUserModules = async (req, res) => {
       user.role?.moduleAccess
     );
 
-    // Use role.moduleAccess instead of user.moduleAccess
-    const moduleAccessList = user.role?.moduleAccess || [];
+    const moduleAccessList = user.moduleAccess || [];
 
     if (moduleAccessList.length > 0) {
       const Module = (await import("../models/Module.js")).default;
@@ -1584,7 +1585,7 @@ export const getUserModules = async (req, res) => {
         }
       }
     } else {
-      console.log("❌ [getUserModules] No role moduleAccess found");
+      console.log("❌ [getUserModules] No user moduleAccess found");
 
       // For SUPER_ADMIN, return all modules if no moduleAccess is configured
       if (user.role?.name === "SUPER_ADMIN") {
@@ -1604,6 +1605,8 @@ export const getUserModules = async (req, res) => {
         console.log(
           `✅ [getUserModules] SUPER_ADMIN: Found ${availableModules.length} modules`
         );
+      } else {
+        console.log("❌ [getUserModules] No modules found for user");
       }
     }
 

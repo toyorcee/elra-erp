@@ -138,4 +138,13 @@ router.get(
   dashboardController.getHRDepartmentData
 );
 
+// ==================== SELF-SERVICE DASHBOARD ROUTES ====================
+
+// Get Self-Service dashboard data
+router.get(
+  "/self-service/overview",
+  protect,
+  dashboardController.getSelfServiceDashboardData
+);
+
 export default router;

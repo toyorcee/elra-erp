@@ -33,7 +33,11 @@ const canApprove = (
   // Super Admin can approve all requests
   if (userRole === 1000) return true;
 
-  // HOD can approve requests from their department
+  // HR HOD can approve ALL requests across the company (ELRA regulatory role)
+  if (userRole === 700 && userDepartment?.name === "Human Resources")
+    return true;
+
+  // Other HODs can approve requests from their department
   if (userRole === 700 && userDepartment.equals(requestDepartment)) return true;
 
   // Manager can approve requests from their department (for direct reports)
@@ -50,16 +54,16 @@ const getNextApprover = async (employeeRole, departmentId) => {
       role: 1000,
     });
   } else if (employeeRole === 600) {
-    // Manager's request goes to HOD in same department
+    // Manager's request goes to HR HOD (ELRA regulatory role)
     return await User.findOne({
       role: 700,
-      department: departmentId,
+      "department.name": "Human Resources",
     });
   } else if (employeeRole === 300) {
-    // Staff's request goes to HOD in same department
+    // Staff's request goes to HR HOD (ELRA regulatory role)
     return await User.findOne({
       role: 700,
-      department: departmentId,
+      "department.name": "Human Resources",
     });
   }
   return null;
@@ -287,8 +291,13 @@ const getLeaveRequests = asyncHandler(async (req, res) => {
   if (userRole?.level === 1000) {
     // Super Admin: can see all requests
   } else if (userRole?.level === 700) {
-    // HOD: can see requests from their department
-    query.department = req.user.department;
+    // HR HOD: can see ALL requests across the company (ELRA regulatory role)
+    if (req.user.department?.name === "Human Resources") {
+      // HR HOD can see all requests - no department filter
+    } else {
+      // Other HODs: can see requests from their department
+      query.department = req.user.department;
+    }
   } else if (userRole?.level === 600) {
     // Manager: can see requests from their department and their own requests
     query.$or = [{ department: req.user.department }, { employee: userId }];
@@ -393,6 +402,8 @@ const getLeaveRequestById = asyncHandler(async (req, res) => {
   const canAccess =
     userRole?.level === 1000 ||
     leaveRequest.employee._id.equals(userId) ||
+    (userRole?.level === 700 &&
+      req.user.department?.name === "Human Resources") || // HR HOD can access all
     (userRole?.level >= 600 &&
       leaveRequest.department._id.equals(req.user.department)) ||
     leaveRequest.currentApprover?._id.equals(userId);
@@ -689,8 +700,13 @@ const getLeaveStats = asyncHandler(async (req, res) => {
   if (userRole?.level === 1000) {
     // Super Admin: all stats
   } else if (userRole?.level === 700) {
-    // HOD: department stats
-    filters.department = req.user.department;
+    // HR HOD: all stats across company (ELRA regulatory role)
+    if (req.user.department?.name === "Human Resources") {
+      // HR HOD can see all stats - no department filter
+    } else {
+      // Other HODs: department stats
+      filters.department = req.user.department;
+    }
   } else if (userRole?.level === 600) {
     // Manager: department stats
     filters.department = req.user.department;
@@ -746,9 +762,14 @@ const getPendingApprovals = asyncHandler(async (req, res) => {
     status: "Pending",
   };
 
-  // HOD can see department requests, Super Admin can see all
+  // HR HOD can see all requests, other HODs see department requests, Super Admin can see all
   if (userRole?.level === 700) {
-    query.department = req.user.department;
+    if (req.user.department?.name === "Human Resources") {
+      // HR HOD can see all requests - no department filter
+    } else {
+      // Other HODs: department requests
+      query.department = req.user.department;
+    }
   }
 
   let pendingApprovalsQuery = LeaveRequest.find(query)

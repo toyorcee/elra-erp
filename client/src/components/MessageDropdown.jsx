@@ -300,7 +300,7 @@ const MessageDropdown = ({ isOpen, onClose }) => {
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-[var(--elra-border-primary)] bg-gradient-to-r from-[var(--elra-secondary-3)] to-white">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-[var(--elra-primary)] text-white">
+                <div className="p-2 rounded-lg bg-[var(--elra-primary)] text-white cursor-pointer">
                   <ChatBubbleLeftRightIcon className="h-5 w-5" />
                 </div>
                 <div>

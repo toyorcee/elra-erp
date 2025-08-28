@@ -13,6 +13,13 @@ import {
   addMaintenanceRecord,
   addNote,
   updateStatus,
+  // Project-specific inventory endpoints
+  getProjectInventoryWorkflow,
+  createProjectEquipment,
+  allocateProjectBudget,
+  assignProjectLocations,
+  completeProjectInventory,
+  getEquipmentCategories,
 } from "../controllers/inventoryController.js";
 import { protect, checkRole } from "../middleware/auth.js";
 
@@ -29,7 +36,14 @@ const validateInventory = [
     .isLength({ min: 10, max: 1000 })
     .withMessage("Description must be between 10 and 1000 characters"),
   body("type")
-    .isIn(["equipment", "vehicle", "property", "furniture", "electronics", "other"])
+    .isIn([
+      "equipment",
+      "vehicle",
+      "property",
+      "furniture",
+      "electronics",
+      "other",
+    ])
     .withMessage("Invalid item type"),
   body("category")
     .trim()
@@ -94,6 +108,9 @@ router.get("/stats", checkRole(600), getInventoryStats);
 // Get available items - Manager+
 router.get("/available", checkRole(600), getAvailableItems);
 
+// Get equipment categories for dropdowns - All authenticated users
+router.get("/categories", getEquipmentCategories);
+
 // Get items by type - Manager+
 router.get("/type/:type", checkRole(600), getByType);
 
@@ -113,12 +130,56 @@ router.put("/:id", checkRole(600), validateInventory, updateInventory);
 router.delete("/:id", checkRole(700), deleteInventory);
 
 // Maintenance routes - Manager+
-router.post("/:id/maintenance", checkRole(600), validateMaintenanceRecord, addMaintenanceRecord);
+router.post(
+  "/:id/maintenance",
+  checkRole(600),
+  validateMaintenanceRecord,
+  addMaintenanceRecord
+);
 
 // Notes routes - Manager+
 router.post("/:id/notes", checkRole(600), validateNote, addNote);
 
 // Status update - Manager+
 router.patch("/:id/status", checkRole(600), updateStatus);
+
+// ============================================================================
+// PROJECT-SPECIFIC INVENTORY WORKFLOW ROUTES
+// ============================================================================
+
+// Get project inventory workflow data - Operations HOD+
+router.get(
+  "/project/:projectId/workflow",
+  checkRole(700),
+  getProjectInventoryWorkflow
+);
+
+// Create equipment for specific project - Operations HOD+
+router.post(
+  "/project/:projectId/equipment",
+  checkRole(700),
+  createProjectEquipment
+);
+
+// Allocate budget for project equipment - Operations HOD+
+router.post(
+  "/project/:projectId/budget",
+  checkRole(700),
+  allocateProjectBudget
+);
+
+// Assign locations for project equipment - Operations HOD+
+router.post(
+  "/project/:projectId/locations",
+  checkRole(700),
+  assignProjectLocations
+);
+
+// Complete project inventory phase - Operations HOD+
+router.post(
+  "/project/:projectId/complete",
+  checkRole(700),
+  completeProjectInventory
+);
 
 export default router;

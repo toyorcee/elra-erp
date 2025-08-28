@@ -159,3 +159,95 @@ export const fetchWorkflowTasks = async () => {
     throw error;
   }
 };
+
+// ============================================================================
+// PROJECT-SPECIFIC INVENTORY WORKFLOW API
+// ============================================================================
+
+// Get project inventory workflow data
+export const getProjectInventoryWorkflow = async (projectId) => {
+  try {
+    const response = await api.get(`/inventory/project/${projectId}/workflow`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching project inventory workflow:", error);
+    throw error;
+  }
+};
+
+// Create equipment for specific project
+export const createProjectEquipment = async (projectId, equipmentData) => {
+  try {
+    const response = await api.post(
+      `/inventory/project/${projectId}/equipment`,
+      equipmentData
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error creating project equipment:", error);
+    throw error;
+  }
+};
+
+// Allocate budget for project equipment
+export const allocateProjectBudget = async (
+  projectId,
+  equipmentId,
+  allocatedAmount
+) => {
+  try {
+    const response = await api.post(`/inventory/project/${projectId}/budget`, {
+      equipmentId,
+      allocatedAmount,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error allocating project budget:", error);
+    throw error;
+  }
+};
+
+// Assign locations for project equipment
+export const assignProjectLocations = async (
+  projectId,
+  equipmentId,
+  location,
+  specifications
+) => {
+  try {
+    const response = await api.post(
+      `/inventory/project/${projectId}/locations`,
+      {
+        equipmentId,
+        location,
+        specifications,
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error assigning project locations:", error);
+    throw error;
+  }
+};
+
+// Complete project inventory phase
+export const completeProjectInventory = async (projectId) => {
+  try {
+    const response = await api.post(`/inventory/project/${projectId}/complete`);
+    return response.data;
+  } catch (error) {
+    console.error("Error completing project inventory:", error);
+    throw error;
+  }
+};
+
+// Get equipment categories for dropdowns
+export const getEquipmentCategories = async () => {
+  try {
+    const response = await api.get("/inventory/categories");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching equipment categories:", error);
+    throw error;
+  }
+};

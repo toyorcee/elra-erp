@@ -36,6 +36,16 @@ export const getDocumentById = async (documentId) => {
   }
 };
 
+// Get project documents
+export const getProjectDocuments = async (projectId) => {
+  try {
+    const response = await api.get(`/documents/project/${projectId}`);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
 // Update document
 export const updateDocument = async (documentId, updateData) => {
   try {
@@ -83,6 +93,40 @@ export const processOCR = async (documentId) => {
   try {
     const response = await api.post(`/documents/${documentId}/ocr`);
     return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+// View document using REST API
+export const viewDocument = async (documentId) => {
+  try {
+    const response = await api.get(
+      `/documents/${documentId}/view?t=${Date.now()}`,
+      {
+        responseType: "blob",
+      }
+    );
+
+    // Create blob URL and open in new tab
+    const blob = new Blob([response.data], {
+      type: response.headers["content-type"] || "application/pdf",
+    });
+
+    const url = window.URL.createObjectURL(blob);
+
+    // Open in new tab
+    const newWindow = window.open(url, "_blank");
+
+    if (!newWindow) {
+      throw new Error("Popup blocked. Please allow popups for this site.");
+    }
+
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+    }, 5000);
+
+    return { success: true, message: "Document opened successfully" };
   } catch (error) {
     throw error.response?.data || error.message;
   }
@@ -359,6 +403,40 @@ export const replaceDocument = async (documentId, formData) => {
   try {
     const response = await api.put(
       `/documents/${documentId}/replace`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const uploadProjectDocuments = async (formData) => {
+  try {
+    const response = await api.post(
+      "/documents/upload-project-documents",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+export const replaceProjectDocument = async (formData) => {
+  try {
+    const response = await api.post(
+      "/documents/replace-project-document",
       formData,
       {
         headers: {

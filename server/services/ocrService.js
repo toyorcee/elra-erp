@@ -1,6 +1,8 @@
 import fs from "fs";
 import path from "path";
 import Tesseract from "tesseract.js";
+import { PDFDocument } from "pdf-lib";
+import sharp from "sharp";
 
 class OCRService {
   /**
@@ -18,13 +20,48 @@ class OCRService {
         throw new Error(`File not found: ${filePath}`);
       }
 
+      // Check if file is PDF and handle accordingly
+      const fileExtension = path.extname(filePath).toLowerCase();
+
+      if (fileExtension === ".pdf") {
+        console.log("📄 [OCRService] PDF detected - skipping OCR processing");
+        console.log(
+          "⚠️ [OCRService] PDF OCR temporarily disabled - returning basic metadata"
+        );
+
+        // Return basic metadata without OCR for PDFs
+        return {
+          success: true,
+          confidence: 0,
+          extractedText: "",
+          keywords: [],
+          suggestedTitle: "PDF Document",
+          suggestedDescription: "PDF document uploaded",
+          suggestedCategory: "document",
+          suggestedConfidentiality: "public",
+          suggestedTags: ["pdf", "document"],
+          documentType: "pdf",
+          processingTime: Date.now(),
+          wordCount: 0,
+          characterCount: 0,
+        };
+      }
+
+      // For non-PDF files, proceed with OCR
+      let imagePath = filePath;
+
       // Extract text using Tesseract.js
       const {
         data: { text, confidence },
-      } = await Tesseract.recognize(filePath, "eng", {
+      } = await Tesseract.recognize(imagePath, "eng", {
         logger: (m) =>
           console.log(`📄 [OCRService] ${m.status}: ${m.progress * 100}%`),
       });
+
+      // Clean up temporary image file if it was created (for non-PDF files)
+      if (imagePath !== filePath && fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
 
       console.log("✅ [OCRService] Text extraction completed");
 
@@ -64,6 +101,27 @@ class OCRService {
         error
       );
       throw new Error(`OCR processing failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Convert PDF to image for OCR processing
+   * @param {string} pdfPath - Path to PDF file
+   * @returns {string} Path to converted image
+   */
+  static async convertPdfToImage(pdfPath) {
+    try {
+      console.log("🔄 [OCRService] Converting PDF to image...");
+
+      // For now, let's skip PDF conversion and return the original path
+      // This will allow OCR to work with other file types while we fix PDF conversion
+      console.log(
+        "⚠️ [OCRService] PDF conversion temporarily disabled - using original file"
+      );
+      return pdfPath;
+    } catch (error) {
+      console.error("❌ [OCRService] Error converting PDF to image:", error);
+      throw new Error(`PDF conversion failed: ${error.message}`);
     }
   }
 

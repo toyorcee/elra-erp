@@ -77,6 +77,17 @@ export const getProjectById = async (id) => {
   }
 };
 
+// Get projects needing inventory workflow (Operations HOD only)
+export const getProjectsNeedingInventory = async () => {
+  try {
+    const response = await api.get("/projects/inventory-workflow");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching projects needing inventory:", error);
+    throw error;
+  }
+};
+
 // Create new project
 export const createProject = async (projectData) => {
   try {
@@ -157,6 +168,34 @@ export const fetchPendingProjectApprovals = async () => {
   }
 };
 
+// Approve project
+export const approveProject = async (projectId, approvalData) => {
+  try {
+    const response = await api.post(
+      `/projects/${projectId}/approve`,
+      approvalData
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error approving project:", error);
+    throw error;
+  }
+};
+
+// Reject project
+export const rejectProject = async (projectId, rejectionData) => {
+  try {
+    const response = await api.post(
+      `/projects/${projectId}/reject`,
+      rejectionData
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error rejecting project:", error);
+    throw error;
+  }
+};
+
 // ============================================================================
 // TEAM MEMBER APIs (New TeamMember Model)
 // ============================================================================
@@ -227,6 +266,94 @@ export const removeTeamMemberNew = async (teamMemberId) => {
     return response.data;
   } catch (error) {
     console.error("Error removing team member:", error);
+    throw error;
+  }
+};
+
+// ============================================================================
+// ANALYTICS API
+// ============================================================================
+
+// Get project analytics for dashboard
+export const fetchProjectAnalytics = async () => {
+  try {
+    const response = await api.get("/projects/analytics");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching project analytics:", error);
+    throw error;
+  }
+};
+
+// Get regulatory compliance status for a project
+export const getRegulatoryComplianceStatus = async (projectId) => {
+  try {
+    const response = await api.get(
+      `/projects/${projectId}/regulatory-compliance`
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching regulatory compliance status:", error);
+    throw error;
+  }
+};
+
+// Complete regulatory compliance for a project
+export const completeRegulatoryCompliance = async (
+  projectId,
+  complianceData
+) => {
+  try {
+    const response = await api.post(
+      `/projects/${projectId}/complete-regulatory-compliance`,
+      {
+        complianceData,
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error completing regulatory compliance:", error);
+    throw error;
+  }
+};
+
+// ============================================================================
+// WORKFLOW COMPLETION API
+// ============================================================================
+
+// Mark inventory as completed (Operations HOD)
+export const completeInventory = async (projectId) => {
+  try {
+    const response = await api.post(
+      `/projects/${projectId}/complete-inventory`
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error completing inventory:", error);
+    throw error;
+  }
+};
+
+// Mark procurement as completed (Procurement HOD)
+export const completeProcurement = async (projectId) => {
+  try {
+    const response = await api.post(
+      `/projects/${projectId}/complete-procurement`
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error completing procurement:", error);
+    throw error;
+  }
+};
+
+// Get workflow status for a project
+export const getWorkflowStatus = async (projectId) => {
+  try {
+    const response = await api.get(`/projects/${projectId}/workflow-status`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching workflow status:", error);
     throw error;
   }
 };

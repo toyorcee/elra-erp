@@ -7,7 +7,7 @@ import ResetPassword from "./pages/auth/ResetPassword";
 import RetrieveCredentials from "./pages/auth/RetrieveCredentials";
 import EmailVerification from "./pages/auth/EmailVerification";
 import EmailVerificationSuccess from "./pages/auth/EmailVerificationSuccess";
-import { Dashboard, Documents } from "./pages/user";
+import { Dashboard } from "./pages/user";
 import HRInvitations from "./pages/user/modules/hr/HRInvitations";
 import OnboardingManagement from "./pages/user/modules/hr/onboarding/OnboardingManagement";
 import OffboardingManagement from "./pages/user/modules/hr/offboarding/OffboardingManagement";
@@ -49,21 +49,14 @@ import TaskList from "./pages/user/modules/tasks/TaskList";
 import TaskAnalytics from "./pages/user/modules/tasks/TaskAnalytics";
 import TaskAssignments from "./pages/user/modules/tasks/TaskAssignments";
 import TaskReports from "./pages/user/modules/tasks/TaskReports";
-import InventoryList from "./pages/user/modules/inventory/InventoryList";
-import AvailableItems from "./pages/user/modules/inventory/AvailableItems";
-import MaintenanceSchedule from "./pages/user/modules/inventory/MaintenanceSchedule";
-import InventoryReports from "./pages/user/modules/inventory/InventoryReports";
 import InventoryManagement from "./pages/user/modules/inventory/InventoryManagement";
-
-import AssetTracking from "./pages/user/modules/inventory/AssetTracking";
-import PurchaseOrders from "./pages/user/modules/procurement/PurchaseOrders";
-import PendingApprovals from "./pages/user/modules/procurement/PendingApprovals";
-import SupplierManagement from "./pages/user/modules/procurement/SupplierManagement";
-import ProcurementReports from "./pages/user/modules/procurement/ProcurementReports";
+import ProcurementManagement from "./pages/user/modules/procurement/ProcurementManagement";
 import FinancialTransactions from "./pages/user/modules/finance/FinancialTransactions";
 import RevenueManagement from "./pages/user/modules/finance/RevenueManagement";
 import ExpenseManagement from "./pages/user/modules/finance/ExpenseManagement";
 import FinancialReports from "./pages/user/modules/finance/FinancialReports";
+import ProjectFinanceManagement from "./pages/user/modules/finance/ProjectFinanceManagement";
+import { PendingReviews, ComplianceHistory } from "./pages/user/modules/legal";
 import SystemSetupOnboarding from "./pages/shared/SystemSetupOnboarding";
 import DashboardLayout from "./layouts/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -138,7 +131,6 @@ const AppRoutes = () => {
         }
       >
         <Route index element={<Dashboard />} />
-        <Route path="documents" element={<Documents />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="settings" element={<Settings />} />
         <Route path="profile" element={<Profile />} />
@@ -234,39 +226,13 @@ const AppRoutes = () => {
           path="modules/projects/approvals"
           element={<ApprovalDashboard />}
         />
+
         <Route path="modules/tasks/list" element={<TaskList />} />
         <Route path="modules/tasks/analytics" element={<TaskAnalytics />} />
         <Route path="modules/tasks/assignments" element={<TaskAssignments />} />
         <Route path="modules/tasks/reports" element={<TaskReports />} />
         <Route path="modules/inventory" element={<InventoryManagement />} />
-        <Route path="modules/inventory/list" element={<InventoryList />} />
-        <Route
-          path="modules/inventory/available"
-          element={<AvailableItems />}
-        />
-        <Route
-          path="modules/inventory/maintenance"
-          element={<MaintenanceSchedule />}
-        />
-        <Route
-          path="modules/inventory/reports"
-          element={<InventoryReports />}
-        />
-
-        <Route path="modules/inventory/assets" element={<AssetTracking />} />
-        <Route path="modules/procurement/orders" element={<PurchaseOrders />} />
-        <Route
-          path="modules/procurement/approvals"
-          element={<PendingApprovals />}
-        />
-        <Route
-          path="modules/procurement/suppliers"
-          element={<SupplierManagement />}
-        />
-        <Route
-          path="modules/procurement/reports"
-          element={<ProcurementReports />}
-        />
+        <Route path="modules/procurement" element={<ProcurementManagement />} />
         <Route
           path="modules/finance/transactions"
           element={<FinancialTransactions />}
@@ -277,6 +243,20 @@ const AppRoutes = () => {
           element={<ExpenseManagement />}
         />
         <Route path="modules/finance/reports" element={<FinancialReports />} />
+        <Route
+          path="modules/finance/projects"
+          element={<ProjectFinanceManagement />}
+        />
+
+        {/* Legal & Compliance Module Routes */}
+        <Route
+          path="modules/legal/pending-reviews"
+          element={<PendingReviews />}
+        />
+        <Route
+          path="modules/legal/compliance-history"
+          element={<ComplianceHistory />}
+        />
       </Route>
 
       {/* Admin routes - commented out - admin folder deleted */}

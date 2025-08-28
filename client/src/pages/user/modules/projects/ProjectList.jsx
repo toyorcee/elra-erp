@@ -9,7 +9,14 @@ import {
   FolderIcon,
   UsersIcon,
   EyeIcon,
+  ArrowLeftIcon,
 } from "@heroicons/react/24/outline";
+import {
+  HiDocument,
+  HiArrowUpTray,
+  HiXMark,
+  HiDocumentText,
+} from "react-icons/hi2";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../../context/AuthContext";
 import {
@@ -20,6 +27,13 @@ import {
   getNextProjectCode,
 } from "../../../../services/projectAPI.js";
 import {
+  uploadDocument,
+  replaceProjectDocument,
+  formatFileSize,
+  getProjectDocuments,
+  viewDocument,
+} from "../../../../services/documents.js";
+import {
   formatCurrency,
   formatDate,
   formatNumberWithCommas,
@@ -27,9 +41,48 @@ import {
 } from "../../../../utils/formatters.js";
 import DataTable from "../../../../components/common/DataTable";
 import UserSearchSelect from "../../../../components/common/UserSearchSelect";
+import ELRALogo from "../../../../components/ELRALogo.jsx";
 
 const ProjectList = () => {
   const { user } = useAuth();
+
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = `
+      .modal-shadow-enhanced {
+        box-shadow: 
+          0 25px 50px -12px rgba(0, 0, 0, 0.25),
+          0 0 0 1px rgba(255, 255, 255, 0.05),
+          0 0 40px rgba(0, 0, 0, 0.1);
+        animation: modalAppear 0.3s ease-out;
+      }
+      .modal-backdrop-enhanced {
+        backdrop-filter: blur(8px);
+        background: rgba(0, 0, 0, 0.6);
+        animation: backdropAppear 0.3s ease-out;
+      }
+      @keyframes modalAppear {
+        from {
+          opacity: 0;
+          transform: scale(0.95) translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+        }
+      }
+      @keyframes backdropAppear {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -48,14 +101,14 @@ const ProjectList = () => {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
+    category: "",
     startDate: "",
     endDate: "",
     budget: "",
     projectManager: "",
-    category: "",
-    customCategory: "",
     status: "planning",
     priority: "medium",
+    projectScope: "personal",
   });
 
   const [nextProjectCode, setNextProjectCode] = useState("");
@@ -68,6 +121,153 @@ const ProjectList = () => {
   const [projectToEdit, setProjectToEdit] = useState(null);
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [selectedProjectForTeam, setSelectedProjectForTeam] = useState(null);
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [selectedProjectForDocument, setSelectedProjectForDocument] =
+    useState(null);
+  const [documentFormData, setDocumentFormData] = useState({
+    title: "",
+    description: "",
+    category: "Project Documentation",
+    documentType: "Project Document",
+    priority: "Medium",
+    tags: "",
+    isConfidential: false,
+  });
+  const [isDocumentEditingDisabled, setIsDocumentEditingDisabled] =
+    useState(false);
+
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploadingDocument, setIsUploadingDocument] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [viewingDocumentId, setViewingDocumentId] = useState(null);
+
+  const [projectDocuments, setProjectDocuments] = useState({});
+  const [loadingDocuments, setLoadingDocuments] = useState({});
+
+  const [showDocumentsModal, setShowDocumentsModal] = useState(false);
+  const [selectedProjectForDocuments, setSelectedProjectForDocuments] =
+    useState(null);
+
+  const [isReplacingDocument, setIsReplacingDocument] = useState(false);
+  const [currentDocumentType, setCurrentDocumentType] = useState(null);
+  const [isInUploadMode, setIsInUploadMode] = useState(false);
+
+  // Document filters
+  const [documentFilters, setDocumentFilters] = useState({
+    documentType: "all",
+    status: "all",
+  });
+  const [documentSearchTerm, setDocumentSearchTerm] = useState("");
+
+  // State for fetching categories from backend
+  const [projectCategories, setProjectCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+
+  // Project statuses for filtering
+  const projectStatuses = [
+    { value: "all", label: "All Statuses" },
+    {
+      value: "planning",
+      label: "Planning",
+      color: "bg-gray-100 text-gray-800",
+    },
+    {
+      value: "pending_approval",
+      label: "Pending Approval",
+      color: "bg-yellow-100 text-yellow-800",
+    },
+    {
+      value: "pending_department_approval",
+      label: "Pending Department Approval",
+      color: "bg-orange-100 text-orange-800",
+    },
+    {
+      value: "pending_finance_approval",
+      label: "Pending Finance Approval",
+      color: "bg-purple-100 text-purple-800",
+    },
+    {
+      value: "pending_executive_approval",
+      label: "Pending Executive Approval",
+      color: "bg-indigo-100 text-indigo-800",
+    },
+    {
+      value: "approved",
+      label: "Approved",
+      color: "bg-[var(--elra-primary)] text-white",
+    },
+    {
+      value: "implementation",
+      label: "Implementation",
+      color: "bg-blue-100 text-blue-800",
+    },
+    {
+      value: "active",
+      label: "Active",
+      color: "bg-[var(--elra-primary)] text-white",
+    },
+    {
+      value: "on_hold",
+      label: "On Hold",
+      color: "bg-yellow-100 text-yellow-800",
+    },
+    {
+      value: "completed",
+      label: "Completed",
+      color: "bg-[var(--elra-primary)] text-white",
+    },
+    {
+      value: "cancelled",
+      label: "Cancelled",
+      color: "bg-red-100 text-red-800",
+    },
+    { value: "rejected", label: "Rejected", color: "bg-red-100 text-red-800" },
+  ];
+
+  const shouldDisableDocumentEditing = (project) => {
+    if (!project) return false;
+
+    if (
+      project.status === "pending_approval" ||
+      project.status === "pending_finance_approval" ||
+      project.status === "pending_executive_approval" ||
+      project.status === "planning"
+    ) {
+      return false;
+    }
+
+    if (
+      project.status === "approved" ||
+      project.status === "implementation" ||
+      project.status === "active" ||
+      project.status === "completed" ||
+      project.status === "rejected" ||
+      project.status === "cancelled"
+    ) {
+      return true;
+    }
+
+    return false;
+  };
+
+  const shouldDisableProjectEditing = (project) => {
+    if (!project) return false;
+
+    if (project.status !== "planning") {
+      return true;
+    }
+
+    if (project.status === "rejected" || project.status === "cancelled") {
+      return true;
+    }
+
+    if (project.status === "completed") {
+      return true;
+    }
+
+    return false;
+  };
 
   const getApprovalLevelText = (budget) => {
     const numBudget = parseFormattedNumber(budget);
@@ -139,100 +339,85 @@ const ProjectList = () => {
     );
   }
 
-  // Project categories for ELRA - All departments can create all types of projects
-  // ELRA is a regulatory authority overseeing all equipment leasing categories
-  const getProjectCategories = () => {
-    const allCategories = [
-      { value: "all", label: "All Categories" },
-      { value: "equipment_lease", label: "Equipment Lease" },
-      { value: "vehicle_lease", label: "Vehicle Lease" },
-      { value: "property_lease", label: "Property Lease" },
-      { value: "financial_lease", label: "Financial Lease" },
-      { value: "training_equipment_lease", label: "Training Equipment Lease" },
-      { value: "compliance_lease", label: "Compliance Lease" },
-      { value: "service_equipment_lease", label: "Service Equipment Lease" },
-      { value: "strategic_lease", label: "Strategic Lease" },
-      { value: "software_development", label: "Software Development" },
-      { value: "system_maintenance", label: "System Maintenance" },
-      { value: "consulting", label: "Consulting" },
-      { value: "training", label: "Training" },
-      { value: "other", label: "Other (Custom Category)" },
-    ];
-
-    return allCategories;
+  const fetchProjectCategories = async () => {
+    try {
+      setLoadingCategories(true);
+      const response = await api.get("/projects/categories");
+      setProjectCategories(response.data.categories || []);
+    } catch (error) {
+      console.error("Error fetching project categories:", error);
+      setProjectCategories([
+        { value: "software_development", label: "Software Development" },
+        { value: "system_maintenance", label: "System Maintenance" },
+        { value: "process_automation", label: "Process Automation" },
+        { value: "integration_project", label: "Integration Project" },
+        { value: "equipment_purchase", label: "Equipment Purchase" },
+        {
+          value: "infrastructure_development",
+          label: "Infrastructure Development",
+        },
+        { value: "equipment_maintenance", label: "Equipment Maintenance" },
+        { value: "training_program", label: "Training Program" },
+        {
+          value: "professional_development",
+          label: "Professional Development",
+        },
+        { value: "industry_training", label: "Industry Training" },
+        { value: "consulting_service", label: "Consulting Service" },
+        { value: "advisory_service", label: "Advisory Service" },
+        { value: "technical_support", label: "Technical Support" },
+        { value: "implementation_service", label: "Implementation Service" },
+        { value: "regulatory_compliance", label: "Regulatory Compliance" },
+        { value: "policy_development", label: "Policy Development" },
+        {
+          value: "standards_implementation",
+          label: "Standards Implementation",
+        },
+        { value: "monitoring_system", label: "Monitoring System" },
+        { value: "oversight_program", label: "Oversight Program" },
+        { value: "verification_service", label: "Verification Service" },
+        { value: "inspection_program", label: "Inspection Program" },
+        { value: "financial_management", label: "Financial Management" },
+        { value: "budget_optimization", label: "Budget Optimization" },
+        { value: "cost_reduction", label: "Cost Reduction" },
+        {
+          value: "administrative_improvement",
+          label: "Administrative Improvement",
+        },
+        { value: "marketplace_development", label: "Marketplace Development" },
+        { value: "exchange_platform", label: "Exchange Platform" },
+        { value: "trading_system", label: "Trading System" },
+        { value: "market_analysis", label: "Market Analysis" },
+        { value: "public_awareness", label: "Public Awareness" },
+        { value: "communication_campaign", label: "Communication Campaign" },
+        { value: "stakeholder_engagement", label: "Stakeholder Engagement" },
+        { value: "public_relations", label: "Public Relations" },
+        { value: "research_project", label: "Research Project" },
+        { value: "market_research", label: "Market Research" },
+        { value: "feasibility_study", label: "Feasibility Study" },
+        { value: "impact_assessment", label: "Impact Assessment" },
+        { value: "other", label: "Other" },
+      ]);
+    } finally {
+      setLoadingCategories(false);
+    }
   };
 
-  const projectCategories = getProjectCategories();
+  // Check if user is from HR department
+  const isHRDepartment =
+    user?.department?.name === "Human Resources" ||
+    user?.department?.name === "HR" ||
+    user?.department?.name === "Human Resource Management";
 
-  const projectStatuses = [
-    { value: "all", label: "All Statuses" },
-    {
-      value: "planning",
-      label: "Planning",
-      color: "bg-gray-100 text-gray-800",
-    },
-    {
-      value: "pending_approval",
-      label: "Pending Approval",
-      color: "bg-yellow-100 text-yellow-800",
-    },
-    {
-      value: "pending_department_approval",
-      label: "Pending Department Approval",
-      color: "bg-orange-100 text-orange-800",
-    },
-    {
-      value: "pending_finance_approval",
-      label: "Pending Finance Approval",
-      color: "bg-purple-100 text-purple-800",
-    },
-    {
-      value: "pending_executive_approval",
-      label: "Pending Executive Approval",
-      color: "bg-indigo-100 text-indigo-800",
-    },
-    {
-      value: "approved",
-      label: "Approved",
-      color:
-        "bg-[var(--elra-primary)] bg-opacity-20 text-[var(--elra-primary)]",
-    },
-    {
-      value: "implementation",
-      label: "Implementation",
-      color: "bg-blue-100 text-blue-800",
-    },
-    {
-      value: "active",
-      label: "Active",
-      color:
-        "bg-[var(--elra-primary)] bg-opacity-20 text-[var(--elra-primary)]",
-    },
-    {
-      value: "on_hold",
-      label: "On Hold",
-      color: "bg-yellow-100 text-yellow-800",
-    },
-    {
-      value: "completed",
-      label: "Completed",
-      color:
-        "bg-[var(--elra-primary)] bg-opacity-20 text-[var(--elra-primary)]",
-    },
-    {
-      value: "cancelled",
-      label: "Cancelled",
-      color: "bg-red-100 text-red-800",
-    },
-    {
-      value: "rejected",
-      label: "Rejected",
-      color: "bg-red-100 text-red-800",
-    },
-  ];
+  const canCreateExternalProjects =
+    (isHRDepartment && user?.role?.level >= 700) || user?.role?.level >= 1000;
+
+  const showExternalProjectFields =
+    formData.projectScope === "external" && canCreateExternalProjects;
 
   useEffect(() => {
     loadProjects();
+    fetchProjectCategories();
   }, []);
 
   useEffect(() => {
@@ -259,6 +444,27 @@ const ProjectList = () => {
       const response = await fetchProjects();
       if (response.success) {
         setProjects(response.data);
+
+        // Load documents for each project
+        const projectIds = response.data.map((project) => project._id);
+        await Promise.all(
+          projectIds.map(async (projectId) => {
+            try {
+              const docResponse = await getProjectDocuments(projectId);
+              if (docResponse.success) {
+                setProjectDocuments((prev) => ({
+                  ...prev,
+                  [projectId]: docResponse.data.documents || [],
+                }));
+              }
+            } catch (error) {
+              console.error(
+                `Error loading documents for project ${projectId}:`,
+                error
+              );
+            }
+          })
+        );
       } else {
         toast.error("Failed to load projects");
       }
@@ -274,16 +480,81 @@ const ProjectList = () => {
     setFormData({
       name: "",
       description: "",
+      category: "",
       startDate: "",
       endDate: "",
       budget: "",
       projectManager: "",
-      category: "",
       status: "planning",
       priority: "medium",
+      projectScope: "personal",
     });
+
     setIsEditMode(false);
     setSelectedProject(null);
+  };
+
+  const truncateFileName = (fileName, maxLength = 25) => {
+    if (!fileName) return "";
+
+    if (fileName.length <= maxLength) {
+      return fileName;
+    }
+
+    const extension = fileName.split(".").pop();
+    const nameWithoutExt = fileName.substring(0, fileName.lastIndexOf("."));
+    const maxNameLength = maxLength - extension.length - 4;
+
+    if (nameWithoutExt.length <= maxNameLength) {
+      return fileName;
+    }
+
+    return `${nameWithoutExt.substring(0, maxNameLength)}...${extension}`;
+  };
+
+  const startDocumentReplacement = (documentType, project) => {
+    setCurrentDocumentType(documentType);
+    setIsReplacingDocument(true);
+    setSelectedProjectForDocument(project);
+    setShowDocumentsModal(false);
+    setShowDocumentModal(true);
+  };
+
+  const getDocumentTypeLabel = (documentType) => {
+    const labels = {
+      project_proposal: "Project Proposal Document",
+      budget_breakdown: "Budget & Financial Plan",
+      technical_specifications: "Technical & Implementation Plan",
+    };
+    return labels[documentType] || documentType;
+  };
+
+  const handleDocumentReplacement = async () => {
+    try {
+      const uploadedDoc = getUploadedDocument(currentDocumentType);
+      if (!uploadedDoc) {
+        toast.error("Original document not found. Cannot replace.");
+        return;
+      }
+
+      // Prepare form data for replacement
+      const formData = new FormData();
+      formData.append("document", selectedFile);
+      formData.append("projectId", selectedProjectForDocument._id);
+      formData.append("documentType", currentDocumentType);
+      formData.append("originalDocumentId", uploadedDoc._id);
+      formData.append("projectName", selectedProjectForDocument.name);
+
+      const response = await replaceProjectDocument(formData);
+
+      if (!response.success) {
+        throw new Error(response.message || "Failed to replace document");
+      }
+    } catch (error) {
+      console.error("Error replacing document:", error);
+      toast.error(`Failed to replace document: ${error.message}`);
+      throw error; // Re-throw to prevent success flow
+    }
   };
 
   const openCreateModal = () => {
@@ -302,6 +573,7 @@ const ProjectList = () => {
     setFormData({
       name: project.name || "",
       description: project.description || "",
+      category: project.category || "",
       startDate: project.startDate
         ? new Date(project.startDate).toISOString().split("T")[0]
         : "",
@@ -313,14 +585,11 @@ const ProjectList = () => {
         : "",
       projectManager:
         project.projectManager?._id || project.projectManager || "",
-      category: project.category || "",
       status: project.status || "planning",
       priority: project.priority || "medium",
+      projectScope: project.projectScope || "personal",
     });
-    console.log(
-      "🔍 [EDIT] Form data set with manager ID:",
-      project.projectManager?._id || project.projectManager
-    );
+
     setShowModal(true);
   };
 
@@ -337,6 +606,363 @@ const ProjectList = () => {
   const closeTeamModal = () => {
     setShowTeamModal(false);
     setSelectedProjectForTeam(null);
+  };
+
+  const fetchProjectDocuments = async (projectId) => {
+    try {
+      setLoadingDocuments((prev) => ({ ...prev, [projectId]: true }));
+      const response = await getProjectDocuments(projectId);
+      if (response.success) {
+        setProjectDocuments((prev) => ({
+          ...prev,
+          [projectId]: response.data.documents || [],
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching project documents:", error);
+      toast.error("Failed to fetch project documents");
+    } finally {
+      setLoadingDocuments((prev) => ({ ...prev, [projectId]: false }));
+    }
+  };
+
+  const handleViewProjectDocuments = async (project) => {
+    setSelectedProjectForDocuments(project);
+    setShowDocumentsModal(true);
+
+    // Fetch documents if not already loaded
+    if (!projectDocuments[project._id]) {
+      await fetchProjectDocuments(project._id);
+    }
+  };
+
+  const closeDocumentModal = () => {
+    setShowDocumentModal(false);
+    setSelectedProjectForDocument(null);
+    setSelectedFile(null);
+    setDocumentFormData({
+      title: "",
+      description: "",
+      category: "Project Documentation",
+      documentType: "Project Document",
+      priority: "Medium",
+      tags: "",
+      isConfidential: false,
+    });
+    setIsInUploadMode(false);
+    setIsReplacingDocument(false);
+    setCurrentDocumentType(null);
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      processSelectedFile(file);
+    }
+  };
+
+  // Enhanced file handling with drag and drop
+  const processSelectedFile = (file) => {
+    // Check file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File size must be less than 10MB");
+      return;
+    }
+
+    // Check file type
+    const supportedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/tiff",
+      "image/bmp",
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ];
+
+    if (!supportedTypes.includes(file.type)) {
+      toast.error(
+        "Please select a supported file type (JPEG, PNG, TIFF, BMP, PDF, DOC, DOCX, XLS, XLSX)"
+      );
+      return;
+    }
+
+    setSelectedFile(file);
+
+    // Auto-generate title from filename
+    const fileName = file.name.replace(/\.[^/.]+$/, "");
+    setDocumentFormData((prev) => ({
+      ...prev,
+      title:
+        fileName.charAt(0).toUpperCase() +
+        fileName.slice(1).replace(/[-_]/g, " "),
+    }));
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      processSelectedFile(files[0]);
+      toast.success(`File "${files[0].name}" selected successfully!`);
+    }
+  };
+
+  // Enhanced document viewing with loading state
+  const handleViewDocument = async (documentId, documentTitle) => {
+    try {
+      setViewingDocumentId(documentId);
+
+      const result = await viewDocument(documentId);
+
+      if (result.success) {
+        toast.success(result.message);
+      }
+    } catch (error) {
+      console.error("Error viewing document:", error);
+      toast.error("Failed to open document. Please try again.");
+    } finally {
+      setViewingDocumentId(null);
+    }
+  };
+
+  const getUploadedDocument = (documentType) => {
+    return projectDocuments[selectedProjectForDocuments._id]?.find(
+      (uploaded) => uploaded.documentType === documentType
+    );
+  };
+
+  const getFilteredDocuments = () => {
+    if (
+      !selectedProjectForDocuments ||
+      !projectDocuments[selectedProjectForDocuments._id]
+    ) {
+      return [];
+    }
+
+    let documents = projectDocuments[selectedProjectForDocuments._id];
+
+    if (documentFilters.documentType !== "all") {
+      documents = documents.filter(
+        (doc) => doc.documentType === documentFilters.documentType
+      );
+    }
+
+    // Filter by status (uploaded vs required)
+    if (documentFilters.status === "uploaded") {
+      documents = documents.filter((doc) => doc._id); // Has an ID means it's uploaded
+    } else if (documentFilters.status === "required") {
+      // For required, we need to show the required document types that aren't uploaded
+      const uploadedTypes = documents.map((doc) => doc.documentType);
+      const requiredTypes = [
+        "project_proposal",
+        "budget_breakdown",
+        "technical_specifications",
+      ];
+      const missingTypes = requiredTypes.filter(
+        (type) => !uploadedTypes.includes(type)
+      );
+
+      // Create placeholder objects for missing documents
+      const missingDocs = missingTypes.map((type) => ({
+        documentType: type,
+        title: getDocumentTypeLabel(type),
+        description: getDocumentTypeDescription(type),
+        isRequired: true,
+        _id: null,
+      }));
+
+      return missingDocs;
+    }
+
+    // Filter by search term
+    if (documentSearchTerm.trim()) {
+      documents = documents.filter(
+        (doc) =>
+          doc.title?.toLowerCase().includes(documentSearchTerm.toLowerCase()) ||
+          doc.documentType
+            ?.toLowerCase()
+            .includes(documentSearchTerm.toLowerCase()) ||
+          doc.description
+            ?.toLowerCase()
+            .includes(documentSearchTerm.toLowerCase())
+      );
+    }
+
+    return documents;
+  };
+
+  // Helper function to get document type description
+  const getDocumentTypeDescription = (documentType) => {
+    const descriptions = {
+      project_proposal:
+        "Complete project proposal with objectives, scope, and detailed description",
+      budget_breakdown:
+        "Detailed budget breakdown, cost analysis, and financial justification",
+      technical_specifications:
+        "Technical specifications, timeline, milestones, and implementation strategy",
+    };
+    return descriptions[documentType] || "";
+  };
+
+  // Function to filter projects based on current filters
+  const getFilteredProjects = () => {
+    let filteredProjects = [...projects];
+
+    // Filter by status
+    if (filters.status !== "all") {
+      filteredProjects = filteredProjects.filter(
+        (project) => project.status === filters.status
+      );
+    }
+
+    // Filter by category
+    if (filters.category !== "all") {
+      filteredProjects = filteredProjects.filter(
+        (project) => project.category === filters.category
+      );
+    }
+
+    // Filter by department (only for Super Admin)
+    if (user.role.level >= 1000 && filters.department !== "all") {
+      filteredProjects = filteredProjects.filter(
+        (project) => project.department?.name === filters.department
+      );
+    }
+
+    // Filter by search term
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      filteredProjects = filteredProjects.filter(
+        (project) =>
+          project.name?.toLowerCase().includes(searchLower) ||
+          project.code?.toLowerCase().includes(searchLower) ||
+          project.description?.toLowerCase().includes(searchLower) ||
+          project.projectManager?.firstName
+            ?.toLowerCase()
+            .includes(searchLower) ||
+          project.projectManager?.lastName
+            ?.toLowerCase()
+            .includes(searchLower) ||
+          project.category?.toLowerCase().includes(searchLower) ||
+          project.department?.name?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    return filteredProjects;
+  };
+
+  const handleDocumentUpload = async (e) => {
+    e.preventDefault();
+
+    if (!selectedFile) {
+      toast.error("Please select a file to upload");
+      return;
+    }
+
+    setIsUploadingDocument(true);
+    setUploadProgress(0);
+
+    try {
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 200);
+
+      if (isReplacingDocument) {
+        // Handle replacement directly
+        await handleDocumentReplacement();
+        toast.success(
+          `Document replaced successfully for project "${selectedProjectForDocument.name}"!`
+        );
+      } else {
+        // Handle new upload
+        if (!documentFormData.title.trim()) {
+          toast.error("Please enter a document title");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("document", selectedFile);
+        formData.append("title", documentFormData.title);
+        formData.append("description", documentFormData.description);
+        formData.append("category", documentFormData.category);
+        formData.append("documentType", documentFormData.documentType);
+        formData.append("priority", documentFormData.priority);
+        formData.append("tags", documentFormData.tags);
+        formData.append("isConfidential", documentFormData.isConfidential);
+        formData.append("projectId", selectedProjectForDocument._id);
+        formData.append("projectName", selectedProjectForDocument.name);
+
+        const response = await uploadDocument(formData);
+
+        if (!response.success) {
+          throw new Error(response.message || "Failed to upload document");
+        }
+
+        toast.success(
+          `Document "${documentFormData.title}" uploaded successfully for project "${selectedProjectForDocument.name}"!`
+        );
+      }
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      await fetchProjectDocuments(selectedProjectForDocument._id);
+
+      // Always return to documents view after upload/replacement
+      setShowDocumentModal(false);
+      setShowDocumentsModal(true);
+      setSelectedFile(null);
+      setDocumentFormData({
+        title: "",
+        description: "",
+        category: "Project Documentation",
+        documentType: "Project Document",
+        priority: "Medium",
+        tags: "",
+        isConfidential: false,
+      });
+      setIsInUploadMode(false);
+      setIsReplacingDocument(false);
+      setCurrentDocumentType(null);
+    } catch (error) {
+      console.error("Document upload error:", error);
+      toast.error(error.message || "Failed to upload document");
+    } finally {
+      setIsUploadingDocument(false);
+      setUploadProgress(0);
+    }
   };
 
   const validateForm = () => {
@@ -364,10 +990,6 @@ const ProjectList = () => {
 
     if (!formData.budget || parseFormattedNumber(formData.budget) <= 0) {
       errors.push("Budget must be greater than 0");
-    }
-
-    if (!formData.projectManager) {
-      errors.push("Project Manager is required");
     }
 
     if (!formData.status) {
@@ -418,8 +1040,10 @@ const ProjectList = () => {
         budget: parseFormattedNumber(formData.budget),
       };
 
+      // Create project
       const response = await createProject(submitData);
       if (response.success) {
+        const createdProject = response.data;
         // Dynamic toast based on approval level
         const budget = parseFormattedNumber(submitData.budget);
         let approvalMessage = "Awaiting approval.";
@@ -464,11 +1088,30 @@ const ProjectList = () => {
         loadProjects();
         closeModal();
       } else {
-        toast.error(response.message || "Failed to create project");
+        // Show more specific error message from backend
+        if (response.errors && Array.isArray(response.errors)) {
+          response.errors.forEach((error) => {
+            toast.error(error);
+          });
+        } else if (response.fieldErrors) {
+          Object.values(response.fieldErrors).forEach((error) => {
+            toast.error(error);
+          });
+        } else {
+          toast.error(response.message || "Failed to create project");
+        }
       }
     } catch (error) {
       console.error("Error submitting project:", error);
-      toast.error("Error submitting project");
+
+      // Show more specific error message
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else if (error.message) {
+        toast.error(error.message);
+      } else {
+        toast.error("Error submitting project");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -581,6 +1224,7 @@ const ProjectList = () => {
     return getDefaultAvatar(user);
   };
 
+  // Define columns inside component to access state
   const columns = [
     {
       header: "Project",
@@ -634,6 +1278,27 @@ const ProjectList = () => {
       ),
     },
     {
+      header: "Documents",
+      accessor: "documents",
+      renderer: (project) => {
+        const documentCount = projectDocuments[project._id]?.length || 0;
+        return (
+          <div className="text-sm min-w-0 max-w-20">
+            <div className="font-medium text-gray-900 truncate">
+              {loadingDocuments[project._id] ? (
+                <div className="animate-pulse bg-gray-200 h-4 w-8 rounded"></div>
+              ) : (
+                `${documentCount} docs`
+              )}
+            </div>
+            {documentCount > 0 && (
+              <div className="text-xs text-green-600">✓ Submitted</div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       header: "Budget",
       accessor: "budget",
       renderer: (project) => (
@@ -656,7 +1321,7 @@ const ProjectList = () => {
       accessor: "actions",
       align: "center",
       renderer: (project) => (
-        <div className="flex items-center justify-center space-x-1 w-32">
+        <div className="flex items-center justify-center space-x-1 w-40">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -680,24 +1345,53 @@ const ProjectList = () => {
           <button
             onClick={(e) => {
               e.stopPropagation();
-              openEditModal(project);
+              handleViewProjectDocuments(project);
             }}
-            className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
-            title="Edit Project"
+            className={`p-2 rounded-lg transition-colors cursor-pointer relative ${
+              projectDocuments[project._id]?.length > 0
+                ? "text-green-600 hover:text-green-800 hover:bg-green-50"
+                : "text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+            }`}
+            title={
+              projectDocuments[project._id]?.length > 0
+                ? `View ${
+                    projectDocuments[project._id].length
+                  } uploaded documents`
+                : "View Documents to Upload"
+            }
           >
-            <PencilIcon className="h-4 w-4" />
+            <HiDocument className="h-4 w-4" />
+            {projectDocuments[project._id]?.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                {projectDocuments[project._id].length}
+              </span>
+            )}
           </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setProjectToDelete(project);
-              setShowDeleteConfirm(true);
-            }}
-            className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-            title="Delete Project"
-          >
-            <TrashIcon className="h-4 w-4" />
-          </button>
+          {!shouldDisableProjectEditing(project) && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                openEditModal(project);
+              }}
+              className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
+              title="Edit Project"
+            >
+              <PencilIcon className="h-4 w-4" />
+            </button>
+          )}
+          {!shouldDisableProjectEditing(project) && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setProjectToDelete(project);
+                setShowDeleteConfirm(true);
+              }}
+              className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+              title="Delete Project"
+            >
+              <TrashIcon className="h-4 w-4" />
+            </button>
+          )}
         </div>
       ),
     },
@@ -737,7 +1431,7 @@ const ProjectList = () => {
         </div>
 
         {/* Filters and Search */}
-        <div className="bg-white rounded-lg shadow-md border border-gray-200 p-4 mb-6">
+        <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-4 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -830,10 +1524,36 @@ const ProjectList = () => {
           </div>
         </div>
 
+        {/* Filter Summary */}
+        {projects.length > 0 && (
+          <div className="mb-4 text-sm text-gray-600">
+            Showing {getFilteredProjects().length} of {projects.length} projects
+            {(filters.status !== "all" ||
+              filters.category !== "all" ||
+              filters.department !== "all" ||
+              searchTerm.trim()) && (
+              <span className="ml-2">
+                (filtered by{" "}
+                {[
+                  filters.status !== "all" && "status",
+                  filters.category !== "all" && "category",
+                  user.role.level >= 1000 &&
+                    filters.department !== "all" &&
+                    "department",
+                  searchTerm.trim() && "search",
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
+                )
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Projects Table */}
         <div className="overflow-x-auto">
           <DataTable
-            data={projects}
+            data={getFilteredProjects()}
             columns={columns}
             loading={loading}
             onRowClick={openDetailsModal}
@@ -846,7 +1566,10 @@ const ProjectList = () => {
             emptyState={{
               icon: <FolderIcon className="h-12 w-12 text-white" />,
               title: "No projects found",
-              description: "Get started by creating your first project",
+              description:
+                getFilteredProjects().length === 0 && projects.length > 0
+                  ? "No projects match your current filters. Try adjusting your search criteria."
+                  : "Get started by creating your first project",
               actionButton: (
                 <button
                   onClick={openCreateModal}
@@ -862,8 +1585,8 @@ const ProjectList = () => {
 
       {/* Unified Create/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-lg">
+        <div className="fixed inset-0 modal-backdrop-enhanced flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto modal-shadow-enhanced border border-gray-100 transform transition-all duration-300 ease-out">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">
                 {isEditMode ? "Edit Project" : "Create New Project"}
@@ -935,27 +1658,7 @@ const ProjectList = () => {
                       ))}
                   </select>
                 </div>
-                {formData.category === "other" && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Custom Category <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.customCategory}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          customCategory: e.target.value,
-                        })
-                      }
-                      placeholder="Enter custom category name"
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                      required
-                      disabled={submitting}
-                    />
-                  </div>
-                )}
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Start Date <span className="text-red-500">*</span>
@@ -966,6 +1669,7 @@ const ProjectList = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, startDate: e.target.value })
                     }
+                    min={new Date().toISOString().split("T")[0]}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
                     required
                     disabled={submitting}
@@ -980,6 +1684,10 @@ const ProjectList = () => {
                     value={formData.endDate}
                     onChange={(e) =>
                       setFormData({ ...formData, endDate: e.target.value })
+                    }
+                    min={
+                      formData.startDate ||
+                      new Date().toISOString().split("T")[0]
                     }
                     className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
                     required
@@ -1053,10 +1761,63 @@ const ProjectList = () => {
                     <option value="critical">Critical</option>
                   </select>
                 </div>
+
+                {/* Project Scope - Only show if user can create external projects */}
+                {canCreateExternalProjects && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Project Scope <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.projectScope}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          projectScope: e.target.value,
+                        })
+                      }
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                      required
+                      disabled={submitting}
+                    >
+                      <option value="personal">Personal Project</option>
+                      <option value="departmental">Departmental Project</option>
+                      <option value="external">External Project</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Project Manager - Full Width */}
               <div className="mt-4">
+                {/* Note for non-HR users */}
+                {!canCreateExternalProjects && (
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0">
+                        <svg
+                          className="h-5 w-5 text-blue-400"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm text-blue-800">
+                          <strong>Note:</strong> You can create personal and
+                          departmental projects. External projects (for
+                          regulating external entities) can only be created by
+                          HR department heads.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <UserSearchSelect
                   value={formData.projectManager}
                   onChange={(value) =>
@@ -1065,17 +1826,17 @@ const ProjectList = () => {
                       projectManager: value,
                     })
                   }
-                  placeholder="Search for project manager..."
-                  label="Project Manager"
-                  required
+                  placeholder="Search for project manager (optional)..."
+                  label="Project Manager (Optional)"
+                  required={false}
                   disabled={submitting}
-                  minRoleLevel={600} // Manager level and above
+                  minRoleLevel={300}
                   className="w-full"
                   currentUser={user}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  HODs can assign themselves or other managers as project
-                  managers
+                  Leave empty to assign yourself as project manager. You can
+                  assign any STAFF, MANAGER, or HOD.
                 </p>
               </div>
               <div className="mt-4">
@@ -1094,6 +1855,7 @@ const ProjectList = () => {
                   disabled={submitting}
                 />
               </div>
+
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   type="button"
@@ -1121,8 +1883,8 @@ const ProjectList = () => {
 
       {/* Project Details Modal */}
       {showDetailsModal && selectedProjectDetails && (
-        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-lg">
+        <div className="fixed inset-0 modal-backdrop-enhanced flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto modal-shadow-enhanced border border-gray-100 transform transition-all duration-300 ease-out">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-900">
                 Project Details
@@ -1138,7 +1900,7 @@ const ProjectList = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Basic Information */}
               <div className="space-y-6">
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-100">
+                <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <FolderIcon className="h-5 w-5 text-blue-600 mr-2" />
                     Basic Information
@@ -1271,7 +2033,7 @@ const ProjectList = () => {
                 </div>
 
                 {/* Financial Information */}
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border border-green-100">
+                <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <span className="text-green-600 font-bold text-xl mr-2">
                       ₦
@@ -1301,7 +2063,7 @@ const ProjectList = () => {
               {/* Timeline and Team */}
               <div className="space-y-6">
                 {/* Timeline */}
-                <div className="bg-gradient-to-r from-orange-50 to-red-50 p-4 rounded-lg border border-orange-100">
+                <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <span className="text-orange-600 font-bold text-xl mr-2">
                       📅
@@ -1363,7 +2125,7 @@ const ProjectList = () => {
                 </div>
 
                 {/* Team Information */}
-                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-lg border border-indigo-100">
+                <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <span className="text-indigo-600 font-bold text-xl mr-2">
                       👥
@@ -1404,15 +2166,17 @@ const ProjectList = () => {
 
             {/* Actions */}
             <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-200">
-              <button
-                onClick={() => {
-                  setShowDetailsModal(false);
-                  openEditModal(selectedProjectDetails);
-                }}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Edit Project
-              </button>
+              {selectedProjectDetails.status === "planning" && (
+                <button
+                  onClick={() => {
+                    setShowDetailsModal(false);
+                    openEditModal(selectedProjectDetails);
+                  }}
+                  className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-md hover:bg-[var(--elra-primary-dark)] transition-colors"
+                >
+                  Edit Project
+                </button>
+              )}
               <button
                 onClick={() => setShowDetailsModal(false)}
                 className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
@@ -1510,8 +2274,8 @@ const ProjectList = () => {
 
       {/* Team Members View Modal */}
       {showTeamModal && selectedProjectForTeam && (
-        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-lg shadow-lg border border-gray-200">
+        <div className="fixed inset-0 modal-backdrop-enhanced flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-lg modal-shadow-enhanced border border-gray-100 transform transition-all duration-300 ease-out">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-900 flex items-center">
                 <UsersIcon className="h-6 w-6 text-blue-600 mr-2" />
@@ -1613,6 +2377,534 @@ const ProjectList = () => {
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Upload Modal */}
+      {showDocumentModal && selectedProjectForDocument && (
+        <div className="fixed inset-0 modal-backdrop-enhanced flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl modal-shadow-enhanced max-w-6xl w-full max-h-[95vh] flex flex-col">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-t-2xl flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <ELRALogo variant="light" size="sm" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">
+                      {isReplacingDocument
+                        ? "Replace Document"
+                        : "Upload Document"}{" "}
+                      for Project
+                    </h2>
+                    <p className="text-white text-opacity-80">
+                      {selectedProjectForDocument.name} -{" "}
+                      {selectedProjectForDocument.code}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={closeDocumentModal}
+                    className="bg-white text-[var(--elra-primary)] px-4 py-2 rounded-lg hover:bg-gray-50 transition-all duration-300 font-medium border border-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={closeDocumentModal}
+                    className="text-white hover:text-gray-200 transition-colors p-1 rounded-full hover:bg-white hover:bg-opacity-20"
+                  >
+                    <HiXMark className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-8 bg-white">
+              {/* Project Information */}
+              <div className="mb-8">
+                <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                  <div className="flex">
+                    <FolderIcon className="h-5 w-5 text-blue-600 mr-3 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm text-blue-800 font-medium mb-2">
+                        Project Information
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="font-medium text-gray-700">
+                            Project:
+                          </span>
+                          <p className="text-gray-600 break-words">
+                            {selectedProjectForDocument.name}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">
+                            Code:
+                          </span>
+                          <p className="text-gray-600">
+                            {selectedProjectForDocument.code}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">
+                            Department:
+                          </span>
+                          <p className="text-gray-600">
+                            {selectedProjectForDocument.department?.name}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">
+                            Status:
+                          </span>
+                          <div className="mt-1">
+                            {getStatusBadge(selectedProjectForDocument.status)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                {/* File Upload Section */}
+                <div className="text-center">
+                  {/* Upload Option */}
+                  <div
+                    className={`bg-white border-2 border-dashed rounded-2xl p-8 transition-all duration-300 group ${
+                      isDragOver
+                        ? "border-[var(--elra-primary)] bg-[var(--elra-primary-light)] shadow-lg scale-105"
+                        : "border-gray-200 hover:border-[var(--elra-primary)] hover:shadow-lg"
+                    }`}
+                    onDragOver={handleDragOver}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                  >
+                    <div className="text-center">
+                      <div
+                        className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 transition-all duration-300 ${
+                          isDragOver
+                            ? "bg-[var(--elra-primary)] scale-110"
+                            : "bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] group-hover:scale-110"
+                        }`}
+                      >
+                        <HiArrowUpTray className="w-8 h-8 text-white" />
+                      </div>
+                      <h3
+                        className={`text-xl font-bold mb-3 transition-colors duration-300 ${
+                          isDragOver
+                            ? "text-[var(--elra-primary)]"
+                            : "text-gray-900"
+                        }`}
+                      >
+                        {isDragOver
+                          ? "Drop your file here"
+                          : `Upload ${documentFormData.title}`}
+                      </h3>
+                      <p
+                        className={`mb-6 leading-relaxed transition-colors duration-300 ${
+                          isDragOver
+                            ? "text-[var(--elra-primary)] font-medium"
+                            : "text-gray-600"
+                        }`}
+                      >
+                        {isDragOver
+                          ? "Release to upload your document"
+                          : "Drag and drop your document here, or click to browse. Document details will be automatically populated."}
+                      </p>
+                      <p className="text-sm text-gray-500 mb-4">
+                        Supported formats: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG,
+                        TIFF, BMP
+                      </p>
+
+                      {selectedFile ? (
+                        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <HiDocument className="w-5 h-5 text-green-600" />
+                              <div className="min-w-0 flex-1">
+                                <p
+                                  className="font-medium text-green-800 truncate cursor-help"
+                                  title={selectedFile.name}
+                                >
+                                  {selectedFile.name.length > 30
+                                    ? selectedFile.name.substring(0, 30) + "..."
+                                    : selectedFile.name}
+                                </p>
+                                <p className="text-sm text-green-600">
+                                  {formatFileSize(selectedFile.size)}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => setSelectedFile(null)}
+                              className="text-red-600 hover:text-red-800 ml-2 flex-shrink-0"
+                              disabled={isUploadingDocument}
+                            >
+                              <HiXMark className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.tiff,.bmp"
+                            onChange={handleFileSelect}
+                            className="hidden"
+                            id="file-upload"
+                            disabled={isUploadingDocument}
+                          />
+                          <label
+                            htmlFor="file-upload"
+                            className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white px-6 py-3 rounded-xl hover:shadow-lg transform hover:scale-105 transition-all duration-300 font-semibold cursor-pointer inline-block"
+                          >
+                            Choose File
+                          </label>
+                        </>
+                      )}
+
+                      {isUploadingDocument && (
+                        <div className="mt-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-gray-700">
+                              Uploading...
+                            </span>
+                            <span className="text-sm text-gray-500">
+                              {uploadProgress}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-[var(--elra-primary)] h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${uploadProgress}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedFile && !isUploadingDocument && (
+                        <button
+                          onClick={handleDocumentUpload}
+                          className="bg-[var(--elra-primary)] text-white px-6 py-3 rounded-xl hover:shadow-lg transform hover:scale-105 transition-all duration-300 font-semibold cursor-pointer"
+                        >
+                          {isReplacingDocument
+                            ? "Replace Document"
+                            : "Upload Document"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Project Documents Modal */}
+      {showDocumentsModal && selectedProjectForDocuments && (
+        <div className="fixed inset-0 modal-backdrop-enhanced flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl modal-shadow-enhanced max-w-[90vw] w-full max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-20 h-20 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <ELRALogo variant="light" size="md" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">
+                      Project Documents - {selectedProjectForDocuments.name}
+                    </h2>
+                    <p className="text-white text-opacity-80">
+                      Code: {selectedProjectForDocuments.code} • Budget: ₦
+                      {selectedProjectForDocuments.budget?.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowDocumentsModal(false);
+                    }}
+                    className="text-white hover:text-gray-200 transition-colors"
+                  >
+                    <HiXMark className="w-8 h-8" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-8 bg-white">
+              {/* Project Information */}
+              <div className="mb-8">
+                <div className="bg-[var(--elra-primary-light)] border border-[var(--elra-primary)] p-4 rounded-lg">
+                  <div className="flex">
+                    <FolderIcon className="h-5 w-5 text-[var(--elra-primary)] mr-3 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm text-[var(--elra-primary-dark)] font-medium mb-2">
+                        Required Documents for Project Approval
+                      </p>
+                      <p className="text-sm text-[var(--elra-primary-dark)] mb-4">
+                        The following documents are required for project
+                        approval. Upload completed documents to proceed with
+                        approval.
+                      </p>
+
+                      {/* Required Documents List */}
+                      <div className="space-y-4">
+                        {[
+                          {
+                            title: "Project Proposal Document",
+                            description:
+                              "Complete project proposal with objectives, scope, and detailed description",
+                            documentType: "project_proposal",
+                            isSubmitted:
+                              projectDocuments[
+                                selectedProjectForDocuments._id
+                              ]?.some(
+                                (uploadedDoc) =>
+                                  uploadedDoc.documentType ===
+                                  "project_proposal"
+                              ) || false,
+                          },
+                          {
+                            title: "Budget & Financial Plan",
+                            description:
+                              "Detailed budget breakdown, cost analysis, and financial justification",
+                            documentType: "budget_breakdown",
+                            isSubmitted:
+                              projectDocuments[
+                                selectedProjectForDocuments._id
+                              ]?.some(
+                                (uploadedDoc) =>
+                                  uploadedDoc.documentType ===
+                                  "budget_breakdown"
+                              ) || false,
+                          },
+                          {
+                            title: "Technical & Implementation Plan",
+                            description:
+                              "Technical specifications, timeline, milestones, and implementation strategy",
+                            documentType: "technical_specifications",
+                            isSubmitted:
+                              projectDocuments[
+                                selectedProjectForDocuments._id
+                              ]?.some(
+                                (uploadedDoc) =>
+                                  uploadedDoc.documentType ===
+                                  "technical_specifications"
+                              ) || false,
+                          },
+                        ].map((doc, index) => (
+                          <div
+                            key={index}
+                            className={`rounded-lg p-6 transition-colors border ${
+                              doc.isSubmitted
+                                ? "bg-green-50 border-green-200 hover:bg-green-100"
+                                : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-start space-x-4 flex-1">
+                                <div
+                                  className={`w-12 h-12 rounded-lg flex items-center justify-center shadow-sm border ${
+                                    doc.isSubmitted
+                                      ? "bg-green-100 border-green-300"
+                                      : "bg-white border-gray-200"
+                                  }`}
+                                >
+                                  {doc.isSubmitted ? (
+                                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                                      <svg
+                                        className="w-4 h-4 text-white"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                      >
+                                        <path
+                                          fillRule="evenodd"
+                                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                          clipRule="evenodd"
+                                        />
+                                      </svg>
+                                    </div>
+                                  ) : (
+                                    <HiDocument className="w-6 h-6 text-[var(--elra-primary)]" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                                    {doc.title}
+                                  </h3>
+                                  <p className="text-sm text-gray-600 mb-3">
+                                    {doc.description}
+                                  </p>
+                                  <div className="flex items-center space-x-4 text-sm">
+                                    <span
+                                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                        doc.isSubmitted
+                                          ? "bg-green-100 text-green-800"
+                                          : "bg-yellow-100 text-yellow-800"
+                                      }`}
+                                    >
+                                      {doc.isSubmitted
+                                        ? "✓ UPLOADED"
+                                        : "REQUIRED"}
+                                    </span>
+                                    <span className="text-gray-500">
+                                      Type:{" "}
+                                      {doc.documentType
+                                        .replace(/_/g, " ")
+                                        .toUpperCase()}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                {doc.isSubmitted ? (
+                                  <div className="flex items-center space-x-2">
+                                    <button
+                                      onClick={() => {
+                                        const uploadedDoc = getUploadedDocument(
+                                          doc.documentType
+                                        );
+
+                                        if (uploadedDoc) {
+                                          handleViewDocument(
+                                            uploadedDoc._id,
+                                            uploadedDoc.title
+                                          );
+                                        } else {
+                                          toast.error(
+                                            "Document not found. Please try uploading again."
+                                          );
+                                        }
+                                      }}
+                                      disabled={
+                                        viewingDocumentId ===
+                                        getUploadedDocument(doc.documentType)
+                                          ?._id
+                                      }
+                                      className="px-4 py-2 rounded-lg transition-colors font-medium flex items-center space-x-2 bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      {viewingDocumentId ===
+                                      getUploadedDocument(doc.documentType)
+                                        ?._id ? (
+                                        <>
+                                          <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                                          <span>Opening...</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <EyeIcon className="w-4 h-4" />
+                                          <span>View Document</span>
+                                        </>
+                                      )}
+                                    </button>
+
+                                    {/* Replace Document Button - Only show if project is not approved */}
+                                    {!shouldDisableDocumentEditing(
+                                      selectedProjectForDocuments
+                                    ) && (
+                                      <button
+                                        onClick={() =>
+                                          startDocumentReplacement(
+                                            doc.documentType,
+                                            selectedProjectForDocuments
+                                          )
+                                        }
+                                        className="px-4 py-2 rounded-lg transition-colors font-medium flex items-center space-x-2 bg-blue-600 text-white hover:bg-blue-700"
+                                        title="Replace document"
+                                      >
+                                        <HiArrowUpTray className="w-4 h-4" />
+                                        <span>Replace</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  // Show Upload button for pending documents
+                                  <button
+                                    onClick={() => {
+                                      setShowDocumentsModal(false);
+                                      setSelectedProjectForDocument(
+                                        selectedProjectForDocuments
+                                      );
+
+                                      // Check if editing should be disabled
+                                      const isDisabled =
+                                        shouldDisableDocumentEditing(
+                                          selectedProjectForDocuments
+                                        );
+                                      setIsDocumentEditingDisabled(isDisabled);
+
+                                      setDocumentFormData({
+                                        title: `${doc.title} - ${selectedProjectForDocuments.name}`,
+                                        description: `${
+                                          doc.description
+                                        }\n\nProject: ${
+                                          selectedProjectForDocuments.name
+                                        }\nProject Code: ${
+                                          selectedProjectForDocuments.code
+                                        }\nCategory: ${
+                                          selectedProjectForDocuments.category
+                                        }\nBudget: ₦${
+                                          selectedProjectForDocuments.budget?.toLocaleString() ||
+                                          "N/A"
+                                        }`,
+                                        category: "Project Documentation",
+                                        documentType: doc.documentType,
+                                        priority: "High",
+                                        tags: `project-document,required,${selectedProjectForDocuments.code?.toLowerCase()},${
+                                          selectedProjectForDocuments.category
+                                        }`,
+                                        isConfidential: false,
+                                      });
+
+                                      setShowDocumentModal(true);
+                                      setIsInUploadMode(true);
+                                    }}
+                                    className={`px-4 py-2 rounded-lg transition-colors font-medium flex items-center space-x-2 ${
+                                      shouldDisableDocumentEditing(
+                                        selectedProjectForDocuments
+                                      )
+                                        ? "bg-gray-400 text-white cursor-not-allowed"
+                                        : "bg-[var(--elra-primary)] text-white hover:bg-[var(--elra-primary-dark)]"
+                                    }`}
+                                    disabled={shouldDisableDocumentEditing(
+                                      selectedProjectForDocuments
+                                    )}
+                                  >
+                                    <HiArrowUpTray className="w-4 h-4" />
+                                    <span>
+                                      {shouldDisableDocumentEditing(
+                                        selectedProjectForDocuments
+                                      )
+                                        ? `Upload ${
+                                            doc.title.split(" ")[0]
+                                          } (Disabled)`
+                                        : `Upload ${doc.title.split(" ")[0]}`}
+                                    </span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

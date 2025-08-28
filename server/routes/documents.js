@@ -1,6 +1,8 @@
 import express from "express";
 import {
   uploadDocument,
+  uploadProjectDocuments,
+  replaceProjectDocument,
   getAllDocuments,
   getMyDocuments,
   getDocumentById,
@@ -19,6 +21,7 @@ import {
   getPendingApprovalDocuments,
   getDocumentStats,
   processDocumentWithOCR,
+  viewDocument,
 } from "../controllers/documentController.js";
 import { protect } from "../middleware/auth.js";
 
@@ -32,6 +35,8 @@ router.get("/metadata", getDocumentMetadata);
 router.get("/stats", getDocumentStats);
 router.post("/ocr", processOCR);
 router.post("/upload", uploadDocument);
+router.post("/upload-project-documents", uploadProjectDocuments);
+router.post("/replace-project-document", replaceProjectDocument);
 router.get("/", getAllDocuments);
 router.get("/my-documents", getMyDocuments);
 router.get("/search", searchDocuments);
@@ -41,6 +46,7 @@ router.get("/search/suggestions", getSearchSuggestions);
 router.get("/pending-approval", getPendingApprovalDocuments);
 router.get("/project/:projectId", getProjectDocuments);
 router.get("/:id/similar", findSimilarDocuments);
+router.get("/:id/view", viewDocument);
 router.get("/:id", getDocumentById);
 
 router.post("/:id/approve", approveDocument);

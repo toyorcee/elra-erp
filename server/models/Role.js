@@ -22,7 +22,7 @@ const roleSchema = new mongoose.Schema(
         // New ERP roles
         "COMPANY_ADMIN",
         "HOD",
-        "HOD", // Head of Department
+        "HOD",
         "HR_MANAGER",
         "PAYROLL_MANAGER",
         "PROCUREMENT_MANAGER",
@@ -123,6 +123,7 @@ const roleSchema = new mongoose.Schema(
             "LEGAL",
             "EXECUTIVE",
             "SYSTEM_ADMIN",
+            "COMMUNICATION",
           ],
         },
         permissions: [String],

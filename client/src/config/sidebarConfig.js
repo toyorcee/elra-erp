@@ -62,7 +62,6 @@ export const sidebarConfig = [
     badge: "IT",
     departments: ["IT", "Information Technology", "Technology"], // IT departments only
   },
-
   {
     label: "Sales & Marketing",
     icon: "HiOutlineChartBar",
@@ -106,15 +105,6 @@ export const sidebarConfig = [
     ], // Finance and HR departments
   },
   {
-    label: "Document Management",
-    icon: "HiOutlineDocumentText",
-    path: "/dashboard/modules/documents",
-    required: { minLevel: 0 },
-    section: "erp",
-    badge: "Docs",
-    departments: ["all"], // Universal access
-  },
-  {
     label: "Procurement",
     icon: "HiOutlineShoppingCart",
     path: "/dashboard/modules/procurement",
@@ -126,14 +116,13 @@ export const sidebarConfig = [
       "Finance",
       "Procurement",
       "Supply Chain",
-      "Operations",
-    ], // Finance and operations departments
+    ], // Finance and procurement departments only
   },
   {
     label: "Project Management",
     icon: "HiOutlineFolder",
     path: "/dashboard/modules/projects",
-    required: { minLevel: 600 },
+    required: { minLevel: 300 },
     section: "erp",
     badge: "Proj",
     departments: ["all"], // Cross-functional - all departments can access
@@ -185,29 +174,6 @@ export const sidebarConfig = [
     path: "/admin/approval-levels",
     required: { minLevel: 1000 },
     section: "system",
-  },
-
-  // ===== DOCUMENT MANAGEMENT =====
-  {
-    label: "Documents",
-    icon: "HiOutlineDocumentText",
-    path: "/documents",
-    required: { minLevel: 300 },
-    section: "documents",
-  },
-  {
-    label: "Workflows",
-    icon: "HiOutlineClipboardCheck",
-    path: "/workflows",
-    required: { minLevel: 300 },
-    section: "documents",
-  },
-  {
-    label: "Document Archive",
-    icon: "HiOutlineArchiveBox",
-    path: "/documents/archive",
-    required: { minLevel: 600 },
-    section: "documents",
   },
 
   // ===== COMMUNICATION =====
@@ -275,14 +241,7 @@ export const roleConfig = {
   // SUPER_ADMIN (1000) - Full access to everything
   1000: {
     title: "Super Administrator",
-    sections: [
-      "main",
-      "erp",
-      "system",
-      "documents",
-      "communication",
-      "reports",
-    ],
+    sections: ["main", "erp", "system", "communication", "reports"],
     color: "text-red-600",
     bgColor: "bg-red-50",
     borderColor: "border-red-200",
@@ -291,14 +250,7 @@ export const roleConfig = {
   // HOD (700) - Head of Department
   700: {
     title: "Head of Department",
-    sections: [
-      "main",
-      "erp",
-      "system",
-      "documents",
-      "communication",
-      "reports",
-    ],
+    sections: ["main", "erp", "system", "communication", "reports"],
     color: "text-purple-600",
     bgColor: "bg-purple-50",
     borderColor: "border-purple-200",
@@ -307,7 +259,7 @@ export const roleConfig = {
   // MANAGER (600) - Manager
   600: {
     title: "Manager",
-    sections: ["main", "erp", "documents", "communication", "reports"],
+    sections: ["main", "erp", "communication", "reports"],
     color: "text-blue-600",
     bgColor: "bg-blue-50",
     borderColor: "border-blue-200",
@@ -316,7 +268,7 @@ export const roleConfig = {
   // STAFF (300) - Regular staff
   300: {
     title: "Staff",
-    sections: ["main", "erp", "documents", "communication"],
+    sections: ["main", "erp", "communication"],
     color: "text-gray-600",
     bgColor: "bg-gray-50",
     borderColor: "border-gray-200",
@@ -325,7 +277,7 @@ export const roleConfig = {
   // VIEWER (100) - Read-only access
   100: {
     title: "Viewer",
-    sections: ["main", "erp", "documents", "communication"],
+    sections: ["main", "erp", "communication"],
     color: "text-gray-500",
     bgColor: "bg-gray-25",
     borderColor: "border-gray-100",
@@ -341,7 +293,27 @@ export const getNavigationForRole = (
   const userRoleConfig = roleConfig[roleLevel] || roleConfig[300];
   const allowedSections = userRoleConfig.sections;
 
-  return sidebarConfig.filter((item) => {
+  // Define pathToModuleMap outside the filter function
+  const pathToModuleMap = {
+    "self-service": "SELF_SERVICE",
+    hr: "HR",
+    finance: "FINANCE",
+    it: "IT",
+    operations: "OPERATIONS",
+    sales: "SALES",
+    legal: "LEGAL",
+    "system-admin": "SYSTEM_ADMIN",
+    payroll: "PAYROLL",
+    procurement: "PROCUREMENT",
+    projects: "PROJECTS",
+    inventory: "INVENTORY",
+    "customer-care": "CUSTOMER_CARE",
+    communication: "COMMUNICATION",
+  };
+
+  // Debug logging removed for production
+
+  const result = sidebarConfig.filter((item) => {
     if (item.path === "/dashboard") {
       return true;
     }
@@ -350,28 +322,10 @@ export const getNavigationForRole = (
       const moduleKey = item.path.split("/").pop();
 
       const hasModuleAccess = userModuleAccess.some((access) => {
-        // Map path names to module codes
-        const pathToModuleMap = {
-          "self-service": "SELF_SERVICE",
-          hr: "HR_MANAGEMENT",
-          finance: "FINANCIAL_MANAGEMENT",
-          it: "IT_MANAGEMENT",
-          operations: "OPERATIONS_MANAGEMENT",
-          sales: "SALES_MARKETING",
-          legal: "LEGAL_COMPLIANCE",
-          "system-admin": "SYSTEM_ADMINISTRATION",
-          payroll: "PAYROLL_MANAGEMENT",
-          documents: "DOCUMENT_MANAGEMENT",
-          procurement: "PROCUREMENT",
-          projects: "PROJECT_MANAGEMENT",
-          inventory: "INVENTORY_MANAGEMENT",
-          "customer-care": "CUSTOMER_CARE",
-          communication: "COMMUNICATION",
-        };
-
         const expectedModuleCode = pathToModuleMap[moduleKey];
 
         const hasAccess = access.module === expectedModuleCode;
+
         return hasAccess;
       });
 
@@ -448,14 +402,7 @@ export const getRoleTitle = (roleLevel) => {
 
 // Helper function to get sections for a role
 export const getRoleSections = (roleLevel) => {
-  return (
-    roleConfig[roleLevel]?.sections || [
-      "main",
-      "erp",
-      "documents",
-      "communication",
-    ]
-  );
+  return roleConfig[roleLevel]?.sections || ["main", "erp", "communication"];
 };
 
 // Helper function to check if user has access to a specific section

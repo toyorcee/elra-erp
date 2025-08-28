@@ -13,10 +13,18 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ClockIcon as ClockSolid,
+  InformationCircleIcon,
+  ExclamationCircleIcon,
+  DocumentIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../../context/AuthContext";
-import { fetchPendingProjectApprovals } from "../../../../services/projectAPI.js";
+import {
+  fetchPendingProjectApprovals,
+  approveProject,
+  rejectProject,
+} from "../../../../services/projectAPI.js";
+import { getProjectDocuments } from "../../../../services/documents.js";
 import { formatCurrency } from "../../../../utils/formatters.js";
 import DataTable from "../../../../components/common/DataTable";
 
@@ -31,6 +39,19 @@ const ApprovalDashboard = () => {
     approved: 0,
     rejected: 0,
   });
+
+  // Approval confirmation modal states
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [approvalComments, setApprovalComments] = useState("");
+  const [rejectionComments, setRejectionComments] = useState("");
+  const [rejectionReason, setRejectionReason] = useState("");
+
+  // Document viewing states
+  const [showDocumentsModal, setShowDocumentsModal] = useState(false);
+  const [projectDocuments, setProjectDocuments] = useState({});
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
 
   useEffect(() => {
     loadPendingProjectApprovals();
@@ -63,23 +84,96 @@ const ApprovalDashboard = () => {
     }
   };
 
+  // Handle approval action with confirmation
+  const handleApprovalClick = (project) => {
+    setSelectedProject(project);
+    setApprovalComments("");
+    setShowApprovalModal(true);
+  };
+
+  const handleRejectionClick = (project) => {
+    setSelectedProject(project);
+    setRejectionComments("");
+    setRejectionReason("");
+    setShowRejectionModal(true);
+  };
+
+  const handleViewDocuments = async (project) => {
+    try {
+      setLoadingDocuments(true);
+      setSelectedProject(project);
+
+      const response = await getProjectDocuments(project._id);
+      if (response.success) {
+        setProjectDocuments((prev) => ({
+          ...prev,
+          [project._id]: response.data.documents,
+        }));
+        setShowDocumentsModal(true);
+      }
+    } catch (error) {
+      toast.error("Failed to load project documents");
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
   const handleApprovalAction = async (projectId, action, comments = "") => {
     setActionLoading((prev) => ({ ...prev, [projectId]: true }));
 
     try {
-      toast.success(
-        `Project ${action === "approve" ? "approved" : "rejected"} successfully`
+      const nextApprovalStep = selectedProject?.approvalChain?.find(
+        (step) => step.status === "pending"
       );
-      loadPendingProjectApprovals();
+
+      if (!nextApprovalStep) {
+        throw new Error("No pending approval step found");
+      }
+
+      const approvalData = {
+        level: nextApprovalStep.level,
+        comments: comments,
+        ...(action === "reject" && {
+          rejectionReason: comments.split(": ")[0],
+        }),
+      };
+
+      let response;
+      if (action === "approve") {
+        response = await approveProject(projectId, approvalData);
+      } else {
+        response = await rejectProject(projectId, approvalData);
+      }
+
+      if (response.success) {
+        toast.success(
+          `Project ${
+            action === "approve" ? "approved" : "rejected"
+          } successfully`
+        );
+        loadPendingProjectApprovals();
+
+        // Close modals
+        setShowApprovalModal(false);
+        setShowRejectionModal(false);
+        setSelectedProject(null);
+      } else {
+        if (response.data && response.data.missing) {
+          toast.error(
+            `Cannot approve project. ${response.data.missing} required document(s) still need to be submitted.`
+          );
+        } else {
+          throw new Error(response.message || `Failed to ${action} project`);
+        }
+      }
     } catch (error) {
       console.error(`Error ${action}ing project approval:`, error);
-      toast.error(`Error ${action}ing project approval`);
+      toast.error(error.message || `Error ${action}ing project approval`);
     } finally {
       setActionLoading((prev) => ({ ...prev, [projectId]: false }));
     }
   };
 
-  // Get current approval level display for project approval chain
   const getCurrentApprovalLevel = (project) => {
     if (!project.approvalChain || project.approvalChain.length === 0) {
       return "No approval chain";
@@ -353,8 +447,8 @@ const ApprovalDashboard = () => {
           Project Approval Dashboard
         </h1>
         <p className="text-gray-600">
-          View project approval status and take action if you are the next
-          approver in the chain
+          View project approval status, take action if you are the next
+          approver, and audit approved projects
         </p>
       </div>
 
@@ -424,7 +518,7 @@ const ApprovalDashboard = () => {
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-900">
-              Project Approval Requests
+              Project Approval Requests & Audit Trail
             </h2>
             <div className="flex items-center space-x-4">
               <div className="text-sm text-gray-500">
@@ -480,59 +574,121 @@ const ApprovalDashboard = () => {
                   (step) => step.status === "pending"
                 );
 
-                const isNextApprover =
-                  nextApprovalStep &&
-                  ((nextApprovalStep.level === "hod" &&
-                    currentUser.department?._id ===
-                      nextApprovalStep.department) ||
-                    (nextApprovalStep.level === "finance" &&
-                      currentUser.department?.name ===
-                        "Finance & Accounting") ||
-                    (nextApprovalStep.level === "executive" &&
-                      currentUser.department?.name === "Executive Office") ||
-                    currentUser.role.level >= 1000);
+                let isNextApprover = false;
+
+                if (nextApprovalStep) {
+                  if (currentUser.role.level >= 1000) {
+                    isNextApprover = true;
+                  } else if (nextApprovalStep.level === "hod") {
+                    isNextApprover =
+                      currentUser.role.level >= 700 &&
+                      currentUser.department?._id ===
+                        nextApprovalStep.department;
+                  } else if (nextApprovalStep.level === "finance") {
+                    isNextApprover =
+                      currentUser.role.level >= 700 &&
+                      currentUser.department?.name === "Finance & Accounting";
+                  } else if (nextApprovalStep.level === "executive") {
+                    isNextApprover =
+                      currentUser.role.level >= 700 &&
+                      currentUser.department?.name === "Executive Office";
+                  }
+                }
 
                 // Show actions only if:
-                // 1. Project is pending approval
+                // 1. Project is in any pending approval status
                 // 2. User is NOT the project creator (can't approve own project)
                 // 3. User IS the next approver in the chain
+                const isPendingApproval = [
+                  "pending_approval",
+                  "pending_finance_approval",
+                  "pending_executive_approval",
+                ].includes(project.status);
+
+                const isApproved = ["approved", "implementation"].includes(
+                  project.status
+                );
+
                 const canShowActions =
                   progress.percentage < 100 &&
-                  project.status === "pending_approval" &&
+                  isPendingApproval &&
                   !isProjectCreator &&
                   isNextApprover;
 
+                // Get document status for this project
+                const docStatus = getDocumentStatus(project);
+
                 return (
                   <div className="flex items-center space-x-2">
-                    {canShowActions ? (
+                    {/* View Documents Button - Always visible */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleViewDocuments(project);
+                      }}
+                      disabled={loadingDocuments}
+                      className="inline-flex items-center justify-center w-8 h-8 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                      title="View Project Documents"
+                    >
+                      {loadingDocuments ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <DocumentIcon className="h-4 w-4" />
+                      )}
+                    </button>
+
+                    {canShowActions &&
+                    docStatus.submitted === docStatus.total ? (
                       <>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleApprovalAction(project._id, "approve");
+                            handleApprovalClick(project);
                           }}
                           disabled={actionLoading[project._id]}
-                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 transition-colors"
+                          className="inline-flex items-center justify-center w-8 h-8 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 transition-colors"
+                          title="Approve Project"
                         >
-                          <CheckIcon className="h-4 w-4 mr-1" />
-                          {actionLoading[project._id]
-                            ? "Processing..."
-                            : "Approve"}
+                          {actionLoading[project._id] ? (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <CheckIcon className="h-4 w-4" />
+                          )}
                         </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleApprovalAction(project._id, "reject");
+                            handleRejectionClick(project);
                           }}
                           disabled={actionLoading[project._id]}
-                          className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 transition-colors"
+                          className="inline-flex items-center justify-center w-8 h-8 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 transition-colors"
+                          title="Reject Project"
                         >
-                          <XMarkIcon className="h-4 w-4 mr-1" />
-                          {actionLoading[project._id]
-                            ? "Processing..."
-                            : "Reject"}
+                          {actionLoading[project._id] ? (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <XMarkIcon className="h-4 w-4" />
+                          )}
                         </button>
                       </>
+                    ) : canShowActions &&
+                      docStatus.submitted < docStatus.total ? (
+                      <span
+                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800"
+                        title={`${
+                          docStatus.total - docStatus.submitted
+                        } document(s) still need to be submitted before approval`}
+                      >
+                        <ClockIcon className="h-3 w-3 mr-1" />
+                        Waiting for Docs
+                      </span>
+                    ) : isApproved ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <CheckCircleIcon className="h-4 w-4 mr-1" />
+                        {project.status === "implementation"
+                          ? "In Implementation"
+                          : "Approved"}
+                      </span>
                     ) : progress.percentage === 100 ? (
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                         <CheckCircleIcon className="h-4 w-4 mr-1" />
@@ -555,11 +711,479 @@ const ApprovalDashboard = () => {
             }}
             emptyState={{
               icon: <DocumentTextIcon className="h-12 w-12 text-gray-400" />,
-              title: "No project approval requests found",
+              title: "No projects found",
               description:
-                "No project approval requests match your current filters",
+                "No projects (pending or approved) match your current filters",
             }}
           />
+        )}
+
+        {/* Approval Confirmation Modal */}
+        {showApprovalModal && selectedProject && (
+          <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center p-4 z-50 animate-fade-in">
+            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto transition-all duration-300">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-gray-900">
+                    ELRA Project Authorization
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowApprovalModal(false);
+                      setSelectedProject(null);
+                      setApprovalComments("");
+                    }}
+                    disabled={actionLoading[selectedProject._id]}
+                    className="p-1 text-gray-400 hover:text-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <XMarkIcon className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Project Information Section */}
+                <div className="bg-white border border-gray-200 p-4 rounded-lg shadow-sm">
+                  <div className="flex">
+                    <InformationCircleIcon className="h-5 w-5 text-[var(--elra-primary)] mr-3 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm text-[var(--elra-primary)] font-medium mb-3">
+                        Project Information
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="font-medium text-gray-700">
+                            Project:
+                          </span>
+                          <p className="text-gray-600 break-words">
+                            {selectedProject.name}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">
+                            Budget:
+                          </span>
+                          <p className="text-gray-600">
+                            {formatCurrency(selectedProject.budget)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">
+                            Department:
+                          </span>
+                          <p className="text-gray-600">
+                            {selectedProject.department?.name}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">
+                            Submitted By:
+                          </span>
+                          <p className="text-gray-600">
+                            {selectedProject.createdBy?.firstName}{" "}
+                            {selectedProject.createdBy?.lastName}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Authorization Level */}
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">
+                    Authorization Level
+                  </h4>
+                  <p className="text-sm text-gray-600">
+                    You are authorizing this project at the{" "}
+                    <strong className="text-[var(--elra-primary)]">
+                      {getCurrentApprovalLevel(selectedProject)}
+                    </strong>{" "}
+                    level.
+                  </p>
+                </div>
+
+                {/* Authorization Checklist */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Authorization Checklist
+                  </label>
+                  <div className="mb-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                    <p className="text-sm text-green-800">
+                      <strong>Please confirm the following:</strong>
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {[
+                      "Project scope and objectives are clearly defined",
+                      "Budget allocation is justified and within limits",
+                      "Resource requirements are adequately specified",
+                      "Timeline and deliverables are realistic",
+                      "Risk assessment has been conducted",
+                    ].map((item, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center space-x-3 p-2 bg-gray-50 rounded-md"
+                      >
+                        <CheckIcon className="h-4 w-4 text-green-500 flex-shrink-0" />
+                        <span className="text-sm text-gray-700">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Authorization Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Authorization Notes
+                  </label>
+                  <textarea
+                    value={approvalComments}
+                    onChange={(e) => setApprovalComments(e.target.value)}
+                    placeholder="Add any additional notes or comments for this authorization..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                    rows="3"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    <strong>Note:</strong> These notes will be recorded with
+                    your authorization.
+                  </p>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowApprovalModal(false);
+                      setSelectedProject(null);
+                      setApprovalComments("");
+                    }}
+                    disabled={actionLoading[selectedProject._id]}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() =>
+                      handleApprovalAction(
+                        selectedProject._id,
+                        "approve",
+                        approvalComments
+                      )
+                    }
+                    disabled={actionLoading[selectedProject._id]}
+                    className="px-4 py-2 text-sm font-medium text-white bg-[var(--elra-primary)] rounded-md hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 cursor-pointer"
+                  >
+                    {actionLoading[selectedProject._id] ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin cursor-pointer"></div>
+                        <span>Processing...</span>
+                      </>
+                    ) : (
+                      "Authorize Project"
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Rejection Confirmation Modal */}
+        {showRejectionModal && selectedProject && (
+          <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center p-4 z-50 animate-fade-in">
+            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto transition-all duration-300">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-gray-900">
+                    ELRA Project Review - Revision Required
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowRejectionModal(false);
+                      setSelectedProject(null);
+                      setRejectionComments("");
+                      setRejectionReason("");
+                    }}
+                    disabled={actionLoading[selectedProject._id]}
+                    className="p-1 text-gray-400 hover:text-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <XMarkIcon className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Project Information Section */}
+                  <div className="bg-white border border-gray-200 p-4 rounded-lg shadow-sm">
+                    <div className="flex">
+                      <ExclamationCircleIcon className="h-5 w-5 text-[var(--elra-primary)] mr-3 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm text-[var(--elra-primary)] font-medium mb-3">
+                          Project Under Review
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Project:
+                            </span>
+                            <p className="text-gray-600 break-words">
+                              {selectedProject.name}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Budget:
+                            </span>
+                            <p className="text-gray-600">
+                              {formatCurrency(selectedProject.budget)}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Department:
+                            </span>
+                            <p className="text-gray-600">
+                              {selectedProject.department?.name}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Submitted By:
+                            </span>
+                            <p className="text-gray-600">
+                              {selectedProject.createdBy?.firstName}{" "}
+                              {selectedProject.createdBy?.lastName}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Revision Level */}
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">
+                      Revision Level
+                    </h4>
+                    <p className="text-sm text-gray-600">
+                      This project requires revision at the{" "}
+                      <strong className="text-[var(--elra-primary)]">
+                        {getCurrentApprovalLevel(selectedProject)}
+                      </strong>{" "}
+                      level.
+                    </p>
+                  </div>
+
+                  {/* Warning Section */}
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="flex">
+                      <ExclamationCircleIcon className="h-5 w-5 text-red-500 mr-3 mt-0.5" />
+                      <div>
+                        <p className="text-sm text-red-700 font-medium mb-1">
+                          Important Notice
+                        </p>
+                        <p className="text-sm text-red-600">
+                          This action will halt the approval process and require
+                          the project to be resubmitted with necessary
+                          revisions.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Revision Category */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Revision Category <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={rejectionReason}
+                      onChange={(e) => setRejectionReason(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                      required
+                    >
+                      <option value="">Select revision category</option>
+                      <option value="budget_issues">
+                        Budget & Financial Concerns
+                      </option>
+                      <option value="scope_concerns">
+                        Scope & Objectives Issues
+                      </option>
+                      <option value="documentation_incomplete">
+                        Documentation & Specifications
+                      </option>
+                      <option value="resource_constraints">
+                        Resource & Capacity Issues
+                      </option>
+                      <option value="timeline_issues">
+                        Timeline & Schedule Concerns
+                      </option>
+                      <option value="compliance_concerns">
+                        Compliance & Regulatory Issues
+                      </option>
+                      <option value="other">Other Requirements</option>
+                    </select>
+                  </div>
+
+                  {/* Revision Requirements */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Revision Requirements{" "}
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={rejectionComments}
+                      onChange={(e) => setRejectionComments(e.target.value)}
+                      placeholder="Please provide specific requirements for revision, including what needs to be addressed and any recommendations..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                      rows="4"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      <strong>Note:</strong> These requirements will be sent to
+                      the project creator for revision.
+                    </p>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowRejectionModal(false);
+                        setSelectedProject(null);
+                        setRejectionComments("");
+                        setRejectionReason("");
+                      }}
+                      disabled={actionLoading[selectedProject._id]}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() =>
+                        handleApprovalAction(
+                          selectedProject._id,
+                          "reject",
+                          `${rejectionReason}: ${rejectionComments}`
+                        )
+                      }
+                      disabled={
+                        actionLoading[selectedProject._id] ||
+                        !rejectionReason ||
+                        !rejectionComments.trim()
+                      }
+                      className="px-4 py-2 text-sm font-medium text-white bg-[var(--elra-primary)] rounded-md hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 cursor-pointer"
+                    >
+                      {actionLoading[selectedProject._id] ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin cursor-pointer"></div>
+                          <span>Processing...</span>
+                        </>
+                      ) : (
+                        "Request Revision"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Documents Modal */}
+        {showDocumentsModal && selectedProject && (
+          <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-gray-900">
+                    Project Documents - {selectedProject.name}
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowDocumentsModal(false);
+                      setSelectedProject(null);
+                    }}
+                    className="p-1 text-gray-400 hover:text-gray-600 rounded"
+                  >
+                    <XMarkIcon className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {loadingDocuments ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--elra-primary)]"></div>
+                    <span className="ml-2 text-gray-600">
+                      Loading documents...
+                    </span>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {projectDocuments[selectedProject._id]?.length > 0 ? (
+                      projectDocuments[selectedProject._id].map(
+                        (doc, index) => (
+                          <div
+                            key={index}
+                            className="bg-gray-50 border border-gray-200 rounded-lg p-4"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                                  <DocumentIcon className="w-5 h-5 text-green-600" />
+                                </div>
+                                <div>
+                                  <h5 className="font-medium text-gray-900">
+                                    {doc.title}
+                                  </h5>
+                                  <p className="text-sm text-gray-600">
+                                    {doc.documentType} • {doc.fileName}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    Uploaded:{" "}
+                                    {new Date(
+                                      doc.createdAt
+                                    ).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  ✓ Uploaded
+                                </span>
+                                <button
+                                  onClick={() => {
+                                    const url = `${
+                                      import.meta.env.VITE_API_URL
+                                    }/documents/${doc._id}/view`;
+                                    window.open(url, "_blank");
+                                  }}
+                                  className="inline-flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                                  title="View Document"
+                                >
+                                  <EyeIcon className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      )
+                    ) : (
+                      <div className="text-center py-8">
+                        <DocumentIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                          No documents uploaded yet
+                        </h3>
+                        <p className="text-gray-600">
+                          The project creator has not uploaded any documents for
+                          this project.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

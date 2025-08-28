@@ -1,26 +1,32 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../../context/AuthContext";
+import { toast } from "react-toastify";
 import {
-  HiOutlineClipboardCheck,
+  completeInventory,
+  getProjectsNeedingInventory,
+} from "../../../../services/projectAPI";
+import { getProjectInventoryWorkflow } from "../../../../services/inventoryAPI";
+import DataTable from "../../../../components/common/DataTable";
+import {
   HiOutlineCube,
-  HiOutlineCheckCircle,
-  HiOutlineClock,
-  HiOutlineExclamation,
-  HiOutlineDocumentText,
-  HiOutlineQrcode,
-  HiOutlineChartBar,
+  HiOutlineCheck,
+  HiOutlineEye,
+  HiOutlineFolder,
 } from "react-icons/hi";
 
 const InventoryManagement = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const [workflowTasks, setWorkflowTasks] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("workflow");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showWorkflowModal, setShowWorkflowModal] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
 
-  // Access control - only Manager+ can access
-  if (!user || user.role.level < 600) {
+  if (
+    !user ||
+    user.role.level < 700 ||
+    user.department?.name !== "Operations"
+  ) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -28,321 +34,459 @@ const InventoryManagement = () => {
             Access Denied
           </h2>
           <p className="text-gray-600">
-            You don't have permission to access Inventory Management.
+            Only Operations HOD can access Inventory Management.
           </p>
         </div>
       </div>
     );
   }
 
-  // Check if user is from Operations department
-  const isOperationsDept = user.department?.name === "Operations";
-
   useEffect(() => {
-    if (isOperationsDept) {
-      fetchWorkflowTasks();
-    } else {
-      // For non-Operations departments, redirect to inventory list
-      navigate("/dashboard/modules/inventory/list", { replace: true });
-    }
-  }, [isOperationsDept, navigate]);
+    fetchProjects();
+  }, []);
 
-  const fetchWorkflowTasks = async () => {
+  const fetchProjects = async () => {
     try {
-      const response = await fetch("/api/workflow-tasks/operations", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
+      setLoading(true);
+      const response = await getProjectsNeedingInventory();
 
-      if (response.ok) {
-        const data = await response.json();
-        setWorkflowTasks(data.tasks || []);
+      if (response.success && response.data) {
+        setProjects(response.data);
+      } else {
+        setProjects([]);
       }
     } catch (error) {
-      console.error("Error fetching workflow tasks:", error);
+      console.error("Error fetching projects:", error);
+      toast.error("Failed to fetch projects");
+      setProjects([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleTaskComplete = async (taskId) => {
+  const handleCompleteInventory = async (projectId) => {
     try {
-      const response = await fetch(`/api/workflow-tasks/${taskId}/complete`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (response.ok) {
-        // Refresh tasks
-        fetchWorkflowTasks();
+      const response = await completeInventory(projectId);
+      if (response.success) {
+        toast.success("Inventory completed successfully!");
+        fetchProjects(); // Refresh the list
       }
     } catch (error) {
-      console.error("Error completing task:", error);
+      console.error("Error completing inventory:", error);
+      toast.error("Failed to complete inventory");
     }
   };
 
-  const getPriorityIcon = (priority) => {
-    switch (priority) {
-      case "high":
-        return <HiOutlineExclamation className="text-red-500" />;
-      case "medium":
-        return <HiOutlineClock className="text-yellow-500" />;
-      case "low":
-        return <HiOutlineCheckCircle className="text-green-500" />;
-      default:
-        return <HiOutlineClock className="text-gray-500" />;
+  const handleViewWorkflow = async (project) => {
+    try {
+      const workflowData = await getProjectInventoryWorkflow(project._id);
+      setSelectedProject({
+        ...project,
+        workflowData: workflowData.data,
+      });
+      setShowWorkflowModal(true);
+    } catch (error) {
+      console.error("Error fetching workflow:", error);
+      setSelectedProject(project);
+      setShowWorkflowModal(true);
     }
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "completed":
-        return "bg-green-100 text-green-800";
-      case "in_progress":
-        return "bg-blue-100 text-blue-800";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+  // Check if all inventory tasks are completed
+  const canCompleteInventory = (project) => {
+    // Only show complete button if:
+    // 1. Inventory is created but not completed
+    // 2. All required steps are done (equipment added, budget allocated, etc.)
+    // For now, we'll be more restrictive - only show if user has actually done the work
+    return false; // Temporarily disable to prevent accidental completion
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--elra-primary)]"></div>
-      </div>
-    );
-  }
+  // Table columns configuration
+  const columns = [
+    {
+      header: "Project Code",
+      accessor: "code",
+      renderer: (project) => (
+        <div className="flex items-center">
+          <HiOutlineFolder className="h-5 w-5 text-[var(--elra-primary)] mr-2" />
+          <span className="font-medium text-gray-900">{project.code}</span>
+        </div>
+      ),
+    },
+    {
+      header: "Project Name",
+      accessor: "name",
+      renderer: (project) => (
+        <div>
+          <div className="font-medium text-gray-900">{project.name}</div>
+          <div className="text-sm text-gray-500">
+            {project.category.replace("_", " ")}
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: "Department",
+      accessor: "department",
+      renderer: (project) => (
+        <span className="text-gray-900">
+          {project.department?.name || "N/A"}
+        </span>
+      ),
+    },
+    {
+      header: "Budget",
+      accessor: "budget",
+      renderer: (project) => (
+        <span className="font-medium text-gray-900">
+          ₦{project.budget?.toLocaleString() || "0"}
+        </span>
+      ),
+    },
+    {
+      header: "Inventory Status",
+      accessor: "inventoryStatus",
+      renderer: (project) => (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-600">Created:</span>
+            <span
+              className={`text-sm ${
+                project.inventoryCreated ? "text-green-600" : "text-red-600"
+              }`}
+            >
+              {project.inventoryCreated ? "✅" : "❌"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-600">Completed:</span>
+            <span
+              className={`text-sm ${
+                project.inventoryCompleted ? "text-green-600" : "text-red-600"
+              }`}
+            >
+              {project.inventoryCompleted ? "✅" : "❌"}
+            </span>
+          </div>
+        </div>
+      ),
+    },
+  ];
 
-  if (!isOperationsDept) {
-    return null; // Will redirect
-  }
+  // Filter projects based on search term
+  const filteredProjects = projects.filter(
+    (project) =>
+      project.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      project.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      project.department?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Operations Dashboard
+          Inventory Management
         </h1>
         <p className="text-gray-600">
-          Manage inventory creation and workflow tasks for approved projects
+          Manage inventory setup for approved projects
         </p>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="-mb-px flex space-x-8">
-          <button
-            onClick={() => setActiveTab("workflow")}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === "workflow"
-                ? "border-[var(--elra-primary)] text-[var(--elra-primary)]"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            }`}
-          >
-            <HiOutlineClipboardCheck className="inline mr-2" />
-            Workflow Tasks
-          </button>
-          <button
-            onClick={() => setActiveTab("inventory")}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-              activeTab === "inventory"
-                ? "border-[var(--elra-primary)] text-[var(--elra-primary)]"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            }`}
-          >
-            <HiOutlineCube className="inline mr-2" />
-            Inventory Management
-          </button>
-        </nav>
+      {/* Search and Filters */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+        <div className="flex items-center space-x-4">
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="Search projects by name, code, or department..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Workflow Tasks Tab */}
-      {activeTab === "workflow" && (
-        <div>
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              Pending Workflow Tasks
-            </h2>
-            <p className="text-gray-600">
-              Complete these tasks to proceed with inventory creation for
-              approved projects
-            </p>
-          </div>
-
-          {workflowTasks.length === 0 ? (
-            <div className="text-center py-12">
-              <HiOutlineCheckCircle className="mx-auto h-12 w-12 text-green-500 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No Pending Tasks
-              </h3>
-              <p className="text-gray-600">
-                All workflow tasks are completed. You can manage inventory items
-                below.
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {workflowTasks.map((task) => (
-                <div
-                  key={task._id}
-                  className="bg-white rounded-lg shadow-md border border-gray-200 p-6"
+      {/* Projects Table */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <DataTable
+          data={filteredProjects}
+          columns={columns}
+          loading={loading}
+          actions={{
+            showEdit: false,
+            showDelete: false,
+            showToggle: false,
+            customActions: (project) => (
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleViewWorkflow(project)}
+                  className="p-2 text-[var(--elra-primary)] hover:bg-[var(--elra-primary)] hover:text-white rounded-lg transition-colors"
+                  title="View Inventory Workflow"
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center">
-                      {getPriorityIcon(task.priority)}
-                      <span className="ml-2 text-sm font-medium text-gray-900">
-                        {task.title}
-                      </span>
+                  <HiOutlineEye className="w-4 h-4" />
+                </button>
+                {canCompleteInventory(project) && (
+                  <button
+                    onClick={() => handleCompleteInventory(project._id)}
+                    className="p-2 text-green-600 hover:bg-green-600 hover:text-white rounded-lg transition-colors"
+                    title="Complete Inventory"
+                  >
+                    <HiOutlineCheck className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            ),
+          }}
+          emptyState={{
+            icon: <HiOutlineCube className="h-12 w-12 text-gray-400" />,
+            title: "No projects requiring inventory setup",
+            description:
+              "Projects will appear here once they are approved and enter the implementation phase.",
+          }}
+        />
+      </div>
+
+      {/* Inventory Workflow Modal */}
+      {showWorkflowModal && selectedProject && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Inventory Workflow
+                </h2>
+                <p className="text-gray-600 mt-1">
+                  {selectedProject.code} - {selectedProject.name}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowWorkflowModal(false);
+                  setSelectedProject(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              <div className="space-y-6">
+                {/* Project Overview */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                    Project Overview
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Budget</p>
+                      <p className="text-xl font-bold text-gray-900">
+                        ₦{selectedProject.budget?.toLocaleString()}
+                      </p>
                     </div>
-                    <span
-                      className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
-                        task.status
-                      )}`}
-                    >
-                      {task.status.replace("_", " ")}
-                    </span>
+                    <div>
+                      <p className="text-sm text-gray-600">Category</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {selectedProject.category?.replace("_", " ")}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Department</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {selectedProject.department?.name}
+                      </p>
+                    </div>
                   </div>
-
-                  <p className="text-gray-600 text-sm mb-4">
-                    {task.description}
-                  </p>
-
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium text-gray-900 mb-2">
-                      Action Items:
-                    </h4>
-                    <ul className="space-y-1">
-                      {task.actionItems?.map((item, index) => (
-                        <li
-                          key={index}
-                          className="text-sm text-gray-600 flex items-center"
-                        >
-                          <HiOutlineCheckCircle className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                    <span>
-                      Due: {new Date(task.dueDate).toLocaleDateString()}
-                    </span>
-                    <span>{task.estimatedHours}h estimated</span>
-                  </div>
-
-                  {task.status === "pending" && (
-                    <button
-                      onClick={() => handleTaskComplete(task._id)}
-                      className="w-full bg-[var(--elra-primary)] text-white py-2 px-4 rounded-md hover:bg-[var(--elra-primary-dark)] transition-colors"
-                    >
-                      Start Task
-                    </button>
-                  )}
-
-                  {task.status === "in_progress" && (
-                    <button
-                      onClick={() => handleTaskComplete(task._id)}
-                      className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors"
-                    >
-                      Complete Task
-                    </button>
-                  )}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* Inventory Management Tab */}
-      {activeTab === "inventory" && (
-        <div>
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              Inventory Management
-            </h2>
-            <p className="text-gray-600">
-              Manage inventory items, create equipment records, and track assets
-            </p>
-          </div>
+                {/* Inventory Steps */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Inventory Setup Steps
+                  </h3>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {/* Core Workflow Task 1: Create Equipment Inventory Records */}
-            <div
-              onClick={() => navigate("/dashboard/modules/inventory/list")}
-              className="bg-white rounded-lg shadow-md border border-gray-200 p-6 cursor-pointer hover:shadow-lg transition-shadow"
-            >
-              <HiOutlineCube className="h-8 w-8 text-[var(--elra-primary)] mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Equipment Inventory
-              </h3>
-              <p className="text-gray-600 text-sm">
-                Create and manage equipment inventory records
-              </p>
-            </div>
+                  {/* Step 1 */}
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-[var(--elra-primary)] text-white rounded-full flex items-center justify-center font-semibold mr-3">
+                          1
+                        </div>
+                        <span className="font-medium">
+                          Review Project Requirements
+                        </span>
+                      </div>
+                      <span className="text-green-600">✅ Complete</span>
+                    </div>
+                  </div>
 
-            {/* Core Workflow Task 3: Set Up Asset Tracking System */}
-            <div
-              onClick={() => navigate("/dashboard/modules/inventory/assets")}
-              className="bg-white rounded-lg shadow-md border border-gray-200 p-6 cursor-pointer hover:shadow-lg transition-shadow"
-            >
-              <HiOutlineQrcode className="h-8 w-8 text-green-500 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Asset Tracking
-              </h3>
-              <p className="text-gray-600 text-sm">
-                Configure tracking and monitoring systems
-              </p>
-            </div>
+                  {/* Step 2 */}
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center font-semibold mr-3">
+                          2
+                        </div>
+                        <span className="font-medium">
+                          Create Equipment Inventory
+                        </span>
+                      </div>
+                      <button className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-md hover:bg-[var(--elra-primary-dark)] transition-colors">
+                        Add Equipment
+                      </button>
+                    </div>
 
-            {/* Supporting Features */}
-            <div
-              onClick={() => navigate("/dashboard/modules/inventory/available")}
-              className="bg-white rounded-lg shadow-md border border-gray-200 p-6 cursor-pointer hover:shadow-lg transition-shadow"
-            >
-              <HiOutlineCheckCircle className="h-8 w-8 text-green-500 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Available Items
-              </h3>
-              <p className="text-gray-600 text-sm">
-                Check available inventory items
-              </p>
-            </div>
+                    {/* Equipment Requirements List */}
+                    {selectedProject.equipmentRequirements &&
+                    selectedProject.equipmentRequirements.length > 0 ? (
+                      <div className="mt-4 space-y-3">
+                        <h4 className="text-sm font-medium text-gray-900">
+                          Required Equipment:
+                        </h4>
+                        {selectedProject.equipmentRequirements.map(
+                          (equipment, index) => (
+                            <div
+                              key={index}
+                              className="bg-gray-50 rounded-lg p-3"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="font-medium text-gray-900">
+                                      {equipment.name}
+                                    </span>
+                                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                                      {equipment.category.replace(/_/g, " ")}
+                                    </span>
+                                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                                      Qty: {equipment.quantity}
+                                    </span>
+                                  </div>
+                                  {equipment.description && (
+                                    <p className="text-sm text-gray-600 mt-1">
+                                      {equipment.description}
+                                    </p>
+                                  )}
+                                  {equipment.estimatedCost > 0 && (
+                                    <p className="text-sm text-gray-600">
+                                      Estimated Cost: ₦
+                                      {equipment.estimatedCost.toLocaleString()}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <span
+                                    className={`text-xs px-2 py-1 rounded-full ${
+                                      equipment.priority === "critical"
+                                        ? "bg-red-100 text-red-800"
+                                        : equipment.priority === "high"
+                                        ? "bg-orange-100 text-orange-800"
+                                        : equipment.priority === "medium"
+                                        ? "bg-yellow-100 text-yellow-800"
+                                        : "bg-gray-100 text-gray-800"
+                                    }`}
+                                  >
+                                    {equipment.priority}
+                                  </span>
+                                  {equipment.isRequired && (
+                                    <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">
+                                      Required
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-4 text-center py-4 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-600">
+                          No equipment requirements specified for this project
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Equipment requirements should be added during project
+                          creation
+                        </p>
+                      </div>
+                    )}
+                  </div>
 
-            <div
-              onClick={() =>
-                navigate("/dashboard/modules/inventory/maintenance")
-              }
-              className="bg-white rounded-lg shadow-md border border-gray-200 p-6 cursor-pointer hover:shadow-lg transition-shadow"
-            >
-              <HiOutlineClock className="h-8 w-8 text-yellow-500 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Maintenance Schedule
-              </h3>
-              <p className="text-gray-600 text-sm">
-                Manage equipment maintenance schedules
-              </p>
-            </div>
+                  {/* Step 3 */}
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center font-semibold mr-3">
+                          3
+                        </div>
+                        <span className="font-medium">Allocate Budget</span>
+                      </div>
+                      <button
+                        className="px-4 py-2 bg-gray-300 text-gray-500 rounded-md cursor-not-allowed"
+                        disabled
+                      >
+                        Pending
+                      </button>
+                    </div>
+                  </div>
 
-            <div
-              onClick={() => navigate("/dashboard/modules/inventory/reports")}
-              className="bg-white rounded-lg shadow-md border border-gray-200 p-6 cursor-pointer hover:shadow-lg transition-shadow"
-            >
-              <HiOutlineChartBar className="h-8 w-8 text-purple-500 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Reports
-              </h3>
-              <p className="text-gray-600 text-sm">
-                View inventory reports and analytics
-              </p>
+                  {/* Step 4 */}
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center font-semibold mr-3">
+                          4
+                        </div>
+                        <span className="font-medium">
+                          Setup Asset Tracking
+                        </span>
+                      </div>
+                      <button
+                        className="px-4 py-2 bg-gray-300 text-gray-500 rounded-md cursor-not-allowed"
+                        disabled
+                      >
+                        Pending
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Step 5 */}
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center font-semibold mr-3">
+                          5
+                        </div>
+                        <span className="font-medium">
+                          Complete Inventory Phase
+                        </span>
+                      </div>
+                      <button
+                        className="px-4 py-2 bg-gray-300 text-gray-500 rounded-md cursor-not-allowed"
+                        disabled
+                      >
+                        Pending
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

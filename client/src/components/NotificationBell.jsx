@@ -22,12 +22,11 @@ const NotificationBell = ({ className = "" }) => {
   } = useQuery({
     queryKey: ["unreadNotifications"],
     queryFn: notificationService.getUnreadCount,
-    refetchInterval: 30000,
+    refetchInterval: 10000,
   });
 
   const unreadCount = unreadData?.data?.count || 0;
 
-  // Fetch notifications when dropdown is opened
   const {
     data: notificationsData,
     isLoading: notificationsLoading,
@@ -35,7 +34,8 @@ const NotificationBell = ({ className = "" }) => {
   } = useQuery({
     queryKey: ["notifications"],
     queryFn: () => notificationService.getNotifications(1, 10),
-    enabled: isOpen,
+    enabled: isOpen || unreadCount > 0,
+    refetchInterval: isOpen ? 5000 : 15000,
   });
 
   useEffect(() => {
@@ -43,6 +43,12 @@ const NotificationBell = ({ className = "" }) => {
       setNotifications(notificationsData.data);
     }
   }, [notificationsData]);
+
+  useEffect(() => {
+    if (unreadCount > 0 && !isOpen) {
+      refetchNotifications();
+    }
+  }, [unreadCount, isOpen, refetchNotifications]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -62,6 +68,15 @@ const NotificationBell = ({ className = "" }) => {
       console.log("🔔 Real-time notification received:", notification);
       setNotifications((prev) => [notification, ...prev]);
       refetchUnread();
+      refetchNotifications(); 
+
+      const bell = document.querySelector('[title="Notifications"]');
+      if (bell) {
+        bell.classList.add("animate-bounce");
+        setTimeout(() => {
+          bell.classList.remove("animate-bounce");
+        }, 1000);
+      }
 
       toast.info(notification.message, {
         position: "top-right",
@@ -78,7 +93,12 @@ const NotificationBell = ({ className = "" }) => {
     return () => {
       socket.off("newNotification", handleNewNotification);
     };
-  }, [socket, isConnected, refetchUnread]);
+  }, [socket, isConnected, refetchUnread, refetchNotifications]);
+
+  const handleRefreshNotifications = () => {
+    refetchUnread();
+    refetchNotifications();
+  };
 
   const handleMarkAsRead = async (notificationId) => {
     try {
@@ -210,7 +230,13 @@ const NotificationBell = ({ className = "" }) => {
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen(!isOpen);
+          if (!isOpen) {
+            // Trigger immediate fetch when opening
+            refetchNotifications();
+          }
+        }}
         className="p-2 rounded-xl text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] transition-all duration-200 hover:scale-105 relative cursor-pointer"
         title="Notifications"
       >
@@ -235,6 +261,30 @@ const NotificationBell = ({ className = "" }) => {
                 Notifications
               </h3>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRefreshNotifications();
+                  }}
+                  disabled={loading}
+                  className="flex items-center gap-1 text-xs text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  title="Refresh notifications"
+                >
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  {loading ? "Refreshing..." : "Refresh"}
+                </button>
                 {unreadCount > 0 && (
                   <button
                     onClick={(e) => {

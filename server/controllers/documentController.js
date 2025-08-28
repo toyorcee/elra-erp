@@ -1,19 +1,207 @@
+import mongoose from "mongoose";
 import Document from "../models/Document.js";
 import User from "../models/User.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import {
   upload,
   formatFileSize,
   getFileExtension,
 } from "../utils/fileUtils.js";
+import { uploadMultipleDocuments } from "../middleware/upload.js";
 import {
   createDocumentMetadata,
   getDocumentType,
   generateDocRef,
 } from "../utils/documentUtils.js";
 import { hasPermission } from "../utils/permissionUtils.js";
+
+// Upload multiple documents for project creation
+export const uploadProjectDocuments = async (req, res) => {
+  console.log(
+    "🚀 [documentController] Starting multiple document upload for project creation"
+  );
+  console.log("👤 [documentController] User:", {
+    id: req.user._id,
+    username: req.user.username,
+    role: req.user.role?.name,
+    permissions: req.user.role?.permissions,
+  });
+
+  try {
+    const currentUser = req.user;
+
+    // Check if user has permission to upload documents
+    if (!hasPermission(currentUser, "document.upload")) {
+      console.log(
+        "❌ [documentController] Permission denied for document upload"
+      );
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to upload documents",
+      });
+    }
+
+    console.log("✅ [documentController] User has upload permission");
+
+    // Use multer upload middleware for multiple files
+    uploadMultipleDocuments(req, res, async (err) => {
+      if (err) {
+        return res.status(400).json({
+          success: false,
+          message: err.message,
+        });
+      }
+
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No files uploaded",
+        });
+      }
+
+      const { projectId, projectName } = req.body;
+
+      if (!projectId) {
+        return res.status(400).json({
+          success: false,
+          message: "Project ID is required",
+        });
+      }
+
+      console.log(
+        `📄 [documentController] Processing ${req.files.length} documents for project ${projectId}`
+      );
+
+      const uploadedDocuments = [];
+      const errors = [];
+
+      // Process each uploaded file
+      for (let i = 0; i < req.files.length; i++) {
+        const file = req.files[i];
+        const documentType = req.body[`documentType_${i}`];
+        const title = req.body[`title_${i}`];
+        const description = req.body[`description_${i}`];
+
+        try {
+          console.log(
+            `📄 [documentController] Processing document ${i + 1}: ${
+              file.originalname
+            }`
+          );
+
+          const reference = await generateDocRef("ELRA", currentUser._id);
+
+          const docData = {
+            title: title || `${documentType} - ${projectName}`,
+            description: description || `Project document for ${projectName}`,
+            fileName: file.filename,
+            originalFileName: file.originalname,
+            fileUrl: file.path.replace(/\\/g, "/"),
+            fileSize: file.size,
+            mimeType: file.mimetype,
+            documentType: documentType,
+            category: "project",
+            status: "approved",
+            project: projectId,
+            department: currentUser.department,
+            createdBy: currentUser._id,
+            reference,
+            metadata: {
+              originalName: file.originalname,
+              filename: file.filename,
+              mimetype: file.mimetype,
+              size: file.size,
+              uploadedBy: currentUser._id,
+              category: "project",
+              uploadDate: new Date(),
+              documentType: getDocumentType(file.originalname),
+              projectId,
+              projectName,
+              documentType,
+              uploadedDuringCreation: true,
+            },
+          };
+
+          const document = new Document(docData);
+          await document.save();
+
+          // Update project's required documents
+          const project = await Project.findById(projectId);
+          if (project && project.requiredDocuments) {
+            const docIndex = project.requiredDocuments.findIndex(
+              (doc) => doc.documentType === documentType
+            );
+
+            if (docIndex !== -1) {
+              project.requiredDocuments[docIndex].documentId = document._id;
+              project.requiredDocuments[docIndex].fileName = file.filename;
+              project.requiredDocuments[docIndex].fileUrl = docData.fileUrl;
+              project.requiredDocuments[docIndex].isSubmitted = true;
+              project.requiredDocuments[docIndex].submittedAt = new Date();
+              project.requiredDocuments[docIndex].submittedBy = currentUser._id;
+              project.requiredDocuments[docIndex].approvalStatus = "approved";
+
+              await project.save();
+            }
+          }
+
+          uploadedDocuments.push({
+            id: document._id,
+            title: document.title,
+            reference: document.reference,
+            filename: document.fileName,
+            fileSize: formatFileSize(document.fileSize),
+            status: document.status,
+            documentType: document.documentType,
+          });
+
+          console.log(
+            `✅ [documentController] Successfully uploaded: ${document.title}`
+          );
+        } catch (error) {
+          console.error(
+            `❌ [documentController] Error uploading document ${i + 1}:`,
+            error
+          );
+          errors.push({
+            filename: file.originalname,
+            error: error.message,
+          });
+        }
+      }
+
+      if (uploadedDocuments.length > 0) {
+        res.status(201).json({
+          success: true,
+          message: `Successfully uploaded ${uploadedDocuments.length} document${
+            uploadedDocuments.length > 1 ? "s" : ""
+          }`,
+          data: {
+            uploadedDocuments,
+            errors: errors.length > 0 ? errors : undefined,
+          },
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: "Failed to upload any documents",
+          errors,
+        });
+      }
+    });
+  } catch (error) {
+    console.error("Upload multiple documents error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to upload documents",
+    });
+  }
+};
 import AuditService from "../services/auditService.js";
 import NotificationService from "../services/notificationService.js";
-import OCRService from "../services/ocrService.js";
+
 import SearchService from "../services/searchService.js";
 import ApprovalLevel from "../models/ApprovalLevel.js";
 import Project from "../models/Project.js";
@@ -33,7 +221,7 @@ const determineDocumentStatus = async (currentUser, category, department) => {
       console.log(
         "✅ [documentController] No approval workflows found - auto-approving document"
       );
-      return "APPROVED";
+      return "approved";
     }
 
     // Check if there's a specific workflow for this category/department
@@ -52,22 +240,22 @@ const determineDocumentStatus = async (currentUser, category, department) => {
 
     if (workflowToUse) {
       console.log(
-        `📋 [documentController] Found approval workflow: ${workflowToUse.name} - setting status to PENDING_APPROVAL`
+        `📋 [documentController] Found approval workflow: ${workflowToUse.name} - setting status to pending_review`
       );
-      return "PENDING_APPROVAL";
+      return "pending_review";
     } else {
       console.log(
         "✅ [documentController] No matching approval workflow found - auto-approving document"
       );
-      return "APPROVED";
+      return "approved";
     }
   } catch (error) {
     console.error(
       "❌ [documentController] Error determining document status:",
       error
     );
-    // Default to APPROVED if there's an error (safer than losing documents)
-    return "APPROVED";
+    // Default to approved if there's an error (safer than losing documents)
+    return "approved";
   }
 };
 
@@ -121,6 +309,8 @@ export const uploadDocument = async (req, res) => {
         priority,
         tags,
         department,
+        projectId,
+        projectName,
       } = req.body;
 
       console.log("[documentController] Incoming req.body:", req.body);
@@ -128,6 +318,7 @@ export const uploadDocument = async (req, res) => {
         "[documentController] Department value received:",
         department
       );
+      console.log("[documentController] Project ID received:", projectId);
 
       console.log("📄 [documentController] File received:", {
         filename: req.file.filename,
@@ -137,48 +328,12 @@ export const uploadDocument = async (req, res) => {
         path: req.file.path,
       });
 
-      // Process document with OCR for enhanced metadata
+      // Simplified document processing - no OCR needed for project documents
+      console.log(
+        "📄 [documentController] Processing document without OCR for project workflow"
+      );
       let ocrMetadata = {};
       let extractedText = "";
-
-      console.log("🔍 [documentController] Starting OCR processing...");
-      try {
-        const ocrResult = await OCRService.processDocument(req.file.path, {
-          language: "eng",
-        });
-
-        console.log("📊 [documentController] OCR result:", {
-          success: ocrResult.success,
-          confidence: ocrResult.confidence,
-          documentType: ocrResult.documentType,
-          keywordsCount: ocrResult.keywords?.length || 0,
-        });
-
-        if (ocrResult.success) {
-          ocrMetadata = ocrResult;
-          extractedText = ocrResult.extractedText;
-
-          // Auto-classify document type if not provided
-          if (!documentType && ocrMetadata.documentType) {
-            documentType = ocrMetadata.documentType;
-            console.log(
-              "🏷️ [documentController] Auto-classified document type:",
-              documentType
-            );
-          }
-
-          // Auto-extract tags from keywords
-          if (!tags && ocrMetadata.suggestedTags) {
-            tags = ocrMetadata.suggestedTags.slice(0, 5).join(",");
-            console.log("🏷️ [documentController] Auto-extracted tags:", tags);
-          }
-        }
-      } catch (ocrError) {
-        console.warn(
-          "❌ [documentController] OCR processing failed, continuing with basic upload:",
-          ocrError.message
-        );
-      }
 
       // Generate ELRA-specific reference number
       const reference = await generateDocRef("ELRA", currentUser._id);
@@ -197,69 +352,42 @@ export const uploadDocument = async (req, res) => {
       const docData = {
         title,
         description,
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        filePath: req.file.path,
+        fileName: req.file.filename,
+        originalFileName: req.file.originalname,
+        fileUrl: req.file.path,
         fileSize: req.file.size,
         mimeType: req.file.mimetype,
-        documentType: documentType || "Other",
-        category,
+        documentType: documentType || "other",
+        category:
+          category === "Project Documentation"
+            ? "project"
+            : category || "project",
         priority: priority || "Medium",
         tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
-        uploadedBy: currentUser._id,
+        createdBy: currentUser._id,
         reference: reference,
-        // Smart status determination based on approval workflow
+        project: projectId || null,
         status: await determineDocumentStatus(
           currentUser,
           category,
           department
         ),
-        // Enhanced metadata from OCR
-        ocrData: {
-          extractedText,
-          confidence: ocrMetadata?.confidence || 0,
-          documentType: ocrMetadata?.documentType,
-          keywords: ocrMetadata?.keywords || [],
-          suggestedTitle: ocrMetadata?.suggestedTitle,
-          suggestedDescription: ocrMetadata?.suggestedDescription,
-          suggestedCategory: ocrMetadata?.suggestedCategory,
-          suggestedConfidentiality: ocrMetadata?.suggestedConfidentiality,
-          suggestedTags: ocrMetadata?.suggestedTags || [],
-          processingDate: new Date(),
-          language: "eng",
-        },
-        // Document classification based on OCR
-        classification: {
-          autoClassified: !!ocrMetadata?.documentType,
-          confidence: ocrMetadata?.confidence || 0,
-          suggestedCategory: ocrMetadata?.suggestedCategory,
-          suggestedTags: ocrMetadata?.suggestedTags || [],
+        // Simplified metadata for project documents
+        metadata: {
+          uploadedBy: currentUser.username,
+          uploadDate: new Date(),
+          projectLinked: !!projectId,
         },
       };
       // Auto-assign user's department if not provided
       if (department && department.trim() !== "") {
         docData.department = department;
-      } else if (currentUser.department?.code) {
-        docData.department = currentUser.department.code;
+      } else if (currentUser.department?._id) {
+        docData.department = currentUser.department._id;
       }
       const document = new Document(docData);
 
-      console.log("💾 [documentController] Saving document to database:", {
-        title: document.title,
-        reference: document.reference,
-        category: document.category,
-        documentType: document.documentType,
-        priority: document.priority,
-        status: document.status,
-        fileSize: document.fileSize,
-      });
-
       await document.save();
-
-      console.log("✅ [documentController] Document saved successfully:", {
-        documentId: document._id,
-        reference: document.reference,
-      });
 
       // Log document creation
       if (currentUser && currentUser._id) {
@@ -286,85 +414,236 @@ export const uploadDocument = async (req, res) => {
       }
 
       try {
-        console.log(
-          "📧 [documentController] Sending notification to document creator"
-        );
-        await NotificationService.sendDocumentUploadSuccessNotification(
-          document._id,
-          currentUser._id,
-          document.title,
-          document.documentType,
-          document.category
-        );
-        console.log(
-          "✅ [documentController] Creator notification sent successfully"
-        );
+        const notification = new NotificationService();
 
-        // Send appropriate notification based on document status
-        if (document.status === "APPROVED") {
-          console.log(
-            "📧 [documentController] Sending auto-approval notification"
-          );
-          await NotificationService.sendDocumentAutoApprovalNotification(
-            document._id,
-            currentUser._id,
-            document.title,
-            document.documentType,
-            document.category
-          );
-          console.log(
-            "✅ [documentController] Auto-approval notification sent successfully"
-          );
-        } else if (document.status === "PENDING_APPROVAL") {
-          console.log(
-            "📧 [documentController] Sending approval request notification"
-          );
-          await NotificationService.sendDocumentApprovalRequestNotification(
-            document._id,
-            currentUser._id,
-            document.title,
-            document.documentType,
-            document.category
-          );
-          console.log(
-            "✅ [documentController] Approval request notification sent successfully"
-          );
-        }
+        // 1. Notify document creator (submitter)
+        await notification.createNotification({
+          recipient: currentUser._id,
+          type: "DOCUMENT_UPLOADED",
+          title: "Document Uploaded Successfully",
+          message: `Your document "${document.title}" has been uploaded for project approval.`,
+          data: {
+            documentId: document._id,
+            projectId: document.project,
+            actionUrl: `/projects`,
+            priority: "medium",
+            senderId: currentUser._id,
+          },
+        });
 
-        // Send OCR processing notification if OCR was successful
-        if (ocrMetadata && ocrMetadata.confidence) {
-          console.log(
-            "📧 [documentController] Sending OCR processing notification"
-          );
-          await NotificationService.sendDocumentOCRProcessingNotification(
-            document._id,
-            currentUser._id,
-            document.title,
-            ocrMetadata.confidence,
-            ocrMetadata.suggestedTags || []
-          );
-          console.log(
-            "✅ [documentController] OCR notification sent successfully"
-          );
+        // 2. If this is a project document, notify the next approver
+        if (document.project) {
+          try {
+            const Project = await import("../models/Project.js");
+            const project = await Project.default.findById(document.project);
+
+            if (project && project.requiredDocuments) {
+              const docIndex = project.requiredDocuments.findIndex(
+                (reqDoc) => reqDoc.documentType === document.documentType
+              );
+
+              if (docIndex !== -1) {
+                project.requiredDocuments[docIndex].isSubmitted = true;
+                project.requiredDocuments[docIndex].submittedAt = new Date();
+                project.requiredDocuments[docIndex].submittedBy =
+                  currentUser._id;
+                project.requiredDocuments[docIndex].documentId = document._id;
+                project.requiredDocuments[docIndex].fileName =
+                  document.fileName;
+                project.requiredDocuments[docIndex].fileUrl = document.fileUrl;
+
+                await project.save();
+
+                await project.updateProgress();
+
+                console.log(
+                  `✅ [documentController] Updated project ${project.code} - marked ${document.documentType} as submitted and updated progress`
+                );
+              }
+            }
+
+            if (project && project.approvalChain) {
+              console.log(
+                `🔍 [documentController] Project has ${project.approvalChain.length} approval steps`
+              );
+
+              // Find the next pending approver
+              const nextApprover = project.approvalChain.find(
+                (approval) => approval.status === "pending"
+              );
+
+              if (nextApprover) {
+                console.log(
+                  `🔍 [documentController] Next approver: ${nextApprover.level} level, department: ${nextApprover.department}`
+                );
+              } else {
+                console.log(
+                  `⚠️ [documentController] No pending approvers found`
+                );
+              }
+
+              if (nextApprover) {
+                // Count total uploaded documents for this project
+                const totalUploadedDocs = await Document.countDocuments({
+                  project: document.project,
+                  isActive: true,
+                });
+
+                // Check if all required documents are now submitted
+                const requiredDocsCount =
+                  project.requiredDocuments?.length || 0;
+                const allDocsSubmitted = totalUploadedDocs >= requiredDocsCount;
+
+                // Find users in the next approver's department
+                console.log(
+                  `🔍 [documentController] Looking for users in department: ${
+                    nextApprover.department
+                  } (${typeof nextApprover.department})`
+                );
+
+                // Use the SAME logic as the approval system to find approvers
+                const approverUsers = await User.find({
+                  department: nextApprover.department,
+                  "role.level": { $gte: 700 },
+                })
+                  .populate("department")
+                  .populate("role");
+
+                console.log(
+                  `🔍 [documentController] Found ${approverUsers.length} approver users in department ${nextApprover.department}`
+                );
+
+                // If no users found with role filter, get ALL users and filter manually
+                if (approverUsers.length === 0) {
+                  console.log(
+                    `⚠️ [documentController] No approver users found with role filter. Getting all users and filtering manually...`
+                  );
+
+                  const allDeptUsers = await User.find({
+                    department: nextApprover.department,
+                  }).populate("role");
+
+                  const manualFilteredUsers = allDeptUsers.filter((user) => {
+                    const hasValidRole = user.role && user.role.level >= 700;
+
+                    return hasValidRole;
+                  });
+
+                  approverUsers.length = 0;
+                  approverUsers.push(...manualFilteredUsers);
+                }
+
+                for (const approver of approverUsers) {
+                  if (approver._id.toString() !== currentUser._id.toString()) {
+                    const notificationType = allDocsSubmitted
+                      ? "PROJECT_READY_FOR_APPROVAL"
+                      : "DOCUMENT_APPROVAL_REQUIRED";
+
+                    const notificationTitle = allDocsSubmitted
+                      ? "Project Ready for Approval"
+                      : "Project Document Ready for Review";
+
+                    const notificationMessage = allDocsSubmitted
+                      ? `All required documents have been submitted for project "${project.name}". The project is now ready for your approval.`
+                      : `A new document "${document.title}" has been uploaded for project "${project.name}" and is ready for your review.`;
+
+                    console.log(
+                      `📧 [documentController] Sending notification to ${approver.firstName} ${approver.lastName} (${approver.email})`
+                    );
+                    console.log(
+                      `📧 [documentController] Notification type: ${notificationType}`
+                    );
+
+                    await notification.createNotification({
+                      recipient: approver._id,
+                      type: notificationType,
+                      title: notificationTitle,
+                      message: notificationMessage,
+                      data: {
+                        documentId: document._id,
+                        projectId: document.project,
+                        projectName: project.name,
+                        actionUrl: `/projects`,
+                        priority: "high",
+                        senderId: currentUser._id,
+                        approvalLevel: nextApprover.level,
+                        allDocumentsSubmitted: allDocsSubmitted,
+                        documentsSubmitted: totalUploadedDocs,
+                        totalRequired: requiredDocsCount,
+                      },
+                    });
+
+                    console.log(
+                      `✅ [documentController] Notification sent successfully to ${approver.email}`
+                    );
+                  }
+                }
+
+                // If no approvers found, notify SUPER_ADMIN as fallback
+                if (approverUsers.length === 0) {
+                  console.log(
+                    `⚠️ [documentController] No approvers found, notifying SUPER_ADMIN as fallback`
+                  );
+                  const superAdmins = await User.find({
+                    "role.name": "SUPER_ADMIN",
+                    isActive: true,
+                  }).populate("role");
+
+                  for (const admin of superAdmins) {
+                    await notification.createNotification({
+                      recipient: admin._id,
+                      type: "PROJECT_APPROVAL_NEEDED",
+                      title:
+                        "Project Approval Required - No Department Approvers",
+                      message: `Project "${project.name}" requires approval but no approvers found in department ${nextApprover.department}. Please assign approvers or handle manually.`,
+                      data: {
+                        projectId: document.project,
+                        projectName: project.name,
+                        actionUrl: `/projects`,
+                        priority: "high",
+                        senderId: currentUser._id,
+                      },
+                    });
+                    console.log(
+                      `📧 [documentController] Fallback notification sent to SUPER_ADMIN: ${admin.email}`
+                    );
+                  }
+                }
+              }
+            }
+          } catch (projectError) {
+            console.warn(
+              "⚠️ [documentController] Project notification failed:",
+              projectError.message
+            );
+          }
         }
 
         // Notify department members (if department is specified)
         if (document.department) {
-          console.log(
-            "📧 [documentController] Sending department notifications"
-          );
           try {
-            await NotificationService.sendDocumentUploadDepartmentNotification(
-              document._id,
-              document.department,
-              document.title,
-              document.documentType,
-              document.category,
-              currentUser.name || currentUser.username
-            );
-            console.log(
-              "✅ [documentController] Department notifications sent successfully"
-            );
+            const departmentUsers = await User.find({
+              department: document.department,
+              _id: { $ne: currentUser._id },
+            });
+
+            for (const user of departmentUsers) {
+              await notification.createNotification({
+                recipient: user._id,
+                type: "DOCUMENT_SUBMITTED",
+                title: "New Document Uploaded",
+                message: `${
+                  currentUser.name || currentUser.username
+                } has uploaded "${document.title}" in your department.`,
+                data: {
+                  documentId: document._id,
+                  actionUrl: `/documents/${document._id}`,
+                  priority: document.priority?.toLowerCase() || "medium",
+                  senderId: currentUser._id,
+                  department: document.department,
+                },
+              });
+            }
           } catch (deptError) {
             console.warn(
               "⚠️ [documentController] Department notification failed:",
@@ -389,12 +668,11 @@ export const uploadDocument = async (req, res) => {
         }
 
         if (adminsToNotify && adminsToNotify.length > 0) {
-          console.log("📧 [documentController] Sending admin notifications");
           for (const admin of adminsToNotify) {
             const departmentInfo = document.department
               ? `in ${admin.department} department`
               : "across all departments";
-            await NotificationService.createNotification({
+            await notification.createNotification({
               recipient: admin._id,
               type: "DOCUMENT_SUBMITTED",
               title: "New Document Uploaded",
@@ -430,7 +708,7 @@ export const uploadDocument = async (req, res) => {
           });
 
           for (const superAdmin of superAdmins) {
-            await NotificationService.createNotification({
+            await notification.createNotification({
               recipient: superAdmin._id,
               type: "SYSTEM_ALERT",
               title: "Confidential Document Uploaded",
@@ -459,8 +737,8 @@ export const uploadDocument = async (req, res) => {
       }
 
       // Populate user info
-      await document.populate("uploadedBy", "name email");
-      const normalizedFilePath = document.filePath.replace(/\\/g, "/");
+      await document.populate("createdBy", "firstName lastName email");
+      const normalizedFilePath = document.fileUrl.replace(/\\/g, "/");
       const fileUrl = `${
         process.env.BASE_URL || "http://localhost:5000"
       }/${normalizedFilePath}`;
@@ -472,12 +750,15 @@ export const uploadDocument = async (req, res) => {
           id: document._id,
           title: document.title,
           reference: document.reference,
-          filename: document.filename,
+          filename: document.fileName,
           fileSize: formatFileSize(document.fileSize),
           status: document.status,
-          uploadedBy: document.uploadedBy.name,
+          uploadedBy: document.createdBy
+            ? `${document.createdBy.firstName} ${document.createdBy.lastName}`
+            : currentUser.username,
           uploadDate: document.createdAt,
           fileUrl,
+          project: document.project,
         },
       });
     });
@@ -1511,6 +1792,109 @@ export const processOCR = async (req, res) => {
   }
 };
 
+// View/Download document file
+export const viewDocument = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUser = req.user;
+
+    console.log("📄 [documentController] Viewing document:", {
+      id,
+      userId: currentUser._id,
+    });
+
+    // Find the document
+    const document = await Document.findById(id).populate(
+      "createdBy",
+      "firstName lastName email"
+    );
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found",
+      });
+    }
+
+    // Check if user has permission to view this document
+    if (!hasPermission(currentUser, "document.view")) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to view this document",
+      });
+    }
+
+    // Check if document is active
+    if (!document.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: "Document is not available",
+      });
+    }
+
+    // Get the file path - handle ES modules
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+
+    // Handle both relative and absolute paths
+    let filePath;
+    if (
+      document.fileUrl.startsWith("/C:") ||
+      document.fileUrl.startsWith("C:")
+    ) {
+      // Absolute Windows path - use as is
+      filePath = document.fileUrl.replace(/^\//, "");
+    } else {
+      // Relative path - construct full path
+      const normalizedFileUrl = document.fileUrl
+        .replace(/\\/g, "/")
+        .replace(/^\//, "");
+      filePath = path.join(__dirname, "..", normalizedFileUrl);
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      console.error("❌ [documentController] File not found:", filePath);
+      return res.status(404).json({
+        success: false,
+        message: "Document file not found",
+      });
+    }
+
+    // Set appropriate headers
+    const contentType = document.mimeType || "application/octet-stream";
+    const fileName = document.originalFileName || document.fileName;
+
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `inline; filename="${fileName}"`);
+    res.setHeader("Content-Length", document.fileSize);
+    res.setHeader("Cache-Control", "no-cache");
+
+    // Stream the file
+    const fileStream = fs.createReadStream(filePath);
+
+    fileStream.on("error", (error) => {
+      console.error("❌ [documentController] File stream error:", error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          message: "Error streaming file",
+          error: error.message,
+        });
+      }
+    });
+
+    fileStream.pipe(res);
+  } catch (error) {
+    console.error("❌ [documentController] Error viewing document:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to view document",
+      error: error.message,
+    });
+  }
+};
+
 // Get document metadata (classifications, categories, etc.)
 export const getDocumentMetadata = async (req, res) => {
   try {
@@ -1581,6 +1965,218 @@ export const getDocumentMetadata = async (req, res) => {
       success: false,
       message: "Failed to get document metadata",
       error: error.message,
+    });
+  }
+};
+
+// Replace document for project
+export const replaceProjectDocument = async (req, res) => {
+  console.log(
+    "🔄 [documentController] Starting document replacement for project"
+  );
+  console.log("👤 [documentController] User:", {
+    id: req.user._id,
+    username: req.user.username,
+    role: req.user.role?.name,
+  });
+
+  try {
+    const currentUser = req.user;
+
+    // Check if user has permission to upload documents
+    if (!hasPermission(currentUser, "document.upload")) {
+      console.log(
+        "❌ [documentController] Permission denied for document replacement"
+      );
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to replace documents",
+      });
+    }
+
+    console.log("✅ [documentController] User has replacement permission");
+
+    // Use multer upload middleware for single file
+    upload.single("document")(req, res, async (err) => {
+      if (err) {
+        return res.status(400).json({
+          success: false,
+          message: err.message,
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "No file uploaded",
+        });
+      }
+
+      const { projectId, documentType, originalDocumentId, projectName } =
+        req.body;
+
+      if (!projectId || !documentType || !originalDocumentId) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Project ID, document type, and original document ID are required",
+        });
+      }
+
+      console.log(
+        `🔄 [documentController] Replacing document for project ${projectId}, type: ${documentType}`
+      );
+
+      try {
+        // Check if project exists and is not approved
+        const project = await Project.findById(projectId);
+        if (!project) {
+          return res.status(404).json({
+            success: false,
+            message: "Project not found",
+          });
+        }
+
+        // Check if project is already approved - prevent replacement
+        if (project.status === "approved" || project.status === "completed") {
+          return res.status(403).json({
+            success: false,
+            message:
+              "Cannot replace documents for approved or completed projects",
+          });
+        }
+
+        // Find the original document
+        const originalDocument = await Document.findById(originalDocumentId);
+        if (!originalDocument) {
+          return res.status(404).json({
+            success: false,
+            message: "Original document not found",
+          });
+        }
+
+        // Verify the document belongs to this project and type
+        if (
+          originalDocument.project?.toString() !== projectId ||
+          originalDocument.documentType !== documentType
+        ) {
+          return res.status(403).json({
+            success: false,
+            message: "Document does not match the specified project and type",
+          });
+        }
+
+        // Generate new reference for the replacement
+        const reference = await generateDocRef("ELRA", currentUser._id);
+
+        // Update the existing document with new file and metadata
+        const updatedDocument = await Document.findByIdAndUpdate(
+          originalDocumentId,
+          {
+            fileName: req.file.filename,
+            originalFileName: req.file.originalname,
+            fileUrl: req.file.path.replace(/\\/g, "/"),
+            fileSize: req.file.size,
+            mimeType: req.file.mimetype,
+            reference: reference,
+            updatedBy: currentUser._id,
+            updatedAt: new Date(),
+            metadata: {
+              originalName: req.file.originalname,
+              filename: req.file.filename,
+              mimetype: req.file.mimetype,
+              size: req.file.size,
+              uploadedBy: currentUser._id,
+              category: "project",
+              uploadDate: new Date(),
+              documentType: getDocumentType(req.file.originalname),
+              replacedAt: new Date(),
+              replacedBy: currentUser._id,
+              replacementCount:
+                (originalDocument.metadata?.replacementCount || 0) + 1,
+              previousFileName: originalDocument.fileName,
+              previousFileSize: originalDocument.fileSize,
+              projectId: projectId,
+              projectName: projectName,
+              documentType: documentType,
+              uploadedDuringCreation: false,
+            },
+          },
+          { new: true, runValidators: true }
+        );
+
+        // Update project's required documents with new file info
+        if (project.requiredDocuments) {
+          const docIndex = project.requiredDocuments.findIndex(
+            (doc) => doc.documentType === documentType
+          );
+
+          if (docIndex !== -1) {
+            project.requiredDocuments[docIndex].fileName = req.file.filename;
+            project.requiredDocuments[docIndex].fileUrl = req.file.path.replace(
+              /\\/g,
+              "/"
+            );
+            project.requiredDocuments[docIndex].updatedAt = new Date();
+            project.requiredDocuments[docIndex].updatedBy = currentUser._id;
+
+            await project.save();
+          }
+        }
+
+        // Log the replacement action
+        await AuditService.logDocumentAction(
+          currentUser._id,
+          "DOCUMENT_REPLACED",
+          updatedDocument._id,
+          {
+            documentTitle: updatedDocument.title,
+            documentType: updatedDocument.documentType,
+            projectId: projectId,
+            projectName: projectName,
+            originalDocumentId: originalDocumentId,
+            newFileName: req.file.filename,
+            previousFileName: originalDocument.fileName,
+            ipAddress: req.ip,
+            userAgent: req.get("User-Agent"),
+          }
+        );
+
+        console.log(
+          `✅ [documentController] Successfully replaced document: ${updatedDocument.title}`
+        );
+
+        res.status(200).json({
+          success: true,
+          message: "Document replaced successfully",
+          data: {
+            id: updatedDocument._id,
+            title: updatedDocument.title,
+            reference: updatedDocument.reference,
+            filename: updatedDocument.fileName,
+            fileSize: formatFileSize(updatedDocument.fileSize),
+            status: updatedDocument.status,
+            documentType: updatedDocument.documentType,
+            replacedAt: updatedDocument.updatedAt,
+          },
+        });
+      } catch (error) {
+        console.error(
+          "❌ [documentController] Error replacing document:",
+          error
+        );
+        res.status(500).json({
+          success: false,
+          message: "Failed to replace document",
+          error: error.message,
+        });
+      }
+    });
+  } catch (error) {
+    console.error("❌ [documentController] Document replacement error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to replace document",
     });
   }
 };

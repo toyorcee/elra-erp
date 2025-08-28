@@ -19,11 +19,38 @@ import {
   getProjectWorkflowStatus,
   getPendingApprovalProjects,
   getProjectAuditTrail,
-  getMyProjectTasks,
   getMyProjects,
-  updateTaskStatus,
+  getProjectAnalytics,
+  getProjectProgress,
+  completeRegulatoryCompliance,
+  getRegulatoryComplianceStatus,
+  completeInventory,
+  completeProcurement,
+  getWorkflowStatus,
+  getProjectsNeedingInventory,
+  getProjectCategories,
+  processProjectReimbursement,
+  completeDepartmentalProjectImplementation,
 } from "../controllers/projectController.js";
 import { protect, checkRole } from "../middleware/auth.js";
+import {
+  checkExternalProjectAccess,
+  checkExternalProjectEdit,
+  checkExternalProjectDelete,
+  checkExternalProjectCreate,
+} from "../middleware/projectPermissions.js";
+import {
+  checkDepartmentalProjectAccess,
+  checkDepartmentalProjectEdit,
+  checkDepartmentalProjectDelete,
+  checkDepartmentalProjectCreate,
+} from "../middleware/departmentalProjectPermissions.js";
+import {
+  checkPersonalProjectAccess,
+  checkPersonalProjectEdit,
+  checkPersonalProjectDelete,
+  checkPersonalProjectCreate,
+} from "../middleware/personalProjectPermissions.js";
 
 const router = express.Router();
 
@@ -52,18 +79,74 @@ const validateProject = [
     .withMessage("Team name must be between 2 and 100 characters"),
   body("category")
     .isIn([
-      "equipment_lease",
-      "vehicle_lease",
-      "property_lease",
-      "financial_lease",
-      "training_equipment_lease",
-      "compliance_lease",
-      "service_equipment_lease",
-      "strategic_lease",
+      // SOFTWARE & TECHNOLOGY
       "software_development",
       "system_maintenance",
-      "consulting",
-      "training",
+      "infrastructure_upgrade",
+      "digital_transformation",
+      "data_management",
+      "security_enhancement",
+      "process_automation",
+      "integration_project",
+
+      // EQUIPMENT & FACILITIES
+      "equipment_purchase",
+      "equipment_lease",
+      "facility_improvement",
+      "infrastructure_development",
+      "equipment_maintenance",
+
+      // TRAINING & DEVELOPMENT
+      "training_program",
+      "capacity_building",
+      "skill_development",
+      "professional_development",
+      "industry_training",
+
+      // CONSULTING & SERVICES
+      "consulting_service",
+      "advisory_service",
+      "technical_support",
+      "implementation_service",
+
+      // REGULATORY & COMPLIANCE
+      "regulatory_compliance",
+      "compliance_audit",
+      "regulatory_enforcement",
+      "policy_development",
+      "standards_implementation",
+
+      // MONITORING & OVERSIGHT
+      "monitoring_system",
+      "oversight_program",
+      "verification_service",
+      "inspection_program",
+
+      // FINANCIAL & ADMINISTRATIVE
+      "financial_management",
+      "budget_optimization",
+      "cost_reduction",
+      "administrative_improvement",
+
+      // MARKETPLACE & EXCHANGE
+      "marketplace_development",
+      "exchange_platform",
+      "trading_system",
+      "market_analysis",
+
+      // PUBLIC & COMMUNICATION
+      "public_awareness",
+      "communication_campaign",
+      "stakeholder_engagement",
+      "public_relations",
+
+      // RESEARCH & ANALYSIS
+      "research_project",
+      "market_research",
+      "feasibility_study",
+      "impact_assessment",
+
+      // OTHER
       "other",
     ])
     .withMessage("Invalid project category"),
@@ -93,8 +176,11 @@ router.use(protect);
 // Get all projects (with role-based filtering) - Viewer+
 router.get("/", checkRole(100), getAllProjects);
 
-// Get next project code - HOD+
-router.get("/next-code", checkRole(700), getNextProjectCode);
+// Get project categories from model schema - All authenticated users
+router.get("/categories", protect, getProjectCategories);
+
+// Get next project code - STAFF+ (300+)
+router.get("/next-code", checkRole(300), getNextProjectCode);
 
 // Get project statistics - Manager+
 router.get("/stats", checkRole(600), getProjectStats);
@@ -109,33 +195,86 @@ router.get(
   getProjectsAvailableForTeams
 );
 
-// Self-service routes for project tasks (must come before /:id routes)
-router.get("/my-tasks", protect, getMyProjectTasks);
+// Self-service routes for projects (must come before /:id routes)
 router.get("/my-projects", protect, getMyProjects);
 
 // Pending approval projects - HOD+ only
 router.get("/pending-approval", checkRole(700), getPendingApprovalProjects);
 
-// Get project by ID - Viewer+
-router.get("/:id", checkRole(100), getProjectById);
+// Analytics route - HOD+ only
+router.get("/analytics", checkRole(700), getProjectAnalytics);
 
-// Create new project - HOD+
-router.post("/", checkRole(700), validateProject, createProject);
+// Inventory workflow route - Operations HOD only
+router.get("/inventory-workflow", checkRole(700), getProjectsNeedingInventory);
 
-// Update project - Manager+
-router.put("/:id", checkRole(600), validateProject, updateProject);
+// Regulatory Compliance routes - Legal/Compliance HOD+ only
+router.get(
+  "/:id/regulatory-compliance",
+  checkRole(700),
+  getRegulatoryComplianceStatus
+);
+router.post(
+  "/:id/complete-regulatory-compliance",
+  checkRole(700),
+  completeRegulatoryCompliance
+);
 
-// Delete project - HOD+
-router.delete("/:id", checkRole(700), deleteProject);
+// Workflow Completion routes - HOD+ only
+router.post("/:id/complete-inventory", checkRole(700), completeInventory);
+router.post("/:id/complete-procurement", checkRole(700), completeProcurement);
+router.get("/:id/workflow-status", checkRole(700), getWorkflowStatus);
 
-// Team management routes - Manager+
+// Get project by ID - Viewer+ (with project access control)
+router.get(
+  "/:id",
+  checkRole(100),
+  checkExternalProjectAccess,
+  checkDepartmentalProjectAccess,
+  checkPersonalProjectAccess,
+  getProjectById
+);
+
+// Create new project - Any authenticated user for personal projects; STAFF+ for others
+router.post(
+  "/",
+  protect,
+  checkPersonalProjectCreate,
+  checkRole(300),
+  checkExternalProjectCreate,
+  checkDepartmentalProjectCreate,
+  validateProject,
+  createProject
+);
+
+// Update project - STAFF+ (300+) (with project edit control)
+router.put(
+  "/:id",
+  checkRole(300),
+  checkExternalProjectEdit,
+  checkDepartmentalProjectEdit,
+  checkPersonalProjectEdit,
+  validateProject,
+  updateProject
+);
+
+// Delete project - HOD+ (700+) (with project delete control)
+router.delete(
+  "/:id",
+  checkRole(700),
+  checkExternalProjectDelete,
+  checkDepartmentalProjectDelete,
+  checkPersonalProjectDelete,
+  deleteProject
+);
+
+// Team management routes - MANAGER+ (600+) - Only managers and HODs can manage teams
 router.post("/:id/team", checkRole(600), validateTeamMember, addTeamMember);
 router.delete("/:id/team/:userId", checkRole(600), removeTeamMember);
 
-// Notes routes - Manager+
-router.post("/:id/notes", checkRole(600), validateNote, addProjectNote);
+// Notes routes - STAFF+ (300+) - All staff can add notes to projects they're involved in
+router.post("/:id/notes", checkRole(300), validateNote, addProjectNote);
 
-// Approval routes - HOD+
+// Approval routes - HOD+ (700+) - Only HODs can approve/reject projects
 router.post("/:id/approve", checkRole(700), approveProject);
 router.post("/:id/reject", checkRole(700), rejectProject);
 
@@ -150,7 +289,14 @@ router.get("/:id/workflow-status", checkRole(700), getProjectWorkflowStatus);
 // Audit routes - HOD+
 router.get("/:id/audit-trail", checkRole(700), getProjectAuditTrail);
 
-// Task status update
-router.put("/tasks/:id/status", protect, updateTaskStatus);
+// Complete departmental project implementation - HOD+
+router.post(
+  "/:id/complete-implementation",
+  checkRole(700),
+  completeDepartmentalProjectImplementation
+);
+
+// Process project reimbursement - Finance HOD+
+router.post("/:id/reimburse", checkRole(700), processProjectReimbursement);
 
 export default router;

@@ -1,9 +1,6 @@
 // Main user components
 export { default as Dashboard } from "./Dashboard";
 
-// Document management
-export { default as Documents } from "./documents/Documents";
-
 // Module components
 export { default as HRModule } from "./modules/hr/HRModule";
 

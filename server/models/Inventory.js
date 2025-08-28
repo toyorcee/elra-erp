@@ -299,11 +299,11 @@ const inventorySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
-    company: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Company",
-      required: true,
-    },
+    // company: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "Company",
+    //   required: true,
+    // },
     isActive: {
       type: Boolean,
       default: true,
@@ -316,10 +316,9 @@ const inventorySchema = new mongoose.Schema(
   }
 );
 
-// Indexes for better performance
-inventorySchema.index({ company: 1, status: 1 });
-inventorySchema.index({ company: 1, type: 1 });
-inventorySchema.index({ company: 1, category: 1 });
+inventorySchema.index({ status: 1 });
+inventorySchema.index({ type: 1 });
+inventorySchema.index({ category: 1 });
 inventorySchema.index({ code: 1 }, { unique: true });
 inventorySchema.index({ "specifications.serialNumber": 1 });
 
@@ -359,18 +358,16 @@ inventorySchema.virtual("insuranceExpiring").get(function () {
 // Pre-save middleware to generate item code if not provided
 inventorySchema.pre("save", async function (next) {
   if (!this.code) {
-    const count = await this.constructor.countDocuments({
-      company: this.company,
-    });
+    const count = await this.constructor.countDocuments();
     this.code = `INV${String(count + 1).padStart(4, "0")}`;
   }
   next();
 });
 
 // Static method to get inventory statistics
-inventorySchema.statics.getInventoryStats = async function (companyId) {
+inventorySchema.statics.getInventoryStats = async function () {
   const stats = await this.aggregate([
-    { $match: { company: companyId, isActive: true } },
+    { $match: { isActive: true } },
     {
       $group: {
         _id: "$status",
@@ -392,23 +389,22 @@ inventorySchema.statics.getInventoryStats = async function (companyId) {
 };
 
 // Static method to get available items
-inventorySchema.statics.getAvailableItems = function (companyId) {
-  return this.find({ company: companyId, isActive: true, status: "available" })
+inventorySchema.statics.getAvailableItems = function () {
+  return this.find({ isActive: true, status: "available" })
     .populate("createdBy", "firstName lastName")
     .sort({ name: 1 });
 };
 
 // Static method to get items by type
-inventorySchema.statics.getByType = function (companyId, type) {
-  return this.find({ company: companyId, isActive: true, type })
+inventorySchema.statics.getByType = function (type) {
+  return this.find({ isActive: true, type })
     .populate("createdBy", "firstName lastName")
     .sort({ name: 1 });
 };
 
 // Static method to get items needing maintenance
-inventorySchema.statics.getMaintenanceDue = function (companyId) {
+inventorySchema.statics.getMaintenanceDue = function () {
   return this.find({
-    company: companyId,
     isActive: true,
     "maintenance.nextServiceDate": { $lte: new Date() },
   })

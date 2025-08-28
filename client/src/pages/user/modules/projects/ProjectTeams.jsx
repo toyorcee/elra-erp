@@ -61,6 +61,7 @@ const ProjectTeams = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingMemberId, setDeletingMemberId] = useState(null);
   const [showEmptyState, setShowEmptyState] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     loadData();
@@ -594,7 +595,16 @@ const ProjectTeams = () => {
                   Add Team Member
                 </h3>
                 <button
-                  onClick={() => setShowAddMember(false)}
+                  onClick={() => {
+                    setShowAddMember(false);
+                    setSearchTerm("");
+                    setNewMemberData({
+                      projectId: "",
+                      selectedUsers: [],
+                      role: "developer",
+                      allocationPercentage: 0,
+                    });
+                  }}
                   disabled={isSubmitting}
                   className="p-1 text-gray-400 hover:text-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -702,65 +712,204 @@ const ProjectTeams = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Select Employees
+                        Select Team Members
                       </label>
-                      <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded-md">
-                        <p className="text-sm text-green-800">
-                          <strong>Note:</strong> Check the boxes to select
-                          multiple employees.
+                      <div className="mb-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <p className="text-sm text-blue-800">
+                          <strong>Role Restrictions:</strong>{" "}
+                          {user.role?.level === 300 &&
+                            "You can only select other STAFF from your department"}
+                          {user.role?.level === 600 &&
+                            "You can only select STAFF from your department"}
+                          {user.role?.level === 700 &&
+                            "You can select STAFF and MANAGER from your department"}
+                          {user.role?.level >= 1000 && "You can select anyone"}
                         </p>
                       </div>
-                      <div className="border border-gray-300 rounded-md p-4 max-h-60 overflow-y-auto">
-                        {allUsers
-                          .filter((user) => {
-                            // Filter out the current user if they are the project manager
-                            if (
-                              selectedProjectManager &&
-                              selectedProjectManager._id === user._id
-                            ) {
+
+                      {/* Search Input */}
+                      <div className="mb-4">
+                        <input
+                          type="text"
+                          placeholder="Search employees by name or email..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                        />
+                      </div>
+
+                      {/* Available Users */}
+                      <div className="border border-gray-300 rounded-md max-h-60 overflow-y-auto">
+                        {(() => {
+                          const filteredUsers = allUsers
+                            .filter((potentialMember) => {
+                              // Exclude project manager
+                              if (
+                                selectedProjectManager &&
+                                selectedProjectManager._id ===
+                                  potentialMember._id
+                              ) {
+                                return false;
+                              }
+
+                              // Apply role restrictions
+                              const currentUserRoleLevel =
+                                user.role?.level || 0;
+                              const potentialMemberRoleLevel =
+                                potentialMember.role?.level || 0;
+
+                              if (currentUserRoleLevel >= 1000) {
+                                return true;
+                              }
+
+                              if (currentUserRoleLevel === 300) {
+                                return (
+                                  potentialMemberRoleLevel === 300 &&
+                                  potentialMember.department?._id ===
+                                    user.department?._id
+                                );
+                              }
+
+                              if (currentUserRoleLevel === 600) {
+                                return (
+                                  potentialMemberRoleLevel === 300 &&
+                                  potentialMember.department?._id ===
+                                    user.department?._id
+                                );
+                              }
+
+                              if (currentUserRoleLevel === 700) {
+                                return (
+                                  (potentialMemberRoleLevel === 300 ||
+                                    potentialMemberRoleLevel === 600) &&
+                                  potentialMember.department?._id ===
+                                    user.department?._id
+                                );
+                              }
+
                               return false;
-                            }
-                            return true;
-                          })
-                          .map((user) => (
+                            })
+                            .filter((user) => {
+                              // Apply search filter
+                              if (!searchTerm) return true;
+                              const searchLower = searchTerm.toLowerCase();
+                              return (
+                                user.firstName
+                                  ?.toLowerCase()
+                                  .includes(searchLower) ||
+                                user.lastName
+                                  ?.toLowerCase()
+                                  .includes(searchLower) ||
+                                user.email?.toLowerCase().includes(searchLower)
+                              );
+                            });
+
+                          if (filteredUsers.length === 0) {
+                            return (
+                              <div className="p-4 text-center text-gray-500">
+                                {searchTerm
+                                  ? "No employees found matching your search."
+                                  : "No available employees to select."}
+                              </div>
+                            );
+                          }
+
+                          return filteredUsers.map((potentialMember) => (
                             <div
-                              key={user._id}
-                              className="flex items-center space-x-3 py-2"
+                              key={potentialMember._id}
+                              className={`flex items-center space-x-3 p-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                                newMemberData.selectedUsers.includes(
+                                  potentialMember._id
+                                )
+                                  ? "bg-blue-50 border-blue-200"
+                                  : ""
+                              }`}
                             >
                               <input
                                 type="checkbox"
-                                id={user._id}
+                                id={potentialMember._id}
                                 checked={newMemberData.selectedUsers.includes(
-                                  user._id
+                                  potentialMember._id
                                 )}
-                                onChange={() => handleEmployeeToggle(user._id)}
+                                onChange={() =>
+                                  handleEmployeeToggle(potentialMember._id)
+                                }
                                 disabled={isSubmitting}
                                 className="h-4 w-4 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                               />
-                              <label
-                                htmlFor={user._id}
-                                className="flex-1 cursor-pointer"
-                              >
-                                <div className="text-sm font-medium text-gray-900">
-                                  {user.firstName} {user.lastName}
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-3">
+                                  <div className="flex-shrink-0 h-8 w-8 relative">
+                                    {getAvatarDisplay(potentialMember)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-medium text-gray-900 truncate">
+                                      {potentialMember.firstName}{" "}
+                                      {potentialMember.lastName}
+                                    </div>
+                                    <div className="text-sm text-gray-500 truncate">
+                                      {potentialMember.email}
+                                    </div>
+                                  </div>
+                                  <div className="flex-shrink-0 text-right">
+                                    <div className="text-xs font-medium text-gray-700">
+                                      {potentialMember.role?.name}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {potentialMember.department?.name}
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="text-sm text-gray-500">
-                                  {user.email} -{" "}
-                                  {user.department?.name || "No Department"}
-                                </div>
-                                <div className="text-xs text-gray-400 mt-1">
-                                  Role: {user.role?.name || "No Role"} • Level:{" "}
-                                  {user.role?.level || "N/A"}
-                                </div>
-                              </label>
+                              </div>
                             </div>
-                          ))}
+                          ));
+                        })()}
                       </div>
+
+                      {/* Selected Users Summary */}
                       {newMemberData.selectedUsers.length > 0 && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          Selected: {newMemberData.selectedUsers.length}{" "}
-                          employee(s)
-                        </p>
+                        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-green-800">
+                              Selected: {newMemberData.selectedUsers.length}{" "}
+                              employee(s)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setNewMemberData((prev) => ({
+                                  ...prev,
+                                  selectedUsers: [],
+                                }))
+                              }
+                              className="text-xs text-green-600 hover:text-green-800 underline"
+                            >
+                              Clear All
+                            </button>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {newMemberData.selectedUsers.map((userId) => {
+                              const user = allUsers.find(
+                                (u) => u._id === userId
+                              );
+                              return user ? (
+                                <span
+                                  key={userId}
+                                  className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800"
+                                >
+                                  {user.firstName} {user.lastName}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEmployeeToggle(userId)}
+                                    className="ml-1 text-green-600 hover:text-green-800"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ) : null;
+                            })}
+                          </div>
+                        </div>
                       )}
                     </div>
 

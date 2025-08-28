@@ -219,6 +219,86 @@ export const addTeamMember = async (req, res) => {
       });
     }
 
+    // Additional validation for external projects
+    if (project.projectScope === "external") {
+      const isHRDepartment =
+        currentUser.department?.name === "Human Resources" ||
+        currentUser.department?.name === "HR" ||
+        currentUser.department?.name === "Human Resource Management";
+
+      if (!isHRDepartment || currentUser.role.level < 700) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Access denied. Only HR HOD can manage external project teams.",
+        });
+      }
+
+      // For external projects, ensure user is from HR department
+      const isUserFromHRDepartment =
+        user.department?.name === "Human Resources" ||
+        user.department?.name === "HR" ||
+        user.department?.name === "Human Resource Management";
+
+      if (!isUserFromHRDepartment) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "External projects can only have team members from the HR department.",
+        });
+      }
+    }
+
+    const currentUserRoleLevel = currentUser.role?.level || 0;
+    const potentialMemberRoleLevel = user.role?.level || 0;
+
+    if (currentUserRoleLevel >= 1000) {
+    } else if (currentUserRoleLevel === 300) {
+      if (
+        potentialMemberRoleLevel !== 300 ||
+        user.department?.toString() !== currentUser.department?.toString()
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Access denied. STAFF can only select other STAFF from their department.",
+        });
+      }
+    }
+    // MANAGER (600) can select STAFF (300) from their department
+    else if (currentUserRoleLevel === 600) {
+      if (
+        potentialMemberRoleLevel !== 300 ||
+        user.department?.toString() !== currentUser.department?.toString()
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Access denied. MANAGER can only select STAFF from their department.",
+        });
+      }
+    }
+    // HOD (700) can select STAFF (300) and MANAGER (600) from their department
+    else if (currentUserRoleLevel === 700) {
+      if (
+        (potentialMemberRoleLevel !== 300 &&
+          potentialMemberRoleLevel !== 600) ||
+        user.department?.toString() !== currentUser.department?.toString()
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Access denied. HOD can only select STAFF and MANAGER from their department.",
+        });
+      }
+    } else {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Insufficient role level to manage team members.",
+      });
+    }
+
     // Check if user is already a team member
     const existingMember = await TeamMember.findOne({
       project: projectId,
@@ -526,6 +606,22 @@ export const getAvailableUsers = async (req, res) => {
         message:
           "Access denied. You don't have permission to manage this project's team.",
       });
+    }
+
+    // Additional validation for external projects
+    if (project.projectScope === "external") {
+      const isHRDepartment =
+        currentUser.department?.name === "Human Resources" ||
+        currentUser.department?.name === "HR" ||
+        currentUser.department?.name === "Human Resource Management";
+
+      if (!isHRDepartment || currentUser.role.level < 700) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Access denied. Only HR HOD can manage external project teams.",
+        });
+      }
     }
 
     // Get current team members

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import ProfileMenu from "./ProfileMenu";
 import {
@@ -62,6 +62,7 @@ import {
   hasSectionAccess,
   getModulesForUser,
 } from "../config/sidebarConfig";
+import { userModulesAPI } from "../services/userModules.js";
 import { useAuth } from "../context/AuthContext";
 import { useDynamicSidebar } from "../context/DynamicSidebarContext";
 
@@ -106,19 +107,110 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     startModuleLoading,
   } = useDynamicSidebar();
 
-  // Use the existing role-based filtering system
-  const userRoleLevel = user?.role?.level || user?.roleLevel || 300;
-  const userDepartment = user?.department?.name || null;
-  const userPermissions = user?.permissions || [];
-  const userModuleAccess = user?.moduleAccess || [];
+  // Use the same logic as the dashboard - fetch from backend API
+  const [backendModules, setBackendModules] = useState([]);
+  const [loadingModules, setLoadingModules] = useState(false);
 
-  // Use the existing getNavigationForRole function that handles all the filtering
-  const navigation = getNavigationForRole(
-    userRoleLevel,
-    userDepartment,
-    userPermissions,
-    userModuleAccess
-  );
+  // Fetch backend modules
+  const fetchBackendModules = async () => {
+    try {
+      setLoadingModules(true);
+      const response = await userModulesAPI.getUserModules();
+      if (response.success && response.data) {
+        setBackendModules(response.data);
+        console.log(
+          "✅ [Sidebar] Backend modules loaded:",
+          response.data.length
+        );
+      }
+    } catch (error) {
+      console.error("❌ [Sidebar] Error fetching backend modules:", error);
+    } finally {
+      setLoadingModules(false);
+    }
+  };
+
+  // Fetch modules when user is available
+  useEffect(() => {
+    if (user) {
+      fetchBackendModules();
+    }
+  }, [user]);
+
+  // Use backend API data if available, otherwise fall back to frontend filtering
+  const getAccessibleModules = () => {
+    if (backendModules && backendModules.length > 0) {
+      // Use backend API data - convert to sidebar format
+      return backendModules.map((module) => {
+        const moduleKey = module.code.toLowerCase().replace(/_/g, "-");
+        return {
+          label: module.name,
+          icon: getIconForModule(moduleKey),
+          path: `/dashboard/modules/${moduleKey}`,
+          required: { minLevel: module.requiredRoleLevel || 300 },
+          section: "erp",
+          badge: module.name.split(" ")[0],
+          permissions: module.permissions,
+        };
+      });
+    }
+
+    // Fallback to frontend filtering
+    const userRoleLevel = user?.role?.level || user?.roleLevel || 300;
+    const userDepartment = user?.department?.name || null;
+    const userPermissions = user?.permissions || [];
+    const userModuleAccess =
+      user?.role?.moduleAccess || user?.moduleAccess || [];
+
+    const fallbackNavigation = getNavigationForRole(
+      userRoleLevel,
+      userDepartment,
+      userPermissions,
+      userModuleAccess
+    );
+
+    return fallbackNavigation
+      ? fallbackNavigation.filter((item) => item.section === "erp")
+      : [];
+  };
+
+  // Helper function to get icon for module
+  const getIconForModule = (moduleKey) => {
+    const iconMap = {
+      "self-service": "HiOutlineUser",
+      hr: "HiOutlineUsers",
+      finance: "HiOutlineCalculator",
+      it: "HiOutlineCog6Tooth",
+      operations: "HiOutlineCog6Tooth",
+      sales: "HiOutlineChartBar",
+      legal: "HiOutlineShieldCheck",
+      "system-admin": "HiOutlineCog6Tooth",
+      payroll: "HiOutlineCurrencyDollar",
+      procurement: "HiOutlineShoppingCart",
+      projects: "HiOutlineFolder",
+      inventory: "HiOutlineCube",
+      "customer-care": "HiOutlineChatBubbleLeftRight",
+    };
+    return iconMap[moduleKey] || "HiOutlineCog6Tooth";
+  };
+
+  const accessibleModules = getAccessibleModules();
+
+  // Create navigation with backend modules
+  const navigation = [
+    // Main dashboard
+    {
+      label: "Dashboard",
+      icon: "HiOutlineHome",
+      path: "/dashboard",
+      required: { minLevel: 0 },
+      section: "main",
+    },
+    // ERP modules from backend
+    ...accessibleModules,
+  ];
+
+  const userRoleLevel = user?.role?.level || user?.roleLevel || 300;
   const roleInfo = getRoleInfo(userRoleLevel);
 
   const handleMouseEnter = () => {

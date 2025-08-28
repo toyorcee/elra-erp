@@ -590,3 +590,336 @@ const checkInventoryDeleteAccess = async (user, inventory) => {
 
   return false;
 };
+
+// ============================================================================
+// PROJECT-SPECIFIC INVENTORY WORKFLOW CONTROLLERS
+// ============================================================================
+
+// @desc    Get project inventory workflow data
+// @route   GET /api/inventory/project/:projectId/workflow
+// @access  Private (Operations HOD+)
+export const getProjectInventoryWorkflow = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const currentUser = req.user;
+
+    // Verify user is Operations HOD
+    if (currentUser.department?.name !== "Operations" || currentUser.role.level < 700) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only Operations HOD can access project inventory workflow.",
+      });
+    }
+
+    // Get project details
+    const Project = await import("../models/Project.js");
+    const project = await Project.default.findById(projectId)
+      .populate("createdBy", "firstName lastName email")
+      .populate("department", "name");
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    // Get existing inventory items for this project
+    const projectInventory = await Inventory.find({ 
+      project: projectId,
+      isActive: true 
+    }).populate("assignedTo", "firstName lastName");
+
+    // Calculate budget allocation
+    const totalAllocated = projectInventory.reduce((sum, item) => sum + (item.purchasePrice || 0), 0);
+    const remainingBudget = project.budget - totalAllocated;
+
+    const workflowData = {
+      project: {
+        _id: project._id,
+        code: project.code,
+        name: project.name,
+        budget: project.budget,
+        category: project.category,
+        progress: project.progress,
+        status: project.status,
+        createdBy: project.createdBy,
+        department: project.department,
+      },
+      inventory: {
+        items: projectInventory,
+        totalItems: projectInventory.length,
+        totalAllocated: totalAllocated,
+        remainingBudget: remainingBudget,
+        budgetUtilization: project.budget > 0 ? (totalAllocated / project.budget) * 100 : 0,
+      },
+      workflow: {
+        inventoryCreated: project.workflowTriggers?.inventoryCreated || false,
+        inventoryCompleted: project.workflowTriggers?.inventoryCompleted || false,
+        canComplete: project.workflowTriggers?.inventoryCreated && !project.workflowTriggers?.inventoryCompleted,
+        nextPhase: "procurement",
+      },
+    };
+
+    res.status(200).json({
+      success: true,
+      data: workflowData,
+    });
+  } catch (error) {
+    console.error("❌ [INVENTORY] Get project workflow error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching project inventory workflow",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Create equipment for specific project
+// @route   POST /api/inventory/project/:projectId/equipment
+// @access  Private (Operations HOD+)
+export const createProjectEquipment = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const currentUser = req.user;
+    const equipmentData = req.body;
+
+    // Verify user is Operations HOD
+    if (currentUser.department?.name !== "Operations" || currentUser.role.level < 700) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only Operations HOD can create project equipment.",
+      });
+    }
+
+    // Verify project exists and is in correct phase
+    const Project = await import("../models/Project.js");
+    const project = await Project.default.findById(projectId);
+    
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    if (!project.workflowTriggers?.inventoryCreated) {
+      return res.status(400).json({
+        success: false,
+        message: "Project inventory phase has not been initiated yet.",
+      });
+    }
+
+    // Create inventory item linked to project
+    const inventoryItem = new Inventory({
+      ...equipmentData,
+      project: projectId,
+      createdBy: currentUser._id,
+      isActive: true,
+    });
+
+    await inventoryItem.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Equipment created successfully for project",
+      data: inventoryItem,
+    });
+  } catch (error) {
+    console.error("❌ [INVENTORY] Create project equipment error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error creating project equipment",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Allocate budget for project equipment
+// @route   POST /api/inventory/project/:projectId/budget
+// @access  Private (Operations HOD+)
+export const allocateProjectBudget = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const currentUser = req.user;
+    const { equipmentId, allocatedAmount } = req.body;
+
+    // Verify user is Operations HOD
+    if (currentUser.department?.name !== "Operations" || currentUser.role.level < 700) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only Operations HOD can allocate project budget.",
+      });
+    }
+
+    // Update equipment with allocated budget
+    const inventoryItem = await Inventory.findById(equipmentId);
+    if (!inventoryItem || inventoryItem.project.toString() !== projectId) {
+      return res.status(404).json({
+        success: false,
+        message: "Equipment not found for this project",
+      });
+    }
+
+    inventoryItem.purchasePrice = allocatedAmount;
+    inventoryItem.currentValue = allocatedAmount;
+    await inventoryItem.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Budget allocated successfully",
+      data: inventoryItem,
+    });
+  } catch (error) {
+    console.error("❌ [INVENTORY] Allocate budget error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error allocating budget",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Assign locations for project equipment
+// @route   POST /api/inventory/project/:projectId/locations
+// @access  Private (Operations HOD+)
+export const assignProjectLocations = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const currentUser = req.user;
+    const { equipmentId, location, specifications } = req.body;
+
+    // Verify user is Operations HOD
+    if (currentUser.department?.name !== "Operations" || currentUser.role.level < 700) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only Operations HOD can assign project locations.",
+      });
+    }
+
+    // Update equipment with location and specifications
+    const inventoryItem = await Inventory.findById(equipmentId);
+    if (!inventoryItem || inventoryItem.project.toString() !== projectId) {
+      return res.status(404).json({
+        success: false,
+        message: "Equipment not found for this project",
+      });
+    }
+
+    inventoryItem.location = location;
+    inventoryItem.specifications = specifications;
+    await inventoryItem.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Location assigned successfully",
+      data: inventoryItem,
+    });
+  } catch (error) {
+    console.error("❌ [INVENTORY] Assign location error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error assigning location",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Complete project inventory phase
+// @route   POST /api/inventory/project/:projectId/complete
+// @access  Private (Operations HOD+)
+export const completeProjectInventory = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const currentUser = req.user;
+
+    // Verify user is Operations HOD
+    if (currentUser.department?.name !== "Operations" || currentUser.role.level < 700) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only Operations HOD can complete project inventory.",
+      });
+    }
+
+    // Use the existing completeInventory method from Project model
+    const Project = await import("../models/Project.js");
+    const project = await Project.default.findById(projectId);
+    
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    await project.completeInventory(currentUser._id);
+
+    res.status(200).json({
+      success: true,
+      message: "Project inventory phase completed successfully",
+      data: {
+        projectId: project._id,
+        projectCode: project.code,
+        projectName: project.name,
+        inventoryCompleted: true,
+        completedAt: project.workflowTriggers.inventoryCompletedAt,
+        completedBy: currentUser._id,
+        currentProgress: project.progress,
+      },
+    });
+  } catch (error) {
+    console.error("❌ [INVENTORY] Complete project inventory error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error completing project inventory",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get equipment categories for dropdowns
+// @route   GET /api/inventory/categories
+// @access  Private
+export const getEquipmentCategories = async (req, res) => {
+  try {
+    const categories = [
+      // Equipment categories
+      { value: "construction_equipment", label: "Construction Equipment" },
+      { value: "office_equipment", label: "Office Equipment" },
+      { value: "medical_equipment", label: "Medical Equipment" },
+      { value: "agricultural_equipment", label: "Agricultural Equipment" },
+      { value: "industrial_equipment", label: "Industrial Equipment" },
+
+      // Vehicle categories
+      { value: "passenger_vehicle", label: "Passenger Vehicle" },
+      { value: "commercial_vehicle", label: "Commercial Vehicle" },
+      { value: "construction_vehicle", label: "Construction Vehicle" },
+      { value: "agricultural_vehicle", label: "Agricultural Vehicle" },
+
+      // Property categories
+      { value: "office_space", label: "Office Space" },
+      { value: "warehouse", label: "Warehouse" },
+      { value: "residential", label: "Residential" },
+      { value: "commercial_space", label: "Commercial Space" },
+
+      // Other categories
+      { value: "furniture", label: "Furniture" },
+      { value: "electronics", label: "Electronics" },
+      { value: "tools", label: "Tools" },
+      { value: "other", label: "Other" },
+    ];
+
+    res.status(200).json({
+      success: true,
+      message: "Equipment categories retrieved successfully",
+      data: categories,
+    });
+  } catch (error) {
+    console.error("❌ [INVENTORY] Get categories error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error retrieving equipment categories",
+      error: error.message,
+    });
+  }
+};

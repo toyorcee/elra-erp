@@ -45,6 +45,7 @@ import {
   CheckCircleIcon,
   StarIcon,
   ExclamationTriangleIcon,
+  DocumentIcon,
 } from "@heroicons/react/24/outline";
 import { userModulesAPI } from "../../services/userModules.js";
 import { getNavigationForRole } from "../../config/sidebarConfig.js";
@@ -65,9 +66,12 @@ const Dashboard = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isModulesCollapsed, setIsModulesCollapsed] = useState(false);
   const [hrDashboardData, setHrDashboardData] = useState(null);
+  const [selfServiceDashboardData, setSelfServiceDashboardData] =
+    useState(null);
   const [loading, setLoading] = useState(false);
   const [backendModules, setBackendModules] = useState([]);
   const [showAllActivities, setShowAllActivities] = useState(false);
+  const [modulesLoading, setModulesLoading] = useState(false);
 
   const getUserRoleLevel = () => {
     if (!user) return 0;
@@ -143,15 +147,7 @@ const Dashboard = () => {
       borderColor: "border-transparent",
       description: "Purchase requisitions and vendor management",
     },
-    documents: {
-      key: "documents",
-      label: "Document Management",
-      icon: DocumentTextIcon,
-      color: "text-[var(--elra-primary)]",
-      bgColor: "bg-gradient-to-br from-slate-50 to-slate-100",
-      borderColor: "border-transparent",
-      description: "Document storage, sharing and workflow",
-    },
+
     projects: {
       key: "projects",
       label: "Project Management",
@@ -229,6 +225,7 @@ const Dashboard = () => {
   // Fetch backend modules
   const fetchBackendModules = async () => {
     try {
+      setModulesLoading(true);
       const response = await userModulesAPI.getUserModules();
       if (response.success && response.data) {
         setBackendModules(response.data);
@@ -239,13 +236,13 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error("❌ [Dashboard] Error fetching backend modules:", error);
+    } finally {
+      setModulesLoading(false);
     }
   };
 
   const getAccessibleModules = () => {
-    // Use backend API data if available, otherwise fall back to frontend filtering
     if (backendModules && backendModules.length > 0) {
-      // Use backend API data
       return backendModules
         .map((module) => {
           const moduleKey = module.code.toLowerCase().replace(/_/g, "-");
@@ -279,7 +276,9 @@ const Dashboard = () => {
       userModuleAccess
     );
 
-    const erpModules = navigation.filter((item) => item.section === "erp");
+    const erpModules = navigation
+      ? navigation.filter((item) => item.section === "erp")
+      : [];
 
     return erpModules
       .map((module) => {
@@ -347,10 +346,11 @@ const Dashboard = () => {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Fetch HR dashboard data when module is 'hr'
   useEffect(() => {
     if (module === "hr") {
       fetchHRDashboardData();
+    } else if (module === "self-service" || module === "self_service") {
+      fetchSelfServiceDashboardData();
     }
   }, [module]);
 
@@ -370,6 +370,23 @@ const Dashboard = () => {
     }
   };
 
+  const fetchSelfServiceDashboardData = async () => {
+    try {
+      setLoading(true);
+
+      const response =
+        await userModulesAPI.dashboard.getSelfServiceDashboardData();
+
+      if (response.success) {
+        setSelfServiceDashboardData(response.data);
+      } else {
+      }
+    } catch (error) {
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Render module card
   const renderModuleCard = (module) => {
     const IconComponent = module.icon;
@@ -381,13 +398,13 @@ const Dashboard = () => {
         setTimeout(() => {
           const firstChildPages = {
             "self-service": "/dashboard/modules/self-service/payslips",
-            documents: "/dashboard/modules/documents",
+
             "customer-care": "/dashboard/modules/customer-care",
             hr: "/dashboard/modules/hr/invitation",
             payroll: "/dashboard/modules/payroll/salary-grades",
             finance: "/dashboard/modules/finance/transactions",
-            inventory: "/dashboard/modules/inventory/list",
-            procurement: "/dashboard/modules/procurement/orders",
+            inventory: "/dashboard/modules/inventory",
+            procurement: "/dashboard/modules/procurement",
             projects: "/dashboard/modules/projects/list",
             it: "/dashboard/modules/it",
             operations: "/dashboard/modules/operations",
@@ -465,14 +482,222 @@ const Dashboard = () => {
     );
   };
 
+  // Render main dashboard content
+  const renderMainDashboard = () => {
+    return (
+      <div className="space-y-8">
+        {/* Welcome Section */}
+        <div className="bg-[var(--elra-primary)] rounded-2xl p-8 text-white shadow-xl">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                <HomeIcon className="h-8 w-8" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">
+                  Welcome back, {user?.firstName || "User"}!
+                </h1>
+                <p className="text-white/80 text-lg">
+                  Access your ERP modules and manage your business operations
+                </p>
+              </div>
+            </div>
+
+            {/* Date and Time */}
+            <div className="text-right">
+              <div className="flex items-center space-x-2 mb-1">
+                <ClockIcon className="h-5 w-5 text-white/80" />
+                <span className="text-lg font-semibold">
+                  {currentTime.toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                    hour12: true,
+                  })}
+                </span>
+              </div>
+              <div className="text-white/80 text-sm">
+                {currentTime.toLocaleDateString("en-US", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
+              <div className="text-lg font-bold">
+                {accessibleModules.length}
+              </div>
+              <div className="text-white/80 text-sm">Available Modules</div>
+            </div>
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
+              <div className="text-lg font-bold">
+                {(user?.role?.name || "USER").replace(/_/g, " ")}
+              </div>
+              <div className="text-white/80 text-sm">Your Role</div>
+            </div>
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
+              <div className="text-lg font-bold">{roleLevel}</div>
+              <div className="text-white/80 text-sm">Access Level</div>
+            </div>
+          </div>
+        </div>
+
+        {/* ERP Modules Grid */}
+        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-[var(--elra-text-primary)] mb-2">
+                ERP Modules
+              </h2>
+              <p className="text-[var(--elra-text-secondary)]">
+                Access and manage different aspects of your business operations
+              </p>
+            </div>
+            <button
+              onClick={() => setIsModulesCollapsed(!isModulesCollapsed)}
+              className="p-2 text-gray-500 hover:text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] rounded-lg transition-colors cursor-pointer"
+              title={
+                isModulesCollapsed
+                  ? "Expand ERP Modules"
+                  : "Collapse ERP Modules"
+              }
+            >
+              {isModulesCollapsed ? (
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 15l7-7 7 7"
+                  />
+                </svg>
+              )}
+            </button>
+          </div>
+
+          {!isModulesCollapsed && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {modulesLoading ? (
+                <div className="col-span-full flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <GradientSpinner size="md" />
+                    <p className="text-[var(--elra-primary)] mt-4 text-sm font-medium">
+                      Loading your modules...
+                    </p>
+                  </div>
+                </div>
+              ) : accessibleModules.length > 0 ? (
+                accessibleModules.map(renderModuleCard)
+              ) : (
+                <div className="col-span-full text-center py-12">
+                  <div className="text-gray-500">
+                    <svg
+                      className="w-16 h-16 mx-auto mb-4 text-gray-300"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    <p className="text-lg font-medium text-gray-600 mb-2">
+                      No Modules Available
+                    </p>
+                    <p className="text-gray-500 text-sm">
+                      Contact your administrator to get access to modules.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // Render dynamic module dashboard content
   const renderDynamicModuleDashboard = () => {
     const moduleInfo = getCurrentModuleInfo();
 
+    // If no module is specified, show the main dashboard
+    if (!module) {
+      return renderMainDashboard();
+    }
+
+    console.log("🔍 [Dashboard] Debug module finding:", {
+      module,
+      accessibleModules: accessibleModules.map((m) => ({
+        key: m.key,
+        path: m.path,
+      })),
+      moduleMapKeys: Object.keys(moduleMap),
+    });
+
     // Find the current module data by matching the path or key
-    const currentModuleData = accessibleModules.find(
+    let currentModuleData = accessibleModules.find(
       (m) => m.key === module || m.path.includes(`/${module}`)
     );
+
+    console.log(
+      "🔍 [Dashboard] Found in accessibleModules:",
+      currentModuleData
+    );
+
+    if (!currentModuleData) {
+      if (module && moduleMap[module]) {
+        currentModuleData = moduleMap[module];
+        console.log(
+          "🔍 [Dashboard] Found in moduleMap (exact):",
+          currentModuleData
+        );
+      } else if (module) {
+        const hyphenVersion = module.replace(/_/g, "-");
+        const underscoreVersion = module.replace(/-/g, "_");
+
+        if (moduleMap[hyphenVersion]) {
+          currentModuleData = moduleMap[hyphenVersion];
+          console.log(
+            "🔍 [Dashboard] Found in moduleMap (hyphen):",
+            currentModuleData
+          );
+        } else if (moduleMap[underscoreVersion]) {
+          currentModuleData = moduleMap[underscoreVersion];
+          console.log(
+            "🔍 [Dashboard] Found in moduleMap (underscore):",
+            currentModuleData
+          );
+        }
+      }
+    }
 
     if (!currentModuleData) {
       return (
@@ -566,9 +791,8 @@ const Dashboard = () => {
 
         {/* Module Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {module === "hr" && loading
-            ? // Loading state for HR module
-              Array.from({ length: 4 }).map((_, index) => (
+          {(module === "self-service" || module === "self_service") && loading
+            ? Array.from({ length: 4 }).map((_, index) => (
                 <div
                   key={index}
                   className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 animate-pulse"
@@ -1002,6 +1226,75 @@ const Dashboard = () => {
           bgColor: "bg-[var(--elra-secondary-3)]",
         },
       ],
+      "self-service": selfServiceDashboardData
+        ? [
+            {
+              label: "My Payslips",
+              value:
+                selfServiceDashboardData.summary?.totalPayslips?.toString() ||
+                "0",
+              icon: DocumentTextIcon,
+              color: "text-[var(--elra-primary)]",
+              bgColor: "bg-[var(--elra-secondary-3)]",
+            },
+            {
+              label: "Leave Requests",
+              value:
+                selfServiceDashboardData.summary?.totalLeaveRequests?.toString() ||
+                "0",
+              icon: ClipboardDocumentListIcon,
+              color: "text-blue-600",
+              bgColor: "bg-blue-50",
+            },
+            {
+              label: "My Projects",
+              value:
+                selfServiceDashboardData.summary?.totalProjects?.toString() ||
+                "0",
+              icon: FolderIcon,
+              color: "text-orange-600",
+              bgColor: "bg-orange-50",
+            },
+            {
+              label: "My Documents",
+              value:
+                selfServiceDashboardData.summary?.totalDocuments?.toString() ||
+                "0",
+              icon: DocumentIcon,
+              color: "text-green-600",
+              bgColor: "bg-green-50",
+            },
+          ]
+        : [
+            {
+              label: "My Payslips",
+              value: "Loading...",
+              icon: DocumentTextIcon,
+              color: "text-gray-400",
+              bgColor: "bg-gray-100",
+            },
+            {
+              label: "Leave Requests",
+              value: "Loading...",
+              icon: ClipboardDocumentListIcon,
+              color: "text-gray-400",
+              bgColor: "bg-gray-100",
+            },
+            {
+              label: "My Projects",
+              value: "Loading...",
+              icon: FolderIcon,
+              color: "text-gray-400",
+              bgColor: "bg-gray-100",
+            },
+            {
+              label: "My Documents",
+              value: "Loading...",
+              icon: DocumentIcon,
+              color: "text-gray-400",
+              bgColor: "bg-gray-100",
+            },
+          ],
       inventory: [
         {
           label: "Total Items",
@@ -1062,36 +1355,7 @@ const Dashboard = () => {
           bgColor: "bg-[var(--elra-secondary-3)]",
         },
       ],
-      "self-service": [
-        {
-          label: "My Payslips",
-          value: "12",
-          icon: DocumentTextIcon,
-          color: "text-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-secondary-3)]",
-        },
-        {
-          label: "My Documents",
-          value: "8",
-          icon: DocumentTextIcon,
-          color: "text-green-600",
-          bgColor: "bg-green-50",
-        },
-        {
-          label: "My Tickets",
-          value: "3",
-          icon: ClipboardDocumentListIcon,
-          color: "text-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-secondary-3)]",
-        },
-        {
-          label: "My Requests",
-          value: "5",
-          icon: ClockIcon,
-          color: "text-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-secondary-3)]",
-        },
-      ],
+
       it: [
         {
           label: "Active Tickets",
@@ -1274,7 +1538,16 @@ const Dashboard = () => {
       ],
     };
 
-    return stats[moduleKey] || [];
+    // Handle both hyphen and underscore versions for module keys
+    const normalizedModuleKey = moduleKey.replace(/_/g, "-");
+    const underscoreModuleKey = moduleKey.replace(/-/g, "_");
+
+    return (
+      stats[moduleKey] ||
+      stats[normalizedModuleKey] ||
+      stats[underscoreModuleKey] ||
+      []
+    );
   };
 
   const getModuleQuickActions = (moduleKey) => {
@@ -1543,8 +1816,43 @@ const Dashboard = () => {
       return showAllActivities ? activities : activities.slice(0, 3);
     }
 
-    // Fallback to hardcoded activities for HR when API data not loaded
+    // For Self-Service module, use real data from API
+    if (
+      (moduleKey === "self-service" || moduleKey === "self_service") &&
+      selfServiceDashboardData?.recentActivity
+    ) {
+      const activities = selfServiceDashboardData.recentActivity.map(
+        (activity) => {
+          return {
+            title: activity.action?.replace(/_/g, " ") || "Activity",
+            description:
+              activity.details?.description || "Self-service activity",
+            icon: getActivityIcon(activity.action),
+            color: "text-[var(--elra-primary)]",
+            bgColor: "bg-[var(--elra-secondary-3)]",
+            time: formatTimeAgo(activity.timestamp),
+          };
+        }
+      );
+
+      return showAllActivities ? activities : activities.slice(0, 3);
+    }
+
     if (moduleKey === "hr") {
+      return [
+        {
+          title: "Loading...",
+          description: "Fetching recent activities",
+          icon: ClockIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+          time: "Just now",
+        },
+      ];
+    }
+
+    // Fallback to hardcoded activities for Self-Service when API data not loaded
+    if (moduleKey === "self-service" || moduleKey === "self_service") {
       return [
         {
           title: "Loading...",
@@ -1686,129 +1994,7 @@ const Dashboard = () => {
   // Render dashboard content based on current view
   const renderDashboardContent = () => {
     // Main dashboard view - ALWAYS present as per user requirement
-    const mainDashboardContent = (
-      <div className="space-y-8">
-        {/* Welcome Section */}
-        <div className="bg-[var(--elra-primary)] rounded-2xl p-8 text-white shadow-xl">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                <HomeIcon className="h-8 w-8" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold">
-                  Welcome back, {user?.firstName || "User"}!
-                </h1>
-                <p className="text-white/80 text-lg">
-                  Access your ERP modules and manage your business operations
-                </p>
-              </div>
-            </div>
-
-            {/* Date and Time */}
-            <div className="text-right">
-              <div className="flex items-center space-x-2 mb-1">
-                <ClockIcon className="h-5 w-5 text-white/80" />
-                <span className="text-lg font-semibold">
-                  {currentTime.toLocaleTimeString("en-US", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit",
-                    hour12: true,
-                  })}
-                </span>
-              </div>
-              <div className="text-white/80 text-sm">
-                {currentTime.toLocaleDateString("en-US", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
-              <div className="text-lg font-bold">
-                {accessibleModules.length}
-              </div>
-              <div className="text-white/80 text-sm">Available Modules</div>
-            </div>
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
-              <div className="text-lg font-bold">
-                {(user?.role?.name || "USER").replace(/_/g, " ")}
-              </div>
-              <div className="text-white/80 text-sm">Your Role</div>
-            </div>
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
-              <div className="text-lg font-bold">{roleLevel}</div>
-              <div className="text-white/80 text-sm">Access Level</div>
-            </div>
-          </div>
-        </div>
-
-        {/* ERP Modules Grid */}
-        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-[var(--elra-text-primary)] mb-2">
-                ERP Modules
-              </h2>
-              <p className="text-[var(--elra-text-secondary)]">
-                Access and manage different aspects of your business operations
-              </p>
-            </div>
-            <button
-              onClick={() => setIsModulesCollapsed(!isModulesCollapsed)}
-              className="p-2 text-gray-500 hover:text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] rounded-lg transition-colors cursor-pointer"
-              title={
-                isModulesCollapsed
-                  ? "Expand ERP Modules"
-                  : "Collapse ERP Modules"
-              }
-            >
-              {isModulesCollapsed ? (
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 15l7-7 7 7"
-                  />
-                </svg>
-              )}
-            </button>
-          </div>
-
-          {!isModulesCollapsed && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {accessibleModules.map(renderModuleCard)}
-            </div>
-          )}
-        </div>
-      </div>
-    );
+    const mainDashboardContent = renderMainDashboard();
 
     if (isModuleView && currentModule) {
       return (
@@ -1840,11 +2026,25 @@ const Dashboard = () => {
   // Show loading spinner while authenticating or during initial load
   if (authLoading || isLoading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50">
         <div className="text-center">
           <GradientSpinner size="lg" />
-          <p className="text-gray-600 mt-4 text-lg">
+          <p className="text-[var(--elra-primary)] mt-4 text-lg font-medium">
             {authLoading ? "Authenticating..." : "Loading your dashboard..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading spinner while modules are being loaded
+  if (modulesLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50">
+        <div className="text-center">
+          <GradientSpinner size="lg" />
+          <p className="text-[var(--elra-primary)] mt-4 text-lg font-medium">
+            Loading your modules...
           </p>
         </div>
       </div>

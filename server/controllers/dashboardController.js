@@ -7,6 +7,8 @@ import LeaveRequest from "../models/LeaveRequest.js";
 import Invitation from "../models/Invitation.js";
 import Compliance from "../models/Compliance.js";
 import Policy from "../models/Policy.js";
+import Payslip from "../models/Payslip.js";
+import Project from "../models/Project.js";
 import AuditService from "../services/auditService.js";
 
 // Get dashboard data based on user role
@@ -670,6 +672,144 @@ export const getHRDepartmentData = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to load department data",
+    });
+  }
+};
+
+// ==================== SELF-SERVICE DASHBOARD METHODS ====================
+
+// Get Self-Service dashboard data for current user
+export const getSelfServiceDashboardData = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const userId = currentUser._id;
+
+    console.log("🚀 [Self-Service Dashboard] Getting data for user:", {
+      userId: currentUser._id,
+      role: currentUser.role?.level,
+      department: currentUser.department?.name,
+    });
+
+    // ==================== SUMMARY METRICS ====================
+
+    // 1. Total Payslips - Count user's payslips from Payslip model
+    const totalPayslips = await Payslip.countDocuments({
+      employee: userId,
+    });
+
+    // 2. Leave Requests - Count user's leave requests
+    const totalLeaveRequests = await LeaveRequest.countDocuments({
+      employee: userId,
+    });
+
+    // 3. Projects - Count user's projects (since no tickets yet)
+    const totalProjects = await Project.countDocuments({
+      $or: [{ createdBy: userId }, { "teamMembers.member": userId }],
+    });
+
+    // 4. Documents - Count user's documents
+    const totalDocuments = await Document.countDocuments({
+      uploadedBy: userId,
+      isActive: true,
+    });
+
+    // ==================== DETAILED DATA ====================
+
+    // Recent Leave Requests
+    const recentLeaveRequests = await LeaveRequest.find({
+      employee: userId,
+    })
+      .populate("department", "name")
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    // Recent Documents
+    const recentDocuments = await Document.find({
+      uploadedBy: userId,
+      isActive: true,
+    })
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    // Pending Leave Requests
+    const pendingLeaveRequests = await LeaveRequest.countDocuments({
+      employee: userId,
+      status: "Pending",
+    });
+
+    // Approved Leave Requests
+    const approvedLeaveRequests = await LeaveRequest.countDocuments({
+      employee: userId,
+      status: "Approved",
+    });
+
+    // Rejected Leave Requests
+    const rejectedLeaveRequests = await LeaveRequest.countDocuments({
+      employee: userId,
+      status: "Rejected",
+    });
+
+    // Recent Activity
+    const recentActivity = await AuditLog.find({
+      userId: userId,
+      resourceType: {
+        $in: ["DOCUMENT", "LEAVE_REQUEST", "PAYSLIP", "PROJECT"],
+      },
+    })
+      .populate("resourceId")
+      .sort({ timestamp: -1 })
+      .limit(10);
+
+    // Recent Payslips
+    const recentPayslips = await Payslip.find({
+      employee: userId,
+    })
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    // Recent Projects
+    const recentProjects = await Project.find({
+      $or: [{ createdBy: userId }, { "teamMembers.member": userId }],
+    })
+      .populate("teamMembers.member", "firstName lastName")
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    res.json({
+      success: true,
+      data: {
+        // Summary Metrics
+        summary: {
+          totalPayslips,
+          totalLeaveRequests,
+          totalProjects,
+          totalDocuments,
+          pendingLeaveRequests,
+          approvedLeaveRequests,
+          rejectedLeaveRequests,
+        },
+
+        // Detailed Data
+        recentLeaveRequests,
+        recentDocuments,
+        recentPayslips,
+        recentProjects,
+        recentActivity,
+
+        // User Info
+        user: {
+          id: currentUser._id,
+          name: `${currentUser.firstName} ${currentUser.lastName}`,
+          role: currentUser.role?.name || "Staff",
+          department: currentUser.department?.name || "Unknown Department",
+        },
+      },
+    });
+  } catch (error) {
+    console.error("❌ [Self-Service Dashboard] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load Self-Service dashboard data",
     });
   }
 };

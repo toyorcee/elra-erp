@@ -1,5 +1,15 @@
-export { default as FinanceManagement } from "./FinanceManagement";
-export { default as FinancialTransactions } from "./FinancialTransactions";
-export { default as RevenueManagement } from "./RevenueManagement";
-export { default as ExpenseManagement } from "./ExpenseManagement";
-export { default as FinancialReports } from "./FinancialReports";
+import FinanceManagement from "./FinanceManagement";
+import FinancialReports from "./FinancialReports";
+import ExpenseManagement from "./ExpenseManagement";
+import RevenueManagement from "./RevenueManagement";
+import FinancialTransactions from "./FinancialTransactions";
+import ProjectFinanceManagement from "./ProjectFinanceManagement";
+
+export {
+  FinanceManagement,
+  FinancialReports,
+  ExpenseManagement,
+  RevenueManagement,
+  FinancialTransactions,
+  ProjectFinanceManagement,
+};

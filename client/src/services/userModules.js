@@ -62,6 +62,27 @@ export const userModulesAPI = {
         throw error;
       }
     },
+
+    // Get Self-Service dashboard data
+    getSelfServiceDashboardData: async () => {
+      try {
+        console.log(
+          "🔍 [dashboardAPI] Fetching Self-Service dashboard data..."
+        );
+        const response = await api.get("/dashboard/self-service/overview");
+        console.log(
+          "✅ [dashboardAPI] Self-Service dashboard data fetched successfully:",
+          response.data
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [dashboardAPI] Error fetching Self-Service dashboard data:",
+          error
+        );
+        throw error;
+      }
+    },
   },
 
   // Invitation Management API

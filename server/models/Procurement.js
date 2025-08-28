@@ -261,11 +261,11 @@ const procurementSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
-    company: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Company",
-      required: true,
-    },
+    // company: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "Company",
+    //   required: true,
+    // },
     isActive: {
       type: Boolean,
       default: true,
@@ -278,9 +278,8 @@ const procurementSchema = new mongoose.Schema(
   }
 );
 
-// Indexes for better performance
-procurementSchema.index({ company: 1, status: 1 });
-procurementSchema.index({ company: 1, "supplier.name": 1 });
+procurementSchema.index({ status: 1 });
+procurementSchema.index({ "supplier.name": 1 });
 procurementSchema.index({ poNumber: 1 }, { unique: true });
 procurementSchema.index({ orderDate: 1 });
 procurementSchema.index({ expectedDeliveryDate: 1 });
@@ -322,9 +321,7 @@ procurementSchema.virtual("receivedPercentage").get(function () {
 // Pre-save middleware to generate PO number if not provided
 procurementSchema.pre("save", async function (next) {
   if (!this.poNumber) {
-    const count = await this.constructor.countDocuments({
-      company: this.company,
-    });
+    const count = await this.constructor.countDocuments();
     this.poNumber = `PO${String(count + 1).padStart(4, "0")}`;
   }
   next();
@@ -342,9 +339,9 @@ procurementSchema.pre("save", function (next) {
 });
 
 // Static method to get procurement statistics
-procurementSchema.statics.getProcurementStats = async function (companyId) {
+procurementSchema.statics.getProcurementStats = async function () {
   const stats = await this.aggregate([
-    { $match: { company: companyId, isActive: true } },
+    { $match: { isActive: true } },
     {
       $group: {
         _id: "$status",
@@ -367,17 +364,16 @@ procurementSchema.statics.getProcurementStats = async function (companyId) {
 };
 
 // Static method to get pending approvals
-procurementSchema.statics.getPendingApprovals = function (companyId) {
-  return this.find({ company: companyId, isActive: true, status: "pending" })
+procurementSchema.statics.getPendingApprovals = function () {
+  return this.find({ isActive: true, status: "pending" })
     .populate("createdBy", "firstName lastName")
     .populate("relatedProject", "name code")
     .sort({ createdAt: 1 });
 };
 
 // Static method to get overdue deliveries
-procurementSchema.statics.getOverdueDeliveries = function (companyId) {
+procurementSchema.statics.getOverdueDeliveries = function () {
   return this.find({
-    company: companyId,
     isActive: true,
     status: { $in: ["ordered", "approved"] },
     expectedDeliveryDate: { $lt: new Date() },

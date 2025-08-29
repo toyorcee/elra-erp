@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   PlusIcon,
   PencilIcon,
@@ -131,8 +132,16 @@ const ProjectList = () => {
       unitPrice: "",
       totalPrice: 0,
       deliveryTimeline: "",
+      currency: "NGN",
     },
   ]);
+
+  // Currency options
+  const currencyOptions = [
+    { value: "NGN", label: "NGN (Nigerian Naira)", symbol: "₦" },
+    { value: "USD", label: "USD (US Dollar)", symbol: "$" },
+    { value: "GBP", label: "GBP (British Pound)", symbol: "£" },
+  ];
 
   // Vendor categories state
   const [vendorCategories, setVendorCategories] = useState([]);
@@ -267,6 +276,29 @@ const ProjectList = () => {
   const shouldDisableDocumentEditing = (project) => {
     if (!project) return false;
 
+    // Personal projects - disable document upload for all statuses
+    if (project.projectScope === "personal") {
+      return true;
+    }
+
+    // Departmental and External projects - allow document upload for most statuses
+    if (
+      project.projectScope === "departmental" ||
+      project.projectScope === "external"
+    ) {
+      // Only disable for completed, rejected, or cancelled projects
+      if (
+        project.status === "completed" ||
+        project.status === "rejected" ||
+        project.status === "cancelled"
+      ) {
+        return true;
+      }
+      // Allow upload for all other statuses (including implementation)
+      return false;
+    }
+
+    // Default fallback for any other project scope
     if (
       project.status === "pending_approval" ||
       project.status === "pending_finance_approval" ||
@@ -312,6 +344,14 @@ const ProjectList = () => {
     const numBudget = parseFormattedNumber(budget);
     if (!numBudget || numBudget <= 0) return null;
 
+    console.log("🔍 [DEBUG] getApprovalLevelText:", {
+      budget: numBudget,
+      projectScope: formData.projectScope,
+      requiresBudgetAllocation: formData.requiresBudgetAllocation,
+      userDepartment: user.department?.name,
+      userRoleLevel: user.role.level,
+    });
+
     // Super Admin - always auto-approved
     if (user.role.level === 1000) {
       return {
@@ -346,7 +386,17 @@ const ProjectList = () => {
           };
         }
       } else if (formData.projectScope === "external") {
-        return { text: "Auto-approved by HOD", color: "text-green-600" };
+        if (formData.requiresBudgetAllocation === "false") {
+          return {
+            text: "Legal → Executive Approval (No Budget)",
+            color: "text-green-600",
+          };
+        } else {
+          return {
+            text: "Legal → Finance → Executive Approval",
+            color: "text-blue-600",
+          };
+        }
       } else {
         // Default fallback
         return { text: "Auto-approved by HOD", color: "text-green-600" };
@@ -362,19 +412,32 @@ const ProjectList = () => {
             text: "Auto-approved (No Budget Allocation Required)",
             color: "text-green-600",
           };
+        } else {
+          // Budget allocation required - show approval workflow
+          if (user.department?.name === "Finance & Accounting") {
+            return {
+              text: "Direct to Executive Approval",
+              color: "text-blue-600",
+            };
+          } else {
+            return {
+              text: "Finance → Executive Approval",
+              color: "text-blue-600",
+            };
+          }
         }
-      }
-
-      if (user.department?.name === "Finance & Accounting") {
-        return {
-          text: "Direct to Executive Approval",
-          color: "text-blue-600",
-        };
-      } else {
-        return {
-          text: "Finance → Executive Approval",
-          color: "text-blue-600",
-        };
+      } else if (formData.projectScope === "external") {
+        if (formData.requiresBudgetAllocation === "false") {
+          return {
+            text: "Legal → Executive Approval (No Budget)",
+            color: "text-green-600",
+          };
+        } else {
+          return {
+            text: "Legal → Finance → Executive Approval",
+            color: "text-blue-600",
+          };
+        }
       }
     } else if (numBudget <= 25000000) {
       // Check budget allocation for personal/departmental projects
@@ -387,19 +450,32 @@ const ProjectList = () => {
             text: "Auto-approved (No Budget Allocation Required)",
             color: "text-green-600",
           };
+        } else {
+          // Budget allocation required - show approval workflow
+          if (user.department?.name === "Finance & Accounting") {
+            return {
+              text: "Direct to Executive Approval",
+              color: "text-orange-600",
+            };
+          } else {
+            return {
+              text: "Finance → Executive Approval",
+              color: "text-orange-600",
+            };
+          }
         }
-      }
-
-      if (user.department?.name === "Finance & Accounting") {
-        return {
-          text: "Direct to Executive Approval",
-          color: "text-orange-600",
-        };
-      } else {
-        return {
-          text: "Finance → Executive Approval",
-          color: "text-orange-600",
-        };
+      } else if (formData.projectScope === "external") {
+        if (formData.requiresBudgetAllocation === "false") {
+          return {
+            text: "Legal → Executive Approval (No Budget)",
+            color: "text-green-600",
+          };
+        } else {
+          return {
+            text: "Legal → Finance → Executive Approval",
+            color: "text-orange-600",
+          };
+        }
       }
     } else {
       // Check budget allocation for personal/departmental projects
@@ -412,21 +488,34 @@ const ProjectList = () => {
             text: "Auto-approved (No Budget Allocation Required)",
             color: "text-green-600",
           };
+        } else {
+          // Budget allocation required - show approval workflow
+          if (user.department?.name === "Finance & Accounting") {
+            return {
+              text: "Direct to Executive Approval",
+              color: "text-red-600",
+            };
+          } else if (user.department?.name === "Executive Office") {
+            return { text: "Finance → Executive Final", color: "text-red-600" };
+          } else {
+            return {
+              text: "Finance → Executive Approval",
+              color: "text-red-600",
+            };
+          }
         }
-      }
-
-      if (user.department?.name === "Finance & Accounting") {
-        return {
-          text: "Direct to Executive Approval",
-          color: "text-red-600",
-        };
-      } else if (user.department?.name === "Executive Office") {
-        return { text: "Finance → Executive Final", color: "text-red-600" };
-      } else {
-        return {
-          text: "Finance → Executive Approval",
-          color: "text-red-600",
-        };
+      } else if (formData.projectScope === "external") {
+        if (formData.requiresBudgetAllocation === "false") {
+          return {
+            text: "Legal → Executive Approval (No Budget)",
+            color: "text-green-600",
+          };
+        } else {
+          return {
+            text: "Legal → Finance → Executive Approval",
+            color: "text-red-600",
+          };
+        }
       }
     }
   };
@@ -449,8 +538,8 @@ const ProjectList = () => {
   const fetchProjectCategories = async () => {
     try {
       setLoadingCategories(true);
-      const response = await fetchProjectCategories();
-      setProjectCategories(response.categories || []);
+      const response = await api.get("/api/projects/categories");
+      setProjectCategories(response.data.categories || []);
     } catch (error) {
       console.error("Error fetching project categories:", error);
       setProjectCategories([
@@ -1254,10 +1343,25 @@ const ProjectList = () => {
             errors.push(`Item ${index + 1}: Item name is required`);
           }
           if (
+            !item.quantity ||
+            item.quantity === "" ||
+            parseInt(item.quantity) <= 0
+          ) {
+            errors.push(
+              `Item ${index + 1}: Valid quantity (number > 0) is required`
+            );
+          }
+          if (
             !item.unitPrice ||
+            item.unitPrice === "" ||
             parseFloat(item.unitPrice.replace(/,/g, "")) <= 0
           ) {
-            errors.push(`Item ${index + 1}: Valid unit price is required`);
+            errors.push(
+              `Item ${index + 1}: Valid unit price (number > 0) is required`
+            );
+          }
+          if (!item.currency) {
+            errors.push(`Item ${index + 1}: Currency is required`);
           }
           if (!item.deliveryTimeline.trim()) {
             errors.push(`Item ${index + 1}: Delivery timeline is required`);
@@ -1280,9 +1384,54 @@ const ProjectList = () => {
     if (formData.startDate && formData.endDate) {
       const startDate = new Date(formData.startDate);
       const endDate = new Date(formData.endDate);
+      const currentDate = new Date();
+      currentDate.setHours(0, 0, 0, 0);
+
+      if (startDate < currentDate) {
+        errors.push("Start date cannot be in the past");
+      }
+
       if (endDate <= startDate) {
         errors.push("End date must be after start date");
       }
+    }
+
+    // Delivery timeline validation for external projects
+    if (formData.projectScope === "external" && projectItems.length > 0) {
+      projectItems.forEach((item, index) => {
+        if (item.deliveryTimeline && formData.startDate && formData.endDate) {
+          const projectStartDate = new Date(formData.startDate);
+          const projectEndDate = new Date(formData.endDate);
+          const timelineText = item.deliveryTimeline.toLowerCase();
+
+          // Check if delivery timeline mentions days that exceed project duration
+          const daysMatch = timelineText.match(/(\d+)\s*days?/);
+          if (daysMatch) {
+            const deliveryDays = parseInt(daysMatch[1]);
+            const projectDuration = Math.ceil(
+              (projectEndDate - projectStartDate) / (1000 * 60 * 60 * 24)
+            );
+
+            if (deliveryDays > projectDuration) {
+              errors.push(
+                `Item ${
+                  index + 1
+                }: Delivery timeline (${deliveryDays} days) exceeds project duration (${projectDuration} days). Maximum allowed: ${projectDuration} days.`
+              );
+            }
+          } else {
+            // If no days mentioned, warn user to specify days
+            const projectDuration = Math.ceil(
+              (projectEndDate - projectStartDate) / (1000 * 60 * 60 * 24)
+            );
+            errors.push(
+              `Item ${
+                index + 1
+              }: Please specify delivery timeline in days (e.g., "Within 45 days of PO approval"). Project duration: ${projectDuration} days.`
+            );
+          }
+        }
+      });
     }
 
     return errors;
@@ -1318,12 +1467,26 @@ const ProjectList = () => {
           ...item,
           unitPrice: parseFloat(item.unitPrice.replace(/,/g, "")),
           totalPrice: item.totalPrice,
+          currency: item.currency,
         }));
       } else {
         delete submitData.vendorId;
         delete submitData.projectItems;
         submitData.requiresBudgetAllocation =
           formData.requiresBudgetAllocation === "true";
+
+        // Debug logging
+        console.log("🔍 [DEBUG] Personal/Departmental Project:");
+        console.log("  - Project Scope:", submitData.projectScope);
+        console.log("  - Budget:", submitData.budget);
+        console.log(
+          "  - requiresBudgetAllocation (frontend):",
+          formData.requiresBudgetAllocation
+        );
+        console.log(
+          "  - requiresBudgetAllocation (backend):",
+          submitData.requiresBudgetAllocation
+        );
       }
 
       const response = await createProject(submitData);
@@ -1351,10 +1514,14 @@ const ProjectList = () => {
               approvalMessage = "Sent to Finance → Executive for approval.";
             }
           } else if (submitData.projectScope === "external") {
-            approvalMessage = "Auto-approved by HOD!";
+            if (submitData.requiresBudgetAllocation === false) {
+              approvalMessage =
+                "Legal → Executive Approval (No Budget Allocation)";
+            } else {
+              approvalMessage = "Legal → Finance → Executive Approval";
+            }
           }
         } else if (budget <= 5000000) {
-          // Check budget allocation for personal/departmental projects
           if (
             submitData.projectScope === "personal" ||
             submitData.projectScope === "departmental"
@@ -1368,10 +1535,15 @@ const ProjectList = () => {
               approvalMessage = "Sent to Finance → Executive for approval.";
             }
           } else if (submitData.projectScope === "external") {
-            if (user.department?.name === "Finance & Accounting") {
-              approvalMessage = "Sent to Executive for approval.";
+            if (submitData.requiresBudgetAllocation === false) {
+              approvalMessage =
+                "Legal → Executive Approval (No Budget Allocation)";
             } else {
-              approvalMessage = "Sent to Finance → Executive for approval.";
+              if (user.department?.name === "Finance & Accounting") {
+                approvalMessage = "Legal → Executive Approval";
+              } else {
+                approvalMessage = "Legal → Finance → Executive Approval";
+              }
             }
           }
         } else if (budget <= 25000000) {
@@ -1380,19 +1552,36 @@ const ProjectList = () => {
             submitData.projectScope === "personal" ||
             submitData.projectScope === "departmental"
           ) {
+            console.log("🔍 [DEBUG] Budget ≤25M - Personal/Departmental:");
+            console.log(
+              "  - requiresBudgetAllocation:",
+              submitData.requiresBudgetAllocation
+            );
+            console.log("  - User Department:", user.department?.name);
+
             if (submitData.requiresBudgetAllocation === false) {
               approvalMessage =
                 "Auto-approved (No Budget Allocation Required)!";
+              console.log("✅ [DEBUG] Auto-approved - No Budget Allocation");
             } else if (user.department?.name === "Finance & Accounting") {
               approvalMessage = "Sent to Executive for approval.";
+              console.log("⏸️ [DEBUG] Finance HOD - Sent to Executive");
             } else {
               approvalMessage = "Sent to Finance → Executive for approval.";
+              console.log(
+                "⏸️ [DEBUG] Regular User - Sent to Finance → Executive"
+              );
             }
           } else if (submitData.projectScope === "external") {
-            if (user.department?.name === "Finance & Accounting") {
-              approvalMessage = "Sent to Executive for approval.";
+            if (submitData.requiresBudgetAllocation === false) {
+              approvalMessage =
+                "Legal → Executive Approval (No Budget Allocation)";
             } else {
-              approvalMessage = "Sent to Finance → Executive for approval.";
+              if (user.department?.name === "Finance & Accounting") {
+                approvalMessage = "Legal → Executive Approval";
+              } else {
+                approvalMessage = "Legal → Finance → Executive Approval";
+              }
             }
           }
         } else {
@@ -1412,12 +1601,17 @@ const ProjectList = () => {
               approvalMessage = "Sent to Finance → Executive for approval.";
             }
           } else if (submitData.projectScope === "external") {
-            if (user.department?.name === "Finance & Accounting") {
-              approvalMessage = "Sent to Executive for approval.";
-            } else if (user.department?.name === "Executive Office") {
-              approvalMessage = "Sent to Finance for approval.";
+            if (submitData.requiresBudgetAllocation === false) {
+              approvalMessage =
+                "Legal → Executive Approval (No Budget Allocation)";
             } else {
-              approvalMessage = "Sent to Finance → Executive for approval.";
+              if (user.department?.name === "Finance & Accounting") {
+                approvalMessage = "Legal → Executive Approval";
+              } else if (user.department?.name === "Executive Office") {
+                approvalMessage = "Legal → Finance Approval";
+              } else {
+                approvalMessage = "Legal → Finance → Executive Approval";
+              }
             }
           }
         }
@@ -1480,6 +1674,7 @@ const ProjectList = () => {
           ...item,
           unitPrice: parseFloat(item.unitPrice.replace(/,/g, "")),
           totalPrice: item.totalPrice,
+          currency: item.currency,
         }));
       } else {
         // Remove vendorId and projectItems for non-external projects
@@ -2017,608 +2212,843 @@ const ProjectList = () => {
         </div>
       </div>
 
-      {/* Unified Create/Edit Modal */}
-      {showModal && (
-        <div className="fixed inset-0 modal-backdrop-enhanced flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto modal-shadow-enhanced border border-gray-100 transform transition-all duration-300 ease-out">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">
-                {isEditMode ? "Edit Project" : "Create New Project"}
-              </h2>
-              <button
-                onClick={closeModal}
-                className="text-gray-400 hover:text-gray-600"
-                disabled={submitting}
-              >
-                <XMarkIcon className="h-6 w-6" />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              {/* Project Code Display - Only for new projects */}
-              {!isEditMode && nextProjectCode && (
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <div className="flex items-center justify-between">
+      {/* Enhanced Create/Edit Modal with ELRA Branding */}
+      <AnimatePresence>
+        {showModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-7xl w-full max-h-[95vh] flex flex-col"
+            >
+              {/* Header - Fixed Position */}
+              <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-t-2xl flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                      <ELRALogo variant="dark" size="md" />
+                    </div>
                     <div>
-                      <span className="text-sm font-medium text-blue-800">
-                        Next Project Code:
-                      </span>
-                      <span className="ml-2 text-lg font-bold text-blue-900">
-                        {nextProjectCode}
-                      </span>
+                      <h2 className="text-2xl font-bold">
+                        {isEditMode ? "Edit Project" : "Create New Project"}
+                      </h2>
+                      <p className="text-white text-opacity-90 mt-1 text-sm">
+                        {isEditMode
+                          ? "Update project details and specifications"
+                          : "Define project scope, budget, and requirements"}
+                      </p>
                     </div>
-                    <div className="text-sm text-blue-600">{currentDate}</div>
                   </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Project Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    placeholder="Enter project name (e.g., ABC Construction - Excavator Lease)"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                    required
-                    disabled={submitting}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Category <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) =>
-                      setFormData({ ...formData, category: e.target.value })
-                    }
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                    required
-                    disabled={submitting}
-                  >
-                    <option value="">Select Category</option>
-                    {projectCategories
-                      .filter((cat) => cat.value !== "all")
-                      .map((category) => (
-                        <option key={category.value} value={category.value}>
-                          {category.label}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Project Scope <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={formData.projectScope}
-                    onChange={(e) => {
-                      setFormData({
-                        ...formData,
-                        projectScope: e.target.value,
-                        requiresBudgetAllocation: "", // Reset budget allocation when scope changes
-                      });
-                      // Reset vendor selection when scope changes
-                      if (e.target.value !== "external") {
-                        setSelectedVendorCategory("");
-                        setFormData((prev) => ({ ...prev, vendorId: "" }));
-                      }
-                    }}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                    required
-                    disabled={submitting}
-                  >
-                    <option value="">Select Project Scope</option>
-                    {allowedProjectScopes.map((scope) => (
-                      <option key={scope} value={scope}>
-                        {scope === "personal" && "Personal"}
-                        {scope === "departmental" && "Departmental"}
-                        {scope === "external" && "External"}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Project Manager - Only show for non-personal projects */}
-                {formData.projectScope !== "personal" && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Project Manager
-                    </label>
-                    <UserSearchSelect
-                      value={formData.projectManager}
-                      onChange={(value) =>
-                        setFormData({ ...formData, projectManager: value })
-                      }
-                      placeholder="Search for a project manager..."
-                      label=""
-                      minRoleLevel={
-                        formData.projectScope === "external" &&
-                        (user?.department?.name === "Human Resources" ||
-                          user?.department?.name === "HR" ||
-                          user?.department?.name ===
-                            "Human Resource Management") &&
-                        user?.role?.level === 700
-                          ? 300 // HR HOD can assign levels 700, 600, 300 for external projects
-                          : 300 // Default for other cases
-                      }
-                      excludeUsers={[]}
-                      currentUser={user}
-                      className="w-full"
-                    />
-                  </div>
-                )}
-
-                {/* Budget Allocation - Only for Personal/Departmental Projects */}
-                {formData.projectScope !== "external" && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Budget Allocation <span className="text-red-500">*</span>
-                    </label>
-                    <div className="space-y-2">
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="requiresBudgetAllocation"
-                          value="false"
-                          checked={
-                            formData.requiresBudgetAllocation === "false"
-                          }
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              requiresBudgetAllocation: e.target.value,
-                            })
-                          }
-                          className="mr-2 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)]"
-                          disabled={submitting}
-                        />
-                        <span className="text-sm">
-                          No Budget Allocation (Use Existing Budget)
-                        </span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="requiresBudgetAllocation"
-                          value="true"
-                          checked={formData.requiresBudgetAllocation === "true"}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              requiresBudgetAllocation: e.target.value,
-                            })
-                          }
-                          className="mr-2 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)]"
-                          disabled={submitting}
-                        />
-                        <span className="text-sm">
-                          Requires Budget Allocation (Go Through Finance)
-                        </span>
-                      </label>
-                    </div>
-                    <p className="mt-2 text-sm text-gray-600">
-                      {formData.requiresBudgetAllocation === "false"
-                        ? formData.projectScope === "personal"
-                          ? "Project will be auto-approved and use your existing budget."
-                          : "Project will be auto-approved and use existing department budget."
-                        : formData.requiresBudgetAllocation === "true"
-                        ? "Project will go through Finance approval workflow."
-                        : "Choose whether this project needs new budget allocation."}
-                    </p>
-                  </div>
-                )}
-
-                {/* Vendor Category Selection - Only for External Projects */}
-                {formData.projectScope === "external" && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Vendor Category <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={selectedVendorCategory}
-                      onChange={(e) => {
-                        setSelectedVendorCategory(e.target.value);
-                        setFormData({ ...formData, vendorId: "" });
-                      }}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                      required
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={closeModal}
+                      className="bg-white text-[var(--elra-primary)] px-4 py-2 rounded-lg hover:bg-gray-50 transition-all duration-300 font-medium border border-white"
                       disabled={submitting}
                     >
-                      <option value="">Select Vendor Category</option>
-                      {vendorCategories.map((category) => (
-                        <option key={category.value} value={category.value}>
-                          {category.label}
-                        </option>
-                      ))}
-                    </select>
+                      Cancel
+                    </button>
+                    <button
+                      onClick={closeModal}
+                      className="text-white hover:text-gray-200 transition-colors p-1 rounded-full hover:bg-white hover:bg-opacity-20"
+                      disabled={submitting}
+                    >
+                      <XMarkIcon className="h-6 w-6" />
+                    </button>
                   </div>
-                )}
+                </div>
+              </div>
 
-                {/* Vendor Selection - Only for External Projects */}
-                {formData.projectScope === "external" &&
-                  selectedVendorCategory && (
+              {/* Content - Scrollable */}
+              <div className="p-8 bg-white overflow-y-auto flex-1">
+                <form onSubmit={handleSubmit}>
+                  {/* Enhanced Project Code Display - Only for new projects */}
+                  {!isEditMode && nextProjectCode && (
+                    <div className="mb-4 p-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+                            <svg
+                              className="w-4 h-4 text-white"
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium text-green-700">
+                              Next Project Code:
+                            </span>
+                            <span className="ml-2 text-xl font-bold text-green-900">
+                              {nextProjectCode}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-sm text-green-600 bg-green-100 px-3 py-1 rounded-full">
+                          {currentDate}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Vendor <span className="text-red-500">*</span>
+                      <label className="block text-sm font-semibold text-gray-800 mb-2">
+                        Project Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.name}
+                        onChange={(e) =>
+                          setFormData({ ...formData, name: e.target.value })
+                        }
+                        placeholder="Enter project name (e.g., Dangote Group - Training System Implementation)"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
+                        required
+                        disabled={submitting}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-800 mb-2">
+                        Category <span className="text-red-500">*</span>
                       </label>
                       <select
-                        value={formData.vendorId}
+                        value={formData.category}
                         onChange={(e) =>
-                          setFormData({ ...formData, vendorId: e.target.value })
+                          setFormData({ ...formData, category: e.target.value })
+                        }
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
+                        required
+                        disabled={submitting}
+                      >
+                        <option value="">Select Category</option>
+                        {projectCategories
+                          .filter((cat) => cat.value !== "all")
+                          .map((category) => (
+                            <option key={category.value} value={category.value}>
+                              {category.label}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-800 mb-2">
+                        Project Scope <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.projectScope}
+                        onChange={(e) => {
+                          setFormData({
+                            ...formData,
+                            projectScope: e.target.value,
+                            requiresBudgetAllocation: "", // Reset budget allocation when scope changes
+                          });
+                          // Reset vendor selection when scope changes
+                          if (e.target.value !== "external") {
+                            setSelectedVendorCategory("");
+                            setFormData((prev) => ({ ...prev, vendorId: "" }));
+                          }
+                        }}
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
+                        required
+                        disabled={submitting}
+                      >
+                        <option value="">Select Project Scope</option>
+                        {allowedProjectScopes.map((scope) => (
+                          <option key={scope} value={scope}>
+                            {scope === "personal" && "Personal"}
+                            {scope === "departmental" && "Departmental"}
+                            {scope === "external" && "External"}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Project Manager - Only show for non-personal projects */}
+                    {formData.projectScope !== "personal" && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Project Manager
+                        </label>
+                        <UserSearchSelect
+                          value={formData.projectManager}
+                          onChange={(value) =>
+                            setFormData({ ...formData, projectManager: value })
+                          }
+                          placeholder="Search for a project manager..."
+                          label=""
+                          minRoleLevel={
+                            formData.projectScope === "external" &&
+                            (user?.department?.name === "Human Resources" ||
+                              user?.department?.name === "HR" ||
+                              user?.department?.name ===
+                                "Human Resource Management") &&
+                            user?.role?.level === 700
+                              ? 300 // HR HOD can assign levels 700, 600, 300 for external projects
+                              : 300 // Default for other cases
+                          }
+                          excludeUsers={[]}
+                          currentUser={user}
+                          className="w-full"
+                        />
+                      </div>
+                    )}
+
+                    {/* Budget Allocation - Only for Personal/Departmental Projects */}
+                    {
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Budget Allocation{" "}
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <div className="space-y-2">
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="requiresBudgetAllocation"
+                              value="false"
+                              checked={
+                                formData.requiresBudgetAllocation === "false"
+                              }
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  requiresBudgetAllocation: e.target.value,
+                                })
+                              }
+                              className="mr-2 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)]"
+                              disabled={submitting}
+                            />
+                            <span className="text-sm">
+                              No Budget Allocation (Use Existing Budget)
+                            </span>
+                          </label>
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="requiresBudgetAllocation"
+                              value="true"
+                              checked={
+                                formData.requiresBudgetAllocation === "true"
+                              }
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  requiresBudgetAllocation: e.target.value,
+                                })
+                              }
+                              className="mr-2 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)]"
+                              disabled={submitting}
+                            />
+                            <span className="text-sm">
+                              Requires Budget Allocation (Go Through Finance)
+                            </span>
+                          </label>
+                        </div>
+                        <p className="mt-2 text-sm text-gray-600">
+                          {formData.requiresBudgetAllocation === "false"
+                            ? formData.projectScope === "personal"
+                              ? "Project will be auto-approved and use your existing budget."
+                              : formData.projectScope === "departmental"
+                              ? "Project will be auto-approved and use existing department budget."
+                              : "Project will be auto-approved and use existing HR department budget."
+                            : formData.requiresBudgetAllocation === "true"
+                            ? formData.projectScope === "external"
+                              ? "Project will go through Legal → Finance → Executive approval workflow."
+                              : "Project will go through Finance approval workflow."
+                            : "Choose whether this project needs new budget allocation."}
+                        </p>
+                      </div>
+                    }
+
+                    {/* Vendor Category Selection - Only for External Projects */}
+                    {formData.projectScope === "external" && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Vendor Category{" "}
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={selectedVendorCategory}
+                          onChange={(e) => {
+                            setSelectedVendorCategory(e.target.value);
+                            setFormData({ ...formData, vendorId: "" });
+                          }}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                          required
+                          disabled={submitting}
+                        >
+                          <option value="">Select Vendor Category</option>
+                          {vendorCategories.map((category) => (
+                            <option key={category.value} value={category.value}>
+                              {category.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Vendor Selection - Only for External Projects */}
+                    {formData.projectScope === "external" &&
+                      selectedVendorCategory && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Vendor Name <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.vendorName || ""}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                vendorName: e.target.value,
+                              })
+                            }
+                            placeholder="e.g., Dangote Group, Microsoft, etc."
+                            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                            required
+                            disabled={submitting}
+                          />
+                        </div>
+                      )}
+
+                    {/* Project Items Specification - Only for External Projects */}
+                    {formData.projectScope === "external" && (
+                      <div className="xl:col-span-2">
+                        <label className="block text-lg font-semibold text-gray-800 mb-4">
+                          Required Items & Specifications{" "}
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <div className="space-y-4">
+                          {projectItems.map((item, index) => (
+                            <div
+                              key={index}
+                              className="border border-gray-200 rounded-xl p-6 bg-gradient-to-br from-gray-50 to-green-50 shadow-sm"
+                            >
+                              <div className="flex items-center justify-between mb-4">
+                                <h4 className="text-lg font-semibold text-gray-800">
+                                  Item {index + 1}
+                                </h4>
+                                {projectItems.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newItems = projectItems.filter(
+                                        (_, i) => i !== index
+                                      );
+                                      setProjectItems(newItems);
+                                    }}
+                                    className="text-red-600 hover:text-red-800 text-sm"
+                                    disabled={submitting}
+                                  >
+                                    Remove Item
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                                    Item Name{" "}
+                                    <span className="text-red-500">*</span>
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={item.name}
+                                    onChange={(e) => {
+                                      const newItems = [...projectItems];
+                                      newItems[index].name = e.target.value;
+                                      setProjectItems(newItems);
+                                    }}
+                                    placeholder="e.g., Training Software Licenses"
+                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                    required
+                                    disabled={submitting}
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                                    Quantity{" "}
+                                    <span className="text-red-500">*</span>
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={item.quantity}
+                                    onChange={(e) => {
+                                      const newItems = [...projectItems];
+                                      const value = e.target.value;
+                                      const quantity =
+                                        value === "" ? 0 : parseInt(value) || 0;
+                                      const unitPrice =
+                                        parseFloat(
+                                          newItems[index].unitPrice.replace(
+                                            /,/g,
+                                            ""
+                                          )
+                                        ) || 0;
+
+                                      newItems[index].quantity = quantity;
+                                      newItems[index].totalPrice =
+                                        quantity * unitPrice;
+
+                                      console.log(
+                                        "🔢 [DEBUG] Quantity changed:",
+                                        {
+                                          quantity,
+                                          unitPrice,
+                                          totalPrice:
+                                            newItems[index].totalPrice,
+                                        }
+                                      );
+
+                                      setProjectItems(newItems);
+                                    }}
+                                    placeholder="e.g., 20"
+                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                    required
+                                    disabled={submitting}
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                                    Currency{" "}
+                                    <span className="text-red-500">*</span>
+                                  </label>
+                                  <select
+                                    value={item.currency}
+                                    onChange={(e) => {
+                                      const newItems = [...projectItems];
+                                      newItems[index].currency = e.target.value;
+                                      setProjectItems(newItems);
+                                    }}
+                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                    required
+                                    disabled={submitting}
+                                  >
+                                    {currencyOptions.map((currency) => (
+                                      <option
+                                        key={currency.value}
+                                        value={currency.value}
+                                      >
+                                        {currency.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                                    Unit Price ({item.currency}){" "}
+                                    <span className="text-red-500">*</span>
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={item.unitPrice}
+                                    onChange={(e) => {
+                                      const newItems = [...projectItems];
+                                      const unitPrice =
+                                        parseFloat(
+                                          e.target.value.replace(/,/g, "")
+                                        ) || 0;
+                                      const quantity =
+                                        newItems[index].quantity || 0;
+
+                                      newItems[index].unitPrice =
+                                        formatNumberWithCommas(e.target.value);
+                                      newItems[index].totalPrice =
+                                        quantity * unitPrice;
+
+                                      console.log(
+                                        "💰 [DEBUG] Unit Price changed:",
+                                        {
+                                          quantity,
+                                          unitPrice,
+                                          totalPrice:
+                                            newItems[index].totalPrice,
+                                        }
+                                      );
+
+                                      setProjectItems(newItems);
+                                    }}
+                                    placeholder={`e.g., ${
+                                      item.currency === "NGN"
+                                        ? "500,000"
+                                        : item.currency === "USD"
+                                        ? "1,250"
+                                        : "400"
+                                    }`}
+                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                    required
+                                    disabled={submitting}
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                                    Total Price ({item.currency})
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={`${
+                                      currencyOptions.find(
+                                        (c) => c.value === item.currency
+                                      )?.symbol || ""
+                                    }${formatNumberWithCommas(
+                                      item.totalPrice.toString()
+                                    )}`}
+                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-gray-100"
+                                    readOnly
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                                    Description
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={item.description}
+                                    onChange={(e) => {
+                                      const newItems = [...projectItems];
+                                      newItems[index].description =
+                                        e.target.value;
+                                      setProjectItems(newItems);
+                                    }}
+                                    placeholder="Brief description of the item"
+                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                    disabled={submitting}
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                                    Delivery Timeline{" "}
+                                    <span className="text-red-500">*</span>
+                                    {formData.startDate && formData.endDate && (
+                                      <span className="text-xs text-green-600 ml-1">
+                                        (Max:{" "}
+                                        {(() => {
+                                          const startDate = new Date(
+                                            formData.startDate
+                                          );
+                                          const endDate = new Date(
+                                            formData.endDate
+                                          );
+                                          return Math.ceil(
+                                            (endDate - startDate) /
+                                              (1000 * 60 * 60 * 24)
+                                          );
+                                        })()}{" "}
+                                        days)
+                                      </span>
+                                    )}
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={item.deliveryTimeline}
+                                    onChange={(e) => {
+                                      const newItems = [...projectItems];
+                                      newItems[index].deliveryTimeline =
+                                        e.target.value;
+                                      setProjectItems(newItems);
+                                    }}
+                                    placeholder={`e.g., Within ${
+                                      formData.startDate && formData.endDate
+                                        ? Math.ceil(
+                                            (new Date(formData.endDate) -
+                                              new Date(formData.startDate)) /
+                                              (1000 * 60 * 60 * 24)
+                                          )
+                                        : 45
+                                    } days of PO approval`}
+                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                    required
+                                    disabled={submitting}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProjectItems([
+                                ...projectItems,
+                                {
+                                  name: "",
+                                  description: "",
+                                  quantity: 1,
+                                  unitPrice: "",
+                                  totalPrice: 0,
+                                  deliveryTimeline: "",
+                                  currency: "NGN",
+                                },
+                              ]);
+                            }}
+                            className="w-full border-2 border-dashed border-gray-300 rounded-lg p-4 text-gray-600 hover:border-gray-400 hover:text-gray-800 transition-colors"
+                            disabled={submitting}
+                          >
+                            + Add Another Item
+                          </button>
+
+                          {/* Enhanced Total Budget Summary */}
+                          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 shadow-sm">
+                            <div className="flex justify-between items-center">
+                              <span className="text-lg font-semibold text-green-800">
+                                Total Items Cost:
+                              </span>
+                              <span className="text-lg font-bold text-green-900">
+                                {(() => {
+                                  const totalCost = projectItems.reduce(
+                                    (sum, item) => sum + item.totalPrice,
+                                    0
+                                  );
+                                  const currencies = [
+                                    ...new Set(
+                                      projectItems.map((item) => item.currency)
+                                    ),
+                                  ];
+                                  if (currencies.length === 1) {
+                                    const currency = currencies[0];
+                                    const symbol =
+                                      currencyOptions.find(
+                                        (c) => c.value === currency
+                                      )?.symbol || "";
+                                    return `${symbol}${formatNumberWithCommas(
+                                      totalCost.toString()
+                                    )}`;
+                                  } else {
+                                    return `Mixed Currencies: ${currencies.join(
+                                      ", "
+                                    )}`;
+                                  }
+                                })()}
+                              </span>
+                            </div>
+                            {formData.budget && (
+                              <div className="mt-3 space-y-2">
+                                <div className="flex justify-between items-center text-sm">
+                                  <span className="text-gray-600">
+                                    Project Budget:
+                                  </span>
+                                  <span className="font-medium">
+                                    ₦{formData.budget}
+                                  </span>
+                                </div>
+                                {(() => {
+                                  const totalCost = projectItems.reduce(
+                                    (sum, item) => sum + item.totalPrice,
+                                    0
+                                  );
+                                  const projectBudget =
+                                    parseFloat(
+                                      formData.budget.replace(/,/g, "")
+                                    ) || 0;
+                                  const isValid = totalCost <= projectBudget;
+
+                                  return (
+                                    <div
+                                      className={`flex items-center justify-between text-sm p-2 rounded-lg ${
+                                        isValid
+                                          ? "bg-green-50 border border-green-200"
+                                          : "bg-red-50 border border-red-200"
+                                      }`}
+                                    >
+                                      <span
+                                        className={`font-medium ${
+                                          isValid
+                                            ? "text-green-700"
+                                            : "text-red-700"
+                                        }`}
+                                      >
+                                        {isValid
+                                          ? "✅ Budget Valid"
+                                          : "❌ Budget Exceeded"}
+                                      </span>
+                                      <span
+                                        className={`font-bold ${
+                                          isValid
+                                            ? "text-green-800"
+                                            : "text-red-800"
+                                        }`}
+                                      >
+                                        {isValid
+                                          ? `Remaining: ₦${formatNumberWithCommas(
+                                              (
+                                                projectBudget - totalCost
+                                              ).toString()
+                                            )}`
+                                          : `Excess: ₦${formatNumberWithCommas(
+                                              (
+                                                totalCost - projectBudget
+                                              ).toString()
+                                            )}`}
+                                      </span>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Start Date <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.startDate}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            startDate: e.target.value,
+                          })
+                        }
+                        min={new Date().toISOString().split("T")[0]}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                        required
+                        disabled={submitting}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        End Date <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.endDate}
+                        onChange={(e) =>
+                          setFormData({ ...formData, endDate: e.target.value })
+                        }
+                        min={
+                          formData.startDate ||
+                          new Date().toISOString().split("T")[0]
+                        }
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                        required
+                        disabled={submitting}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Budget (NGN) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.budget}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            budget: formatNumberWithCommas(e.target.value),
+                          })
+                        }
+                        placeholder="Enter budget amount (e.g., 2,500,000)"
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                        required
+                        disabled={submitting}
+                      />
+                      {formData.budget &&
+                        getApprovalLevelText(formData.budget) && (
+                          <p
+                            className={`mt-2 text-sm font-medium ${
+                              getApprovalLevelText(formData.budget).color
+                            }`}
+                          >
+                            {getApprovalLevelText(formData.budget).text}
+                          </p>
+                        )}
+                    </div>
+                    {/* Status field removed - managed by backend workflow system */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Priority <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.priority}
+                        onChange={(e) =>
+                          setFormData({ ...formData, priority: e.target.value })
                         }
                         className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
                         required
                         disabled={submitting}
                       >
-                        <option value="">Select Vendor</option>
-                        {filteredVendors.map((vendor) => (
-                          <option key={vendor._id} value={vendor._id}>
-                            {vendor.name} - {vendor.contactPerson}
-                          </option>
-                        ))}
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
                       </select>
-                      {filteredVendors.length === 0 &&
-                        selectedVendorCategory && (
-                          <p className="text-sm text-orange-600 mt-1">
-                            No approved vendors found for this category. Please
-                            contact Procurement.
-                          </p>
-                        )}
-                    </div>
-                  )}
-
-                {/* Project Items Specification - Only for External Projects */}
-                {formData.projectScope === "external" && (
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      Required Items & Specifications{" "}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <div className="space-y-4">
-                      {projectItems.map((item, index) => (
-                        <div
-                          key={index}
-                          className="border border-gray-200 rounded-lg p-4 bg-gray-50"
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="text-sm font-medium text-gray-700">
-                              Item {index + 1}
-                            </h4>
-                            {projectItems.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const newItems = projectItems.filter(
-                                    (_, i) => i !== index
-                                  );
-                                  setProjectItems(newItems);
-                                }}
-                                className="text-red-600 hover:text-red-800 text-sm"
-                                disabled={submitting}
-                              >
-                                Remove Item
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                Item Name{" "}
-                                <span className="text-red-500">*</span>
-                              </label>
-                              <input
-                                type="text"
-                                value={item.name}
-                                onChange={(e) => {
-                                  const newItems = [...projectItems];
-                                  newItems[index].name = e.target.value;
-                                  setProjectItems(newItems);
-                                }}
-                                placeholder="e.g., Training Software Licenses"
-                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                                required
-                                disabled={submitting}
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                Quantity <span className="text-red-500">*</span>
-                              </label>
-                              <input
-                                type="number"
-                                value={item.quantity}
-                                onChange={(e) => {
-                                  const newItems = [...projectItems];
-                                  newItems[index].quantity =
-                                    parseInt(e.target.value) || 1;
-                                  newItems[index].totalPrice =
-                                    newItems[index].quantity *
-                                    (parseFloat(newItems[index].unitPrice) ||
-                                      0);
-                                  setProjectItems(newItems);
-                                }}
-                                min="1"
-                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                                required
-                                disabled={submitting}
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                Unit Price (NGN){" "}
-                                <span className="text-red-500">*</span>
-                              </label>
-                              <input
-                                type="text"
-                                value={item.unitPrice}
-                                onChange={(e) => {
-                                  const newItems = [...projectItems];
-                                  newItems[index].unitPrice =
-                                    formatNumberWithCommas(e.target.value);
-                                  newItems[index].totalPrice =
-                                    newItems[index].quantity *
-                                    (parseFloat(
-                                      e.target.value.replace(/,/g, "")
-                                    ) || 0);
-                                  setProjectItems(newItems);
-                                }}
-                                placeholder="e.g., 500,000"
-                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                                required
-                                disabled={submitting}
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                Total Price (NGN)
-                              </label>
-                              <input
-                                type="text"
-                                value={formatNumberWithCommas(
-                                  item.totalPrice.toString()
-                                )}
-                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-gray-100"
-                                readOnly
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                Description
-                              </label>
-                              <input
-                                type="text"
-                                value={item.description}
-                                onChange={(e) => {
-                                  const newItems = [...projectItems];
-                                  newItems[index].description = e.target.value;
-                                  setProjectItems(newItems);
-                                }}
-                                placeholder="Brief description of the item"
-                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                                disabled={submitting}
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                Delivery Timeline{" "}
-                                <span className="text-red-500">*</span>
-                              </label>
-                              <input
-                                type="text"
-                                value={item.deliveryTimeline}
-                                onChange={(e) => {
-                                  const newItems = [...projectItems];
-                                  newItems[index].deliveryTimeline =
-                                    e.target.value;
-                                  setProjectItems(newItems);
-                                }}
-                                placeholder="e.g., Within 30 days"
-                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                                required
-                                disabled={submitting}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setProjectItems([
-                            ...projectItems,
-                            {
-                              name: "",
-                              description: "",
-                              quantity: 1,
-                              unitPrice: "",
-                              totalPrice: 0,
-                              deliveryTimeline: "",
-                            },
-                          ]);
-                        }}
-                        className="w-full border-2 border-dashed border-gray-300 rounded-lg p-4 text-gray-600 hover:border-gray-400 hover:text-gray-800 transition-colors"
-                        disabled={submitting}
-                      >
-                        + Add Another Item
-                      </button>
-
-                      {/* Total Budget Summary */}
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium text-blue-800">
-                            Total Items Cost:
-                          </span>
-                          <span className="text-lg font-bold text-blue-900">
-                            ₦
-                            {formatNumberWithCommas(
-                              projectItems
-                                .reduce((sum, item) => sum + item.totalPrice, 0)
-                                .toString()
-                            )}
-                          </span>
-                        </div>
-                        {formData.budget && (
-                          <div className="mt-2">
-                            <div className="flex justify-between items-center text-sm">
-                              <span className="text-gray-600">
-                                Project Budget:
-                              </span>
-                              <span className="font-medium">
-                                ₦{formData.budget}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
                     </div>
                   </div>
-                )}
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Date <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, startDate: e.target.value })
-                    }
-                    min={new Date().toISOString().split("T")[0]}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                    required
-                    disabled={submitting}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Date <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, endDate: e.target.value })
-                    }
-                    min={
-                      formData.startDate ||
-                      new Date().toISOString().split("T")[0]
-                    }
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                    required
-                    disabled={submitting}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Budget (NGN) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.budget}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        budget: formatNumberWithCommas(e.target.value),
-                      })
-                    }
-                    placeholder="Enter budget amount (e.g., 2,500,000)"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                    required
-                    disabled={submitting}
-                  />
-                  {formData.budget && getApprovalLevelText(formData.budget) && (
-                    <p
-                      className={`mt-2 text-sm font-medium ${
-                        getApprovalLevelText(formData.budget).color
-                      }`}
+                  {/* Project Manager - Full Width */}
+                  <div className="mt-4"></div>
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Description <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={formData.description}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          description: e.target.value,
+                        })
+                      }
+                      placeholder="Enter project description and objectives..."
+                      rows={3}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                      required
+                      disabled={submitting}
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-3 mt-6">
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                      disabled={submitting}
                     >
-                      {getApprovalLevelText(formData.budget).text}
-                    </p>
-                  )}
-                </div>
-                {/* Status field removed - managed by backend workflow system */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Priority <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={formData.priority}
-                    onChange={(e) =>
-                      setFormData({ ...formData, priority: e.target.value })
-                    }
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                    required
-                    disabled={submitting}
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="critical">Critical</option>
-                  </select>
-                </div>
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-md hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                      disabled={submitting}
+                    >
+                      {submitting && (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      )}
+                      {isEditMode ? "Update Project" : "Create Project"}
+                    </button>
+                  </div>
+                </form>
               </div>
-
-              {/* Project Manager - Full Width */}
-              <div className="mt-4"></div>
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  placeholder="Enter project description and objectives..."
-                  rows={3}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                  required
-                  disabled={submitting}
-                />
-              </div>
-
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                  disabled={submitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-md hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                  disabled={submitting}
-                >
-                  {submitting && (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  )}
-                  {isEditMode ? "Update Project" : "Create Project"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Project Details Modal */}
       {showDetailsModal && selectedProjectDetails && (

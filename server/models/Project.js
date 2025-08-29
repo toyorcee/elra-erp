@@ -310,6 +310,12 @@ const projectSchema = new mongoose.Schema(
           required: true,
           min: 0,
         },
+        currency: {
+          type: String,
+          enum: ["NGN", "USD", "GBP"],
+          default: "NGN",
+          required: true,
+        },
         deliveryTimeline: {
           type: String,
           required: true,

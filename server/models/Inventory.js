@@ -289,6 +289,28 @@ const inventorySchema = new mongoose.Schema(
       ref: "Project",
     },
 
+    // Procurement Association
+    procurementId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Procurement",
+    },
+
+    // Assignment Information
+    assignedTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+
+    // Receipt Information
+    receivedDate: {
+      type: Date,
+    },
+
+    // Expiry Information (for consumables)
+    expiryDate: {
+      type: Date,
+    },
+
     // Audit Fields
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

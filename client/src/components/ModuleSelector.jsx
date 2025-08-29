@@ -370,28 +370,7 @@ function ModuleSelector() {
       return;
     }
 
-    // Define first child routes for each module
-    const firstChildPages = {
-      "self-service": "/dashboard/modules/self-service/payslips",
-      documents: "/dashboard/modules/documents",
-      "customer-care": "/dashboard/modules/customer-care",
-      hr: "/dashboard/modules/hr/invitation",
-      payroll: "/dashboard/modules/payroll/salary-grades",
-      finance: "/dashboard/modules/finance/transactions",
-      inventory: "/dashboard/modules/inventory",
-      procurement: "/dashboard/modules/procurement",
-      projects: "/dashboard/modules/projects/list",
-      it: "/dashboard/modules/it",
-      operations: "/dashboard/modules/operations",
-      sales: "/dashboard/modules/sales",
-      legal: "/dashboard/modules/legal",
-      "system-admin": "/dashboard/modules/system-admin",
-    };
-
-    const moduleKey = module.path.split("/").pop();
-
-    const targetPath = firstChildPages[moduleKey] || module.path;
-    navigate(targetPath);
+    navigate(module.path);
   };
 
   const handleLogin = () => {

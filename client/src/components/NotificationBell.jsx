@@ -5,6 +5,7 @@ import { BellIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { toast } from "react-toastify";
 import notificationService from "../services/notifications";
 import { useSocket } from "../context/SocketContext";
+import NotificationModal from "./NotificationModal";
 
 const NotificationBell = ({ className = "" }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -68,7 +69,7 @@ const NotificationBell = ({ className = "" }) => {
       console.log("🔔 Real-time notification received:", notification);
       setNotifications((prev) => [notification, ...prev]);
       refetchUnread();
-      refetchNotifications(); 
+      refetchNotifications();
 
       const bell = document.querySelector('[title="Notifications"]');
       if (bell) {
@@ -108,6 +109,10 @@ const NotificationBell = ({ className = "" }) => {
           prev.map((notif) =>
             notif._id === notificationId ? { ...notif, read: true } : notif
           )
+        );
+        // Update selectedNotification if it's the same notification
+        setSelectedNotification((prev) =>
+          prev && prev._id === notificationId ? { ...prev, read: true } : prev
         );
         refetchUnread();
         refetchNotifications();
@@ -162,12 +167,12 @@ const NotificationBell = ({ className = "" }) => {
     }
   };
 
-  const handleNotificationClick = (notification) => {
-    setIsOpen(false);
+  const [selectedNotification, setSelectedNotification] = useState(null);
 
-    navigate("/dashboard/notifications", {
-      state: { selectedNotificationId: notification._id },
-    });
+  const handleNotificationClick = (notification) => {
+    console.log("🔔 Clicking notification:", notification);
+    setIsOpen(false);
+    setSelectedNotification(notification);
   };
 
   const getNotificationIcon = (type) => {
@@ -198,21 +203,6 @@ const NotificationBell = ({ className = "" }) => {
         return "📝";
       default:
         return "📢";
-    }
-  };
-
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case "urgent":
-        return "border-l-red-500";
-      case "high":
-        return "border-l-orange-500";
-      case "medium":
-        return "border-l-yellow-500";
-      case "low":
-        return "border-l-green-500";
-      default:
-        return "border-l-gray-500";
     }
   };
 
@@ -384,6 +374,19 @@ const NotificationBell = ({ className = "" }) => {
           )}
         </div>
       )}
+
+      {/* Notification Modal */}
+      <NotificationModal
+        notification={
+          selectedNotification
+            ? notifications.find((n) => n._id === selectedNotification._id) ||
+              selectedNotification
+            : null
+        }
+        onClose={() => setSelectedNotification(null)}
+        onMarkAsRead={handleMarkAsRead}
+        onDelete={handleDeleteNotification}
+      />
     </div>
   );
 };

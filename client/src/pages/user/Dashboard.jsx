@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useDynamicSidebar } from "../../context/DynamicSidebarContext";
+import { useDebouncedNavigation } from "../../hooks/useDebouncedNavigation";
+import { useModulePreloader } from "../../hooks/useModulePreloader";
 import GradientSpinner from "../../components/common/GradientSpinner";
 import {
   UsersIcon,
@@ -51,7 +53,7 @@ import { userModulesAPI } from "../../services/userModules.js";
 import { getNavigationForRole } from "../../config/sidebarConfig.js";
 
 const Dashboard = () => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, initialized } = useAuth();
   const {
     currentModule,
     isModuleView,
@@ -61,7 +63,8 @@ const Dashboard = () => {
   } = useDynamicSidebar();
   const { module } = useParams();
 
-  const navigate = useNavigate();
+  const navigate = useDebouncedNavigation();
+  const { isModulePreloaded } = useModulePreloader();
   const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isModulesCollapsed, setIsModulesCollapsed] = useState(false);
@@ -395,28 +398,8 @@ const Dashboard = () => {
     const handleModuleClick = () => {
       if (currentModule !== module.key) {
         startModuleLoading();
-        setTimeout(() => {
-          const firstChildPages = {
-            "self-service": "/dashboard/modules/self-service/payslips",
-
-            "customer-care": "/dashboard/modules/customer-care",
-            hr: "/dashboard/modules/hr/invitation",
-            payroll: "/dashboard/modules/payroll/salary-grades",
-            finance: "/dashboard/modules/finance/transactions",
-            inventory: "/dashboard/modules/inventory",
-            procurement: "/dashboard/modules/procurement",
-            projects: "/dashboard/modules/projects/list",
-            it: "/dashboard/modules/it",
-            operations: "/dashboard/modules/operations",
-            sales: "/dashboard/modules/sales",
-            legal: "/dashboard/modules/legal",
-            "system-admin": "/dashboard/modules/system-admin",
-          };
-
-          const targetPath =
-            firstChildPages[module.key] || `/dashboard/modules/${module.key}`;
-          navigate(targetPath);
-        }, 100);
+        const targetPath = `/dashboard/modules/${module.key}`;
+        navigate(targetPath);
       }
     };
 
@@ -2023,14 +2006,28 @@ const Dashboard = () => {
     return mainDashboardContent;
   };
 
-  // Show loading spinner while authenticating or during initial load
-  if (authLoading || isLoading || !user) {
+  // Show loading spinner only if auth is not initialized yet
+  if (!initialized && authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50">
         <div className="text-center">
           <GradientSpinner size="lg" />
           <p className="text-[var(--elra-primary)] mt-4 text-lg font-medium">
-            {authLoading ? "Authenticating..." : "Loading your dashboard..."}
+            Authenticating...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading spinner while modules are being loaded
+  if (isLoading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50">
+        <div className="text-center">
+          <GradientSpinner size="lg" />
+          <p className="text-[var(--elra-primary)] mt-4 text-lg font-medium">
+            Loading your dashboard...
           </p>
         </div>
       </div>

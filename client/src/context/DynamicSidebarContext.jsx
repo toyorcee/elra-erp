@@ -56,12 +56,12 @@ export const DynamicSidebarProvider = ({ children }) => {
   };
 
   const stopModuleLoading = () => {
-    setTimeout(() => {
-      setIsModuleLoading(false);
-    }, 1000);
+    setIsModuleLoading(false);
   };
 
   useEffect(() => {
+    if (!user) return;
+
     const pathSegments = location.pathname.split("/");
     const moduleIndex = pathSegments.findIndex(
       (segment) => segment === "modules"
@@ -70,7 +70,6 @@ export const DynamicSidebarProvider = ({ children }) => {
     if (moduleIndex !== -1 && pathSegments[moduleIndex + 1]) {
       const moduleKey = pathSegments[moduleIndex + 1];
 
-      // Handle both underscores and hyphens in module names
       let normalizedModuleKey = moduleKey;
       if (moduleKey.includes("_")) {
         normalizedModuleKey = moduleKey.replace(/_/g, "-");
@@ -88,27 +87,23 @@ export const DynamicSidebarProvider = ({ children }) => {
             startModuleLoading();
           }
 
-          setTimeout(
-            () => {
-              setCurrentModule(normalizedModuleKey);
-              setIsModuleView(true);
+          // Immediate module switching for instant response
+          setCurrentModule(normalizedModuleKey);
+          setIsModuleView(true);
 
-              const moduleConfig = getModuleSidebarConfig(configKey);
-              if (moduleConfig) {
-                const roleLevel = getUserRoleLevel();
-                const filteredSections = getModuleNavigationForRole(
-                  configKey,
-                  roleLevel
-                );
-                setModuleSidebarItems(filteredSections);
-              }
+          const moduleConfig = getModuleSidebarConfig(configKey);
+          if (moduleConfig) {
+            const roleLevel = getUserRoleLevel();
+            const filteredSections = getModuleNavigationForRole(
+              configKey,
+              roleLevel
+            );
+            setModuleSidebarItems(filteredSections);
+          }
 
-              if (!isInitialLoad) {
-                stopModuleLoading();
-              }
-            },
-            isInitialLoad ? 0 : 500
-          );
+          if (!isInitialLoad) {
+            stopModuleLoading();
+          }
         }
       } else {
         setCurrentModule(null);
@@ -123,25 +118,20 @@ export const DynamicSidebarProvider = ({ children }) => {
           startModuleLoading();
         }
 
-        setTimeout(
-          () => {
-            setCurrentModule(null);
-            setIsModuleView(false);
-            setModuleSidebarItems([]);
+        setCurrentModule(null);
+        setIsModuleView(false);
+        setModuleSidebarItems([]);
 
-            if (!isInitialLoad) {
-              stopModuleLoading();
-            }
-          },
-          isInitialLoad ? 0 : 500
-        );
+        if (!isInitialLoad) {
+          stopModuleLoading();
+        }
       }
     }
 
     if (isInitialLoad) {
       setIsInitialLoad(false);
     }
-  }, [location.pathname, currentModule, isInitialLoad]);
+  }, [location.pathname, currentModule, isInitialLoad, user]);
 
   const getCurrentModuleInfo = () => {
     if (!currentModule) return null;
@@ -166,22 +156,20 @@ export const DynamicSidebarProvider = ({ children }) => {
       setPreviousModule(currentModule);
       startModuleLoading();
 
-      setTimeout(() => {
-        setCurrentModule(moduleKey);
-        setIsModuleView(true);
+      setCurrentModule(moduleKey);
+      setIsModuleView(true);
 
-        const moduleConfig = getModuleSidebarConfig(configKey);
-        if (moduleConfig) {
-          const roleLevel = getUserRoleLevel();
-          const filteredSections = getModuleNavigationForRole(
-            configKey,
-            roleLevel
-          );
-          setModuleSidebarItems(filteredSections);
-        }
+      const moduleConfig = getModuleSidebarConfig(configKey);
+      if (moduleConfig) {
+        const roleLevel = getUserRoleLevel();
+        const filteredSections = getModuleNavigationForRole(
+          configKey,
+          roleLevel
+        );
+        setModuleSidebarItems(filteredSections);
+      }
 
-        stopModuleLoading();
-      }, 500);
+      stopModuleLoading();
     }
   };
 
@@ -189,12 +177,11 @@ export const DynamicSidebarProvider = ({ children }) => {
     setPreviousModule(currentModule);
     startModuleLoading();
 
-    setTimeout(() => {
-      setCurrentModule(null);
-      setIsModuleView(false);
-      setModuleSidebarItems([]);
-      stopModuleLoading();
-    }, 500);
+    // Immediate state update for better UX
+    setCurrentModule(null);
+    setIsModuleView(false);
+    setModuleSidebarItems([]);
+    stopModuleLoading();
   };
 
   const value = {

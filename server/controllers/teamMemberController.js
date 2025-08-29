@@ -201,13 +201,18 @@ export const addTeamMember = async (req, res) => {
     }
 
     // Check if user exists
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).populate("role", "name level").populate("department", "name");
     if (!user) {
       return res.status(404).json({
         success: false,
         message: "User not found",
       });
     }
+
+    console.log("🔍 [TEAM MEMBERS] Adding team member:");
+    console.log(`  - Current User: ${currentUser.firstName} ${currentUser.lastName} (${currentUser.role?.name}, Level: ${currentUser.role?.level})`);
+    console.log(`  - Target User: ${user.firstName} ${user.lastName} (${user.role?.name}, Level: ${user.role?.level})`);
+    console.log(`  - Project: ${project.name} (${project.projectScope})`);
 
     // Check access permissions
     const canManage = await checkProjectEditAccess(currentUser, project);
@@ -252,45 +257,51 @@ export const addTeamMember = async (req, res) => {
     const currentUserRoleLevel = currentUser.role?.level || 0;
     const potentialMemberRoleLevel = user.role?.level || 0;
 
+    // SUPER_ADMIN can assign anyone
     if (currentUserRoleLevel >= 1000) {
-    } else if (currentUserRoleLevel === 300) {
-      if (
-        potentialMemberRoleLevel !== 300 ||
-        user.department?.toString() !== currentUser.department?.toString()
-      ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "Access denied. STAFF can only select other STAFF from their department.",
-        });
-      }
+      console.log("🔍 [TEAM MEMBERS] Super Admin - can assign any user");
     }
-    // MANAGER (600) can select STAFF (300) from their department
-    else if (currentUserRoleLevel === 600) {
+    // HOD (700) can assign users at their level or below from their department
+    else if (currentUserRoleLevel >= 700) {
       if (
-        potentialMemberRoleLevel !== 300 ||
+        potentialMemberRoleLevel > currentUserRoleLevel ||
         user.department?.toString() !== currentUser.department?.toString()
       ) {
         return res.status(403).json({
           success: false,
           message:
-            "Access denied. MANAGER can only select STAFF from their department.",
+            "Access denied. HOD can only assign users at their level or below from their department.",
         });
       }
+      console.log("🔍 [TEAM MEMBERS] HOD - assigning user at level or below");
     }
-    // HOD (700) can select STAFF (300) and MANAGER (600) from their department
-    else if (currentUserRoleLevel === 700) {
+    // MANAGER (600) can assign users at their level or below from their department
+    else if (currentUserRoleLevel >= 600) {
       if (
-        (potentialMemberRoleLevel !== 300 &&
-          potentialMemberRoleLevel !== 600) ||
+        potentialMemberRoleLevel > currentUserRoleLevel ||
         user.department?.toString() !== currentUser.department?.toString()
       ) {
         return res.status(403).json({
           success: false,
           message:
-            "Access denied. HOD can only select STAFF and MANAGER from their department.",
+            "Access denied. MANAGER can only assign users at their level or below from their department.",
         });
       }
+      console.log("🔍 [TEAM MEMBERS] Manager - assigning user at level or below");
+    }
+    // STAFF (300) can assign users at their level or below from their department
+    else if (currentUserRoleLevel >= 300) {
+      if (
+        potentialMemberRoleLevel > currentUserRoleLevel ||
+        user.department?.toString() !== currentUser.department?.toString()
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Access denied. STAFF can only assign users at their level or below from their department.",
+        });
+      }
+      console.log("🔍 [TEAM MEMBERS] Staff - assigning user at level or below");
     } else {
       return res.status(403).json({
         success: false,
@@ -644,7 +655,7 @@ export const getAvailableUsers = async (req, res) => {
         "🔍 [TEAM MEMBERS] Super Admin - showing all available users"
       );
     }
-    // HOD can see users in their department
+    // HOD can see users in their department at their level or below
     else if (currentUser.role.level >= 700) {
       if (!currentUser.department) {
         return res.status(403).json({
@@ -653,11 +664,13 @@ export const getAvailableUsers = async (req, res) => {
         });
       }
       userQuery.department = currentUser.department;
+      // HOD can only assign users at their level (700) or below
+      userQuery["role.level"] = { $lte: currentUser.role.level };
       console.log(
-        "🔍 [TEAM MEMBERS] HOD - showing available users in department"
+        "🔍 [TEAM MEMBERS] HOD - showing available users in department at level 700 or below"
       );
     }
-    // MANAGER can see users in their department
+    // MANAGER can see users in their department at their level or below
     else if (currentUser.role.level >= 600) {
       if (!currentUser.department) {
         return res.status(403).json({
@@ -666,8 +679,25 @@ export const getAvailableUsers = async (req, res) => {
         });
       }
       userQuery.department = currentUser.department;
+      // Manager can only assign users at their level (600) or below
+      userQuery["role.level"] = { $lte: currentUser.role.level };
       console.log(
-        "🔍 [TEAM MEMBERS] Manager - showing available users in department"
+        "🔍 [TEAM MEMBERS] Manager - showing available users in department at level 600 or below"
+      );
+    }
+    // STAFF can see users in their department at their level or below
+    else if (currentUser.role.level >= 300) {
+      if (!currentUser.department) {
+        return res.status(403).json({
+          success: false,
+          message: "You must be assigned to a department to view users",
+        });
+      }
+      userQuery.department = currentUser.department;
+      // Staff can only assign users at their level (300) or below
+      userQuery["role.level"] = { $lte: currentUser.role.level };
+      console.log(
+        "🔍 [TEAM MEMBERS] Staff - showing available users in department at level 300 or below"
       );
     } else {
       return res.status(403).json({
@@ -689,12 +719,26 @@ export const getAvailableUsers = async (req, res) => {
       ];
     }
 
+    console.log(
+      "🔍 [TEAM MEMBERS] User query:",
+      JSON.stringify(userQuery, null, 2)
+    );
+
     const users = await User.find(userQuery)
       .populate("department", "name")
       .populate("role", "name level")
       .select("firstName lastName email avatar department role")
       .sort({ firstName: 1, lastName: 1 })
       .limit(50);
+
+    console.log(
+      `🔍 [TEAM MEMBERS] Found ${users.length} available users for assignment`
+    );
+    users.forEach((user) => {
+      console.log(
+        `  - ${user.firstName} ${user.lastName} (${user.role?.name}, Level: ${user.role?.level})`
+      );
+    });
 
     res.status(200).json({
       success: true,

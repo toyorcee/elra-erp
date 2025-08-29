@@ -24,7 +24,7 @@ const TaskManagement = () => {
 
   // Redirect to Task List (main functionality)
   useEffect(() => {
-    navigate("/dashboard/modules/tasks/list", { replace: true });
+    navigate("/dashboard/modules/tasks", { replace: true });
   }, [navigate]);
 
   // Loading state while redirecting

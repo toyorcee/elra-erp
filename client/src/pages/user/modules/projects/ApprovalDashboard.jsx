@@ -51,7 +51,7 @@ const ApprovalDashboard = () => {
   // Document viewing states
   const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [projectDocuments, setProjectDocuments] = useState({});
-  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [loadingDocuments, setLoadingDocuments] = useState({});
 
   useEffect(() => {
     loadPendingProjectApprovals();
@@ -67,8 +67,15 @@ const ApprovalDashboard = () => {
         // Calculate stats
         const stats = {
           total: response.data.length,
-          pending: response.data.filter((p) => p.status === "pending_approval")
-            .length,
+          pending: response.data.filter(
+            (p) =>
+              p.status === "pending_approval" ||
+              p.status === "pending_department_approval" ||
+              p.status === "pending_finance_approval" ||
+              p.status === "pending_executive_approval" ||
+              p.status === "pending_legal_compliance_approval" ||
+              p.status === "resubmitted"
+          ).length,
           approved: response.data.filter((p) => p.status === "approved").length,
           rejected: response.data.filter((p) => p.status === "rejected").length,
         };
@@ -100,7 +107,7 @@ const ApprovalDashboard = () => {
 
   const handleViewDocuments = async (project) => {
     try {
-      setLoadingDocuments(true);
+      setLoadingDocuments((prev) => ({ ...prev, [project._id]: true }));
       setSelectedProject(project);
 
       const response = await getProjectDocuments(project._id);
@@ -114,7 +121,7 @@ const ApprovalDashboard = () => {
     } catch (error) {
       toast.error("Failed to load project documents");
     } finally {
-      setLoadingDocuments(false);
+      setLoadingDocuments((prev) => ({ ...prev, [project._id]: false }));
     }
   };
 
@@ -179,6 +186,49 @@ const ApprovalDashboard = () => {
       return "No approval chain";
     }
 
+    // Handle resubmitted projects - show which step was rejected and preserved approvals
+    if (
+      project.status === "resubmitted" ||
+      project.workflowHistory?.some((h) => h.action === "project_resubmitted")
+    ) {
+      const firstPendingStep = project.approvalChain.find(
+        (step) => step.status === "pending"
+      );
+
+      // Find the rejection point from workflow history
+      const resubmissionHistory = project.workflowHistory?.find(
+        (h) => h.action === "project_resubmitted"
+      );
+      const rejectionPoint = resubmissionHistory?.metadata?.rejectionPoint;
+      const preservedApprovals =
+        resubmissionHistory?.metadata?.preservedApprovals || [];
+
+      if (firstPendingStep) {
+        const levelMap = {
+          hod: "HOD Approval",
+          department: "Department Approval",
+          finance: "Finance Approval",
+          executive: "Executive Approval",
+          legal_compliance: "Legal & Compliance Approval",
+        };
+
+        let displayText = `${
+          levelMap[firstPendingStep.level] || firstPendingStep.level
+        } (Resubmitted)`;
+
+        // Show preserved approvals if any
+        if (preservedApprovals.length > 0) {
+          const preservedText = preservedApprovals
+            .map((level) => levelMap[level] || level)
+            .join(", ");
+          displayText += ` - Preserved: ${preservedText}`;
+        }
+
+        return displayText;
+      }
+      return "Resubmitted - Pending Approval";
+    }
+
     const currentStep = project.approvalChain.find(
       (step) => step.status === "pending"
     );
@@ -191,6 +241,7 @@ const ApprovalDashboard = () => {
       department: "Department Approval",
       finance: "Finance Approval",
       executive: "Executive Approval",
+      legal_compliance: "Legal & Compliance Approval",
     };
 
     return levelMap[currentStep.level] || currentStep.level;
@@ -601,8 +652,11 @@ const ApprovalDashboard = () => {
                 // 3. User IS the next approver in the chain
                 const isPendingApproval = [
                   "pending_approval",
+                  "pending_department_approval",
                   "pending_finance_approval",
                   "pending_executive_approval",
+                  "pending_legal_compliance_approval",
+                  "resubmitted",
                 ].includes(project.status);
 
                 const isApproved = ["approved", "implementation"].includes(
@@ -626,11 +680,11 @@ const ApprovalDashboard = () => {
                         e.stopPropagation();
                         handleViewDocuments(project);
                       }}
-                      disabled={loadingDocuments}
+                      disabled={loadingDocuments[project._id]}
                       className="inline-flex items-center justify-center w-8 h-8 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
                       title="View Project Documents"
                     >
-                      {loadingDocuments ? (
+                      {loadingDocuments[project._id] ? (
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                       ) : (
                         <DocumentIcon className="h-4 w-4" />
@@ -1110,7 +1164,7 @@ const ApprovalDashboard = () => {
                   </button>
                 </div>
 
-                {loadingDocuments ? (
+                {loadingDocuments[selectedProject._id] ? (
                   <div className="flex items-center justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--elra-primary)]"></div>
                     <span className="ml-2 text-gray-600">

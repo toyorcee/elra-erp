@@ -31,8 +31,9 @@ const procurementSchema = new mongoose.Schema(
         "draft",
         "pending",
         "approved",
-        "ordered",
-        "received",
+        "issued",
+        "delivered",
+        "completed",
         "cancelled",
       ],
       default: "draft",
@@ -193,6 +194,30 @@ const procurementSchema = new mongoose.Schema(
         ref: "Inventory",
       },
     ],
+
+    // Vendor Information (link to Vendor model)
+    vendorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Vendor",
+    },
+
+    // Currency Information
+    currency: {
+      type: String,
+      default: "NGN",
+      enum: ["NGN", "USD", "EUR", "GBP"],
+    },
+
+    // Request and Approval Information
+    requestedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
 
     // Notes and Comments
     notes: [

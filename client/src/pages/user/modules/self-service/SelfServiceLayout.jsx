@@ -1,6 +1,6 @@
 import React from "react";
 import { Outlet, NavLink } from "react-router-dom";
-import { useAuth } from "../../../../contexts/AuthContext";
+import { useAuth } from "../../../../context/AuthContext";
 import {
   DocumentTextIcon,
   CreditCardIcon,
@@ -17,43 +17,43 @@ const SelfServiceLayout = () => {
   const navigation = [
     {
       name: "My Documents",
-      href: "/user/self-service/documents",
+      href: "/dashboard/modules/self-service/documents",
       icon: DocumentTextIcon,
       description: "View and manage your documents",
     },
     {
       name: "My Payslips",
-      href: "/user/self-service/payslips",
+      href: "/dashboard/modules/self-service/payslips",
       icon: CreditCardIcon,
       description: "Access your payslips and salary information",
     },
     {
       name: "Leave Requests",
-      href: "/user/self-service/leave",
+      href: "/dashboard/modules/self-service/leave-requests",
       icon: CalendarIcon,
       description: "Submit and track leave requests",
     },
     {
       name: "Equipment Requests",
-      href: "/user/self-service/equipment",
+      href: "/dashboard/modules/self-service/equipment",
       icon: WrenchScrewdriverIcon,
       description: "Request equipment and tools",
     },
     {
       name: "My Tickets",
-      href: "/user/self-service/tickets",
+      href: "/dashboard/modules/self-service/my-tickets",
       icon: TicketIcon,
       description: "View your support tickets",
     },
     {
       name: "IT Support",
-      href: "/user/self-service/it-support",
+      href: "/dashboard/modules/self-service/it-support",
       icon: ComputerDesktopIcon,
       description: "Get IT support and assistance",
     },
     {
       name: "Project Tasks",
-      href: "/user/self-service/project-tasks",
+      href: "/dashboard/modules/self-service/project-tasks",
       icon: CheckCircleIcon,
       description: "Manage tasks from your assigned projects",
     },

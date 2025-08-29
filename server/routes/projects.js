@@ -15,6 +15,7 @@ import {
   addProjectNote,
   approveProject,
   rejectProject,
+  resubmitProject,
   triggerPostApprovalWorkflow,
   getProjectWorkflowStatus,
   getPendingApprovalProjects,
@@ -173,7 +174,7 @@ const validateNote = [
 // All routes require authentication
 router.use(protect);
 
-// Get all projects (with role-based filtering) - Viewer+
+// Get all projects (with role-based filtering) - VIEWER+
 router.get("/", checkRole(100), getAllProjects);
 
 // Get project categories from model schema - All authenticated users
@@ -277,6 +278,7 @@ router.post("/:id/notes", checkRole(300), validateNote, addProjectNote);
 // Approval routes - HOD+ (700+) - Only HODs can approve/reject projects
 router.post("/:id/approve", checkRole(700), approveProject);
 router.post("/:id/reject", checkRole(700), rejectProject);
+router.post("/:id/resubmit", protect, resubmitProject);
 
 // Workflow routes - HOD+
 router.post(

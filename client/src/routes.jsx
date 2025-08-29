@@ -49,8 +49,6 @@ import TaskList from "./pages/user/modules/tasks/TaskList";
 import TaskAnalytics from "./pages/user/modules/tasks/TaskAnalytics";
 import TaskAssignments from "./pages/user/modules/tasks/TaskAssignments";
 import TaskReports from "./pages/user/modules/tasks/TaskReports";
-import InventoryManagement from "./pages/user/modules/inventory/InventoryManagement";
-import ProcurementManagement from "./pages/user/modules/procurement/ProcurementManagement";
 import FinancialTransactions from "./pages/user/modules/finance/FinancialTransactions";
 import RevenueManagement from "./pages/user/modules/finance/RevenueManagement";
 import ExpenseManagement from "./pages/user/modules/finance/ExpenseManagement";
@@ -185,7 +183,7 @@ const AppRoutes = () => {
         />
         <Route path="modules/payroll/payslips" element={<PaySlips />} />
 
-        {/* Self-Service Module routes are handled by the dynamic route above */}
+        {/* Self-Service Module routes */}
         <Route path="modules/self-service/payslips" element={<MyPayslips />} />
         <Route path="modules/self-service/projects" element={<MyProjects />} />
         <Route
@@ -231,8 +229,7 @@ const AppRoutes = () => {
         <Route path="modules/tasks/analytics" element={<TaskAnalytics />} />
         <Route path="modules/tasks/assignments" element={<TaskAssignments />} />
         <Route path="modules/tasks/reports" element={<TaskReports />} />
-        <Route path="modules/inventory" element={<InventoryManagement />} />
-        <Route path="modules/procurement" element={<ProcurementManagement />} />
+
         <Route
           path="modules/finance/transactions"
           element={<FinancialTransactions />}

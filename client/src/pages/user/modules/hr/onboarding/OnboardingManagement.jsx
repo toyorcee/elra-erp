@@ -20,6 +20,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { toast } from "react-toastify";
 import defaultAvatar from "../../../../../assets/defaulticon.jpg";
+import ELRALogo from "../../../../../components/ELRALogo";
 
 const OnboardingManagement = () => {
   const { user } = useAuth();
@@ -760,7 +761,7 @@ const OnboardingManagement = () => {
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div className="flex items-center space-x-3">
-                <img src={ELRALogo} alt="ELRA Logo" className="h-8 w-auto" />
+                <ELRALogo size="sm" />
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">
                     {selectedUser.user.firstName} {selectedUser.user.lastName}

@@ -24,7 +24,7 @@ const FinanceManagement = () => {
 
   // Redirect to Financial Transactions (main functionality)
   useEffect(() => {
-    navigate("/dashboard/modules/finance/transactions", { replace: true });
+    navigate("/dashboard/modules/finance", { replace: true });
   }, [navigate]);
 
   // Loading state while redirecting

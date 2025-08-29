@@ -25,7 +25,13 @@ import {
   updateProject,
   deleteProject,
   getNextProjectCode,
+  resubmitProject,
+  fetchProjectCategories,
 } from "../../../../services/projectAPI.js";
+import {
+  fetchApprovedVendors,
+  fetchVendorCategories,
+} from "../../../../services/vendorAPI.js";
 import {
   uploadDocument,
   replaceProjectDocument,
@@ -44,7 +50,7 @@ import UserSearchSelect from "../../../../components/common/UserSearchSelect";
 import ELRALogo from "../../../../components/ELRALogo.jsx";
 
 const ProjectList = () => {
-  const { user } = useAuth();
+  const { user, loading: userLoading } = useAuth();
 
   useEffect(() => {
     const style = document.createElement("style");
@@ -98,6 +104,11 @@ const ProjectList = () => {
   const [showModal, setShowModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
+
+  const [vendors, setVendors] = useState([]);
+  const [selectedVendorCategory, setSelectedVendorCategory] = useState("");
+  const [filteredVendors, setFilteredVendors] = useState([]);
+
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -106,10 +117,25 @@ const ProjectList = () => {
     endDate: "",
     budget: "",
     projectManager: "",
-    status: "planning",
     priority: "medium",
     projectScope: "personal",
+    vendorId: "",
+    requiresBudgetAllocation: "",
   });
+
+  const [projectItems, setProjectItems] = useState([
+    {
+      name: "",
+      description: "",
+      quantity: 1,
+      unitPrice: "",
+      totalPrice: 0,
+      deliveryTimeline: "",
+    },
+  ]);
+
+  // Vendor categories state
+  const [vendorCategories, setVendorCategories] = useState([]);
 
   const [nextProjectCode, setNextProjectCode] = useState("");
   const [currentDate, setCurrentDate] = useState("");
@@ -119,6 +145,9 @@ const ProjectList = () => {
   const [showEditConfirm, setShowEditConfirm] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState(null);
   const [projectToEdit, setProjectToEdit] = useState(null);
+  const [resubmittingProject, setResubmittingProject] = useState(null);
+  const [showResubmitConfirm, setShowResubmitConfirm] = useState(false);
+  const [projectToResubmit, setProjectToResubmit] = useState(null);
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [selectedProjectForTeam, setSelectedProjectForTeam] = useState(null);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
@@ -223,6 +252,16 @@ const ProjectList = () => {
       color: "bg-red-100 text-red-800",
     },
     { value: "rejected", label: "Rejected", color: "bg-red-100 text-red-800" },
+    {
+      value: "revision_required",
+      label: "Revision Required",
+      color: "bg-orange-100 text-orange-800",
+    },
+    {
+      value: "resubmitted",
+      label: "Resubmitted",
+      color: "bg-blue-100 text-blue-800",
+    },
   ];
 
   const shouldDisableDocumentEditing = (project) => {
@@ -282,8 +321,50 @@ const ProjectList = () => {
     }
 
     if (numBudget <= 1000000) {
-      return { text: "Auto-approved by HOD", color: "text-green-600" };
+      if (formData.projectScope === "personal") {
+        if (formData.requiresBudgetAllocation === "false") {
+          return {
+            text: "Auto-approved (No Budget Allocation Required)",
+            color: "text-green-600",
+          };
+        } else {
+          return {
+            text: "Finance → Executive Approval",
+            color: "text-blue-600",
+          };
+        }
+      } else if (formData.projectScope === "departmental") {
+        if (formData.requiresBudgetAllocation === "false") {
+          return {
+            text: "Auto-approved (No Budget Allocation Required)",
+            color: "text-green-600",
+          };
+        } else {
+          return {
+            text: "Finance → Executive Approval",
+            color: "text-blue-600",
+          };
+        }
+      } else if (formData.projectScope === "external") {
+        return { text: "Auto-approved by HOD", color: "text-green-600" };
+      } else {
+        // Default fallback
+        return { text: "Auto-approved by HOD", color: "text-green-600" };
+      }
     } else if (numBudget <= 5000000) {
+      // Check budget allocation for personal/departmental projects
+      if (
+        formData.projectScope === "personal" ||
+        formData.projectScope === "departmental"
+      ) {
+        if (formData.requiresBudgetAllocation === "false") {
+          return {
+            text: "Auto-approved (No Budget Allocation Required)",
+            color: "text-green-600",
+          };
+        }
+      }
+
       if (user.department?.name === "Finance & Accounting") {
         return {
           text: "Direct to Executive Approval",
@@ -296,6 +377,19 @@ const ProjectList = () => {
         };
       }
     } else if (numBudget <= 25000000) {
+      // Check budget allocation for personal/departmental projects
+      if (
+        formData.projectScope === "personal" ||
+        formData.projectScope === "departmental"
+      ) {
+        if (formData.requiresBudgetAllocation === "false") {
+          return {
+            text: "Auto-approved (No Budget Allocation Required)",
+            color: "text-green-600",
+          };
+        }
+      }
+
       if (user.department?.name === "Finance & Accounting") {
         return {
           text: "Direct to Executive Approval",
@@ -308,6 +402,19 @@ const ProjectList = () => {
         };
       }
     } else {
+      // Check budget allocation for personal/departmental projects
+      if (
+        formData.projectScope === "personal" ||
+        formData.projectScope === "departmental"
+      ) {
+        if (formData.requiresBudgetAllocation === "false") {
+          return {
+            text: "Auto-approved (No Budget Allocation Required)",
+            color: "text-green-600",
+          };
+        }
+      }
+
       if (user.department?.name === "Finance & Accounting") {
         return {
           text: "Direct to Executive Approval",
@@ -324,7 +431,7 @@ const ProjectList = () => {
     }
   };
 
-  if (!user || user.role.level < 700) {
+  if (!user || user.role.level < 300) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -332,7 +439,7 @@ const ProjectList = () => {
             Access Denied
           </h2>
           <p className="text-gray-600">
-            Only HOD and Super Admin can access Project List.
+            Only STAFF and above can access Project List.
           </p>
         </div>
       </div>
@@ -342,8 +449,8 @@ const ProjectList = () => {
   const fetchProjectCategories = async () => {
     try {
       setLoadingCategories(true);
-      const response = await api.get("/projects/categories");
-      setProjectCategories(response.data.categories || []);
+      const response = await fetchProjectCategories();
+      setProjectCategories(response.categories || []);
     } catch (error) {
       console.error("Error fetching project categories:", error);
       setProjectCategories([
@@ -403,22 +510,110 @@ const ProjectList = () => {
     }
   };
 
-  // Check if user is from HR department
   const isHRDepartment =
     user?.department?.name === "Human Resources" ||
     user?.department?.name === "HR" ||
     user?.department?.name === "Human Resource Management";
 
-  const canCreateExternalProjects =
-    (isHRDepartment && user?.role?.level >= 700) || user?.role?.level >= 1000;
+  const fetchVendors = async () => {
+    try {
+      const [vendorsResponse, categoriesResponse] = await Promise.all([
+        fetchApprovedVendors(),
+        fetchVendorCategories(),
+      ]);
+
+      if (vendorsResponse.success) {
+        setVendors(vendorsResponse.data);
+      } else {
+        setVendors([]);
+      }
+
+      if (categoriesResponse.success) {
+        setVendorCategories(categoriesResponse.data);
+      } else {
+        setVendorCategories([]);
+      }
+    } catch (error) {
+      console.error("Error fetching vendors:", error);
+      setVendors([]);
+      setVendorCategories([]);
+    }
+  };
+
+  // Filter vendors by selected category
+  useEffect(() => {
+    if (selectedVendorCategory && vendors.length > 0) {
+      const filtered = vendors.filter(
+        (vendor) =>
+          vendor.servicesOffered.includes(selectedVendorCategory) &&
+          vendor.status === "approved"
+      );
+      setFilteredVendors(filtered);
+    } else {
+      setFilteredVendors([]);
+    }
+  }, [selectedVendorCategory, vendors]);
+
+  // Determine allowed project scopes based on user role
+  const getAllowedProjectScopes = () => {
+    if (user?.role?.level >= 1000) {
+      // SUPER_ADMIN can create all types
+      return ["personal", "departmental", "external"];
+    } else if (user?.role?.level >= 700 && isHRDepartment) {
+      // HR HOD can create personal, departmental, and external projects
+      return ["personal", "departmental", "external"];
+    } else if (user?.role?.level >= 700) {
+      // ALL HODs can create personal and departmental projects
+      return ["personal", "departmental"];
+    } else if (user?.role?.level >= 600) {
+      // MANAGER can create personal and departmental projects
+      return ["personal", "departmental"];
+    } else if (user?.role?.level >= 300) {
+      // STAFF can only create personal projects
+      return ["personal"];
+    }
+    return [];
+  };
+
+  const allowedProjectScopes = getAllowedProjectScopes();
+
+  const canCreateExternalProjects = allowedProjectScopes.includes("external");
+  const canCreateDepartmentalProjects =
+    allowedProjectScopes.includes("departmental");
 
   const showExternalProjectFields =
     formData.projectScope === "external" && canCreateExternalProjects;
+
+  // Debug logging for external project fields
+  useEffect(() => {
+    if (formData.projectScope === "external") {
+      console.log("🔍 [DEBUG] Showing external project fields for user:", {
+        roleLevel: user?.role?.level,
+        department: user?.department?.name,
+        allowedProjectScopes: allowedProjectScopes,
+        currentScope: formData.projectScope,
+      });
+    }
+  }, [
+    formData.projectScope,
+    user?.role?.level,
+    user?.department?.name,
+    allowedProjectScopes,
+  ]);
 
   useEffect(() => {
     loadProjects();
     fetchProjectCategories();
   }, []);
+
+  useEffect(() => {
+    if (allowedProjectScopes.length > 0 && !showModal) {
+      setFormData((prev) => ({
+        ...prev,
+        projectScope: allowedProjectScopes[0],
+      }));
+    }
+  }, [allowedProjectScopes, showModal]);
 
   useEffect(() => {
     if (showModal && !isEditMode) {
@@ -485,11 +680,24 @@ const ProjectList = () => {
       endDate: "",
       budget: "",
       projectManager: "",
-      status: "planning",
       priority: "medium",
-      projectScope: "personal",
+      projectScope: "", // Let user choose, don't auto-set
+      vendorId: "",
+      requiresBudgetAllocation: "",
     });
 
+    setSelectedVendorCategory("");
+    setFilteredVendors([]);
+    setProjectItems([
+      {
+        name: "",
+        description: "",
+        quantity: 1,
+        unitPrice: "",
+        totalPrice: 0,
+        deliveryTimeline: "",
+      },
+    ]);
     setIsEditMode(false);
     setSelectedProject(null);
   };
@@ -560,6 +768,14 @@ const ProjectList = () => {
   const openCreateModal = () => {
     resetForm();
     setShowModal(true);
+    fetchVendors(); // Fetch vendors when modal opens
+
+    // Debug logs
+    console.log("🔍 [DEBUG] Opening create modal for user:", {
+      roleLevel: user?.role?.level,
+      department: user?.department?.name,
+      allowedProjectScopes: allowedProjectScopes,
+    });
   };
 
   const openDetailsModal = (project) => {
@@ -570,6 +786,15 @@ const ProjectList = () => {
   const openEditModal = (project) => {
     setSelectedProject(project);
     setIsEditMode(true);
+
+    // Ensure the project scope is allowed for the current user
+    const projectScope = project.projectScope || "personal";
+    const allowedScope = allowedProjectScopes.includes(projectScope)
+      ? projectScope
+      : allowedProjectScopes.length > 0
+      ? allowedProjectScopes[0]
+      : "personal";
+
     setFormData({
       name: project.name || "",
       description: project.description || "",
@@ -585,9 +810,8 @@ const ProjectList = () => {
         : "",
       projectManager:
         project.projectManager?._id || project.projectManager || "",
-      status: project.status || "planning",
       priority: project.priority || "medium",
-      projectScope: project.projectScope || "personal",
+      projectScope: allowedScope,
     });
 
     setShowModal(true);
@@ -992,9 +1216,7 @@ const ProjectList = () => {
       errors.push("Budget must be greater than 0");
     }
 
-    if (!formData.status) {
-      errors.push("Status is required");
-    }
+    // Status is managed by backend workflow - no validation needed
 
     if (!formData.priority) {
       errors.push("Priority is required");
@@ -1002,6 +1224,57 @@ const ProjectList = () => {
 
     if (!formData.description.trim()) {
       errors.push("Description is required");
+    }
+
+    // Validate budget allocation for personal/departmental projects
+    if (
+      formData.projectScope !== "external" &&
+      formData.requiresBudgetAllocation === ""
+    ) {
+      errors.push(
+        "Budget allocation option is required for personal/departmental projects"
+      );
+    }
+
+    // Validate vendor selection for external projects
+    if (formData.projectScope === "external") {
+      if (!selectedVendorCategory) {
+        errors.push("Vendor category is required for external projects");
+      }
+      if (!formData.vendorId) {
+        errors.push("Vendor selection is required for external projects");
+      }
+
+      // Validate project items
+      if (projectItems.length === 0) {
+        errors.push("At least one item is required for external projects");
+      } else {
+        projectItems.forEach((item, index) => {
+          if (!item.name.trim()) {
+            errors.push(`Item ${index + 1}: Item name is required`);
+          }
+          if (
+            !item.unitPrice ||
+            parseFloat(item.unitPrice.replace(/,/g, "")) <= 0
+          ) {
+            errors.push(`Item ${index + 1}: Valid unit price is required`);
+          }
+          if (!item.deliveryTimeline.trim()) {
+            errors.push(`Item ${index + 1}: Delivery timeline is required`);
+          }
+        });
+
+        // Check if total items cost exceeds budget
+        const totalItemsCost = projectItems.reduce(
+          (sum, item) => sum + item.totalPrice,
+          0
+        );
+        const projectBudget =
+          parseFloat(formData.budget.replace(/,/g, "")) || 0;
+        if (totalItemsCost > projectBudget) {
+          errors.push("Total items cost cannot exceed project budget");
+        }
+      }
     }
 
     if (formData.startDate && formData.endDate) {
@@ -1040,37 +1313,112 @@ const ProjectList = () => {
         budget: parseFormattedNumber(formData.budget),
       };
 
-      // Create project
+      if (formData.projectScope === "external") {
+        submitData.projectItems = projectItems.map((item) => ({
+          ...item,
+          unitPrice: parseFloat(item.unitPrice.replace(/,/g, "")),
+          totalPrice: item.totalPrice,
+        }));
+      } else {
+        delete submitData.vendorId;
+        delete submitData.projectItems;
+        submitData.requiresBudgetAllocation =
+          formData.requiresBudgetAllocation === "true";
+      }
+
       const response = await createProject(submitData);
       if (response.success) {
         const createdProject = response.data;
-        // Dynamic toast based on approval level
         const budget = parseFormattedNumber(submitData.budget);
         let approvalMessage = "Awaiting approval.";
 
         if (user.role.level === 1000) {
           approvalMessage = "Auto-approved by Super Admin!";
         } else if (budget <= 1000000) {
-          approvalMessage = "Auto-approved by HOD!";
+          // Check budget allocation for personal/departmental projects
+          if (submitData.projectScope === "personal") {
+            if (submitData.requiresBudgetAllocation === false) {
+              approvalMessage =
+                "Auto-approved (No Budget Allocation Required)!";
+            } else {
+              approvalMessage = "Sent to Finance → Executive for approval.";
+            }
+          } else if (submitData.projectScope === "departmental") {
+            if (submitData.requiresBudgetAllocation === false) {
+              approvalMessage =
+                "Auto-approved (No Budget Allocation Required)!";
+            } else {
+              approvalMessage = "Sent to Finance → Executive for approval.";
+            }
+          } else if (submitData.projectScope === "external") {
+            approvalMessage = "Auto-approved by HOD!";
+          }
         } else if (budget <= 5000000) {
-          if (user.department?.name === "Finance & Accounting") {
-            approvalMessage = "Sent to Executive for approval.";
-          } else {
-            approvalMessage = "Sent to Finance → Executive for approval.";
+          // Check budget allocation for personal/departmental projects
+          if (
+            submitData.projectScope === "personal" ||
+            submitData.projectScope === "departmental"
+          ) {
+            if (submitData.requiresBudgetAllocation === false) {
+              approvalMessage =
+                "Auto-approved (No Budget Allocation Required)!";
+            } else if (user.department?.name === "Finance & Accounting") {
+              approvalMessage = "Sent to Executive for approval.";
+            } else {
+              approvalMessage = "Sent to Finance → Executive for approval.";
+            }
+          } else if (submitData.projectScope === "external") {
+            if (user.department?.name === "Finance & Accounting") {
+              approvalMessage = "Sent to Executive for approval.";
+            } else {
+              approvalMessage = "Sent to Finance → Executive for approval.";
+            }
           }
         } else if (budget <= 25000000) {
-          if (user.department?.name === "Finance & Accounting") {
-            approvalMessage = "Sent to Executive for approval.";
-          } else {
-            approvalMessage = "Sent to Finance → Executive for approval.";
+          // Check budget allocation for personal/departmental projects
+          if (
+            submitData.projectScope === "personal" ||
+            submitData.projectScope === "departmental"
+          ) {
+            if (submitData.requiresBudgetAllocation === false) {
+              approvalMessage =
+                "Auto-approved (No Budget Allocation Required)!";
+            } else if (user.department?.name === "Finance & Accounting") {
+              approvalMessage = "Sent to Executive for approval.";
+            } else {
+              approvalMessage = "Sent to Finance → Executive for approval.";
+            }
+          } else if (submitData.projectScope === "external") {
+            if (user.department?.name === "Finance & Accounting") {
+              approvalMessage = "Sent to Executive for approval.";
+            } else {
+              approvalMessage = "Sent to Finance → Executive for approval.";
+            }
           }
         } else {
-          if (user.department?.name === "Finance & Accounting") {
-            approvalMessage = "Sent to Executive for approval.";
-          } else if (user.department?.name === "Executive Office") {
-            approvalMessage = "Sent to Finance for approval.";
-          } else {
-            approvalMessage = "Sent to Finance → Executive for approval.";
+          // Check budget allocation for personal/departmental projects
+          if (
+            submitData.projectScope === "personal" ||
+            submitData.projectScope === "departmental"
+          ) {
+            if (submitData.requiresBudgetAllocation === false) {
+              approvalMessage =
+                "Auto-approved (No Budget Allocation Required)!";
+            } else if (user.department?.name === "Finance & Accounting") {
+              approvalMessage = "Sent to Executive for approval.";
+            } else if (user.department?.name === "Executive Office") {
+              approvalMessage = "Sent to Finance for approval.";
+            } else {
+              approvalMessage = "Sent to Finance → Executive for approval.";
+            }
+          } else if (submitData.projectScope === "external") {
+            if (user.department?.name === "Finance & Accounting") {
+              approvalMessage = "Sent to Executive for approval.";
+            } else if (user.department?.name === "Executive Office") {
+              approvalMessage = "Sent to Finance for approval.";
+            } else {
+              approvalMessage = "Sent to Finance → Executive for approval.";
+            }
           }
         }
 
@@ -1126,6 +1474,21 @@ const ProjectList = () => {
         budget: parseFormattedNumber(formData.budget),
       };
 
+      // Add project items for external projects
+      if (formData.projectScope === "external") {
+        submitData.projectItems = projectItems.map((item) => ({
+          ...item,
+          unitPrice: parseFloat(item.unitPrice.replace(/,/g, "")),
+          totalPrice: item.totalPrice,
+        }));
+      } else {
+        // Remove vendorId and projectItems for non-external projects
+        delete submitData.vendorId;
+        delete submitData.projectItems;
+        submitData.requiresBudgetAllocation =
+          formData.requiresBudgetAllocation === "true";
+      }
+
       const response = await updateProject(selectedProject._id, submitData);
       if (response.success) {
         toast.success(`✅ Project "${submitData.name}" updated successfully!`, {
@@ -1173,6 +1536,36 @@ const ProjectList = () => {
       setShowDeleteConfirm(false);
       setProjectToDelete(null);
     }
+  };
+
+  const handleResubmitProject = (project) => {
+    setProjectToResubmit(project);
+    setShowResubmitConfirm(true);
+  };
+
+  const confirmResubmitProject = async () => {
+    try {
+      setResubmittingProject(projectToResubmit._id);
+      const response = await resubmitProject(projectToResubmit._id);
+      if (response.success) {
+        toast.success("Project resubmitted successfully");
+        loadProjects();
+      } else {
+        toast.error("Failed to resubmit project");
+      }
+    } catch (error) {
+      console.error("Error resubmitting project:", error);
+      toast.error("Error resubmitting project");
+    } finally {
+      setResubmittingProject(null);
+      setShowResubmitConfirm(false);
+      setProjectToResubmit(null);
+    }
+  };
+
+  const closeResubmitConfirm = () => {
+    setShowResubmitConfirm(false);
+    setProjectToResubmit(null);
   };
 
   const getStatusBadge = (status) => {
@@ -1230,15 +1623,15 @@ const ProjectList = () => {
       header: "Project",
       accessor: "name",
       renderer: (project) => (
-        <div className="flex items-center min-w-0 max-w-xs">
+        <div className="flex items-center min-w-0 max-w-[200px]">
           <FolderIcon className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
           <div className="min-w-0 flex-1">
             <div
               className="font-medium text-gray-900 truncate"
               title={project.name}
             >
-              {project.name.length > 25
-                ? `${project.name.slice(0, 25)}...`
+              {project.name.length > 20
+                ? `${project.name.slice(0, 12)}...`
                 : project.name}
             </div>
             <div
@@ -1267,12 +1660,28 @@ const ProjectList = () => {
       ),
     },
     {
+      header: "Scope",
+      accessor: "projectScope",
+      renderer: (project) => (
+        <div className="text-sm min-w-0 max-w-20">
+          <div className="font-medium text-gray-900 truncate">
+            {project.projectScope === "personal" && "Personal"}
+            {project.projectScope === "departmental" && "Departmental"}
+            {project.projectScope === "external" && "External"}
+          </div>
+        </div>
+      ),
+    },
+    {
       header: "Team",
       accessor: "teamMembers",
       renderer: (project) => (
         <div className="text-sm min-w-0 max-w-20">
           <div className="font-medium text-gray-900 truncate">
-            {project.enhancedTeamMembers?.length || 0} members
+            {project.enhancedTeamMembers?.length || 0}{" "}
+            {(project.enhancedTeamMembers?.length || 0) === 1
+              ? "member"
+              : "members"}
           </div>
         </div>
       ),
@@ -1342,31 +1751,33 @@ const ProjectList = () => {
           >
             <UsersIcon className="h-4 w-4" />
           </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleViewProjectDocuments(project);
-            }}
-            className={`p-2 rounded-lg transition-colors cursor-pointer relative ${
-              projectDocuments[project._id]?.length > 0
-                ? "text-green-600 hover:text-green-800 hover:bg-green-50"
-                : "text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-            }`}
-            title={
-              projectDocuments[project._id]?.length > 0
-                ? `View ${
-                    projectDocuments[project._id].length
-                  } uploaded documents`
-                : "View Documents to Upload"
-            }
-          >
-            <HiDocument className="h-4 w-4" />
-            {projectDocuments[project._id]?.length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                {projectDocuments[project._id].length}
-              </span>
-            )}
-          </button>
+          {project.projectScope !== "personal" && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleViewProjectDocuments(project);
+              }}
+              className={`p-2 rounded-lg transition-colors cursor-pointer relative ${
+                projectDocuments[project._id]?.length > 0
+                  ? "text-green-600 hover:text-green-800 hover:bg-green-50"
+                  : "text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+              }`}
+              title={
+                projectDocuments[project._id]?.length > 0
+                  ? `View ${
+                      projectDocuments[project._id].length
+                    } uploaded documents`
+                  : "View Documents to Upload"
+              }
+            >
+              <HiDocument className="h-4 w-4" />
+              {projectDocuments[project._id]?.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                  {projectDocuments[project._id].length}
+                </span>
+              )}
+            </button>
+          )}
           {!shouldDisableProjectEditing(project) && (
             <button
               onClick={(e) => {
@@ -1392,6 +1803,27 @@ const ProjectList = () => {
               <TrashIcon className="h-4 w-4" />
             </button>
           )}
+          {/* Resubmit button for rejected projects */}
+          {(project.status === "revision_required" ||
+            project.status === "rejected") &&
+            (project.createdBy._id === user.id ||
+              project.createdBy === user.id) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleResubmitProject(project);
+                }}
+                disabled={resubmittingProject === project._id}
+                className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                title="Resubmit Project"
+              >
+                {resubmittingProject === project._id ? (
+                  <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <ArrowPathIcon className="h-4 w-4" />
+                )}
+              </button>
+            )}
         </div>
       ),
     },
@@ -1416,9 +1848,11 @@ const ProjectList = () => {
             <p className="text-gray-600">
               {user.role.level >= 1000
                 ? "Manage and track all projects across all departments"
-                : `Manage and track projects for ${
+                : user.role.level >= 600
+                ? `View and manage personal and departmental projects for ${
                     user.department?.name || "your department"
-                  } - ELRA regulatory authority oversees all equipment categories`}
+                  }`
+                : `View and manage your personal projects only`}
             </p>
           </div>
           <button
@@ -1661,6 +2095,404 @@ const ProjectList = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Project Scope <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.projectScope}
+                    onChange={(e) => {
+                      setFormData({
+                        ...formData,
+                        projectScope: e.target.value,
+                        requiresBudgetAllocation: "", // Reset budget allocation when scope changes
+                      });
+                      // Reset vendor selection when scope changes
+                      if (e.target.value !== "external") {
+                        setSelectedVendorCategory("");
+                        setFormData((prev) => ({ ...prev, vendorId: "" }));
+                      }
+                    }}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                    required
+                    disabled={submitting}
+                  >
+                    <option value="">Select Project Scope</option>
+                    {allowedProjectScopes.map((scope) => (
+                      <option key={scope} value={scope}>
+                        {scope === "personal" && "Personal"}
+                        {scope === "departmental" && "Departmental"}
+                        {scope === "external" && "External"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Project Manager - Only show for non-personal projects */}
+                {formData.projectScope !== "personal" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Project Manager
+                    </label>
+                    <UserSearchSelect
+                      value={formData.projectManager}
+                      onChange={(value) =>
+                        setFormData({ ...formData, projectManager: value })
+                      }
+                      placeholder="Search for a project manager..."
+                      label=""
+                      minRoleLevel={
+                        formData.projectScope === "external" &&
+                        (user?.department?.name === "Human Resources" ||
+                          user?.department?.name === "HR" ||
+                          user?.department?.name ===
+                            "Human Resource Management") &&
+                        user?.role?.level === 700
+                          ? 300 // HR HOD can assign levels 700, 600, 300 for external projects
+                          : 300 // Default for other cases
+                      }
+                      excludeUsers={[]}
+                      currentUser={user}
+                      className="w-full"
+                    />
+                  </div>
+                )}
+
+                {/* Budget Allocation - Only for Personal/Departmental Projects */}
+                {formData.projectScope !== "external" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Budget Allocation <span className="text-red-500">*</span>
+                    </label>
+                    <div className="space-y-2">
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="requiresBudgetAllocation"
+                          value="false"
+                          checked={
+                            formData.requiresBudgetAllocation === "false"
+                          }
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              requiresBudgetAllocation: e.target.value,
+                            })
+                          }
+                          className="mr-2 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)]"
+                          disabled={submitting}
+                        />
+                        <span className="text-sm">
+                          No Budget Allocation (Use Existing Budget)
+                        </span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="requiresBudgetAllocation"
+                          value="true"
+                          checked={formData.requiresBudgetAllocation === "true"}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              requiresBudgetAllocation: e.target.value,
+                            })
+                          }
+                          className="mr-2 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)]"
+                          disabled={submitting}
+                        />
+                        <span className="text-sm">
+                          Requires Budget Allocation (Go Through Finance)
+                        </span>
+                      </label>
+                    </div>
+                    <p className="mt-2 text-sm text-gray-600">
+                      {formData.requiresBudgetAllocation === "false"
+                        ? formData.projectScope === "personal"
+                          ? "Project will be auto-approved and use your existing budget."
+                          : "Project will be auto-approved and use existing department budget."
+                        : formData.requiresBudgetAllocation === "true"
+                        ? "Project will go through Finance approval workflow."
+                        : "Choose whether this project needs new budget allocation."}
+                    </p>
+                  </div>
+                )}
+
+                {/* Vendor Category Selection - Only for External Projects */}
+                {formData.projectScope === "external" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Vendor Category <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={selectedVendorCategory}
+                      onChange={(e) => {
+                        setSelectedVendorCategory(e.target.value);
+                        setFormData({ ...formData, vendorId: "" });
+                      }}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                      required
+                      disabled={submitting}
+                    >
+                      <option value="">Select Vendor Category</option>
+                      {vendorCategories.map((category) => (
+                        <option key={category.value} value={category.value}>
+                          {category.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Vendor Selection - Only for External Projects */}
+                {formData.projectScope === "external" &&
+                  selectedVendorCategory && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Vendor <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.vendorId}
+                        onChange={(e) =>
+                          setFormData({ ...formData, vendorId: e.target.value })
+                        }
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                        required
+                        disabled={submitting}
+                      >
+                        <option value="">Select Vendor</option>
+                        {filteredVendors.map((vendor) => (
+                          <option key={vendor._id} value={vendor._id}>
+                            {vendor.name} - {vendor.contactPerson}
+                          </option>
+                        ))}
+                      </select>
+                      {filteredVendors.length === 0 &&
+                        selectedVendorCategory && (
+                          <p className="text-sm text-orange-600 mt-1">
+                            No approved vendors found for this category. Please
+                            contact Procurement.
+                          </p>
+                        )}
+                    </div>
+                  )}
+
+                {/* Project Items Specification - Only for External Projects */}
+                {formData.projectScope === "external" && (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Required Items & Specifications{" "}
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <div className="space-y-4">
+                      {projectItems.map((item, index) => (
+                        <div
+                          key={index}
+                          className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-sm font-medium text-gray-700">
+                              Item {index + 1}
+                            </h4>
+                            {projectItems.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newItems = projectItems.filter(
+                                    (_, i) => i !== index
+                                  );
+                                  setProjectItems(newItems);
+                                }}
+                                className="text-red-600 hover:text-red-800 text-sm"
+                                disabled={submitting}
+                              >
+                                Remove Item
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Item Name{" "}
+                                <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={item.name}
+                                onChange={(e) => {
+                                  const newItems = [...projectItems];
+                                  newItems[index].name = e.target.value;
+                                  setProjectItems(newItems);
+                                }}
+                                placeholder="e.g., Training Software Licenses"
+                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                required
+                                disabled={submitting}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Quantity <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const newItems = [...projectItems];
+                                  newItems[index].quantity =
+                                    parseInt(e.target.value) || 1;
+                                  newItems[index].totalPrice =
+                                    newItems[index].quantity *
+                                    (parseFloat(newItems[index].unitPrice) ||
+                                      0);
+                                  setProjectItems(newItems);
+                                }}
+                                min="1"
+                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                required
+                                disabled={submitting}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Unit Price (NGN){" "}
+                                <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={item.unitPrice}
+                                onChange={(e) => {
+                                  const newItems = [...projectItems];
+                                  newItems[index].unitPrice =
+                                    formatNumberWithCommas(e.target.value);
+                                  newItems[index].totalPrice =
+                                    newItems[index].quantity *
+                                    (parseFloat(
+                                      e.target.value.replace(/,/g, "")
+                                    ) || 0);
+                                  setProjectItems(newItems);
+                                }}
+                                placeholder="e.g., 500,000"
+                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                required
+                                disabled={submitting}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Total Price (NGN)
+                              </label>
+                              <input
+                                type="text"
+                                value={formatNumberWithCommas(
+                                  item.totalPrice.toString()
+                                )}
+                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-gray-100"
+                                readOnly
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Description
+                              </label>
+                              <input
+                                type="text"
+                                value={item.description}
+                                onChange={(e) => {
+                                  const newItems = [...projectItems];
+                                  newItems[index].description = e.target.value;
+                                  setProjectItems(newItems);
+                                }}
+                                placeholder="Brief description of the item"
+                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                disabled={submitting}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">
+                                Delivery Timeline{" "}
+                                <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={item.deliveryTimeline}
+                                onChange={(e) => {
+                                  const newItems = [...projectItems];
+                                  newItems[index].deliveryTimeline =
+                                    e.target.value;
+                                  setProjectItems(newItems);
+                                }}
+                                placeholder="e.g., Within 30 days"
+                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                required
+                                disabled={submitting}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProjectItems([
+                            ...projectItems,
+                            {
+                              name: "",
+                              description: "",
+                              quantity: 1,
+                              unitPrice: "",
+                              totalPrice: 0,
+                              deliveryTimeline: "",
+                            },
+                          ]);
+                        }}
+                        className="w-full border-2 border-dashed border-gray-300 rounded-lg p-4 text-gray-600 hover:border-gray-400 hover:text-gray-800 transition-colors"
+                        disabled={submitting}
+                      >
+                        + Add Another Item
+                      </button>
+
+                      {/* Total Budget Summary */}
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium text-blue-800">
+                            Total Items Cost:
+                          </span>
+                          <span className="text-lg font-bold text-blue-900">
+                            ₦
+                            {formatNumberWithCommas(
+                              projectItems
+                                .reduce((sum, item) => sum + item.totalPrice, 0)
+                                .toString()
+                            )}
+                          </span>
+                        </div>
+                        {formData.budget && (
+                          <div className="mt-2">
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-gray-600">
+                                Project Budget:
+                              </span>
+                              <span className="font-medium">
+                                ₦{formData.budget}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Start Date <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -1722,26 +2554,7 @@ const ProjectList = () => {
                     </p>
                   )}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Status <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) =>
-                      setFormData({ ...formData, status: e.target.value })
-                    }
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                    required
-                    disabled={submitting}
-                  >
-                    {projectStatuses.slice(1).map((status) => (
-                      <option key={status.value} value={status.value}>
-                        {status.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {/* Status field removed - managed by backend workflow system */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Priority <span className="text-red-500">*</span>
@@ -1761,84 +2574,10 @@ const ProjectList = () => {
                     <option value="critical">Critical</option>
                   </select>
                 </div>
-
-                {/* Project Scope - Only show if user can create external projects */}
-                {canCreateExternalProjects && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Project Scope <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={formData.projectScope}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          projectScope: e.target.value,
-                        })
-                      }
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                      required
-                      disabled={submitting}
-                    >
-                      <option value="personal">Personal Project</option>
-                      <option value="departmental">Departmental Project</option>
-                      <option value="external">External Project</option>
-                    </select>
-                  </div>
-                )}
               </div>
 
               {/* Project Manager - Full Width */}
-              <div className="mt-4">
-                {/* Note for non-HR users */}
-                {!canCreateExternalProjects && (
-                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <div className="flex items-start">
-                      <div className="flex-shrink-0">
-                        <svg
-                          className="h-5 w-5 text-blue-400"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm text-blue-800">
-                          <strong>Note:</strong> You can create personal and
-                          departmental projects. External projects (for
-                          regulating external entities) can only be created by
-                          HR department heads.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <UserSearchSelect
-                  value={formData.projectManager}
-                  onChange={(value) =>
-                    setFormData({
-                      ...formData,
-                      projectManager: value,
-                    })
-                  }
-                  placeholder="Search for project manager (optional)..."
-                  label="Project Manager (Optional)"
-                  required={false}
-                  disabled={submitting}
-                  minRoleLevel={300}
-                  className="w-full"
-                  currentUser={user}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Leave empty to assign yourself as project manager. You can
-                  assign any STAFF, MANAGER, or HOD.
-                </p>
-              </div>
+              <div className="mt-4"></div>
               <div className="mt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Description <span className="text-red-500">*</span>
@@ -2267,6 +3006,140 @@ const ProjectList = () => {
                   Update Project
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Resubmit Confirmation Modal */}
+      {showResubmitConfirm && projectToResubmit && (
+        <div className="fixed inset-0 modal-backdrop-enhanced flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-lg modal-shadow-enhanced border border-gray-100 transform transition-all duration-300 ease-out">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center">
+                <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
+                  <ArrowPathIcon className="h-6 w-6 text-green-600" />
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900 ml-3">
+                  Resubmit Project
+                </h2>
+              </div>
+              <button
+                onClick={closeResubmitConfirm}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <ELRALogo className="h-8 w-8 text-blue-600" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-blue-800">
+                      ELRA Project Resubmission
+                    </h3>
+                    <p className="text-sm text-blue-700 mt-1">
+                      Please ensure you have addressed all rejection reasons
+                      before resubmitting.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Project Details
+                  </h3>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium text-gray-700">
+                          Project:
+                        </span>
+                        <p className="text-gray-900">
+                          {projectToResubmit.name}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Code:</span>
+                        <p className="text-gray-900">
+                          {projectToResubmit.code}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">
+                          Status:
+                        </span>
+                        <p className="text-gray-900">
+                          {getStatusBadge(projectToResubmit.status)}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">
+                          Budget:
+                        </span>
+                        <p className="text-gray-900">
+                          {formatCurrency(projectToResubmit.budget)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <div className="w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center">
+                        <span className="text-yellow-600 text-sm font-medium">
+                          !
+                        </span>
+                      </div>
+                    </div>
+                    <div className="ml-3">
+                      <h4 className="text-sm font-medium text-yellow-800">
+                        Important Reminder
+                      </h4>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        Have you reviewed and addressed the rejection reasons
+                        provided by the approver? The project will be
+                        resubmitted for approval from the rejection point
+                        onwards.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={closeResubmitConfirm}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmResubmitProject}
+                disabled={resubmittingProject === projectToResubmit._id}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+              >
+                {resubmittingProject === projectToResubmit._id ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Resubmitting...
+                  </>
+                ) : (
+                  <>
+                    <ArrowPathIcon className="h-4 w-4 mr-2" />
+                    Yes, Resubmit Project
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

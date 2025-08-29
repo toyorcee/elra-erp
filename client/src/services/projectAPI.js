@@ -196,6 +196,16 @@ export const rejectProject = async (projectId, rejectionData) => {
   }
 };
 
+export const resubmitProject = async (projectId) => {
+  try {
+    const response = await api.post(`/projects/${projectId}/resubmit`);
+    return response.data;
+  } catch (error) {
+    console.error("Error resubmitting project:", error);
+    throw error;
+  }
+};
+
 // ============================================================================
 // TEAM MEMBER APIs (New TeamMember Model)
 // ============================================================================
@@ -354,6 +364,17 @@ export const getWorkflowStatus = async (projectId) => {
     return response.data;
   } catch (error) {
     console.error("Error fetching workflow status:", error);
+    throw error;
+  }
+};
+
+// Get project categories
+export const fetchProjectCategories = async () => {
+  try {
+    const response = await api.get("/projects/categories");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching project categories:", error);
     throw error;
   }
 };

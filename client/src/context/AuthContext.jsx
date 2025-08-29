@@ -11,7 +11,7 @@ const getInitialState = () => {
   return {
     user: null,
     isAuthenticated: false,
-    loading: true,
+    loading: false, // Start with false to prevent loading screens
     error: null,
     initialized: false,
     subscriptionPlans: [],
@@ -137,16 +137,14 @@ export const AuthProvider = ({ children }) => {
 
   const initializeAuth = useCallback(async () => {
     try {
-      dispatch({ type: AUTH_ACTIONS.INIT_START });
-
-      // Simple check - if we have any cookies, try to get user data
-      if (!document.cookie.includes("token")) {
+      if (document.cookie.includes("token")) {
+        dispatch({ type: AUTH_ACTIONS.INIT_START });
+      } else {
         dispatch({ type: AUTH_ACTIONS.INIT_FAILURE });
         return;
       }
 
       const response = await authAPI.getMe();
-
       const userData = response.data.data?.user || response.data.user;
 
       setHasLoggedIn(true);

@@ -87,8 +87,9 @@ const createEmailTemplate = (
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                gap: 15px;
                 flex-direction: column;
+                gap: 12px;
+                text-align: center;
             }
             
             .logo-image {
@@ -98,20 +99,23 @@ const createEmailTemplate = (
             }
             
             .logo-text {
-                font-size: 48px;
+                font-size: 52px;
                 font-weight: 800;
                 letter-spacing: -2px;
                 font-family: 'Poppins', sans-serif;
                 color: white;
                 margin: 0;
+                text-align: center;
             }
             
             .logo-subtitle {
-                font-size: 16px;
+                font-size: 18px;
                 font-weight: 500;
                 color: white;
                 letter-spacing: 0.5px;
-                margin-top: 8px;
+                margin: 0;
+                text-align: center;
+                font-style: italic;
             }
             
             .content {
@@ -239,25 +243,9 @@ const createEmailTemplate = (
         <div class="email-container">
             <div class="header">
                 <div class="logo-container">
-                            <div style="
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.1) 100%);
-            border: 2px solid #ffffff;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Poppins', sans-serif;
-            font-size: 28px;
-            font-weight: 800;
-            color: #ffffff;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            letter-spacing: 2px;
-        ">ELRA</div>
                     <div class="logo-text">ELRA</div>
+                    <div class="logo-subtitle">You Lease, We Regulate...</div>
                 </div>
-                <div class="subtitle">Enterprise Resource Planning System</div>
             </div>
             
             <div class="content">
@@ -345,7 +333,7 @@ export const sendWelcomeEmail = async (email, userName) => {
       `
         <p>Hello <strong>${userName}</strong>,</p>
         <p>🎉 Congratulations! Your ELRA account has been successfully activated.</p>
-        <p>You now have full access to our comprehensive Enterprise Resource Planning (ERP) platform with advanced features including HR management, payroll processing, procurement, finance, inventory management, and secure document workflows.</p>
+        <p>You now have full access to our comprehensive platform with advanced features including HR management, payroll processing, procurement, finance, inventory management, and secure document workflows.</p>
         <p>Ready to transform your business operations? Click the button below to get started!</p>
       `,
       "Login to ELRA",
@@ -385,7 +373,7 @@ export const sendAccountActivationEmail = async (
       "Activate Your ELRA Account",
       `
         <p>Hello <strong>${userName}</strong>,</p>
-        <p>🎉 Welcome to ELRA! We're excited to have you join our comprehensive Enterprise Resource Planning (ERP) platform.</p>
+        <p>🎉 Welcome to ELRA! We're excited to have you join our comprehensive platform.</p>
         <p>To complete your account setup and unlock all the powerful business management features, please click the button below to activate your account.</p>
         <p>Once activated, you'll have full access to HR management, payroll processing, procurement, finance, inventory management, and secure document workflows.</p>
       `,
@@ -498,7 +486,7 @@ export const sendIndustryInstanceInvitation = async (
         <p><strong>Temporary Password:</strong> ${tempPassword}</p>
         
         <p>⚠️ <strong>Security Note:</strong> Please change your password immediately after your first login to ensure account security.</p>
-        <p>You can now access the platform and start configuring your ERP system!</p>
+        <p>You can now access the platform and start configuring your system!</p>
       `,
       "Login to ELRA",
       loginUrl,
@@ -540,7 +528,7 @@ export const sendInvitationEmail = async (
       `You're Invited to Join ELRA`,
       `
         <p>Hello <strong>${userName}</strong>,</p>
-        <p>You've been invited to join ELRA's Enterprise Resource Planning (ERP) system.</p>
+        <p>You've been invited to join ELRA's comprehensive platform.</p>
         
         <div class="info-box">
             <div class="info-title">📋 Your Assignment Details</div>
@@ -617,7 +605,7 @@ export const sendSubscriptionEmail = async (
           <li>Configure procurement and inventory management</li>
           <li>Set up approval workflows and document management</li>
           <li>Create departments and user roles</li>
-          <li>Configure your ERP system settings</li>
+                          <li>Configure your system settings</li>
         </ul>
         
         <p>Your ERP platform is now ready for use! Need help getting started? Our support team is here to assist you!</p>
@@ -1312,7 +1300,7 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
               </svg>
             <div class="logo-text">ELRA</div>
             </div>
-            <div class="subtitle">Enterprise Resource Planning System</div>
+            <div class="subtitle">You Lease, We Regulate...</div>
           </div>
           
           <div class="content">
@@ -1321,7 +1309,7 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
             <p class="message">
               Hello <strong>${firstName}</strong>,<br><br>
               Thank you for registering with ELRA! 🎉<br><br>
-              Your registration has been received and is currently under review by our Super Administrator for access to our comprehensive ERP platform.
+              Your registration has been received and is currently under review by our Super Administrator for access to our comprehensive platform.
             </p>
             
             <div class="info-card">
@@ -1333,7 +1321,7 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
                 1. Super Admin will review your registration<br>
                 2. You'll receive an invitation email with a special code<br>
                 3. Use the code to complete your account setup<br>
-                4. Start using ELRA ERP! 🚀
+                4. Start using ELRA! 🚀
               </div>
             </div>
             
@@ -1344,13 +1332,13 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
             <div class="company-info">
               <div class="company-name">Century Info Systems</div>
               <div class="company-tagline">Empowering Digital Transformation</div>
-              <div class="company-tagline-secondary">Enterprise Resource Planning Solutions</div>
+              <div class="company-tagline-secondary">Comprehensive Business Solutions</div>
             </div>
           </div>
           
           <div class="footer">
             <p class="footer-text">Thank you for choosing ELRA</p>
-            <p class="footer-subtitle">Powered by ELRA - Enterprise Resource Planning</p>
+            <p class="footer-subtitle">Powered by ELRA</p>
             <p class="footer-date">${currentDate}</p>
           </div>
         </div>
@@ -1604,7 +1592,7 @@ const sendPayslipEmail = async ({
              <div class="logo-container">
                <div class="logo-text">ELRA</div>
              </div>
-             <div class="subtitle">Enterprise Resource Planning System</div>
+             <div class="subtitle">You Lease, We Regulate...</div>
            </div>
           
           <div class="content">
@@ -1619,7 +1607,14 @@ const sendPayslipEmail = async ({
               <div class="payslip-title" style="text-align: center; font-size: 20px; font-weight: 600; color: #1f2937; margin-bottom: 15px;">Payslip Summary</div>
               
               <div style="text-align: center; margin: 20px 0;">
-                <div style="font-size: 28px; font-weight: 700; color: #059669; margin: 0;">₦${netPay ? netPay.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}</div>
+                <div style="font-size: 28px; font-weight: 700; color: #059669; margin: 0;">₦${
+                  netPay
+                    ? netPay.toLocaleString("en-NG", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })
+                    : "0.00"
+                }</div>
               </div>
               
               <p style="color: #6b7280; font-size: 14px; margin: 15px 0;">
@@ -1639,7 +1634,7 @@ const sendPayslipEmail = async ({
           
           <div class="footer">
             <p class="footer-text">Thank you for choosing ELRA</p>
-            <p class="footer-subtitle">Powered by ELRA - Enterprise Resource Planning</p>
+            <p class="footer-subtitle">Powered by ELRA</p>
             <p class="footer-date">${currentDate}</p>
           </div>
         </div>
@@ -1672,6 +1667,62 @@ const sendPayslipEmail = async ({
   }
 };
 
+// Send vendor notification email with PDF attachment
+export const sendVendorNotificationEmail = async (
+  vendorData,
+  projectData,
+  pdfBuffer = null
+) => {
+  try {
+    const transporter = createTransporter();
+
+    const htmlContent = createEmailTemplate(
+      "Thank You for Partnering with ELRA!",
+      `
+        <p>Hello <strong>${vendorData.name}</strong>,</p>
+        <p>🎉 Thank you for trusting ELRA with your business partnership!</p>
+        <p>We're excited to work with you on our upcoming project and look forward to a successful collaboration.</p>
+        <p>Your vendor registration has been received and is currently being processed. We'll be in touch soon with next steps.</p>
+        <p>If you have any questions, please don't hesitate to reach out to our procurement team.</p>
+      `,
+      null, // No action button needed
+      null,
+      "Thank you for choosing ELRA as your business partner"
+    );
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM,
+      to: vendorData.email,
+      subject: "Welcome to ELRA - Vendor Registration Confirmation",
+      html: htmlContent,
+    };
+
+    // Add PDF attachment if provided
+    if (pdfBuffer) {
+      mailOptions.attachments = [
+        {
+          filename: `vendor_receipt_${vendorData.name.replace(
+            /\s+/g,
+            "_"
+          )}.pdf`,
+          content: pdfBuffer,
+          contentType: "application/pdf",
+        },
+      ];
+    }
+
+    const result = await transporter.sendMail(mailOptions);
+    console.log(`✅ Vendor notification email sent to: ${vendorData.email}`);
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    console.error(
+      `❌ Error sending vendor notification email to ${vendorData.email}:`,
+      error.message
+    );
+    return { success: false, error: error.message };
+  }
+};
+
 export default {
   sendPasswordResetEmail,
   sendWelcomeEmail,
@@ -1690,4 +1741,5 @@ export default {
   sendUserCancellationEmail,
   sendUserPaymentFailureEmail,
   sendPayslipEmail,
+  sendVendorNotificationEmail,
 };

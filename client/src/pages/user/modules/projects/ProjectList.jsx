@@ -121,6 +121,9 @@ const ProjectList = () => {
     priority: "medium",
     projectScope: "personal",
     vendorId: "",
+    vendorName: "",
+    vendorEmail: "",
+    vendorPhone: "",
     requiresBudgetAllocation: "",
   });
 
@@ -159,6 +162,12 @@ const ProjectList = () => {
   const [projectToResubmit, setProjectToResubmit] = useState(null);
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [selectedProjectForTeam, setSelectedProjectForTeam] = useState(null);
+  const [showStep2ConfirmModal, setShowStep2ConfirmModal] = useState(false);
+
+  // Multi-step form state for external projects
+  const [currentStep, setCurrentStep] = useState(1);
+  const [totalSteps] = useState(2);
+  const [showScopeSelection, setShowScopeSelection] = useState(true);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [selectedProjectForDocument, setSelectedProjectForDocument] =
     useState(null);
@@ -219,6 +228,11 @@ const ProjectList = () => {
       value: "pending_department_approval",
       label: "Pending Department Approval",
       color: "bg-orange-100 text-orange-800",
+    },
+    {
+      value: "pending_legal_compliance_approval",
+      label: "Pending Legal Compliance Approval",
+      color: "bg-teal-100 text-teal-800",
     },
     {
       value: "pending_finance_approval",
@@ -908,7 +922,149 @@ const ProjectList = () => {
 
   const closeModal = () => {
     setShowModal(false);
+    setCurrentStep(1); // Reset to step 1
+    setShowScopeSelection(true); // Reset scope selection
     resetForm();
+  };
+
+  // Step navigation functions
+  const nextStep = () => {
+    if (currentStep < totalSteps) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const validateStep1 = () => {
+    const errors = [];
+    if (!formData.name || !formData.name.trim()) {
+      errors.push("Project name is required");
+    }
+    if (!formData.category || !formData.category.trim()) {
+      errors.push("Project category is required");
+    }
+    if (!formData.budget || !formData.budget.trim()) {
+      errors.push("Project budget is required");
+    }
+    if (!formData.startDate) {
+      errors.push("Start date is required");
+    }
+    if (!formData.endDate) {
+      errors.push("End date is required");
+    }
+    if (formData.projectScope === "external") {
+      if (!selectedVendorCategory) {
+        errors.push("Vendor category is required for external projects");
+      }
+      if (!formData.vendorName || !formData.vendorName.trim()) {
+        errors.push("Vendor name is required for external projects");
+      }
+    }
+    return errors;
+  };
+
+  const isStep1Complete = () => {
+    const errors = validateStep1();
+    return errors.length === 0;
+  };
+
+  const validateStep2 = () => {
+    const errors = [];
+
+    // Check if project items are filled
+    if (projectItems.length === 0) {
+      errors.push("At least one project item is required");
+      return errors;
+    }
+
+    // Validate each project item
+    projectItems.forEach((item, index) => {
+      if (!item.name || !item.name.trim()) {
+        errors.push(`Item ${index + 1}: Name is required`);
+      }
+      if (!item.description || !item.description.trim()) {
+        errors.push(`Item ${index + 1}: Description is required`);
+      }
+      if (!item.quantity || item.quantity <= 0) {
+        errors.push(`Item ${index + 1}: Quantity must be greater than 0`);
+      }
+      if (
+        !item.unitPrice ||
+        parseFloat(item.unitPrice.replace(/,/g, "")) <= 0
+      ) {
+        errors.push(`Item ${index + 1}: Unit price must be greater than 0`);
+      }
+      if (!item.deliveryTimeline || !item.deliveryTimeline.trim()) {
+        errors.push(`Item ${index + 1}: Delivery timeline is required`);
+      }
+    });
+
+    return errors;
+  };
+
+  const isStep2Complete = () => {
+    const errors = validateStep2();
+    return errors.length === 0;
+  };
+
+  const isFormValid = () => {
+    if (formData.projectScope === "external") {
+      return currentStep === 1 ? isStep1Complete() : isStep2Complete();
+    }
+    return isStep1Complete();
+  };
+
+  const hasInvalidInputs = () => {
+    // Check for negative budget
+    if (formData.budget && parseFloat(formData.budget.replace(/,/g, "")) < 0) {
+      return true;
+    }
+
+    // Check for invalid dates
+    if (formData.startDate && formData.endDate) {
+      const startDate = new Date(formData.startDate);
+      const endDate = new Date(formData.endDate);
+      if (endDate <= startDate) {
+        return true;
+      }
+    }
+
+    // Check for negative quantities or prices in project items
+    if (formData.projectScope === "external") {
+      return projectItems.some((item) => {
+        const quantity = parseInt(item.quantity) || 0;
+        const unitPrice = parseFloat(item.unitPrice.replace(/,/g, "")) || 0;
+        return quantity <= 0 || unitPrice <= 0;
+      });
+    }
+
+    return false;
+  };
+
+  const handleScopeSelection = (scope) => {
+    setFormData({
+      ...formData,
+      projectScope: scope,
+      requiresBudgetAllocation: "", // Reset budget allocation when scope changes
+    });
+    // Reset vendor selection when scope changes
+    if (scope !== "external") {
+      setSelectedVendorCategory("");
+      setFormData((prev) => ({
+        ...prev,
+        vendorId: "",
+        vendorName: "",
+        vendorEmail: "",
+        vendorPhone: "",
+      }));
+    }
+    setShowScopeSelection(false);
+    setCurrentStep(1);
   };
 
   const handleViewTeamMembers = (project) => {
@@ -1311,27 +1467,33 @@ const ProjectList = () => {
       errors.push("Priority is required");
     }
 
-    if (!formData.description.trim()) {
+    // Description is only required for non-external projects
+    if (formData.projectScope !== "external" && !formData.description.trim()) {
       errors.push("Description is required");
     }
 
-    // Validate budget allocation for personal/departmental projects
-    if (
-      formData.projectScope !== "external" &&
-      formData.requiresBudgetAllocation === ""
-    ) {
-      errors.push(
-        "Budget allocation option is required for personal/departmental projects"
-      );
-    }
+    // Budget allocation is optional - defaults to false if not selected
+    // No validation needed as it defaults to false
 
     // Validate vendor selection for external projects
     if (formData.projectScope === "external") {
+      console.log("🔍 [VALIDATION DEBUG] External project validation:");
+      console.log("  - selectedVendorCategory:", selectedVendorCategory);
+      console.log("  - formData.vendorName:", formData.vendorName);
+      console.log("  - projectItems:", projectItems);
+
       if (!selectedVendorCategory) {
         errors.push("Vendor category is required for external projects");
       }
-      if (!formData.vendorId) {
-        errors.push("Vendor selection is required for external projects");
+      if (!formData.vendorName || !formData.vendorName.trim()) {
+        errors.push("Vendor name is required for external projects");
+      }
+      // Email validation (optional)
+      if (formData.vendorEmail && formData.vendorEmail.trim()) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.vendorEmail)) {
+          errors.push("Please enter a valid vendor email address");
+        }
       }
 
       // Validate project items
@@ -1339,6 +1501,14 @@ const ProjectList = () => {
         errors.push("At least one item is required for external projects");
       } else {
         projectItems.forEach((item, index) => {
+          console.log(`🔍 [VALIDATION DEBUG] Item ${index + 1}:`, {
+            name: item.name,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            currency: item.currency,
+            deliveryTimeline: item.deliveryTimeline,
+          });
+
           if (!item.name.trim()) {
             errors.push(`Item ${index + 1}: Item name is required`);
           }
@@ -1360,9 +1530,7 @@ const ProjectList = () => {
               `Item ${index + 1}: Valid unit price (number > 0) is required`
             );
           }
-          if (!item.currency) {
-            errors.push(`Item ${index + 1}: Currency is required`);
-          }
+          // Currency is always NGN - no validation needed
           if (!item.deliveryTimeline.trim()) {
             errors.push(`Item ${index + 1}: Delivery timeline is required`);
           }
@@ -1440,8 +1608,32 @@ const ProjectList = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Comprehensive form data logging
+    console.log(
+      "🔍 [FORM DATA DEBUG] ========================================"
+    );
+    console.log("🔍 [FORM DATA] Form Data:", {
+      ...formData,
+      budget: parseFormattedNumber(formData.budget),
+    });
+    console.log("🔍 [FORM DATA] Project Items:", projectItems);
+    console.log(
+      "🔍 [FORM DATA] Selected Vendor Category:",
+      selectedVendorCategory
+    );
+    console.log("🔍 [FORM DATA] Vendor Name:", formData.vendorName);
+    console.log("🔍 [FORM DATA] User Info:", {
+      department: user?.department?.name,
+      roleLevel: user?.role?.level,
+      roleName: user?.role?.name,
+    });
+    console.log(
+      "🔍 [FORM DATA] =============================================="
+    );
+
     const validationErrors = validateForm();
     if (validationErrors.length > 0) {
+      console.log("❌ [VALIDATION ERRORS]:", validationErrors);
       validationErrors.forEach((error) => {
         toast.error(error);
       });
@@ -1467,15 +1659,36 @@ const ProjectList = () => {
           ...item,
           unitPrice: parseFloat(item.unitPrice.replace(/,/g, "")),
           totalPrice: item.totalPrice,
-          currency: item.currency,
+          currency: "NGN",
         }));
+
+        // Add vendor category
+        submitData.vendorCategory = selectedVendorCategory;
+
+        // Default to false if not selected for external projects
+        submitData.requiresBudgetAllocation =
+          formData.requiresBudgetAllocation === "true" ? true : false;
+
+        // Debug logging for external projects
+        console.log("🔍 [DEBUG] External Project Data:");
+        console.log("  - Project Scope:", submitData.projectScope);
+        console.log("  - Budget:", submitData.budget);
+        console.log("  - Vendor Category:", selectedVendorCategory);
+        console.log("  - Vendor Name:", submitData.vendorName);
+        console.log("  - Project Items:", submitData.projectItems);
+        console.log("  - Items Count:", submitData.projectItems.length);
+        console.log(
+          "  - requiresBudgetAllocation:",
+          submitData.requiresBudgetAllocation
+        );
       } else {
         delete submitData.vendorId;
         delete submitData.projectItems;
+        // Default to false if not selected
         submitData.requiresBudgetAllocation =
-          formData.requiresBudgetAllocation === "true";
+          formData.requiresBudgetAllocation === "true" ? true : false;
 
-        // Debug logging
+        // Debug logging for personal/departmental projects
         console.log("🔍 [DEBUG] Personal/Departmental Project:");
         console.log("  - Project Scope:", submitData.projectScope);
         console.log("  - Budget:", submitData.budget);
@@ -1629,6 +1842,7 @@ const ProjectList = () => {
         );
         loadProjects();
         closeModal();
+        setShowStep2ConfirmModal(false);
       } else {
         // Show more specific error message from backend
         if (response.errors && Array.isArray(response.errors)) {
@@ -1680,8 +1894,9 @@ const ProjectList = () => {
         // Remove vendorId and projectItems for non-external projects
         delete submitData.vendorId;
         delete submitData.projectItems;
+        // Default to false if not selected
         submitData.requiresBudgetAllocation =
-          formData.requiresBudgetAllocation === "true";
+          formData.requiresBudgetAllocation === "true" ? true : false;
       }
 
       const response = await updateProject(selectedProject._id, submitData);
@@ -2242,7 +2457,7 @@ const ProjectList = () => {
                       <p className="text-white text-opacity-90 mt-1 text-sm">
                         {isEditMode
                           ? "Update project details and specifications"
-                          : "Define project scope, budget, and requirements"}
+                          : "Choose project type, budget, and requirements"}
                       </p>
                     </div>
                   </div>
@@ -2267,6 +2482,76 @@ const ProjectList = () => {
 
               {/* Content - Scrollable */}
               <div className="p-8 bg-white overflow-y-auto flex-1">
+                {/* Back to Project Type Selection Button - Only show when not on scope selection page */}
+                {!showScopeSelection && (
+                  <div className="mb-6">
+                    <button
+                      type="button"
+                      onClick={() => setShowScopeSelection(true)}
+                      className="flex items-center space-x-2 text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-colors duration-200 cursor-pointer"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 19l-7-7 7-7"
+                        />
+                      </svg>
+                      <span className="font-medium">
+                        Back to Project Type Selection
+                      </span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Step Indicator - Only for external projects */}
+                {formData.projectScope === "external" && (
+                  <div className="mb-8">
+                    <div className="flex items-center justify-center space-x-4">
+                      {[1, 2].map((step) => (
+                        <div key={step} className="flex items-center">
+                          <div
+                            className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-all duration-300 ${
+                              currentStep >= step
+                                ? "bg-[var(--elra-primary)] text-white"
+                                : "bg-gray-200 text-gray-500"
+                            }`}
+                          >
+                            {step}
+                          </div>
+                          {step < 2 && (
+                            <div
+                              className={`w-16 h-1 mx-2 transition-all duration-300 ${
+                                currentStep > step
+                                  ? "bg-[var(--elra-primary)]"
+                                  : "bg-gray-200"
+                              }`}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="text-center mt-4">
+                      <h3 className="text-lg font-semibold text-gray-800">
+                        {currentStep === 1
+                          ? "Basic Information"
+                          : "Item Specifications"}
+                      </h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {currentStep === 1
+                          ? "Define project details, budget, and vendor information"
+                          : "Add project items and review total costs"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <form onSubmit={handleSubmit}>
                   {/* Enhanced Project Code Display - Only for new projects */}
                   {!isEditMode && nextProjectCode && (
@@ -2302,747 +2587,1947 @@ const ProjectList = () => {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">
-                        Project Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.name}
-                        onChange={(e) =>
-                          setFormData({ ...formData, name: e.target.value })
-                        }
-                        placeholder="Enter project name (e.g., Dangote Group - Training System Implementation)"
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
-                        required
-                        disabled={submitting}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">
-                        Category <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.category}
-                        onChange={(e) =>
-                          setFormData({ ...formData, category: e.target.value })
-                        }
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
-                        required
-                        disabled={submitting}
-                      >
-                        <option value="">Select Category</option>
-                        {projectCategories
-                          .filter((cat) => cat.value !== "all")
-                          .map((category) => (
-                            <option key={category.value} value={category.value}>
-                              {category.label}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">
-                        Project Scope <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.projectScope}
-                        onChange={(e) => {
-                          setFormData({
-                            ...formData,
-                            projectScope: e.target.value,
-                            requiresBudgetAllocation: "", // Reset budget allocation when scope changes
-                          });
-                          // Reset vendor selection when scope changes
-                          if (e.target.value !== "external") {
-                            setSelectedVendorCategory("");
-                            setFormData((prev) => ({ ...prev, vendorId: "" }));
-                          }
-                        }}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
-                        required
-                        disabled={submitting}
-                      >
-                        <option value="">Select Project Scope</option>
-                        {allowedProjectScopes.map((scope) => (
-                          <option key={scope} value={scope}>
-                            {scope === "personal" && "Personal"}
-                            {scope === "departmental" && "Departmental"}
-                            {scope === "external" && "External"}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Project Manager - Only show for non-personal projects */}
-                    {formData.projectScope !== "personal" && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Project Manager
-                        </label>
-                        <UserSearchSelect
-                          value={formData.projectManager}
-                          onChange={(value) =>
-                            setFormData({ ...formData, projectManager: value })
-                          }
-                          placeholder="Search for a project manager..."
-                          label=""
-                          minRoleLevel={
-                            formData.projectScope === "external" &&
-                            (user?.department?.name === "Human Resources" ||
-                              user?.department?.name === "HR" ||
-                              user?.department?.name ===
-                                "Human Resource Management") &&
-                            user?.role?.level === 700
-                              ? 300 // HR HOD can assign levels 700, 600, 300 for external projects
-                              : 300 // Default for other cases
-                          }
-                          excludeUsers={[]}
-                          currentUser={user}
-                          className="w-full"
-                        />
-                      </div>
-                    )}
-
-                    {/* Budget Allocation - Only for Personal/Departmental Projects */}
-                    {
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Budget Allocation{" "}
-                          <span className="text-red-500">*</span>
-                        </label>
-                        <div className="space-y-2">
-                          <label className="flex items-center">
-                            <input
-                              type="radio"
-                              name="requiresBudgetAllocation"
-                              value="false"
-                              checked={
-                                formData.requiresBudgetAllocation === "false"
-                              }
-                              onChange={(e) =>
-                                setFormData({
-                                  ...formData,
-                                  requiresBudgetAllocation: e.target.value,
-                                })
-                              }
-                              className="mr-2 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)]"
-                              disabled={submitting}
-                            />
-                            <span className="text-sm">
-                              No Budget Allocation (Use Existing Budget)
-                            </span>
-                          </label>
-                          <label className="flex items-center">
-                            <input
-                              type="radio"
-                              name="requiresBudgetAllocation"
-                              value="true"
-                              checked={
-                                formData.requiresBudgetAllocation === "true"
-                              }
-                              onChange={(e) =>
-                                setFormData({
-                                  ...formData,
-                                  requiresBudgetAllocation: e.target.value,
-                                })
-                              }
-                              className="mr-2 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)]"
-                              disabled={submitting}
-                            />
-                            <span className="text-sm">
-                              Requires Budget Allocation (Go Through Finance)
-                            </span>
-                          </label>
-                        </div>
-                        <p className="mt-2 text-sm text-gray-600">
-                          {formData.requiresBudgetAllocation === "false"
-                            ? formData.projectScope === "personal"
-                              ? "Project will be auto-approved and use your existing budget."
-                              : formData.projectScope === "departmental"
-                              ? "Project will be auto-approved and use existing department budget."
-                              : "Project will be auto-approved and use existing HR department budget."
-                            : formData.requiresBudgetAllocation === "true"
-                            ? formData.projectScope === "external"
-                              ? "Project will go through Legal → Finance → Executive approval workflow."
-                              : "Project will go through Finance approval workflow."
-                            : "Choose whether this project needs new budget allocation."}
+                  {/* Scope Selection Interface */}
+                  {showScopeSelection ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.5 }}
+                      className="space-y-8"
+                    >
+                      {/* Header */}
+                      <div className="text-center">
+                        <h2 className="text-3xl font-bold text-gray-800 mb-4">
+                          Choose Project Type
+                        </h2>
+                        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                          Select the type of project you want to create. This
+                          will determine the approval process and required
+                          information.
                         </p>
                       </div>
-                    }
 
-                    {/* Vendor Category Selection - Only for External Projects */}
-                    {formData.projectScope === "external" && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Vendor Category{" "}
-                          <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          value={selectedVendorCategory}
-                          onChange={(e) => {
-                            setSelectedVendorCategory(e.target.value);
-                            setFormData({ ...formData, vendorId: "" });
-                          }}
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                          required
-                          disabled={submitting}
+                      {/* Project Type Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+                        {/* Personal Project Type */}
+                        <motion.div
+                          whileHover={{ scale: 1.05, y: -5 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white rounded-2xl p-8 shadow-xl cursor-pointer border-2 border-transparent hover:border-white/20 transition-all duration-300"
+                          onClick={() => handleScopeSelection("personal")}
                         >
-                          <option value="">Select Vendor Category</option>
-                          {vendorCategories.map((category) => (
-                            <option key={category.value} value={category.value}>
-                              {category.label}
-                            </option>
-                          ))}
-                        </select>
+                          <div className="text-center">
+                            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                              <svg
+                                className="w-8 h-8"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </div>
+                            <h3 className="text-2xl font-bold mb-3">
+                              Personal
+                            </h3>
+                            <p className="text-white/90 text-sm leading-relaxed">
+                              Individual projects for personal development,
+                              learning, or small tasks within your department.
+                            </p>
+                            <div className="mt-6 text-xs text-white/80">
+                              <div className="flex items-center justify-center space-x-2 mb-2">
+                                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                                <span>Quick approval process</span>
+                              </div>
+                              <div className="flex items-center justify-center space-x-2 mb-2">
+                                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                                <span>Basic project details</span>
+                              </div>
+                              <div className="flex items-center justify-center space-x-2">
+                                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                                <span>Single-step form</span>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+
+                        {/* Departmental Project Type */}
+                        <motion.div
+                          whileHover={{ scale: 1.05, y: -5 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white rounded-2xl p-8 shadow-xl cursor-pointer border-2 border-transparent hover:border-white/20 transition-all duration-300"
+                          onClick={() => handleScopeSelection("departmental")}
+                        >
+                          <div className="text-center">
+                            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                              <svg
+                                className="w-8 h-8"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
+                              </svg>
+                            </div>
+                            <h3 className="text-2xl font-bold mb-3">
+                              Departmental
+                            </h3>
+                            <p className="text-white/90 text-sm leading-relaxed">
+                              Team projects involving multiple team members
+                              within your department or cross-departmental
+                              collaboration.
+                            </p>
+                            <div className="mt-6 text-xs text-white/80">
+                              <div className="flex items-center justify-center space-x-2 mb-2">
+                                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                                <span>Department approval</span>
+                              </div>
+                              <div className="flex items-center justify-center space-x-2 mb-2">
+                                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                                <span>Team assignment</span>
+                              </div>
+                              <div className="flex items-center justify-center space-x-2">
+                                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                                <span>Single-step form</span>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+
+                        {/* External Project Type */}
+                        <motion.div
+                          whileHover={{ scale: 1.05, y: -5 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white rounded-2xl p-8 shadow-xl cursor-pointer border-2 border-transparent hover:border-white/20 transition-all duration-300"
+                          onClick={() => handleScopeSelection("external")}
+                        >
+                          <div className="text-center">
+                            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                              <svg
+                                className="w-8 h-8"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </div>
+                            <h3 className="text-2xl font-bold mb-3">
+                              External
+                            </h3>
+                            <p className="text-white/90 text-sm leading-relaxed">
+                              Client projects involving external vendors,
+                              detailed specifications, and multi-level approval
+                              process.
+                            </p>
+                            <div className="mt-6 text-xs text-white/80">
+                              <div className="flex items-center justify-center space-x-2 mb-2">
+                                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                                <span>Multi-step form</span>
+                              </div>
+                              <div className="flex items-center justify-center space-x-2 mb-2">
+                                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                                <span>Vendor management</span>
+                              </div>
+                              <div className="flex items-center justify-center space-x-2">
+                                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                                <span>Detailed specifications</span>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
                       </div>
-                    )}
 
-                    {/* Vendor Selection - Only for External Projects */}
-                    {formData.projectScope === "external" &&
-                      selectedVendorCategory && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Vendor Name <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={formData.vendorName || ""}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                vendorName: e.target.value,
-                              })
-                            }
-                            placeholder="e.g., Dangote Group, Microsoft, etc."
-                            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                            required
-                            disabled={submitting}
-                          />
-                        </div>
-                      )}
+                      {/* Back to Form Button */}
+                      <div className="text-center pt-6">
+                        <button
+                          type="button"
+                          onClick={closeModal}
+                          className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-all duration-200 flex items-center space-x-2 mx-auto"
+                        >
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                          <span>Cancel</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    /* Form content after scope selection */
+                    <div>
+                      {/* Step-based content rendering */}
+                      <AnimatePresence mode="wait">
+                        {formData.projectScope === "external" ? (
+                          // Multi-step form for external projects
+                          <motion.div
+                            key={currentStep}
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            {currentStep === 1 ? (
+                              // Step 1: Basic Information
+                              <div className="space-y-6">
+                                {/* Parent Level Fields - Moved to top for better UX */}
+                                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
+                                  {/* Budget Field */}
+                                  <div className="lg:col-span-1">
+                                    <label className="block text-sm font-semibold text-gray-800 mb-2">
+                                      Total Project Budget (₦ NGN){" "}
+                                      <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={formData.budget}
+                                      onChange={(e) =>
+                                        setFormData({
+                                          ...formData,
+                                          budget: formatNumberWithCommas(
+                                            e.target.value
+                                          ),
+                                        })
+                                      }
+                                      placeholder="Enter total budget amount (e.g., 25,000,000)"
+                                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200 text-lg font-semibold"
+                                      required
+                                      disabled={submitting}
+                                    />
+                                    {formData.budget &&
+                                      getApprovalLevelText(formData.budget) && (
+                                        <p
+                                          className={`mt-2 text-sm font-medium ${
+                                            getApprovalLevelText(
+                                              formData.budget
+                                            ).color
+                                          }`}
+                                        >
+                                          {
+                                            getApprovalLevelText(
+                                              formData.budget
+                                            ).text
+                                          }
+                                        </p>
+                                      )}
+                                  </div>
 
-                    {/* Project Items Specification - Only for External Projects */}
-                    {formData.projectScope === "external" && (
-                      <div className="xl:col-span-2">
-                        <label className="block text-lg font-semibold text-gray-800 mb-4">
-                          Required Items & Specifications{" "}
-                          <span className="text-red-500">*</span>
-                        </label>
-                        <div className="space-y-4">
-                          {projectItems.map((item, index) => (
-                            <div
-                              key={index}
-                              className="border border-gray-200 rounded-xl p-6 bg-gradient-to-br from-gray-50 to-green-50 shadow-sm"
-                            >
-                              <div className="flex items-center justify-between mb-4">
-                                <h4 className="text-lg font-semibold text-gray-800">
-                                  Item {index + 1}
-                                </h4>
-                                {projectItems.length > 1 && (
+                                  {/* Start Date Field */}
+                                  <div className="lg:col-span-1">
+                                    <label className="block text-sm font-semibold text-gray-800 mb-2">
+                                      Start Date of Project{" "}
+                                      <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                      type="date"
+                                      value={formData.startDate}
+                                      onChange={(e) =>
+                                        setFormData({
+                                          ...formData,
+                                          startDate: e.target.value,
+                                        })
+                                      }
+                                      min={
+                                        new Date().toISOString().split("T")[0]
+                                      }
+                                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
+                                      required
+                                      disabled={submitting}
+                                    />
+                                  </div>
+
+                                  {/* End Date Field */}
+                                  <div className="lg:col-span-1">
+                                    <label className="block text-sm font-semibold text-gray-800 mb-2">
+                                      End Date of Project{" "}
+                                      <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                      type="date"
+                                      value={formData.endDate}
+                                      onChange={(e) =>
+                                        setFormData({
+                                          ...formData,
+                                          endDate: e.target.value,
+                                        })
+                                      }
+                                      min={
+                                        formData.startDate ||
+                                        new Date().toISOString().split("T")[0]
+                                      }
+                                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
+                                      required
+                                      disabled={submitting}
+                                    />
+                                  </div>
+
+                                  {/* Priority Field */}
+                                  <div className="lg:col-span-1">
+                                    <label className="block text-sm font-semibold text-gray-800 mb-2">
+                                      Project Priority{" "}
+                                      <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                      value={formData.priority}
+                                      onChange={(e) =>
+                                        setFormData({
+                                          ...formData,
+                                          priority: e.target.value,
+                                        })
+                                      }
+                                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
+                                      required
+                                      disabled={submitting}
+                                    >
+                                      <option value="low">Low Priority</option>
+                                      <option value="medium">
+                                        Medium Priority
+                                      </option>
+                                      <option value="high">
+                                        High Priority
+                                      </option>
+                                      <option value="urgent">
+                                        Urgent Priority
+                                      </option>
+                                    </select>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                  <div>
+                                    <label className="block text-sm font-semibold text-gray-800 mb-2">
+                                      Project Name{" "}
+                                      <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={formData.name}
+                                      onChange={(e) =>
+                                        setFormData({
+                                          ...formData,
+                                          name: e.target.value,
+                                        })
+                                      }
+                                      placeholder="Enter project name (e.g., Dangote Group - Training System Implementation)"
+                                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
+                                      required
+                                      disabled={submitting}
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-sm font-semibold text-gray-800 mb-2">
+                                      Category{" "}
+                                      <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                      value={formData.category}
+                                      onChange={(e) =>
+                                        setFormData({
+                                          ...formData,
+                                          category: e.target.value,
+                                        })
+                                      }
+                                      className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
+                                      required
+                                      disabled={submitting}
+                                    >
+                                      <option value="">Select Category</option>
+                                      {projectCategories
+                                        .filter((cat) => cat.value !== "all")
+                                        .map((category) => (
+                                          <option
+                                            key={category.value}
+                                            value={category.value}
+                                          >
+                                            {category.label}
+                                          </option>
+                                        ))}
+                                    </select>
+                                  </div>
+
+                                  {/* Project Manager - Only show for non-personal projects */}
+                                  {formData.projectScope !== "personal" && (
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Project Manager
+                                      </label>
+                                      <UserSearchSelect
+                                        value={formData.projectManager}
+                                        onChange={(value) =>
+                                          setFormData({
+                                            ...formData,
+                                            projectManager: value,
+                                          })
+                                        }
+                                        placeholder="Search for a project manager..."
+                                        label=""
+                                        minRoleLevel={
+                                          formData.projectScope ===
+                                            "external" &&
+                                          (user?.department?.name ===
+                                            "Human Resources" ||
+                                            user?.department?.name === "HR" ||
+                                            user?.department?.name ===
+                                              "Human Resource Management") &&
+                                          user?.role?.level === 700
+                                            ? 300 // HR HOD can assign levels 700, 600, 300 for external projects
+                                            : 300 // Default for other cases
+                                        }
+                                        excludeUsers={[]}
+                                        currentUser={user}
+                                        className="w-full"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Vendor Category Selection - Only for External Projects */}
+                                {formData.projectScope === "external" && (
+                                  <div className="rounded-xl p-4">
+                                    <label className="block text-sm font-semibold text-gray-800 mb-2">
+                                      Vendor Category{" "}
+                                      <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                      value={selectedVendorCategory}
+                                      onChange={(e) => {
+                                        setSelectedVendorCategory(
+                                          e.target.value
+                                        );
+                                        setFormData({
+                                          ...formData,
+                                          vendorId: "",
+                                        });
+                                      }}
+                                      className="w-full border border-blue-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                      required
+                                      disabled={submitting}
+                                    >
+                                      <option value="">
+                                        Select Vendor Category
+                                      </option>
+                                      {vendorCategories.map((category) => (
+                                        <option
+                                          key={category.value}
+                                          value={category.value}
+                                        >
+                                          {category.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <p className="mt-2 text-sm text-blue-600">
+                                      Choose the category that best describes
+                                      the vendor's services
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Budget Allocation - For External Projects Step 1 */}
+                                {/* Budget Allocation - For All Project Types */}
+                                {/* Budget Allocation - For External Projects Step 1 */}
+                                {formData.projectScope === "external" && (
+                                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                                    <label className="block text-sm font-semibold text-gray-800 mb-2">
+                                      Request Budget Allocation{" "}
+                                      <span className="text-gray-500">
+                                        (Optional)
+                                      </span>
+                                    </label>
+                                    <div className="space-y-2">
+                                      <label className="flex items-center">
+                                        <input
+                                          type="checkbox"
+                                          checked={
+                                            formData.requiresBudgetAllocation ===
+                                            "true"
+                                          }
+                                          onChange={(e) =>
+                                            setFormData({
+                                              ...formData,
+                                              requiresBudgetAllocation: e.target
+                                                .checked
+                                                ? "true"
+                                                : "false",
+                                            })
+                                          }
+                                          className="mr-2 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] rounded"
+                                          disabled={submitting}
+                                        />
+                                        <span className="text-sm">
+                                          Request new budget allocation for this
+                                          project
+                                        </span>
+                                      </label>
+                                    </div>
+                                    <p className="mt-2 text-sm text-blue-600">
+                                      {formData.requiresBudgetAllocation ===
+                                      "true"
+                                        ? "Project will go through Legal → Finance → Executive approval."
+                                        : "Project will go through Legal → Executive approval (using existing budget)."}
+                                    </p>
+                                  </div>
+                                )}
+                                {/* {formData.projectScope === "external" && (
+                                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                                    <label className="block text-sm font-semibold text-gray-800 mb-2">
+                                      Budget Allocation{" "}
+                                      <span className="text-gray-500">
+                                        (Optional - defaults to No Budget
+                                        Allocation)
+                                      </span>
+                                    </label>
+                                    <div className="space-y-2">
+                                      <label className="flex items-center">
+                                        <input
+                                          type="radio"
+                                          name="requiresBudgetAllocation_external"
+                                          value="false"
+                                          checked={
+                                            formData.requiresBudgetAllocation ===
+                                            "false"
+                                          }
+                                          onChange={(e) =>
+                                            setFormData({
+                                              ...formData,
+                                              requiresBudgetAllocation:
+                                                e.target.value,
+                                            })
+                                          }
+                                          className="mr-2 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)]"
+                                          disabled={submitting}
+                                        />
+                                        <span className="text-sm">
+                                          No Budget Allocation (Use Existing
+                                          Budget)
+                                        </span>
+                                      </label>
+                                      <label className="flex items-center">
+                                        <input
+                                          type="radio"
+                                          name="requiresBudgetAllocation_external"
+                                          value="true"
+                                          checked={
+                                            formData.requiresBudgetAllocation ===
+                                            "true"
+                                          }
+                                          onChange={(e) =>
+                                            setFormData({
+                                              ...formData,
+                                              requiresBudgetAllocation:
+                                                e.target.value,
+                                            })
+                                          }
+                                          className="mr-2 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)]"
+                                          disabled={submitting}
+                                        />
+                                        <span className="text-sm">
+                                          Requires Budget Allocation (Go Through
+                                          Finance)
+                                        </span>
+                                      </label>
+                                    </div>
+                                    <p className="mt-2 text-sm text-blue-600">
+                                      {formData.requiresBudgetAllocation ===
+                                      "false"
+                                        ? "Project will go through Legal → Executive approval (No Budget Allocation)."
+                                        : formData.requiresBudgetAllocation ===
+                                          "true"
+                                        ? "Project will go through Legal → Finance → Executive approval workflow."
+                                        : "Choose whether this project needs new budget allocation. If left unselected, defaults to No Budget Allocation."}
+                                    </p>
+                                  </div>
+                                )} */}
+
+                                {/* Vendor Information Section - Only for External Projects */}
+                                {formData.projectScope === "external" &&
+                                  selectedVendorCategory && (
+                                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
+                                      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                        <svg
+                                          className="w-5 h-5 mr-2 text-[var(--elra-primary)]"
+                                          fill="currentColor"
+                                          viewBox="0 0 20 20"
+                                        >
+                                          <path
+                                            fillRule="evenodd"
+                                            d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0a1 1 0 011-1h6a1 1 0 011 1v12a1 1 0 01-1 1H6a1 1 0 01-1-1V4z"
+                                            clipRule="evenodd"
+                                          />
+                                        </svg>
+                                        Vendor Information
+                                      </h3>
+
+                                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {/* Vendor Name - Full Width */}
+                                        <div className="md:col-span-2 lg:col-span-3">
+                                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Vendor Name{" "}
+                                            <span className="text-red-500">
+                                              *
+                                            </span>
+                                          </label>
+                                          <input
+                                            type="text"
+                                            value={formData.vendorName || ""}
+                                            onChange={(e) =>
+                                              setFormData({
+                                                ...formData,
+                                                vendorName: e.target.value,
+                                              })
+                                            }
+                                            placeholder="e.g., Dangote Group, Microsoft, etc."
+                                            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                            required
+                                            disabled={submitting}
+                                          />
+                                        </div>
+
+                                        {/* Vendor Email */}
+                                        <div>
+                                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Email{" "}
+                                            <span className="text-gray-500">
+                                              (Optional)
+                                            </span>
+                                          </label>
+                                          <input
+                                            type="email"
+                                            value={formData.vendorEmail || ""}
+                                            onChange={(e) =>
+                                              setFormData({
+                                                ...formData,
+                                                vendorEmail: e.target.value,
+                                              })
+                                            }
+                                            placeholder="contact@company.com"
+                                            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                            disabled={submitting}
+                                          />
+                                        </div>
+
+                                        {/* Vendor Phone */}
+                                        <div>
+                                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Phone{" "}
+                                            <span className="text-gray-500">
+                                              (Optional)
+                                            </span>
+                                          </label>
+                                          <input
+                                            type="tel"
+                                            value={formData.vendorPhone || ""}
+                                            onChange={(e) =>
+                                              setFormData({
+                                                ...formData,
+                                                vendorPhone: e.target.value,
+                                              })
+                                            }
+                                            placeholder="+234 801 234 5678"
+                                            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                            disabled={submitting}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                {/* Step 1 Navigation */}
+                                <div className="flex justify-between pt-6">
                                   <button
                                     type="button"
-                                    onClick={() => {
-                                      const newItems = projectItems.filter(
-                                        (_, i) => i !== index
-                                      );
-                                      setProjectItems(newItems);
-                                    }}
-                                    className="text-red-600 hover:text-red-800 text-sm"
+                                    onClick={closeModal}
+                                    className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-all duration-200 flex items-center space-x-2"
                                     disabled={submitting}
                                   >
-                                    Remove Item
+                                    <svg
+                                      className="w-5 h-5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M6 18L18 6M6 6l12 12"
+                                      />
+                                    </svg>
+                                    <span>Cancel</span>
                                   </button>
-                                )}
+                                  <button
+                                    type="button"
+                                    onClick={nextStep}
+                                    className={`px-6 py-3 rounded-lg transition-all duration-200 flex items-center space-x-2 ${
+                                      isStep1Complete()
+                                        ? "bg-[var(--elra-primary)] text-white hover:bg-[var(--elra-primary-dark)]"
+                                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                    }`}
+                                    disabled={submitting || !isStep1Complete()}
+                                  >
+                                    <span>Next: Item Specifications</span>
+                                    <svg
+                                      className="w-5 h-5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M9 5l7 7-7 7"
+                                      />
+                                    </svg>
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              // Step 2: Item Specifications
+                              <div className="space-y-6">
+                                {/* Project Items Specification */}
+                                <div className="xl:col-span-2">
+                                  <label className="block text-lg font-semibold text-gray-800 mb-4">
+                                    Required Items & Specifications{" "}
+                                    <span className="text-red-500">*</span>
+                                  </label>
+                                  <div className="space-y-4">
+                                    {projectItems.map((item, index) => (
+                                      <div
+                                        key={index}
+                                        className="border border-gray-200 rounded-xl p-6 bg-gradient-to-br from-gray-50 to-green-50 shadow-sm"
+                                      >
+                                        <div className="flex items-center justify-between mb-4">
+                                          <h4 className="text-lg font-semibold text-gray-800">
+                                            Item {index + 1}
+                                          </h4>
+                                          {projectItems.length > 1 && (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const newItems =
+                                                  projectItems.filter(
+                                                    (_, i) => i !== index
+                                                  );
+                                                setProjectItems(newItems);
+                                              }}
+                                              className="text-red-600 hover:text-red-800 text-sm"
+                                              disabled={submitting}
+                                            >
+                                              Remove Item
+                                            </button>
+                                          )}
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                              Item Name{" "}
+                                              <span className="text-red-500">
+                                                *
+                                              </span>
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={item.name}
+                                              onChange={(e) => {
+                                                const newItems = [
+                                                  ...projectItems,
+                                                ];
+                                                newItems[index].name =
+                                                  e.target.value;
+                                                setProjectItems(newItems);
+                                              }}
+                                              placeholder="e.g., Training Software Licenses"
+                                              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                              required
+                                              disabled={submitting}
+                                            />
+                                          </div>
+
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                              Description{" "}
+                                              <span className="text-red-500">
+                                                *
+                                              </span>
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={item.description}
+                                              onChange={(e) => {
+                                                const newItems = [
+                                                  ...projectItems,
+                                                ];
+                                                newItems[index].description =
+                                                  e.target.value;
+                                                setProjectItems(newItems);
+                                              }}
+                                              placeholder="e.g., Software licenses for training"
+                                              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                              required
+                                              disabled={submitting}
+                                            />
+                                          </div>
+
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                              Quantity{" "}
+                                              <span className="text-red-500">
+                                                *
+                                              </span>
+                                            </label>
+                                            <input
+                                              type="number"
+                                              value={item.quantity}
+                                              onChange={(e) => {
+                                                const newItems = [
+                                                  ...projectItems,
+                                                ];
+                                                const value = e.target.value;
+                                                const quantity =
+                                                  value === ""
+                                                    ? ""
+                                                    : parseInt(value) || 0;
+                                                const unitPrice =
+                                                  parseFloat(
+                                                    newItems[
+                                                      index
+                                                    ].unitPrice.replace(
+                                                      /,/g,
+                                                      ""
+                                                    )
+                                                  ) || 0;
+                                                newItems[index].quantity =
+                                                  quantity;
+                                                newItems[index].totalPrice =
+                                                  (quantity || 0) * unitPrice;
+                                                setProjectItems(newItems);
+                                              }}
+                                              placeholder="1"
+                                              min="1"
+                                              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                              required
+                                              disabled={submitting}
+                                            />
+                                          </div>
+
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                              Unit Price (₦ NGN){" "}
+                                              <span className="text-red-500">
+                                                *
+                                              </span>
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={item.unitPrice}
+                                              onChange={(e) => {
+                                                const newItems = [
+                                                  ...projectItems,
+                                                ];
+                                                const value = e.target.value;
+                                                const unitPrice =
+                                                  parseFloat(
+                                                    value.replace(/,/g, "")
+                                                  ) || 0;
+                                                const quantity =
+                                                  newItems[index].quantity || 0;
+                                                newItems[index].unitPrice =
+                                                  formatNumberWithCommas(value);
+                                                newItems[index].totalPrice =
+                                                  quantity * unitPrice;
+                                                setProjectItems(newItems);
+                                              }}
+                                              placeholder="e.g., 500,000"
+                                              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                              required
+                                              disabled={submitting}
+                                            />
+                                          </div>
+
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                              Total Price (₦ NGN)
+                                            </label>
+                                            <div className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-gray-50 text-gray-700 font-semibold">
+                                              ₦
+                                              {item.totalPrice.toLocaleString(
+                                                "en-NG"
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div className="mt-4">
+                                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                                            Delivery Timeline{" "}
+                                            <span className="text-red-500">
+                                              *
+                                            </span>
+                                          </label>
+                                          <input
+                                            type="text"
+                                            value={item.deliveryTimeline}
+                                            onChange={(e) => {
+                                              const newItems = [
+                                                ...projectItems,
+                                              ];
+                                              newItems[index].deliveryTimeline =
+                                                e.target.value;
+                                              setProjectItems(newItems);
+                                            }}
+                                            placeholder="e.g., 30 days from project start"
+                                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                            required
+                                            disabled={submitting}
+                                          />
+                                        </div>
+                                      </div>
+                                    ))}
+
+                                    {/* Add Another Item Button */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setProjectItems([
+                                          ...projectItems,
+                                          {
+                                            name: "",
+                                            description: "",
+                                            quantity: 1,
+                                            unitPrice: "",
+                                            totalPrice: 0,
+                                            deliveryTimeline: "",
+                                            currency: "NGN",
+                                          },
+                                        ]);
+                                      }}
+                                      className="w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-gray-600 hover:border-[var(--elra-primary)] hover:text-[var(--elra-primary)] transition-all duration-200 flex items-center justify-center space-x-2"
+                                      disabled={submitting}
+                                    >
+                                      <PlusIcon className="h-5 w-5" />
+                                      <span>Add Another Item</span>
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Budget Summary */}
+                                <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+                                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                    <svg
+                                      className="w-5 h-5 mr-2 text-green-600"
+                                      fill="currentColor"
+                                      viewBox="0 0 20 20"
+                                    >
+                                      <path
+                                        fillRule="evenodd"
+                                        d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0a1 1 0 011-1h6a1 1 0 011 1v12a1 1 0 01-1 1H6a1 1 0 01-1-1V4z"
+                                        clipRule="evenodd"
+                                      />
+                                    </svg>
+                                    Budget Summary
+                                  </h3>
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                                        Total Items Cost
+                                      </label>
+                                      <div className="text-2xl font-bold text-green-600">
+                                        ₦
+                                        {projectItems
+                                          .reduce(
+                                            (sum, item) =>
+                                              sum + item.totalPrice,
+                                            0
+                                          )
+                                          .toLocaleString("en-NG")}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                                        Project Budget
+                                      </label>
+                                      <div className="text-2xl font-bold text-blue-600">
+                                        ₦
+                                        {(
+                                          parseFloat(
+                                            formData.budget.replace(/,/g, "")
+                                          ) || 0
+                                        ).toLocaleString("en-NG")}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-600 mb-1">
+                                        Remaining Budget
+                                      </label>
+                                      <div
+                                        className={`text-2xl font-bold ${
+                                          projectItems.reduce(
+                                            (sum, item) =>
+                                              sum + item.totalPrice,
+                                            0
+                                          ) >
+                                          (parseFloat(
+                                            formData.budget.replace(/,/g, "")
+                                          ) || 0)
+                                            ? "text-red-600"
+                                            : "text-green-600"
+                                        }`}
+                                      >
+                                        ₦
+                                        {(
+                                          (parseFloat(
+                                            formData.budget.replace(/,/g, "")
+                                          ) || 0) -
+                                          projectItems.reduce(
+                                            (sum, item) =>
+                                              sum + item.totalPrice,
+                                            0
+                                          )
+                                        ).toLocaleString("en-NG")}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Step 2 Navigation */}
+                                <div className="flex justify-between pt-6">
+                                  <button
+                                    type="button"
+                                    onClick={prevStep}
+                                    className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-all duration-200 flex items-center space-x-2"
+                                    disabled={submitting}
+                                  >
+                                    <svg
+                                      className="w-5 h-5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M15 19l-7-7 7-7"
+                                      />
+                                    </svg>
+                                    <span>Previous: Basic Information</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setShowStep2ConfirmModal(true)
+                                    }
+                                    className={`px-6 py-3 rounded-lg transition-all duration-200 flex items-center space-x-2 ${
+                                      isFormValid() && !hasInvalidInputs()
+                                        ? "bg-[var(--elra-primary)] text-white hover:bg-[var(--elra-primary-dark)]"
+                                        : "bg-gray-300 text-gray-500 cursor-not-allowed cursor-pointer"
+                                    }`}
+                                    disabled={
+                                      submitting ||
+                                      !isFormValid() ||
+                                      hasInvalidInputs()
+                                    }
+                                  >
+                                    <span>
+                                      {isEditMode
+                                        ? "Update Project"
+                                        : "Create Project"}
+                                    </span>
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </motion.div>
+                        ) : (
+                          // Single-step form for personal/departmental projects
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            {/* Parent Level Fields - Moved to top for better UX */}
+                            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
+                              {/* Budget Field */}
+                              <div className="lg:col-span-1">
+                                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                                  Total Project Budget (₦ NGN){" "}
+                                  <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  value={formData.budget}
+                                  onChange={(e) =>
+                                    setFormData({
+                                      ...formData,
+                                      budget: formatNumberWithCommas(
+                                        e.target.value
+                                      ),
+                                    })
+                                  }
+                                  placeholder="Enter total budget amount (e.g., 25,000,000)"
+                                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200 text-lg font-semibold"
+                                  required
+                                  disabled={submitting}
+                                />
+                                {formData.budget &&
+                                  getApprovalLevelText(formData.budget) && (
+                                    <p
+                                      className={`mt-2 text-sm font-medium ${
+                                        getApprovalLevelText(formData.budget)
+                                          .color
+                                      }`}
+                                    >
+                                      {
+                                        getApprovalLevelText(formData.budget)
+                                          .text
+                                      }
+                                    </p>
+                                  )}
                               </div>
 
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                              {/* Start Date Field */}
+                              <div className="lg:col-span-1">
+                                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                                  Start Date of Project{" "}
+                                  <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                  type="date"
+                                  value={formData.startDate}
+                                  onChange={(e) =>
+                                    setFormData({
+                                      ...formData,
+                                      startDate: e.target.value,
+                                    })
+                                  }
+                                  min={new Date().toISOString().split("T")[0]}
+                                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
+                                  required
+                                  disabled={submitting}
+                                />
+                              </div>
+
+                              {/* End Date Field */}
+                              <div className="lg:col-span-1">
+                                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                                  End Date of Project{" "}
+                                  <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                  type="date"
+                                  value={formData.endDate}
+                                  onChange={(e) =>
+                                    setFormData({
+                                      ...formData,
+                                      endDate: e.target.value,
+                                    })
+                                  }
+                                  min={
+                                    formData.startDate ||
+                                    new Date().toISOString().split("T")[0]
+                                  }
+                                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
+                                  required
+                                  disabled={submitting}
+                                />
+                              </div>
+
+                              {/* Priority Field */}
+                              <div className="lg:col-span-1">
+                                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                                  Project Priority{" "}
+                                  <span className="text-red-500">*</span>
+                                </label>
+                                <select
+                                  value={formData.priority}
+                                  onChange={(e) =>
+                                    setFormData({
+                                      ...formData,
+                                      priority: e.target.value,
+                                    })
+                                  }
+                                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
+                                  required
+                                  disabled={submitting}
+                                >
+                                  <option value="low">Low Priority</option>
+                                  <option value="medium">
+                                    Medium Priority
+                                  </option>
+                                  <option value="high">High Priority</option>
+                                  <option value="urgent">
+                                    Urgent Priority
+                                  </option>
+                                </select>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                                  Project Name{" "}
+                                  <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  value={formData.name}
+                                  onChange={(e) =>
+                                    setFormData({
+                                      ...formData,
+                                      name: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Enter project name (e.g., Dangote Group - Training System Implementation)"
+                                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
+                                  required
+                                  disabled={submitting}
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-semibold text-gray-800 mb-2">
+                                  Category{" "}
+                                  <span className="text-red-500">*</span>
+                                </label>
+                                <select
+                                  value={formData.category}
+                                  onChange={(e) =>
+                                    setFormData({
+                                      ...formData,
+                                      category: e.target.value,
+                                    })
+                                  }
+                                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
+                                  required
+                                  disabled={submitting}
+                                >
+                                  <option value="">Select Category</option>
+                                  {projectCategories
+                                    .filter((cat) => cat.value !== "all")
+                                    .map((category) => (
+                                      <option
+                                        key={category.value}
+                                        value={category.value}
+                                      >
+                                        {category.label}
+                                      </option>
+                                    ))}
+                                </select>
+                              </div>
+
+                              {/* Project Manager - Only show for non-personal projects */}
+                              {formData.projectScope !== "personal" && (
                                 <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    Item Name{" "}
-                                    <span className="text-red-500">*</span>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Project Manager
                                   </label>
-                                  <input
-                                    type="text"
-                                    value={item.name}
-                                    onChange={(e) => {
-                                      const newItems = [...projectItems];
-                                      newItems[index].name = e.target.value;
-                                      setProjectItems(newItems);
-                                    }}
-                                    placeholder="e.g., Training Software Licenses"
-                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                                    required
-                                    disabled={submitting}
+                                  <UserSearchSelect
+                                    value={formData.projectManager}
+                                    onChange={(value) =>
+                                      setFormData({
+                                        ...formData,
+                                        projectManager: value,
+                                      })
+                                    }
+                                    placeholder="Search for a project manager..."
+                                    label=""
+                                    minRoleLevel={
+                                      formData.projectScope === "external" &&
+                                      (user?.department?.name ===
+                                        "Human Resources" ||
+                                        user?.department?.name === "HR" ||
+                                        user?.department?.name ===
+                                          "Human Resource Management") &&
+                                      user?.role?.level === 700
+                                        ? 300
+                                        : 300
+                                    }
+                                    excludeUsers={[]}
+                                    currentUser={user}
+                                    className="w-full"
                                   />
                                 </div>
+                              )}
 
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    Quantity{" "}
-                                    <span className="text-red-500">*</span>
+                              {/* Budget Allocation - For All Project Types */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Request Budget Allocation{" "}
+                                  <span className="text-gray-500">
+                                    (Optional)
+                                  </span>
+                                </label>
+                                <div className="space-y-2">
+                                  <label className="flex items-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={
+                                        formData.requiresBudgetAllocation ===
+                                        "true"
+                                      }
+                                      onChange={(e) =>
+                                        setFormData({
+                                          ...formData,
+                                          requiresBudgetAllocation: e.target
+                                            .checked
+                                            ? "true"
+                                            : "false",
+                                        })
+                                      }
+                                      className="mr-2 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] rounded"
+                                      disabled={submitting}
+                                    />
+                                    <span className="text-sm">
+                                      Request new budget allocation for this
+                                      project
+                                    </span>
                                   </label>
-                                  <input
-                                    type="text"
-                                    value={item.quantity}
-                                    onChange={(e) => {
-                                      const newItems = [...projectItems];
-                                      const value = e.target.value;
-                                      const quantity =
-                                        value === "" ? 0 : parseInt(value) || 0;
-                                      const unitPrice =
-                                        parseFloat(
-                                          newItems[index].unitPrice.replace(
-                                            /,/g,
-                                            ""
-                                          )
-                                        ) || 0;
-
-                                      newItems[index].quantity = quantity;
-                                      newItems[index].totalPrice =
-                                        quantity * unitPrice;
-
-                                      console.log(
-                                        "🔢 [DEBUG] Quantity changed:",
-                                        {
-                                          quantity,
-                                          unitPrice,
-                                          totalPrice:
-                                            newItems[index].totalPrice,
-                                        }
-                                      );
-
-                                      setProjectItems(newItems);
-                                    }}
-                                    placeholder="e.g., 20"
-                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                                    required
-                                    disabled={submitting}
-                                  />
                                 </div>
+                                <p className="mt-2 text-sm text-gray-600">
+                                  {formData.requiresBudgetAllocation === "true"
+                                    ? formData.projectScope === "external"
+                                      ? "Project will go through Legal → Finance → Executive approval workflow."
+                                      : "Project will go through Finance and Executive."
+                                    : formData.projectScope === "personal"
+                                    ? "Project will be auto-approved and use your existing budget."
+                                    : formData.projectScope === "departmental"
+                                    ? "Project will be auto-approved and use existing department budget."
+                                    : formData.projectScope === "external"
+                                    ? "Project will go through Legal → Executive approval (using existing budget)."
+                                    : "Project will be auto-approved and use existing budget."}
+                                </p>
+                              </div>
 
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    Currency{" "}
+                              {/* Vendor Category Selection - Only for External Projects */}
+                              {formData.projectScope === "external" && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                                    Vendor Category{" "}
                                     <span className="text-red-500">*</span>
                                   </label>
                                   <select
-                                    value={item.currency}
+                                    value={selectedVendorCategory}
                                     onChange={(e) => {
-                                      const newItems = [...projectItems];
-                                      newItems[index].currency = e.target.value;
-                                      setProjectItems(newItems);
+                                      setSelectedVendorCategory(e.target.value);
+                                      setFormData({
+                                        ...formData,
+                                        vendorId: "",
+                                      });
                                     }}
-                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                    className="w-full border border-blue-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     required
                                     disabled={submitting}
                                   >
-                                    {currencyOptions.map((currency) => (
+                                    <option value="">
+                                      Select Vendor Category
+                                    </option>
+                                    {vendorCategories.map((category) => (
                                       <option
-                                        key={currency.value}
-                                        value={currency.value}
+                                        key={category.value}
+                                        value={category.value}
                                       >
-                                        {currency.label}
+                                        {category.label}
                                       </option>
                                     ))}
                                   </select>
+                                  <p className="mt-2 text-sm text-blue-600">
+                                    Choose the category that best describes the
+                                    vendor's services
+                                  </p>
                                 </div>
+                              )}
 
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    Unit Price ({item.currency}){" "}
-                                    <span className="text-red-500">*</span>
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={item.unitPrice}
-                                    onChange={(e) => {
-                                      const newItems = [...projectItems];
-                                      const unitPrice =
-                                        parseFloat(
-                                          e.target.value.replace(/,/g, "")
-                                        ) || 0;
-                                      const quantity =
-                                        newItems[index].quantity || 0;
-
-                                      newItems[index].unitPrice =
-                                        formatNumberWithCommas(e.target.value);
-                                      newItems[index].totalPrice =
-                                        quantity * unitPrice;
-
-                                      console.log(
-                                        "💰 [DEBUG] Unit Price changed:",
-                                        {
-                                          quantity,
-                                          unitPrice,
-                                          totalPrice:
-                                            newItems[index].totalPrice,
-                                        }
-                                      );
-
-                                      setProjectItems(newItems);
-                                    }}
-                                    placeholder={`e.g., ${
-                                      item.currency === "NGN"
-                                        ? "500,000"
-                                        : item.currency === "USD"
-                                        ? "1,250"
-                                        : "400"
-                                    }`}
-                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                                    required
-                                    disabled={submitting}
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    Total Price ({item.currency})
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={`${
-                                      currencyOptions.find(
-                                        (c) => c.value === item.currency
-                                      )?.symbol || ""
-                                    }${formatNumberWithCommas(
-                                      item.totalPrice.toString()
-                                    )}`}
-                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-gray-100"
-                                    readOnly
-                                  />
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    Description
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={item.description}
-                                    onChange={(e) => {
-                                      const newItems = [...projectItems];
-                                      newItems[index].description =
-                                        e.target.value;
-                                      setProjectItems(newItems);
-                                    }}
-                                    placeholder="Brief description of the item"
-                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                                    disabled={submitting}
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    Delivery Timeline{" "}
-                                    <span className="text-red-500">*</span>
-                                    {formData.startDate && formData.endDate && (
-                                      <span className="text-xs text-green-600 ml-1">
-                                        (Max:{" "}
-                                        {(() => {
-                                          const startDate = new Date(
-                                            formData.startDate
-                                          );
-                                          const endDate = new Date(
-                                            formData.endDate
-                                          );
-                                          return Math.ceil(
-                                            (endDate - startDate) /
-                                              (1000 * 60 * 60 * 24)
-                                          );
-                                        })()}{" "}
-                                        days)
-                                      </span>
-                                    )}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={item.deliveryTimeline}
-                                    onChange={(e) => {
-                                      const newItems = [...projectItems];
-                                      newItems[index].deliveryTimeline =
-                                        e.target.value;
-                                      setProjectItems(newItems);
-                                    }}
-                                    placeholder={`e.g., Within ${
-                                      formData.startDate && formData.endDate
-                                        ? Math.ceil(
-                                            (new Date(formData.endDate) -
-                                              new Date(formData.startDate)) /
-                                              (1000 * 60 * 60 * 24)
-                                          )
-                                        : 45
-                                    } days of PO approval`}
-                                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                                    required
-                                    disabled={submitting}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setProjectItems([
-                                ...projectItems,
-                                {
-                                  name: "",
-                                  description: "",
-                                  quantity: 1,
-                                  unitPrice: "",
-                                  totalPrice: 0,
-                                  deliveryTimeline: "",
-                                  currency: "NGN",
-                                },
-                              ]);
-                            }}
-                            className="w-full border-2 border-dashed border-gray-300 rounded-lg p-4 text-gray-600 hover:border-gray-400 hover:text-gray-800 transition-colors"
-                            disabled={submitting}
-                          >
-                            + Add Another Item
-                          </button>
-
-                          {/* Enhanced Total Budget Summary */}
-                          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 shadow-sm">
-                            <div className="flex justify-between items-center">
-                              <span className="text-lg font-semibold text-green-800">
-                                Total Items Cost:
-                              </span>
-                              <span className="text-lg font-bold text-green-900">
-                                {(() => {
-                                  const totalCost = projectItems.reduce(
-                                    (sum, item) => sum + item.totalPrice,
-                                    0
-                                  );
-                                  const currencies = [
-                                    ...new Set(
-                                      projectItems.map((item) => item.currency)
-                                    ),
-                                  ];
-                                  if (currencies.length === 1) {
-                                    const currency = currencies[0];
-                                    const symbol =
-                                      currencyOptions.find(
-                                        (c) => c.value === currency
-                                      )?.symbol || "";
-                                    return `${symbol}${formatNumberWithCommas(
-                                      totalCost.toString()
-                                    )}`;
-                                  } else {
-                                    return `Mixed Currencies: ${currencies.join(
-                                      ", "
-                                    )}`;
-                                  }
-                                })()}
-                              </span>
-                            </div>
-                            {formData.budget && (
-                              <div className="mt-3 space-y-2">
-                                <div className="flex justify-between items-center text-sm">
-                                  <span className="text-gray-600">
-                                    Project Budget:
-                                  </span>
-                                  <span className="font-medium">
-                                    ₦{formData.budget}
-                                  </span>
-                                </div>
-                                {(() => {
-                                  const totalCost = projectItems.reduce(
-                                    (sum, item) => sum + item.totalPrice,
-                                    0
-                                  );
-                                  const projectBudget =
-                                    parseFloat(
-                                      formData.budget.replace(/,/g, "")
-                                    ) || 0;
-                                  const isValid = totalCost <= projectBudget;
-
-                                  return (
-                                    <div
-                                      className={`flex items-center justify-between text-sm p-2 rounded-lg ${
-                                        isValid
-                                          ? "bg-green-50 border border-green-200"
-                                          : "bg-red-50 border border-red-200"
-                                      }`}
-                                    >
-                                      <span
-                                        className={`font-medium ${
-                                          isValid
-                                            ? "text-green-700"
-                                            : "text-red-700"
-                                        }`}
+                              {/* Vendor Information Section - Only for External Projects */}
+                              {formData.projectScope === "external" &&
+                                selectedVendorCategory && (
+                                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
+                                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                      <svg
+                                        className="w-5 h-5 mr-2 text-[var(--elra-primary)]"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
                                       >
-                                        {isValid
-                                          ? "✅ Budget Valid"
-                                          : "❌ Budget Exceeded"}
-                                      </span>
-                                      <span
-                                        className={`font-bold ${
-                                          isValid
-                                            ? "text-green-800"
-                                            : "text-red-800"
-                                        }`}
-                                      >
-                                        {isValid
-                                          ? `Remaining: ₦${formatNumberWithCommas(
-                                              (
-                                                projectBudget - totalCost
-                                              ).toString()
-                                            )}`
-                                          : `Excess: ₦${formatNumberWithCommas(
-                                              (
-                                                totalCost - projectBudget
-                                              ).toString()
-                                            )}`}
-                                      </span>
+                                        <path
+                                          fillRule="evenodd"
+                                          d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0a1 1 0 011-1h6a1 1 0 011 1v12a1 1 0 01-1 1H6a1 1 0 01-1-1V4z"
+                                          clipRule="evenodd"
+                                        />
+                                      </svg>
+                                      Vendor Information
+                                    </h3>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                      {/* Vendor Name - Full Width */}
+                                      <div className="md:col-span-2 lg:col-span-3">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                          Vendor Name{" "}
+                                          <span className="text-red-500">
+                                            *
+                                          </span>
+                                        </label>
+                                        <input
+                                          type="text"
+                                          value={formData.vendorName || ""}
+                                          onChange={(e) =>
+                                            setFormData({
+                                              ...formData,
+                                              vendorName: e.target.value,
+                                            })
+                                          }
+                                          placeholder="e.g., Dangote Group, Microsoft, etc."
+                                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                          required
+                                          disabled={submitting}
+                                        />
+                                      </div>
+
+                                      {/* Vendor Email */}
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                          Email{" "}
+                                          <span className="text-gray-500">
+                                            (Optional)
+                                          </span>
+                                        </label>
+                                        <input
+                                          type="email"
+                                          value={formData.vendorEmail || ""}
+                                          onChange={(e) =>
+                                            setFormData({
+                                              ...formData,
+                                              vendorEmail: e.target.value,
+                                            })
+                                          }
+                                          placeholder="contact@company.com"
+                                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                          disabled={submitting}
+                                        />
+                                      </div>
+
+                                      {/* Vendor Phone */}
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                          Phone{" "}
+                                          <span className="text-gray-500">
+                                            (Optional)
+                                          </span>
+                                        </label>
+                                        <input
+                                          type="tel"
+                                          value={formData.vendorPhone || ""}
+                                          onChange={(e) =>
+                                            setFormData({
+                                              ...formData,
+                                              vendorPhone: e.target.value,
+                                            })
+                                          }
+                                          placeholder="+234 801 234 5678"
+                                          className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                          disabled={submitting}
+                                        />
+                                      </div>
                                     </div>
-                                  );
-                                })()}
+                                  </div>
+                                )}
+
+                              {/* Project Items Specification - Only for External Projects */}
+                              {formData.projectScope === "external" && (
+                                <div className="xl:col-span-2">
+                                  <label className="block text-lg font-semibold text-gray-800 mb-4">
+                                    Required Items & Specifications{" "}
+                                    <span className="text-red-500">*</span>
+                                  </label>
+                                  <div className="space-y-4">
+                                    {projectItems.map((item, index) => (
+                                      <div
+                                        key={index}
+                                        className="border border-gray-200 rounded-xl p-6 bg-gradient-to-br from-gray-50 to-green-50 shadow-sm"
+                                      >
+                                        <div className="flex items-center justify-between mb-4">
+                                          <h4 className="text-lg font-semibold text-gray-800">
+                                            Item {index + 1}
+                                          </h4>
+                                          {projectItems.length > 1 && (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const newItems =
+                                                  projectItems.filter(
+                                                    (_, i) => i !== index
+                                                  );
+                                                setProjectItems(newItems);
+                                              }}
+                                              className="text-red-600 hover:text-red-800 text-sm"
+                                              disabled={submitting}
+                                            >
+                                              Remove Item
+                                            </button>
+                                          )}
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                              Item Name{" "}
+                                              <span className="text-red-500">
+                                                *
+                                              </span>
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={item.name}
+                                              onChange={(e) => {
+                                                const newItems = [
+                                                  ...projectItems,
+                                                ];
+                                                newItems[index].name =
+                                                  e.target.value;
+                                                setProjectItems(newItems);
+                                              }}
+                                              placeholder="e.g., Training Software Licenses"
+                                              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                              required
+                                              disabled={submitting}
+                                            />
+                                          </div>
+
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                              Quantity{" "}
+                                              <span className="text-red-500">
+                                                *
+                                              </span>
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={item.quantity}
+                                              onChange={(e) => {
+                                                const newItems = [
+                                                  ...projectItems,
+                                                ];
+                                                const value = e.target.value;
+                                                const quantity =
+                                                  value === ""
+                                                    ? ""
+                                                    : parseInt(value) || 0;
+                                                const unitPrice =
+                                                  parseFloat(
+                                                    newItems[
+                                                      index
+                                                    ].unitPrice.replace(
+                                                      /,/g,
+                                                      ""
+                                                    )
+                                                  ) || 0;
+
+                                                newItems[index].quantity =
+                                                  quantity;
+                                                newItems[index].totalPrice =
+                                                  (quantity || 0) * unitPrice;
+
+                                                console.log(
+                                                  "🔢 [DEBUG] Quantity changed:",
+                                                  {
+                                                    quantity,
+                                                    unitPrice,
+                                                    totalPrice:
+                                                      newItems[index]
+                                                        .totalPrice,
+                                                  }
+                                                );
+
+                                                setProjectItems(newItems);
+                                              }}
+                                              placeholder="e.g., 20"
+                                              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                              required
+                                              disabled={submitting}
+                                            />
+                                          </div>
+
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                              Currency
+                                            </label>
+                                            <div className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-gray-50 text-gray-600">
+                                              ₦ NGN (Nigerian Naira)
+                                            </div>
+                                          </div>
+
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                              Unit Price (₦ NGN){" "}
+                                              <span className="text-red-500">
+                                                *
+                                              </span>
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={item.unitPrice}
+                                              onChange={(e) => {
+                                                const newItems = [
+                                                  ...projectItems,
+                                                ];
+                                                const unitPrice =
+                                                  parseFloat(
+                                                    e.target.value.replace(
+                                                      /,/g,
+                                                      ""
+                                                    )
+                                                  ) || 0;
+                                                const quantity =
+                                                  newItems[index].quantity || 0;
+
+                                                newItems[index].unitPrice =
+                                                  formatNumberWithCommas(
+                                                    e.target.value
+                                                  );
+                                                newItems[index].totalPrice =
+                                                  quantity * unitPrice;
+
+                                                console.log(
+                                                  "💰 [DEBUG] Unit Price changed:",
+                                                  {
+                                                    quantity,
+                                                    unitPrice,
+                                                    totalPrice:
+                                                      newItems[index]
+                                                        .totalPrice,
+                                                  }
+                                                );
+
+                                                setProjectItems(newItems);
+                                              }}
+                                              placeholder="e.g., 500,000"
+                                              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                              required
+                                              disabled={submitting}
+                                            />
+                                          </div>
+
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                              Total Price ({item.currency})
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={`₦${formatNumberWithCommas(
+                                                item.totalPrice.toString()
+                                              )}`}
+                                              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-gray-100"
+                                              readOnly
+                                            />
+                                          </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                              Description
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={item.description}
+                                              onChange={(e) => {
+                                                const newItems = [
+                                                  ...projectItems,
+                                                ];
+                                                newItems[index].description =
+                                                  e.target.value;
+                                                setProjectItems(newItems);
+                                              }}
+                                              placeholder="Brief description of the item"
+                                              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                              disabled={submitting}
+                                            />
+                                          </div>
+
+                                          <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                                              Delivery Timeline{" "}
+                                              <span className="text-red-500">
+                                                *
+                                              </span>
+                                              {formData.startDate &&
+                                                formData.endDate && (
+                                                  <span className="text-xs text-green-600 ml-1">
+                                                    (Max:{" "}
+                                                    {(() => {
+                                                      const startDate =
+                                                        new Date(
+                                                          formData.startDate
+                                                        );
+                                                      const endDate = new Date(
+                                                        formData.endDate
+                                                      );
+                                                      return Math.ceil(
+                                                        (endDate - startDate) /
+                                                          (1000 * 60 * 60 * 24)
+                                                      );
+                                                    })()}{" "}
+                                                    days)
+                                                  </span>
+                                                )}
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={item.deliveryTimeline}
+                                              onChange={(e) => {
+                                                const newItems = [
+                                                  ...projectItems,
+                                                ];
+                                                newItems[
+                                                  index
+                                                ].deliveryTimeline =
+                                                  e.target.value;
+                                                setProjectItems(newItems);
+                                              }}
+                                              placeholder={`e.g., Within ${
+                                                formData.startDate &&
+                                                formData.endDate
+                                                  ? Math.ceil(
+                                                      (new Date(
+                                                        formData.endDate
+                                                      ) -
+                                                        new Date(
+                                                          formData.startDate
+                                                        )) /
+                                                        (1000 * 60 * 60 * 24)
+                                                    )
+                                                  : 45
+                                              } days of PO approval`}
+                                              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                              required
+                                              disabled={submitting}
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setProjectItems([
+                                          ...projectItems,
+                                          {
+                                            name: "",
+                                            description: "",
+                                            quantity: 1,
+                                            unitPrice: "",
+                                            totalPrice: 0,
+                                            deliveryTimeline: "",
+                                            currency: "NGN",
+                                          },
+                                        ]);
+                                      }}
+                                      className="w-full border-2 border-dashed border-gray-300 rounded-lg p-4 text-gray-600 hover:border-gray-400 hover:text-gray-800 transition-colors"
+                                      disabled={submitting}
+                                    >
+                                      + Add Another Item
+                                    </button>
+
+                                    {/* Enhanced Total Budget Summary */}
+                                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 shadow-sm">
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-lg font-semibold text-green-800">
+                                          Total Items Cost:
+                                        </span>
+                                        <span className="text-lg font-bold text-green-900">
+                                          {(() => {
+                                            const totalCost =
+                                              projectItems.reduce(
+                                                (sum, item) =>
+                                                  sum + item.totalPrice,
+                                                0
+                                              );
+                                            return `₦${formatNumberWithCommas(
+                                              totalCost.toString()
+                                            )}`;
+                                          })()}
+                                        </span>
+                                      </div>
+                                      {formData.budget && (
+                                        <div className="mt-3 space-y-2">
+                                          <div className="flex justify-between items-center text-sm">
+                                            <span className="text-gray-600">
+                                              Project Budget:
+                                            </span>
+                                            <span className="font-medium">
+                                              ₦{formData.budget}
+                                            </span>
+                                          </div>
+                                          {(() => {
+                                            const totalCost =
+                                              projectItems.reduce(
+                                                (sum, item) =>
+                                                  sum + item.totalPrice,
+                                                0
+                                              );
+                                            const projectBudget =
+                                              parseFloat(
+                                                formData.budget.replace(
+                                                  /,/g,
+                                                  ""
+                                                )
+                                              ) || 0;
+                                            const isValid =
+                                              totalCost <= projectBudget;
+
+                                            return (
+                                              <div
+                                                className={`flex items-center justify-between text-sm p-2 rounded-lg ${
+                                                  isValid
+                                                    ? "bg-green-50 border border-green-200"
+                                                    : "bg-red-50 border border-red-200"
+                                                }`}
+                                              >
+                                                <span
+                                                  className={`font-medium ${
+                                                    isValid
+                                                      ? "text-green-700"
+                                                      : "text-red-700"
+                                                  }`}
+                                                >
+                                                  {isValid
+                                                    ? "✅ Budget Valid"
+                                                    : "❌ Budget Exceeded"}
+                                                </span>
+                                                <span
+                                                  className={`font-bold ${
+                                                    isValid
+                                                      ? "text-green-800"
+                                                      : "text-red-800"
+                                                  }`}
+                                                >
+                                                  {isValid
+                                                    ? `Remaining: ₦${formatNumberWithCommas(
+                                                        (
+                                                          projectBudget -
+                                                          totalCost
+                                                        ).toString()
+                                                      )}`
+                                                    : `Excess: ₦${formatNumberWithCommas(
+                                                        (
+                                                          totalCost -
+                                                          projectBudget
+                                                        ).toString()
+                                                      )}`}
+                                                </span>
+                                              </div>
+                                            );
+                                          })()}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Status field removed - managed by backend workflow system */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Priority{" "}
+                                  <span className="text-red-500">*</span>
+                                </label>
+                                <select
+                                  value={formData.priority}
+                                  onChange={(e) =>
+                                    setFormData({
+                                      ...formData,
+                                      priority: e.target.value,
+                                    })
+                                  }
+                                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                  required
+                                  disabled={submitting}
+                                >
+                                  <option value="low">Low</option>
+                                  <option value="medium">Medium</option>
+                                  <option value="high">High</option>
+                                  <option value="critical">Critical</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            {/* Project Manager - Full Width */}
+                            <div className="mt-4"></div>
+
+                            {/* Description - Only show for non-external projects */}
+                            {formData.projectScope !== "external" && (
+                              <div className="mt-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  Description{" "}
+                                  <span className="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                  value={formData.description}
+                                  onChange={(e) =>
+                                    setFormData({
+                                      ...formData,
+                                      description: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Enter project description and objectives..."
+                                  rows={3}
+                                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                                  required
+                                  disabled={submitting}
+                                />
                               </div>
                             )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Start Date <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.startDate}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            startDate: e.target.value,
-                          })
-                        }
-                        min={new Date().toISOString().split("T")[0]}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                        required
-                        disabled={submitting}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        End Date <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.endDate}
-                        onChange={(e) =>
-                          setFormData({ ...formData, endDate: e.target.value })
-                        }
-                        min={
-                          formData.startDate ||
-                          new Date().toISOString().split("T")[0]
-                        }
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                        required
-                        disabled={submitting}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Budget (NGN) <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.budget}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            budget: formatNumberWithCommas(e.target.value),
-                          })
-                        }
-                        placeholder="Enter budget amount (e.g., 2,500,000)"
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                        required
-                        disabled={submitting}
-                      />
-                      {formData.budget &&
-                        getApprovalLevelText(formData.budget) && (
-                          <p
-                            className={`mt-2 text-sm font-medium ${
-                              getApprovalLevelText(formData.budget).color
-                            }`}
-                          >
-                            {getApprovalLevelText(formData.budget).text}
-                          </p>
+                            <div className="flex justify-end space-x-3 mt-6">
+                              <button
+                                type="button"
+                                onClick={closeModal}
+                                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                                disabled={submitting}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="submit"
+                                className={`px-4 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center cursor-pointer ${
+                                  isFormValid() && !hasInvalidInputs()
+                                    ? "bg-[var(--elra-primary)] text-white hover:bg-[var(--elra-primary-dark)]"
+                                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                }`}
+                                disabled={
+                                  submitting ||
+                                  !isFormValid() ||
+                                  hasInvalidInputs()
+                                }
+                              >
+                                {submitting && (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                )}
+                                {isEditMode
+                                  ? "Update Project"
+                                  : "Create Project"}
+                              </button>
+                            </div>
+                          </motion.div>
                         )}
+                      </AnimatePresence>
                     </div>
-                    {/* Status field removed - managed by backend workflow system */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Priority <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.priority}
-                        onChange={(e) =>
-                          setFormData({ ...formData, priority: e.target.value })
-                        }
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                        required
-                        disabled={submitting}
-                      >
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                        <option value="critical">Critical</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Project Manager - Full Width */}
-                  <div className="mt-4"></div>
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Description <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          description: e.target.value,
-                        })
-                      }
-                      placeholder="Enter project description and objectives..."
-                      rows={3}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
-                      required
-                      disabled={submitting}
-                    />
-                  </div>
-
-                  <div className="flex justify-end space-x-3 mt-6">
-                    <button
-                      type="button"
-                      onClick={closeModal}
-                      className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                      disabled={submitting}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-md hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                      disabled={submitting}
-                    >
-                      {submitting && (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      )}
-                      {isEditMode ? "Update Project" : "Create Project"}
-                    </button>
-                  </div>
+                  )}
                 </form>
               </div>
             </motion.div>
@@ -3910,6 +5395,219 @@ const ProjectList = () => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Step 2 Confirmation Modal */}
+      {showStep2ConfirmModal && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] border border-gray-100 overflow-hidden flex flex-col"
+          >
+            {/* Header - Fixed */}
+            <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <ELRALogo variant="dark" size="sm" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">
+                      Confirm Project Creation
+                    </h2>
+                    <p className="text-white text-opacity-90 text-sm">
+                      Review your project details before final submission
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowStep2ConfirmModal(false)}
+                  className="text-white hover:text-gray-200 transition-colors p-1 rounded-full hover:bg-white hover:bg-opacity-20"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Project Summary */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                  <FolderIcon className="h-5 w-5 text-blue-600 mr-2" />
+                  Project Summary
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-700">Name:</span>
+                    <p className="text-gray-900 font-semibold">
+                      {formData.name}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Category:</span>
+                    <p className="text-gray-900">
+                      {projectCategories.find(
+                        (cat) => cat.value === formData.category
+                      )?.label || formData.category}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Budget:</span>
+                    <p className="text-green-600 font-bold">
+                      ₦{formData.budget}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Vendor:</span>
+                    <p className="text-gray-900">{formData.vendorName}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Timeline:</span>
+                    <p className="text-gray-900">
+                      {formData.startDate} to {formData.endDate}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Priority:</span>
+                    <p className="text-gray-900 capitalize">
+                      {formData.priority}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">
+                      Budget Allocation:
+                    </span>
+                    <p className="text-gray-900">
+                      {formData.requiresBudgetAllocation === "true"
+                        ? "Request new budget allocation"
+                        : "Use existing budget"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Items Summary */}
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                  <svg
+                    className="h-5 w-5 text-green-600 mr-2"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  Items Summary
+                </h3>
+                <div className="space-y-3">
+                  {projectItems.map((item, index) => (
+                    <div
+                      key={index}
+                      className="bg-white rounded-lg p-3 border border-green-200"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900">
+                            {item.name}
+                          </h4>
+                          <p className="text-sm text-gray-600">
+                            {item.description}
+                          </p>
+                          <div className="flex items-center space-x-4 mt-1 text-xs text-gray-500">
+                            <span>Qty: {item.quantity}</span>
+                            <span>Price: ₦{item.unitPrice}</span>
+                            <span>Timeline: {item.deliveryTimeline}</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-green-600">
+                            ₦{item.totalPrice.toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="bg-white rounded-lg p-3 border-2 border-green-300">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-gray-900">
+                        Total Items Cost:
+                      </span>
+                      <span className="font-bold text-green-600 text-lg">
+                        ₦
+                        {projectItems
+                          .reduce((sum, item) => sum + item.totalPrice, 0)
+                          .toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Approval Workflow */}
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-4">
+                <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                  <svg
+                    className="h-5 w-5 text-purple-600 mr-2"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  Approval Workflow
+                </h3>
+                {getApprovalLevelText(formData.budget) && (
+                  <div className="bg-white rounded-lg p-3 border border-purple-200">
+                    <p
+                      className={`text-sm font-medium ${
+                        getApprovalLevelText(formData.budget).color
+                      }`}
+                    >
+                      {getApprovalLevelText(formData.budget).text}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Actions - Fixed */}
+            <div className="bg-gray-50 px-6 py-4 flex justify-end space-x-3 flex-shrink-0">
+              <button
+                onClick={() => setShowStep2ConfirmModal(false)}
+                disabled={submitting}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Back to Edit
+              </button>
+              <button
+                onClick={() => {
+                  handleSubmit(new Event("submit"));
+                }}
+                disabled={submitting}
+                className="px-6 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              >
+                {submitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Creating Project...</span>
+                  </>
+                ) : (
+                  <span>Confirm & Create Project</span>
+                )}
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
 

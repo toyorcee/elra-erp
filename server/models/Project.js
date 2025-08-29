@@ -13,7 +13,9 @@ const projectSchema = new mongoose.Schema(
     },
     description: {
       type: String,
-      required: true,
+      required: function () {
+        return this.projectScope !== "external";
+      },
       trim: true,
       maxlength: 1000,
     },
@@ -32,6 +34,7 @@ const projectSchema = new mongoose.Schema(
         "planning",
         "pending_approval",
         "pending_department_approval",
+        "pending_legal_compliance_approval",
         "pending_finance_approval",
         "pending_executive_approval",
         "approved",
@@ -49,7 +52,7 @@ const projectSchema = new mongoose.Schema(
     },
     priority: {
       type: String,
-      enum: ["low", "medium", "high", "critical"],
+      enum: ["low", "medium", "high", "urgent", "critical"],
       default: "medium",
       required: true,
     },
@@ -310,12 +313,7 @@ const projectSchema = new mongoose.Schema(
           required: true,
           min: 0,
         },
-        currency: {
-          type: String,
-          enum: ["NGN", "USD", "GBP"],
-          default: "NGN",
-          required: true,
-        },
+        // Currency is always NGN - removed for simplicity
         deliveryTimeline: {
           type: String,
           required: true,

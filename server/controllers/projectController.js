@@ -4,9 +4,12 @@ import User from "../models/User.js";
 import Department from "../models/Department.js";
 import TeamMember from "../models/TeamMember.js";
 import Approval from "../models/Approval.js";
+import Vendor from "../models/Vendor.js";
 import { checkDepartmentAccess } from "../middleware/auth.js";
 import NotificationService from "../services/notificationService.js";
 import ProjectAuditService from "../services/projectAuditService.js";
+import emailService from "../services/emailService.js";
+import { generateVendorReceiptPDF } from "../utils/pdfUtils.js";
 
 // Create notification service instance
 const notificationService = new NotificationService();
@@ -365,12 +368,16 @@ export const createProject = async (req, res) => {
 
     const requiredFields = [
       "name",
-      "description",
       "category",
       "budget",
       "startDate",
       "endDate",
     ];
+
+    // Description is only required for non-external projects
+    if (req.body.projectScope !== "external") {
+      requiredFields.push("description");
+    }
 
     // Add budget allocation requirement for personal/departmental projects
     if (req.body.projectScope !== "external") {
@@ -393,10 +400,8 @@ export const createProject = async (req, res) => {
       }
     }
 
-    // Add vendor and project items requirements for external projects
+    // Add project items requirements for external projects
     if (req.body.projectScope === "external") {
-      requiredFields.push("vendorId");
-
       // Validate project items
       if (
         !req.body.projectItems ||
@@ -452,6 +457,29 @@ export const createProject = async (req, res) => {
           fieldErrors: { projectItems: "Items cost exceeds budget" },
         });
       }
+
+      // Validate vendor information for external projects
+      if (!req.body.vendorName || !req.body.vendorName.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Vendor information is required for external projects",
+          errors: ["Vendor name is required for external projects"],
+          fieldErrors: { vendorName: "Vendor name is required" },
+        });
+      }
+
+      // Email validation (optional)
+      if (req.body.vendorEmail && req.body.vendorEmail.trim()) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(req.body.vendorEmail)) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid vendor email format",
+            errors: ["Please enter a valid vendor email address"],
+            fieldErrors: { vendorEmail: "Invalid email format" },
+          });
+        }
+      }
     }
 
     const missingFields = requiredFields.filter(
@@ -479,31 +507,7 @@ export const createProject = async (req, res) => {
       });
     }
 
-    // Validate vendor for external projects
-    if (req.body.projectScope === "external" && req.body.vendorId) {
-      const Vendor = mongoose.model("Vendor");
-      const vendor = await Vendor.findById(req.body.vendorId);
-
-      if (!vendor) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid vendor selected",
-          errors: ["Selected vendor does not exist"],
-          fieldErrors: { vendorId: "Selected vendor does not exist" },
-        });
-      }
-
-      if (vendor.status !== "approved") {
-        return res.status(400).json({
-          success: false,
-          message: "Vendor not approved",
-          errors: ["Selected vendor is not approved for projects"],
-          fieldErrors: {
-            vendorId: "Selected vendor is not approved for projects",
-          },
-        });
-      }
-    }
+    // Vendor validation is handled in the vendor creation/finding logic above
 
     // Validate dates
     const startDate = new Date(req.body.startDate);
@@ -801,6 +805,159 @@ export const createProject = async (req, res) => {
       }
     }
 
+    let vendorId = null;
+    if (projectScope === "external" && req.body.vendorName) {
+      try {
+        let vendor = await Vendor.findOne({
+          name: { $regex: new RegExp(req.body.vendorName, "i") },
+        });
+
+        if (!vendor) {
+          // Create vendor with proper data handling
+          const vendorData = {
+            name: req.body.vendorName,
+            contactPerson: "To be updated",
+            address: {
+              street: "To be updated",
+              city: "To be updated",
+              state: "To be updated",
+              country: "Nigeria",
+            },
+            servicesOffered: [req.body.vendorCategory || "other"],
+            status: "pending",
+            createdBy: currentUser._id,
+          };
+
+          // Add email and phone only if provided
+          if (req.body.vendorEmail && req.body.vendorEmail.trim()) {
+            vendorData.email = req.body.vendorEmail.trim().toLowerCase();
+            console.log(`📧 [VENDOR] Email provided: ${vendorData.email}`);
+          } else {
+            console.log(`📧 [VENDOR] No email provided - will use placeholder`);
+          }
+
+          if (req.body.vendorPhone && req.body.vendorPhone.trim()) {
+            vendorData.phone = req.body.vendorPhone.trim();
+            console.log(`📞 [VENDOR] Phone provided: ${vendorData.phone}`);
+          } else {
+            console.log(`📞 [VENDOR] No phone provided - will use placeholder`);
+          }
+
+          vendor = new Vendor(vendorData);
+
+          await vendor.save();
+          console.log(
+            `🏢 [VENDOR] Created new vendor: ${vendor.name} (ID: ${vendor._id})`
+          );
+          console.log(`📋 [VENDOR] Details:`, {
+            name: vendor.name,
+            email: vendor.email || "Not provided",
+            phone: vendor.phone || "Not provided",
+            services: vendor.servicesOffered,
+            status: vendor.status,
+          });
+        } else {
+          console.log(
+            `🏢 [VENDOR] Found existing vendor: ${vendor.name} (ID: ${vendor._id})`
+          );
+        }
+
+        try {
+          // Fetch project manager name if ID is provided
+          let projectManagerName = "Not assigned";
+          if (
+            req.body.projectManager &&
+            req.body.projectManager !== "Not assigned"
+          ) {
+            try {
+              const projectManager = await User.findById(
+                req.body.projectManager
+              ).select("firstName lastName");
+              if (projectManager) {
+                projectManagerName = `${projectManager.firstName} ${projectManager.lastName}`;
+              }
+            } catch (error) {
+              console.log(
+                "⚠️ Could not fetch project manager name:",
+                error.message
+              );
+              projectManagerName = req.body.projectManager; // Fallback to ID
+            }
+          }
+
+          const projectData = {
+            name: req.body.name,
+            budget: parseFloat(req.body.budget),
+            startDate: req.body.startDate,
+            endDate: req.body.endDate,
+            projectItems: req.body.projectItems || [],
+            category: req.body.category || "Not specified",
+            projectManager: projectManagerName,
+            priority: req.body.priority || "medium",
+            projectScope: req.body.projectScope || "external",
+            requiresBudgetAllocation:
+              req.body.requiresBudgetAllocation || false,
+            vendorCategory: req.body.vendorCategory || "Not specified",
+          };
+
+          // Debug logging for budget allocation
+          console.log("🔍 [PDF DEBUG] Budget allocation data:");
+          console.log(
+            "  - req.body.requiresBudgetAllocation:",
+            req.body.requiresBudgetAllocation
+          );
+          console.log(
+            "  - projectData.requiresBudgetAllocation:",
+            projectData.requiresBudgetAllocation
+          );
+          console.log("  - Type:", typeof projectData.requiresBudgetAllocation);
+
+          console.log(
+            `📄 [VENDOR PDF] Generating receipt for vendor: ${vendor.name}`
+          );
+          const pdfBuffer = await generateVendorReceiptPDF(vendor, projectData);
+          console.log(`📄 [VENDOR PDF] Receipt generated successfully`);
+
+          // Only send email if vendor has an email address
+          if (vendor.email && vendor.email.trim()) {
+            console.log(
+              `📧 [VENDOR EMAIL] Sending notification to: ${vendor.email}`
+            );
+            const emailResult = await emailService.sendVendorNotificationEmail(
+              vendor,
+              projectData,
+              pdfBuffer
+            );
+
+            if (emailResult.success) {
+              console.log(
+                `📧 [VENDOR EMAIL] ✅ Welcome email with PDF sent successfully to ${vendor.email}`
+              );
+            } else {
+              console.error(
+                `📧 [VENDOR EMAIL] ❌ Failed to send email to ${vendor.email}: ${emailResult.error}`
+              );
+            }
+          } else {
+            console.log(
+              `📧 [VENDOR EMAIL] ⚠️ No email address provided - skipping email notification`
+            );
+          }
+        } catch (emailError) {
+          console.error("❌ [VENDOR EMAIL] Failed to send email:", emailError);
+        }
+
+        vendorId = vendor._id;
+      } catch (error) {
+        console.error("❌ [VENDOR] Error handling vendor:", error);
+        return res.status(400).json({
+          success: false,
+          message: "Error processing vendor information",
+          errors: ["Failed to process vendor data"],
+        });
+      }
+    }
+
     const projectData = {
       ...req.body,
       projectManager,
@@ -809,6 +966,7 @@ export const createProject = async (req, res) => {
       budgetThreshold,
       requiredDocuments,
       status: projectStatus,
+      vendorId: vendorId, // Set the vendor ID for external projects
     };
 
     const project = new Project(projectData);
@@ -918,22 +1076,39 @@ export const createProject = async (req, res) => {
             (step) => step.status === "pending"
           );
 
+          console.log("🔍 [DEBUG] Next pending step:", nextPendingStep?.level);
+
           if (nextPendingStep) {
             switch (nextPendingStep.level) {
               case "legal_compliance":
                 project.status = "pending_legal_compliance_approval";
+                console.log(
+                  "🔍 [DEBUG] Setting status to pending_legal_compliance_approval"
+                );
                 break;
               case "executive":
                 project.status = "pending_executive_approval";
+                console.log(
+                  "🔍 [DEBUG] Setting status to pending_executive_approval"
+                );
                 break;
               case "finance":
                 project.status = "pending_finance_approval";
+                console.log(
+                  "🔍 [DEBUG] Setting status to pending_finance_approval"
+                );
                 break;
               default:
                 project.status = "pending_approval";
+                console.log(
+                  "🔍 [DEBUG] Setting status to pending_approval (default)"
+                );
             }
           } else {
             project.status = "approved";
+            console.log(
+              "🔍 [DEBUG] Setting status to approved (no pending steps)"
+            );
           }
 
           await project.save();

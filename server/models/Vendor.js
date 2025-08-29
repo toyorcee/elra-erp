@@ -17,13 +17,13 @@ const vendorSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
       maxlength: 20,
     },
     email: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
       lowercase: true,
       maxlength: 100,

@@ -441,6 +441,44 @@ procurementSchema.methods.receiveItems = async function (
   }
 };
 
+// Instance method to mark procurement as delivered and notify Operations HOD
+procurementSchema.methods.markAsDelivered = async function (deliveredBy) {
+  try {
+    console.log(
+      `📦 [PROCUREMENT] Marking procurement order ${this.poNumber} as delivered`
+    );
+
+    // Update procurement status
+    this.status = "delivered";
+    this.actualDeliveryDate = new Date();
+    await this.save();
+
+    // If this procurement is linked to a project, notify Operations HOD
+    if (this.relatedProject) {
+      const Project = mongoose.model("Project");
+      const project = await Project.findById(this.relatedProject);
+
+      if (project && project.projectScope === "external") {
+        console.log(
+          `📦 [PROCUREMENT] Notifying Operations HOD for project: ${project.name}`
+        );
+        await project.notifyOperationsHODForInventory(this, deliveredBy);
+      }
+    }
+
+    console.log(
+      `✅ [PROCUREMENT] Procurement order ${this.poNumber} marked as delivered and Operations HOD notified`
+    );
+    return true;
+  } catch (error) {
+    console.error(
+      `❌ [PROCUREMENT] Error marking procurement as delivered:`,
+      error
+    );
+    throw error;
+  }
+};
+
 // Instance method to add note
 procurementSchema.methods.addNote = async function (
   content,

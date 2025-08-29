@@ -1056,18 +1056,41 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
 
     // Handle workflow based on project scope
     if (this.projectScope === "external") {
-      // External projects: Always trigger inventory and procurement
+      // External projects: Check budget allocation first
       console.log(
-        "🌐 [WORKFLOW] External project detected - triggering inventory and procurement"
+        "🌐 [WORKFLOW] External project detected - checking budget allocation"
       );
 
-      console.log("📦 [WORKFLOW] Triggering Inventory for external project");
-      await this.triggerInventoryCreation(triggeredByUser);
+      if (this.requiresBudgetAllocation === true) {
+        // Budget allocation required - notify Finance HOD first
+        console.log(
+          "💰 [WORKFLOW] Budget allocation required - notifying Finance HOD"
+        );
+        await this.notifyFinanceHODForBudgetAllocation(triggeredByUser);
+        console.log(
+          "⏸️ [WORKFLOW] Waiting for Finance budget allocation before procurement"
+        );
+        console.log(
+          "📋 [WORKFLOW] Finance HOD must allocate budget before procurement can proceed"
+        );
+      } else {
+        // No budget allocation - proceed with procurement
+        console.log(
+          "💰 [WORKFLOW] No budget allocation required - proceeding with procurement"
+        );
+        console.log(
+          "🛒 [WORKFLOW] Triggering Procurement for external project"
+        );
+        await this.triggerProcurementCreation(triggeredByUser);
 
-      console.log("🛒 [WORKFLOW] Triggering Procurement for external project");
-      await this.triggerProcurementCreation(triggeredByUser);
+        // Send notification to Operations HOD about pending inventory
+        await this.notifyOperationsHOD(triggeredByUser);
+      }
 
-      console.log("✅ [WORKFLOW] External project workflow triggers completed");
+      console.log("✅ [WORKFLOW] External project workflow triggered");
+      console.log(
+        "📦 [WORKFLOW] Inventory will be created after procurement delivery"
+      );
     } else if (this.projectScope === "departmental") {
       // Departmental projects: No inventory/procurement triggers, go directly to implementation
       console.log(
@@ -1802,33 +1825,75 @@ projectSchema.methods.createStandardProcurementOrder = async function (
     const totalBudget = this.budget || 0;
     const procurementCategory = getProcurementCategory(this.category);
 
+    // Calculate actual budget from project items if available
+    let actualBudget = totalBudget;
+    if (this.projectItems && this.projectItems.length > 0) {
+      actualBudget = this.projectItems.reduce((sum, item) => {
+        return sum + (item.quantity || 1) * (item.unitPrice || 0);
+      }, 0);
+
+      // Log budget discrepancy if any
+      if (actualBudget !== totalBudget) {
+        console.log(`⚠️ [PROCUREMENT] Budget discrepancy detected:`);
+        console.log(`  - Project Budget: ₦${totalBudget.toLocaleString()}`);
+        console.log(`  - Items Total: ₦${actualBudget.toLocaleString()}`);
+        console.log(
+          `  - Difference: ₦${(totalBudget - actualBudget).toLocaleString()}`
+        );
+        console.log(
+          `  - Procurement will use Items Total: ₦${actualBudget.toLocaleString()}`
+        );
+      }
+    }
+
     console.log(
       `🛒 [PROCUREMENT] Project category: ${this.category} → Procurement category: ${procurementCategory}`
     );
     console.log(
-      `💰 [PROCUREMENT] Project budget: ₦${totalBudget.toLocaleString()}`
+      `💰 [PROCUREMENT] Project budget: ₦${totalBudget.toLocaleString()} → Actual items budget: ₦${actualBudget.toLocaleString()}`
     );
 
     // Generate PO number
     const poCount = await Procurement.countDocuments();
     const poNumber = `PO${String(poCount + 1).padStart(4, "0")}`;
 
-    // Create standard procurement order
-    const procurementOrder = new Procurement({
-      poNumber: poNumber,
-      title: `${this.name} - Procurement Order`,
-      description: `Standard procurement order for project: ${
-        this.name
-      } (Budget: ₦${totalBudget.toLocaleString()}) - Procurement HOD to process`,
-      status: "draft",
-      priority: "high",
-      supplier: {
-        name: "TBD - Procurement HOD to assign",
-        contactPerson: "TBD",
-        email: "tbd@supplier.com",
-        phone: "TBD",
-      },
-      items: [
+    // Create procurement order with actual project items (if available)
+    let procurementItems = [];
+    let calculatedSubtotal = 0;
+
+    if (this.projectItems && this.projectItems.length > 0) {
+      // Use actual project items for external projects
+      console.log(
+        `🛒 [PROCUREMENT] Found ${this.projectItems.length} project items to convert to procurement items`
+      );
+
+      procurementItems = this.projectItems.map((item, index) => {
+        const itemTotal = (item.quantity || 1) * (item.unitPrice || 0);
+        calculatedSubtotal += itemTotal;
+
+        return {
+          name: item.name || `Project Item ${index + 1}`,
+          description: item.description || `Item from project: ${this.name}`,
+          quantity: item.quantity || 1,
+          unitPrice: item.unitPrice || 0,
+          totalPrice: itemTotal,
+          category: procurementCategory,
+          specifications: {
+            brand: "TBD",
+            model: "TBD",
+            year: new Date().getFullYear(),
+            deliveryTimeline: item.deliveryTimeline || "TBD",
+            projectItemId: index + 1,
+          },
+        };
+      });
+
+      console.log(
+        `🛒 [PROCUREMENT] Converted ${procurementItems.length} project items to procurement items`
+      );
+    } else {
+      // Fallback to generic item for non-external projects
+      procurementItems = [
         {
           name: `${this.name} - Project Items`,
           description: `Procurement items for project: ${this.name}`,
@@ -1842,11 +1907,33 @@ projectSchema.methods.createStandardProcurementOrder = async function (
             year: new Date().getFullYear(),
           },
         },
-      ],
-      subtotal: totalBudget,
+      ];
+      calculatedSubtotal = totalBudget;
+    }
+
+    const procurementOrder = new Procurement({
+      poNumber: poNumber,
+      title: `${this.name} - Procurement Order`,
+      description: `Procurement order for project: ${
+        this.name
+      } (Budget: ₦${totalBudget.toLocaleString()}) - Procurement HOD to process`,
+      status: "draft",
+      priority: "high",
+      supplier: {
+        name: this.vendorId
+          ? "TBD - Procurement HOD to assign vendor"
+          : "TBD - Procurement HOD to assign",
+        contactPerson: "TBD",
+        email: "tbd@supplier.com",
+        phone: "TBD",
+      },
+      // Add vendor ID for external projects
+      vendorId: this.vendorId || undefined,
+      items: procurementItems,
+      subtotal: calculatedSubtotal,
       tax: 0,
       shipping: 0,
-      totalAmount: totalBudget,
+      totalAmount: calculatedSubtotal,
       relatedProject: this._id,
       approvedBy: createdBy._id,
       createdBy: createdBy._id,
@@ -1867,6 +1954,281 @@ projectSchema.methods.createStandardProcurementOrder = async function (
       error
     );
     throw error;
+  }
+};
+
+// Instance method to create inventory from procurement when goods are delivered
+projectSchema.methods.createInventoryFromProcurement = async function (
+  procurementOrder,
+  triggeredByUser
+) {
+  try {
+    console.log(
+      `📦 [INVENTORY] Creating inventory from procurement order: ${procurementOrder.poNumber}`
+    );
+
+    this.workflowTriggers.inventoryCreated = true;
+
+    const Inventory = mongoose.model("Inventory");
+    const inventoryItems = [];
+
+    // Create inventory items from procurement items
+    for (const procurementItem of procurementOrder.items) {
+      const inventoryCount = await Inventory.countDocuments();
+      const inventoryCode = `INV${String(inventoryCount + 1).padStart(4, "0")}`;
+
+      const inventoryItem = {
+        name: procurementItem.name,
+        description: procurementItem.description,
+        code: inventoryCode,
+        type: "equipment",
+        category: this.category || "office_equipment",
+        status: "available",
+        specifications: {
+          brand: procurementItem.specifications?.brand || "TBD",
+          model: procurementItem.specifications?.model || "TBD",
+          year:
+            procurementItem.specifications?.year || new Date().getFullYear(),
+          deliveryTimeline:
+            procurementItem.specifications?.deliveryTimeline || "TBD",
+          procurementOrder: procurementOrder.poNumber,
+        },
+        purchasePrice: procurementItem.totalPrice,
+        currentValue: procurementItem.totalPrice,
+        location: "TBD",
+        project: this._id,
+        procurementOrder: procurementOrder._id,
+        createdBy: triggeredByUser._id,
+        quantity: procurementItem.quantity,
+        unitPrice: procurementItem.unitPrice,
+      };
+
+      inventoryItems.push(inventoryItem);
+    }
+
+    // Create the inventory items
+    const createdItems = await Inventory.insertMany(inventoryItems);
+
+    // Update procurement order with created inventory items
+    procurementOrder.createdInventoryItems = createdItems.map(
+      (item) => item._id
+    );
+    await procurementOrder.save();
+
+    // Update project workflow triggers
+    this.workflowTriggers.inventoryCompleted = true;
+    await this.save();
+
+    console.log(
+      `✅ [INVENTORY] Created ${createdItems.length} inventory items from procurement order ${procurementOrder.poNumber}`
+    );
+
+    return createdItems;
+  } catch (error) {
+    console.error(
+      "❌ [INVENTORY] Error creating inventory from procurement:",
+      error
+    );
+    throw error;
+  }
+};
+
+// Instance method to notify Operations HOD about pending inventory
+projectSchema.methods.notifyOperationsHOD = async function (triggeredByUser) {
+  try {
+    console.log("📧 [NOTIFICATION] Sending notification to Operations HOD...");
+
+    const NotificationService = await import(
+      "../services/notificationService.js"
+    );
+    const notification = new NotificationService.default();
+
+    // Find Operations HOD
+    const Department = mongoose.model("Department");
+    const User = mongoose.model("User");
+
+    const operationsDept = await Department.findOne({ name: "Operations" });
+    if (!operationsDept) {
+      console.log("⚠️ [NOTIFICATION] Operations department not found");
+      return;
+    }
+
+    const operationsHOD = await User.findOne({
+      department: operationsDept._id,
+      "role.level": { $gte: 700 }, // HOD level or higher
+      isActive: true,
+    });
+
+    if (operationsHOD) {
+      console.log(
+        `📧 [NOTIFICATION] Found Operations HOD: ${operationsHOD.firstName} ${operationsHOD.lastName} (${operationsHOD.email})`
+      );
+
+      await notification.createNotification({
+        recipient: operationsHOD._id,
+        type: "INVENTORY_PENDING_FOR_PROJECT",
+        title: "Inventory Setup Pending",
+        message: `Project "${this.name}" (${this.code}) has been approved. Procurement will be initiated first. You will be notified when goods arrive for inventory setup.`,
+        priority: "medium",
+        data: {
+          projectId: this._id,
+          projectName: this.name,
+          projectCode: this.code,
+          budget: this.budget,
+          category: this.category,
+          actionUrl: "/dashboard/modules/inventory",
+          triggeredBy: triggeredByUser ? triggeredByUser._id : null,
+          workflowPhase: "procurement_pending",
+        },
+      });
+
+      console.log(
+        `✅ [NOTIFICATION] Operations HOD notified: ${operationsHOD.firstName} ${operationsHOD.lastName}`
+      );
+    } else {
+      console.log("⚠️ [NOTIFICATION] No Operations HOD found to notify");
+    }
+  } catch (error) {
+    console.error("❌ [NOTIFICATION] Error notifying Operations HOD:", error);
+  }
+};
+
+// Instance method to notify Operations HOD when goods are delivered
+projectSchema.methods.notifyOperationsHODForInventory = async function (
+  procurementOrder,
+  deliveredBy
+) {
+  try {
+    console.log(
+      "📧 [NOTIFICATION] Notifying Operations HOD for inventory setup..."
+    );
+
+    const NotificationService = await import(
+      "../services/notificationService.js"
+    );
+    const notification = new NotificationService.default();
+
+    // Find Operations HOD
+    const Department = mongoose.model("Department");
+    const User = mongoose.model("User");
+
+    const operationsDept = await Department.findOne({ name: "Operations" });
+    if (!operationsDept) {
+      console.log("⚠️ [NOTIFICATION] Operations department not found");
+      return;
+    }
+
+    const operationsHOD = await User.findOne({
+      department: operationsDept._id,
+      "role.level": { $gte: 700 }, // HOD level or higher
+      isActive: true,
+    });
+
+    if (operationsHOD) {
+      console.log(
+        `📧 [NOTIFICATION] Found Operations HOD: ${operationsHOD.firstName} ${operationsHOD.lastName} (${operationsHOD.email})`
+      );
+
+      await notification.createNotification({
+        recipient: operationsHOD._id,
+        type: "INVENTORY_SETUP_REQUIRED",
+        title: "Inventory Setup Required",
+        message: `Goods have been delivered for project "${this.name}" (${this.code}). Procurement order ${procurementOrder.poNumber} is ready for inventory setup.`,
+        priority: "high",
+        data: {
+          projectId: this._id,
+          projectName: this.name,
+          projectCode: this.code,
+          procurementOrderId: procurementOrder._id,
+          procurementOrderNumber: procurementOrder.poNumber,
+          budget: this.budget,
+          category: this.category,
+          actionUrl: "/dashboard/modules/inventory",
+          deliveredBy: deliveredBy ? deliveredBy._id : null,
+          workflowPhase: "inventory_setup_required",
+        },
+      });
+
+      console.log(
+        `✅ [NOTIFICATION] Operations HOD notified for inventory setup: ${operationsHOD.firstName} ${operationsHOD.lastName}`
+      );
+    } else {
+      console.log("⚠️ [NOTIFICATION] No Operations HOD found to notify");
+    }
+  } catch (error) {
+    console.error(
+      "❌ [NOTIFICATION] Error notifying Operations HOD for inventory:",
+      error
+    );
+  }
+};
+
+// Instance method to notify Finance HOD for budget allocation
+projectSchema.methods.notifyFinanceHODForBudgetAllocation = async function (
+  triggeredByUser
+) {
+  try {
+    console.log(
+      "📧 [NOTIFICATION] Sending budget allocation notification to Finance HOD..."
+    );
+
+    const NotificationService = await import(
+      "../services/notificationService.js"
+    );
+    const notification = new NotificationService.default();
+
+    // Find Finance HOD
+    const Department = mongoose.model("Department");
+    const User = mongoose.model("User");
+
+    const financeDept = await Department.findOne({
+      name: "Finance & Accounting",
+    });
+    if (!financeDept) {
+      console.log("⚠️ [NOTIFICATION] Finance department not found");
+      return;
+    }
+
+    const financeHOD = await User.findOne({
+      department: financeDept._id,
+      "role.level": { $gte: 700 },
+      isActive: true,
+    });
+
+    if (financeHOD) {
+      console.log(
+        `📧 [NOTIFICATION] Found Finance HOD: ${financeHOD.firstName} ${financeHOD.lastName} (${financeHOD.email})`
+      );
+
+      await notification.createNotification({
+        recipient: financeHOD._id,
+        type: "BUDGET_ALLOCATION_REQUIRED",
+        title: "Budget Allocation Required",
+        message: `External project "${this.name}" (${
+          this.code
+        }) requires budget allocation of ₦${this.budget.toLocaleString()} before procurement can proceed.`,
+        priority: "high",
+        data: {
+          projectId: this._id,
+          projectName: this.name,
+          projectCode: this.code,
+          budget: this.budget,
+          category: this.category,
+          actionUrl: "/dashboard/modules/finance",
+          triggeredBy: triggeredByUser ? triggeredByUser._id : null,
+          workflowPhase: "budget_allocation_required",
+          requiresBudgetAllocation: this.requiresBudgetAllocation,
+        },
+      });
+
+      console.log(
+        `✅ [NOTIFICATION] Finance HOD notified for budget allocation: ${financeHOD.firstName} ${financeHOD.lastName}`
+      );
+    } else {
+      console.log("⚠️ [NOTIFICATION] No Finance HOD found to notify");
+    }
+  } catch (error) {
+    console.error("❌ [NOTIFICATION] Error notifying Finance HOD:", error);
   }
 };
 

@@ -1,209 +1,101 @@
 import React, { useState, useEffect } from "react";
 import {
   ShieldCheckIcon,
-  PlusIcon,
-  PencilIcon,
-  TrashIcon,
   UsersIcon,
-  CheckIcon,
-  XMarkIcon,
   KeyIcon,
-  EyeIcon,
 } from "@heroicons/react/24/outline";
 import { userModulesAPI } from "../../../../services/userModules.js";
 
 const RoleManagement = () => {
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [editingRole, setEditingRole] = useState(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    level: 100,
-    permissions: [],
-    status: "ACTIVE",
-  });
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
 
-  // Available permissions
-  const availablePermissions = [
-    {
-      value: "user.manage",
-      label: "Manage Users",
-      category: "User Management",
+  const systemPermissions = {
+    HOD: {
+      level: 700,
+      permissions: ["view", "create", "edit", "delete", "approve"],
+      description: "Head of Department - Full access to department modules",
     },
-    { value: "user.view", label: "View Users", category: "User Management" },
-    {
-      value: "department.manage",
-      label: "Manage Departments",
-      category: "Department Management",
+    MANAGER: {
+      level: 600,
+      permissions: ["view", "edit", "approve"],
+      description: "Manager - Can manage and approve within modules",
     },
-    {
-      value: "department.view",
-      label: "View Departments",
-      category: "Department Management",
+    STAFF: {
+      level: 500,
+      permissions: ["view"],
+      description: "Staff - Basic access to modules",
     },
-    {
-      value: "role.manage",
-      label: "Manage Roles",
-      category: "Role Management",
+    VIEWER: {
+      level: 400,
+      permissions: ["view"],
+      description: "Viewer - Read-only access to modules",
     },
-    { value: "role.view", label: "View Roles", category: "Role Management" },
-    {
-      value: "invitation.manage",
-      label: "Manage Invitations",
-      category: "Invitation Management",
+    PROJECT_MANAGER: {
+      level: 600,
+      permissions: ["view", "create", "edit", "approve"],
+      description: "Project Manager - Specialized project management role",
     },
-    {
-      value: "invitation.view",
-      label: "View Invitations",
-      category: "Invitation Management",
+    SUPER_ADMIN: {
+      level: 1000,
+      permissions: [
+        "view",
+        "create",
+        "edit",
+        "delete",
+        "approve",
+        "system_admin",
+      ],
+      description: "Super Administrator - Full system access",
     },
-    {
-      value: "payroll.manage",
-      label: "Manage Payroll",
-      category: "Payroll Management",
-    },
-    {
-      value: "payroll.view",
-      label: "View Payroll",
-      category: "Payroll Management",
-    },
-    {
-      value: "document.manage",
-      label: "Manage Documents",
-      category: "Document Management",
-    },
-    {
-      value: "document.view",
-      label: "View Documents",
-      category: "Document Management",
-    },
-    { value: "report.view", label: "View Reports", category: "Reporting" },
-    {
-      value: "report.generate",
-      label: "Generate Reports",
-      category: "Reporting",
-    },
-    {
-      value: "system.settings",
-      label: "System Settings",
-      category: "System Administration",
-    },
-    {
-      value: "audit.view",
-      label: "View Audit Logs",
-      category: "System Administration",
-    },
-  ];
+  };
 
   useEffect(() => {
     loadRoles();
   }, []);
+
+  const handleRoleClick = (role) => {
+    setSelectedRole(role);
+    setShowPermissionsModal(true);
+  };
 
   const loadRoles = async () => {
     try {
       setLoading(true);
       const response = await userModulesAPI.roles.getAllRoles();
       console.log("Roles response:", response);
-      setRoles(response.data || []);
+
+      // Merge backend roles with system permissions for complete info
+      const enhancedRoles = (response.data || []).map((role) => ({
+        ...role,
+        systemInfo: systemPermissions[role.name] || {
+          level: role.level,
+          permissions: role.permissions || [],
+          description: role.description || "Custom role",
+        },
+      }));
+
+      setRoles(enhancedRoles);
     } catch (error) {
       console.error("Error loading roles:", error);
+      // Fallback to system permissions if API fails
+      const fallbackRoles = Object.entries(systemPermissions).map(
+        ([name, info]) => ({
+          name,
+          level: info.level,
+          permissions: info.permissions,
+          description: info.description,
+          isActive: true,
+          systemInfo: info,
+        })
+      );
+      setRoles(fallbackRoles);
     } finally {
       setLoading(false);
     }
   };
-
-  const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const handlePermissionChange = (permission) => {
-    setFormData((prev) => ({
-      ...prev,
-      permissions: prev.permissions.includes(permission)
-        ? prev.permissions.filter((p) => p !== permission)
-        : [...prev.permissions, permission],
-    }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      if (editingRole) {
-        await userModulesAPI.roles.updateRole(editingRole.id, formData);
-      } else {
-        await userModulesAPI.roles.createRole(formData);
-      }
-      setShowModal(false);
-      setEditingRole(null);
-      setFormData({
-        name: "",
-        description: "",
-        level: 100,
-        permissions: [],
-        status: "ACTIVE",
-      });
-      loadRoles();
-    } catch (error) {
-      console.error("Error saving role:", error);
-      alert(error.response?.data?.message || "Error saving role");
-    }
-  };
-
-  const handleEdit = (role) => {
-    setEditingRole(role);
-    setFormData({
-      name: role.name,
-      description: role.description,
-      level: role.level,
-      permissions: role.permissions || [],
-      status: role.status,
-    });
-    setShowModal(true);
-  };
-
-  const handleDelete = async (roleId) => {
-    if (window.confirm("Are you sure you want to delete this role?")) {
-      try {
-        await userModulesAPI.roles.deleteRole(roleId);
-        loadRoles();
-      } catch (error) {
-        console.error("Error deleting role:", error);
-        alert(error.response?.data?.message || "Error deleting role");
-      }
-    }
-  };
-
-  const openCreateModal = () => {
-    setEditingRole(null);
-    setFormData({
-      name: "",
-      description: "",
-      level: 100,
-      permissions: [],
-      status: "ACTIVE",
-    });
-    setShowModal(true);
-  };
-
-  const getPermissionCategory = (permission) => {
-    return (
-      availablePermissions.find((p) => p.value === permission)?.category ||
-      "Other"
-    );
-  };
-
-  const groupedPermissions = availablePermissions.reduce((acc, permission) => {
-    if (!acc[permission.category]) {
-      acc[permission.category] = [];
-    }
-    acc[permission.category].push(permission);
-    return acc;
-  }, {});
 
   return (
     <div className="min-h-screen bg-[var(--elra-bg-light)] p-6">
@@ -220,17 +112,20 @@ const RoleManagement = () => {
                   Role Management
                 </h1>
                 <p className="text-[var(--elra-text-secondary)]">
-                  Manage user roles and their permissions
+                  View system roles and their permissions (Read-only)
+                </p>
+                <p className="text-xs text-[var(--elra-text-muted)] mt-1">
+                  Roles are automatically assigned based on department and user
+                  level
+                </p>
+                <p className="text-xs text-[var(--elra-primary)] mt-1 font-medium">
+                  💡 Click any role card to view complete permissions
+                </p>
+                <p className="text-xs text-[var(--elra-text-muted)] mt-1">
+                  Permissions shown are from backend system configuration
                 </p>
               </div>
             </div>
-            <button
-              onClick={openCreateModal}
-              className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:opacity-90 transition-colors flex items-center space-x-2"
-            >
-              <PlusIcon className="h-5 w-5" />
-              <span>Add Role</span>
-            </button>
           </div>
         </div>
 
@@ -248,8 +143,9 @@ const RoleManagement = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {roles.map((role) => (
               <div
-                key={role._id}
-                className="bg-white rounded-xl shadow-lg border border-[var(--elra-border-primary)] overflow-hidden hover:shadow-xl transition-shadow"
+                key={role._id || role.name}
+                className="bg-white rounded-xl shadow-lg border border-[var(--elra-border-primary)] overflow-hidden hover:shadow-xl hover:scale-[1.02] transition-all duration-200 cursor-pointer"
+                onClick={() => handleRoleClick(role)}
               >
                 <div className="p-6">
                   <div className="flex items-start justify-between mb-4">
@@ -259,26 +155,12 @@ const RoleManagement = () => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold text-[var(--elra-text-primary)]">
-                          {role.name}
+                          {role.name.replace(/_/g, " ")}
                         </h3>
                         <p className="text-sm text-[var(--elra-text-secondary)]">
                           Level: {role.level}
                         </p>
                       </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleEdit(role)}
-                        className="p-1 text-[var(--elra-text-secondary)] hover:text-[var(--elra-primary)] rounded"
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(role._id)}
-                        className="p-1 text-[var(--elra-text-secondary)] hover:text-red-500 rounded"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
                     </div>
                   </div>
 
@@ -300,7 +182,7 @@ const RoleManagement = () => {
                           : "bg-red-100 text-red-800"
                       }`}
                     >
-                      {role.status}
+                      {role.status || "ACTIVE"}
                     </span>
                   </div>
 
@@ -309,21 +191,34 @@ const RoleManagement = () => {
                     <div className="flex items-center space-x-2 mb-2">
                       <KeyIcon className="h-4 w-4 text-[var(--elra-text-secondary)]" />
                       <span className="text-sm font-medium text-[var(--elra-text-primary)]">
-                        Permissions ({role.permissions?.length || 0})
+                        System Permissions (
+                        {role.systemInfo?.permissions?.length ||
+                          role.permissions?.length ||
+                          0}
+                        )
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-1">
-                      {role.permissions?.slice(0, 3).map((permission) => (
-                        <span
-                          key={permission}
-                          className="px-2 py-1 bg-[var(--elra-bg-secondary)] text-xs text-[var(--elra-text-secondary)] rounded"
-                        >
-                          {permission}
-                        </span>
-                      ))}
-                      {role.permissions?.length > 3 && (
+                      {(role.systemInfo?.permissions || role.permissions || [])
+                        .slice(0, 3)
+                        .map((permission) => (
+                          <span
+                            key={permission}
+                            className="px-2 py-1 bg-[var(--elra-bg-secondary)] text-xs text-[var(--elra-text-secondary)] rounded"
+                          >
+                            {permission}
+                          </span>
+                        ))}
+                      {(role.systemInfo?.permissions || role.permissions || [])
+                        .length > 3 && (
                         <span className="px-2 py-1 bg-[var(--elra-bg-secondary)] text-xs text-[var(--elra-text-secondary)] rounded">
-                          +{role.permissions.length - 3} more
+                          +
+                          {(
+                            role.systemInfo?.permissions ||
+                            role.permissions ||
+                            []
+                          ).length - 3}{" "}
+                          more
                         </span>
                       )}
                     </div>
@@ -334,163 +229,127 @@ const RoleManagement = () => {
           </div>
         )}
 
-        {/* Empty State */}
-        {!loading && roles.length === 0 && (
-          <div className="bg-white rounded-xl shadow-lg p-12 border border-[var(--elra-border-primary)] text-center">
-            <ShieldCheckIcon className="h-12 w-12 text-[var(--elra-text-muted)] mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-[var(--elra-text-primary)] mb-2">
-              No roles found
-            </h3>
-            <p className="text-[var(--elra-text-secondary)] mb-6">
-              Get started by creating your first role
-            </p>
-            <button
-              onClick={openCreateModal}
-              className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:opacity-90 transition-colors flex items-center space-x-2 mx-auto"
-            >
-              <PlusIcon className="h-5 w-5" />
-              <span>Add Role</span>
-            </button>
-          </div>
-        )}
-
-        {/* Create/Edit Modal */}
-        {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-[var(--elra-text-primary)]">
-                    {editingRole ? "Edit Role" : "Create Role"}
-                  </h3>
+        {/* Permissions Modal */}
+        {showPermissionsModal && selectedRole && (
+          <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-t-2xl">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">
+                      {selectedRole.name.replace(/_/g, " ")} - Role Details
+                    </h2>
+                    <p className="text-white text-opacity-90 mt-1">
+                      Complete permissions and role information
+                    </p>
+                  </div>
                   <button
-                    onClick={() => setShowModal(false)}
-                    className="p-1 text-[var(--elra-text-secondary)] hover:text-[var(--elra-text-primary)] rounded"
+                    onClick={() => setShowPermissionsModal(false)}
+                    className="p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
                   >
-                    <XMarkIcon className="h-5 w-5" />
+                    <svg
+                      className="h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
                   </button>
                 </div>
+              </div>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Content */}
+              <div className="p-6">
+                {/* Role Info */}
+                <div className="mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
-                        Role Name *
+                        Role Name
                       </label>
-                      <input
-                        type="text"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleInputChange}
-                        required
-                        className="w-full p-3 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-border-focus)] focus:border-[var(--elra-border-focus)]"
-                        placeholder="e.g., HR Manager"
-                      />
+                      <div className="p-3 bg-[var(--elra-bg-secondary)] rounded-lg">
+                        <span className="text-lg font-semibold text-[var(--elra-text-primary)]">
+                          {selectedRole.name.replace(/_/g, " ")}
+                        </span>
+                      </div>
                     </div>
-
                     <div>
                       <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
-                        Role Level *
+                        Role Level
                       </label>
-                      <input
-                        type="number"
-                        name="level"
-                        value={formData.level}
-                        onChange={handleInputChange}
-                        required
-                        min="1"
-                        max="1000"
-                        className="w-full p-3 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-border-focus)] focus:border-[var(--elra-border-focus)]"
-                        placeholder="100"
-                      />
+                      <div className="p-3 bg-[var(--elra-bg-secondary)] rounded-lg">
+                        <span className="text-lg font-semibold text-[var(--elra-text-primary)]">
+                          {selectedRole.level}
+                        </span>
+                      </div>
                     </div>
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
                       Description
                     </label>
-                    <textarea
-                      name="description"
-                      value={formData.description}
-                      onChange={handleInputChange}
-                      rows={3}
-                      className="w-full p-3 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-border-focus)] focus:border-[var(--elra-border-focus)] resize-none"
-                      placeholder="Brief description of the role..."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
-                      Status
-                    </label>
-                    <select
-                      name="status"
-                      value={formData.status}
-                      onChange={handleInputChange}
-                      className="w-full p-3 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-border-focus)] focus:border-[var(--elra-border-focus)]"
-                    >
-                      <option value="ACTIVE">Active</option>
-                      <option value="INACTIVE">Inactive</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-4">
-                      Permissions
-                    </label>
-                    <div className="max-h-64 overflow-y-auto border border-[var(--elra-border-primary)] rounded-lg p-4">
-                      {Object.entries(groupedPermissions).map(
-                        ([category, permissions]) => (
-                          <div key={category} className="mb-4">
-                            <h4 className="text-sm font-medium text-[var(--elra-text-primary)] mb-2">
-                              {category}
-                            </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                              {permissions.map((permission) => (
-                                <label
-                                  key={permission.value}
-                                  className="flex items-center space-x-2"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={formData.permissions.includes(
-                                      permission.value
-                                    )}
-                                    onChange={() =>
-                                      handlePermissionChange(permission.value)
-                                    }
-                                    className="h-4 w-4 text-[var(--elra-primary)] focus:ring-[var(--elra-border-focus)] border-[var(--elra-border-primary)] rounded"
-                                  />
-                                  <span className="text-sm text-[var(--elra-text-secondary)]">
-                                    {permission.label}
-                                  </span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        )
-                      )}
+                    <div className="p-3 bg-[var(--elra-bg-secondary)] rounded-lg">
+                      <span className="text-[var(--elra-text-secondary)]">
+                        {selectedRole.description || "No description provided"}
+                      </span>
                     </div>
                   </div>
+                </div>
 
-                  <div className="flex justify-end space-x-4 pt-4">
-                    <button
-                      type="button"
-                      onClick={() => setShowModal(false)}
-                      className="px-4 py-2 text-[var(--elra-text-secondary)] hover:text-[var(--elra-text-primary)]"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-6 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:opacity-90 transition-colors flex items-center space-x-2"
-                    >
-                      <CheckIcon className="h-4 w-4" />
-                      <span>{editingRole ? "Update" : "Create"}</span>
-                    </button>
+                {/* Permissions */}
+                <div>
+                  <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-3">
+                    All Permissions (
+                    {selectedRole.systemInfo?.permissions?.length ||
+                      selectedRole.permissions?.length ||
+                      0}
+                    )
+                  </label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {(
+                      selectedRole.systemInfo?.permissions ||
+                      selectedRole.permissions ||
+                      []
+                    ).map((permission) => (
+                      <div
+                        key={permission}
+                        className="p-3 bg-[var(--elra-bg-secondary)] rounded-lg border border-[var(--elra-border-primary)]"
+                      >
+                        <span className="text-sm font-medium text-[var(--elra-text-primary)] capitalize">
+                          {permission}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                </form>
+
+                  {/* Special Note for Project Management */}
+                  {selectedRole.name === "PROJECT_MANAGER" && (
+                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-800">
+                        💡 <strong>Special Case:</strong> Project Management
+                        department allows all roles (including STAFF and VIEWER)
+                        to create projects, unlike other departments.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Close Button */}
+                <div className="flex justify-end mt-8 pt-6 border-t border-[var(--elra-border-primary)]">
+                  <button
+                    onClick={() => setShowPermissionsModal(false)}
+                    className="px-6 py-3 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors font-medium"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -76,6 +76,19 @@ router.get("/salary-grades", checkRole(700), getSalaryGrades);
 router.get("/next-batch-number", checkRole(700), getNextBatchNumber);
 router.post("/batch/:batchId/retry-emails", checkRole(700), retryFailedEmails);
 router.post("/:invitationId/retry-email", checkRole(700), retrySingleEmail);
+// Single invitation route
+// router.post(
+//   "/create-single",
+//   checkRole(700),
+//   checkDepartmentAccess,
+//   [
+//     body("email").isEmail().normalizeEmail().withMessage("Please provide a valid email address"),
+//     body("departmentId").isMongoId().withMessage("Valid department ID is required"),
+//     body("roleId").isMongoId().withMessage("Valid role ID is required"),
+//   ],
+//   createSingleInvitation
+// );
+
 router.post(
   "/bulk-create",
   checkRole(700),

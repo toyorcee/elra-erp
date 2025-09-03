@@ -207,9 +207,10 @@ const ApprovalDashboard = () => {
         const levelMap = {
           hod: "HOD Approval",
           department: "Department Approval",
-          finance: "Finance Approval",
+          finance: "Finance Review",
           executive: "Executive Approval",
           legal_compliance: "Legal & Compliance Approval",
+          budget_allocation: "Budget Allocation",
         };
 
         let displayText = `${
@@ -613,6 +614,12 @@ const ApprovalDashboard = () => {
               showDelete: false,
               showToggle: false,
               customActions: (project) => {
+                console.log("🔍 [FULL PROJECT DATA] Project:", project.name);
+                console.log(
+                  "🔍 [FULL PROJECT DATA] Complete project object:",
+                  JSON.stringify(project, null, 2)
+                );
+
                 const progress = getApprovalProgress(project);
                 const currentUser = user;
 
@@ -627,24 +634,96 @@ const ApprovalDashboard = () => {
 
                 let isNextApprover = false;
 
+                // Add debug logging
+                console.log("🔍 [APPROVAL DEBUG] Project:", project.name);
+                console.log("🔍 [APPROVAL DEBUG] Current User:", {
+                  id: currentUser._id,
+                  name: `${currentUser.firstName} ${currentUser.lastName}`,
+                  role: currentUser.role?.name,
+                  roleLevel: currentUser.role?.level,
+                  department: currentUser.department?.name,
+                });
+                console.log(
+                  "🔍 [APPROVAL DEBUG] Next Approval Step:",
+                  nextApprovalStep
+                );
+                console.log(
+                  "🔍 [APPROVAL DEBUG] Project Status:",
+                  project.status
+                );
+
                 if (nextApprovalStep) {
                   if (currentUser.role.level >= 1000) {
                     isNextApprover = true;
+                    console.log(
+                      "🔍 [APPROVAL DEBUG] User is admin/super admin - can approve"
+                    );
                   } else if (nextApprovalStep.level === "hod") {
                     isNextApprover =
                       currentUser.role.level >= 700 &&
                       currentUser.department?._id ===
                         nextApprovalStep.department;
+                    console.log("🔍 [APPROVAL DEBUG] HOD check:", {
+                      userRoleLevel: currentUser.role.level,
+                      requiredLevel: 700,
+                      userDeptId: currentUser.department?._id,
+                      requiredDeptId: nextApprovalStep.department,
+                      isNextApprover,
+                    });
                   } else if (nextApprovalStep.level === "finance") {
                     isNextApprover =
                       currentUser.role.level >= 700 &&
                       currentUser.department?.name === "Finance & Accounting";
+                    console.log("🔍 [APPROVAL DEBUG] Finance check:", {
+                      userRoleLevel: currentUser.role.level,
+                      requiredLevel: 700,
+                      userDept: currentUser.department?.name,
+                      requiredDept: "Finance & Accounting",
+                      isNextApprover,
+                    });
+                  } else if (nextApprovalStep.level === "legal_compliance") {
+                    isNextApprover =
+                      currentUser.role.level >= 700 &&
+                      currentUser.department?.name === "Legal & Compliance";
+                    console.log("🔍 [APPROVAL DEBUG] Legal Compliance check:", {
+                      userRoleLevel: currentUser.role.level,
+                      requiredLevel: 700,
+                      userDept: currentUser.department?.name,
+                      requiredDept: "Legal & Compliance",
+                      isNextApprover,
+                    });
                   } else if (nextApprovalStep.level === "executive") {
                     isNextApprover =
                       currentUser.role.level >= 700 &&
                       currentUser.department?.name === "Executive Office";
+                    console.log("🔍 [APPROVAL DEBUG] Executive check:", {
+                      userRoleLevel: currentUser.role.level,
+                      requiredLevel: 700,
+                      userDept: currentUser.department?.name,
+                      requiredDept: "Executive Office",
+                      isNextApprover,
+                    });
+                  } else if (nextApprovalStep.level === "budget_allocation") {
+                    isNextApprover =
+                      currentUser.role.level >= 700 &&
+                      currentUser.department?.name === "Finance & Accounting";
+                    console.log(
+                      "🔍 [APPROVAL DEBUG] Budget Allocation check:",
+                      {
+                        userRoleLevel: currentUser.role.level,
+                        requiredLevel: 700,
+                        userDept: currentUser.department?.name,
+                        requiredDept: "Finance & Accounting",
+                        isNextApprover,
+                      }
+                    );
                   }
                 }
+
+                console.log(
+                  "🔍 [APPROVAL DEBUG] Final isNextApprover:",
+                  isNextApprover
+                );
 
                 // Show actions only if:
                 // 1. Project is in any pending approval status
@@ -656,6 +735,7 @@ const ApprovalDashboard = () => {
                   "pending_finance_approval",
                   "pending_executive_approval",
                   "pending_legal_compliance_approval",
+                  "pending_budget_allocation",
                   "resubmitted",
                 ].includes(project.status);
 
@@ -671,6 +751,18 @@ const ApprovalDashboard = () => {
 
                 // Get document status for this project
                 const docStatus = getDocumentStatus(project);
+
+                // Add debug logging for action visibility
+                console.log("🔍 [APPROVAL DEBUG] Action visibility check:", {
+                  progressPercentage: progress.percentage,
+                  isPendingApproval,
+                  isProjectCreator,
+                  isNextApprover,
+                  canShowActions,
+                  docStatusSubmitted: docStatus.submitted,
+                  docStatusTotal: docStatus.total,
+                  allDocsSubmitted: docStatus.submitted === docStatus.total,
+                });
 
                 return (
                   <div className="flex items-center space-x-2">

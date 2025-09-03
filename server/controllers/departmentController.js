@@ -5,15 +5,19 @@ import Document from "../models/Document.js";
 
 // @desc    Create a new department
 // @route   POST /api/departments
-// @access  Private (Super Admin only)
+// @access  Private (HR HOD+ only)
 export const createDepartment = async (req, res) => {
   try {
-    // Check if user has permission to create departments (Super Admin only)
-    if (req.user.role.level < 1000) {
+    // Check if user has permission to create departments (Super Admin or HR HOD+ only)
+    if (
+      req.user.role.level < 700 ||
+      (req.user.role.level < 1000 &&
+        req.user.department?.name !== "Human Resources")
+    ) {
       return res.status(403).json({
         success: false,
         message:
-          "Access denied. Super admin privileges required to create departments.",
+          "Access denied. Super Admin or HR HOD privileges required to create departments.",
       });
     }
 
@@ -27,16 +31,7 @@ export const createDepartment = async (req, res) => {
       });
     }
 
-    const {
-      name,
-      code,
-      description,
-      level,
-      parentDepartment,
-      manager,
-      color,
-      settings,
-    } = req.body;
+    const { name, code, description, level, isActive } = req.body;
 
     // Check if department with same name or code already exists
     const existingDepartment = await Department.findOne({
@@ -50,63 +45,20 @@ export const createDepartment = async (req, res) => {
       });
     }
 
-    // Check if parent department exists (if provided)
-    if (parentDepartment) {
-      const parentDept = await Department.findById(parentDepartment);
-      if (!parentDept) {
-        return res.status(400).json({
-          success: false,
-          message: "Parent department not found",
-        });
-      }
-    }
-
-    // Check if manager exists (if provided)
-    if (manager) {
-      const managerUser = await User.findById(manager);
-      if (!managerUser) {
-        return res.status(400).json({
-          success: false,
-          message: "Manager user not found",
-        });
-      }
-    }
-
     // Create new department
     const department = new Department({
       name,
       code: code.toUpperCase(),
       description,
-      level: level || 50,
-      parentDepartment: parentDepartment || null,
-      manager: manager || null,
-      color: color || "#3B82F6",
-      settings: settings || {
-        allowDocumentUpload: true,
-        requireApproval: true,
-        maxFileSize: 10,
-        allowedFileTypes: [
-          "pdf",
-          "doc",
-          "docx",
-          "xls",
-          "xlsx",
-          "ppt",
-          "pptx",
-          "txt",
-          "jpg",
-          "png",
-        ],
-      },
+      level,
+      isActive: isActive !== undefined ? isActive : true,
       createdBy: req.user.id,
     });
 
     await department.save();
 
-    // Populate references
+    // Populate createdBy reference
     await department.populate([
-      { path: "parentDepartment", select: "name code" },
-      { path: "manager", select: "firstName lastName email" },
       { path: "createdBy", select: "firstName lastName" },
     ]);
 
@@ -135,19 +87,28 @@ export const getAllDepartments = async (req, res) => {
     const currentUser = req.user;
     const { search, status = "active", includeInactive = false } = req.query;
 
-    // Check if user has permission to view departments (Manager+ can view departments)
-    if (currentUser.role.level < 600) {
+    // Check if user has permission to view departments (Super Admin or HR HOD+ can view departments)
+    if (
+      currentUser.role.level < 700 ||
+      (currentUser.role.level < 1000 &&
+        currentUser.department?.name !== "Human Resources")
+    ) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. Manager level required to view departments.",
+        message:
+          "Access denied. Super Admin or HR HOD privileges required to view departments.",
       });
     }
 
     const query = {};
 
-    // For super admins, show all departments including inactive ones
-    if (currentUser.role.level >= 1000) {
-      // Super admin can see all departments
+    // For super admins and HR HODs, show all departments including inactive ones
+    if (
+      currentUser.role.level >= 1000 ||
+      (currentUser.role.level >= 700 &&
+        currentUser.department?.name === "Human Resources")
+    ) {
+      // Super admin and HR HOD can see all departments
       if (status === "active") {
         query.isActive = true;
       } else if (status === "inactive") {
@@ -173,8 +134,7 @@ export const getAllDepartments = async (req, res) => {
       .populate("parentDepartment", "name code")
       .populate("manager", "firstName lastName email")
       .populate("createdBy", "firstName lastName")
-      .sort({ name: 1 });
-
+      .sort({ level: -1, name: 1 });
     res.status(200).json({
       success: true,
       data: departments,
@@ -232,10 +192,23 @@ export const getDepartmentById = async (req, res) => {
 
 // @desc    Update department
 // @route   PUT /api/departments/:id
-// @access  Private (Super Admin only)
+// @access  Private (HR HOD+ only)
 export const updateDepartment = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Check if user has permission to update departments (Super Admin or HR HOD+ only)
+    if (
+      req.user.role.level < 700 ||
+      (req.user.role.level < 1000 &&
+        req.user.department?.name !== "Human Resources")
+    ) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Super Admin or HR HOD privileges required to update departments.",
+      });
+    }
 
     // Check for validation errors
     const errors = validationResult(req);
@@ -325,6 +298,7 @@ export const updateDepartment = async (req, res) => {
       updateData.parentDepartment = parentDepartment;
     if (manager !== undefined) updateData.manager = manager;
     if (color) updateData.color = color;
+
     if (settings) updateData.settings = { ...department.settings, ...settings };
     if (isActive !== undefined) updateData.isActive = isActive;
 
@@ -360,10 +334,23 @@ export const updateDepartment = async (req, res) => {
 
 // @desc    Delete department (soft delete)
 // @route   DELETE /api/departments/:id
-// @access  Private (Super Admin only)
+// @access  Private (HR HOD+ only)
 export const deleteDepartment = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Check if user has permission to delete departments (Super Admin or HR HOD+ only)
+    if (
+      req.user.role.level < 700 ||
+      (req.user.role.level < 1000 &&
+        req.user.department?.name !== "Human Resources")
+    ) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Super Admin or HR HOD privileges required to delete departments.",
+      });
+    }
 
     const department = await Department.findById(id);
     if (!department) {

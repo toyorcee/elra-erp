@@ -49,6 +49,14 @@ const leaveRequestSchema = new mongoose.Schema(
       type: Number,
       default: 1,
     },
+    approvalChain: {
+      type: [String],
+      default: [],
+    },
+    totalApprovalSteps: {
+      type: Number,
+      default: 1,
+    },
     approvals: [
       {
         approver: {
@@ -118,15 +126,71 @@ leaveRequestSchema.methods.addApproval = function (
   status,
   comment = ""
 ) {
-  const approval = {
-    approver: approverId,
-    role,
-    status,
-    comment,
-    approvedAt: status !== "Pending" ? new Date() : null,
-  };
+  // Check if an approval entry already exists for this approver
+  const existingApprovalIndex = this.approvals.findIndex(
+    (approval) => approval.approver.toString() === approverId.toString()
+  );
 
-  this.approvals.push(approval);
+  if (existingApprovalIndex !== -1) {
+    // Update existing approval entry
+    const existingApproval = this.approvals[existingApprovalIndex];
+
+    // Only update if the existing status is "Pending" or if we're adding a comment
+    if (
+      existingApproval.status === "Pending" ||
+      (comment && comment !== existingApproval.comment)
+    ) {
+      existingApproval.status = status;
+      existingApproval.comment = comment || existingApproval.comment;
+      existingApproval.approvedAt = status !== "Pending" ? new Date() : null;
+
+      console.log(
+        `✅ [LeaveRequest] Updated existing approval for ${approverId}: ${existingApproval.status}`
+      );
+    } else {
+      console.log(
+        `⚠️ [LeaveRequest] Skipping update - existing approval already ${existingApproval.status}`
+      );
+    }
+  } else {
+    const approval = {
+      approver: approverId,
+      role,
+      status,
+      comment,
+      approvedAt: status !== "Pending" ? new Date() : null,
+    };
+
+    this.approvals.push(approval);
+    console.log(
+      `✅ [LeaveRequest] Added new approval entry for ${approverId}: ${status}`
+    );
+  }
+
+  return this.save();
+};
+
+leaveRequestSchema.methods.cleanupApprovals = function () {
+  const uniqueApprovals = [];
+  const seenApprovers = new Set();
+
+  // Process approvals in reverse order to keep the latest status
+  for (let i = this.approvals.length - 1; i >= 0; i--) {
+    const approval = this.approvals[i];
+    const approverKey = approval.approver.toString();
+
+    if (!seenApprovers.has(approverKey)) {
+      uniqueApprovals.unshift(approval);
+      seenApprovers.add(approverKey);
+    }
+  }
+
+  // Update the approvals array
+  this.approvals = uniqueApprovals;
+
+  console.log(
+    `🧹 [LeaveRequest] Cleaned up approvals: ${this.approvals.length} unique entries`
+  );
   return this.save();
 };
 

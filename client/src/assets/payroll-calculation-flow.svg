@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="800" viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background -->
+    <rect width="1200" height="800" fill="#f8fafc"/>
+    
+    <!-- Title -->
+    <text x="600" y="50" font-family="Arial" font-size="24" font-weight="bold" text-anchor="middle" fill="#1e293b">
+        Payroll Calculation Flow
+    </text>
+
+    <!-- Input Section -->
+    <g transform="translate(100, 100)">
+        <rect width="200" height="120" rx="8" fill="#e2e8f0" stroke="#64748b"/>
+        <text x="100" y="30" font-family="Arial" font-size="16" font-weight="bold" text-anchor="middle" fill="#334155">
+            Employee Data
+        </text>
+        <text x="20" y="60" font-family="Arial" font-size="14" fill="#64748b">• Role</text>
+        <text x="20" y="85" font-family="Arial" font-size="14" fill="#64748b">• Salary Grade</text>
+        <text x="20" y="110" font-family="Arial" font-size="14" fill="#64748b">• Step Level</text>
+    </g>
+
+    <!-- Salary Grade Box -->
+    <g transform="translate(400, 100)">
+        <rect width="250" height="160" rx="8" fill="#dbeafe" stroke="#3b82f6"/>
+        <text x="125" y="30" font-family="Arial" font-size="16" font-weight="bold" text-anchor="middle" fill="#1e40af">
+            Salary Grade Components
+        </text>
+        <text x="20" y="60" font-family="Arial" font-size="14" fill="#1e40af">• Base Salary Range</text>
+        <text x="20" y="85" font-family="Arial" font-size="14" fill="#1e40af">• Housing Allowance</text>
+        <text x="20" y="110" font-family="Arial" font-size="14" fill="#1e40af">• Transport Allowance</text>
+        <text x="20" y="135" font-family="Arial" font-size="14" fill="#1e40af">• Meal Allowance</text>
+    </g>
+
+    <!-- Additional Components -->
+    <g transform="translate(750, 100)">
+        <rect width="250" height="160" rx="8" fill="#dcfce7" stroke="#22c55e"/>
+        <text x="125" y="30" font-family="Arial" font-size="16" font-weight="bold" text-anchor="middle" fill="#166534">
+            Additional Components
+        </text>
+        <text x="20" y="60" font-family="Arial" font-size="14" fill="#166534">• Personal Allowances</text>
+        <text x="20" y="85" font-family="Arial" font-size="14" fill="#166534">• Personal Bonuses</text>
+        <text x="20" y="110" font-family="Arial" font-size="14" fill="#166534">• Frequency Tracking</text>
+        <text x="20" y="135" font-family="Arial" font-size="14" fill="#166534">• Usage Status</text>
+    </g>
+
+    <!-- Calculation Process -->
+    <g transform="translate(100, 350)">
+        <rect width="900" height="200" rx="8" fill="#fef3c7" stroke="#d97706"/>
+        <text x="450" y="30" font-family="Arial" font-size="16" font-weight="bold" text-anchor="middle" fill="#92400e">
+            Calculation Process
+        </text>
+        
+        <!-- Process Steps -->
+        <g transform="translate(20, 50)">
+            <rect width="200" height="120" rx="4" fill="#fff" stroke="#d97706"/>
+            <text x="100" y="30" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#92400e">
+                Base Calculation
+            </text>
+            <text x="10" y="60" font-family="Arial" font-size="12" fill="#92400e">1. Get role salary grade</text>
+            <text x="10" y="80" font-family="Arial" font-size="12" fill="#92400e">2. Apply step increment</text>
+            <text x="10" y="100" font-family="Arial" font-size="12" fill="#92400e">3. Add grade allowances</text>
+        </g>
+
+        <g transform="translate(240, 50)">
+            <rect width="200" height="120" rx="4" fill="#fff" stroke="#d97706"/>
+            <text x="100" y="30" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#92400e">
+                Additional Components
+            </text>
+            <text x="10" y="60" font-family="Arial" font-size="12" fill="#92400e">1. Personal allowances</text>
+            <text x="10" y="80" font-family="Arial" font-size="12" fill="#92400e">2. Personal bonuses</text>
+            <text x="10" y="100" font-family="Arial" font-size="12" fill="#92400e">3. Track usage</text>
+        </g>
+
+        <g transform="translate(460, 50)">
+            <rect width="200" height="120" rx="4" fill="#fff" stroke="#d97706"/>
+            <text x="100" y="30" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#92400e">
+                Deductions
+            </text>
+            <text x="10" y="60" font-family="Arial" font-size="12" fill="#92400e">1. Calculate PAYE tax</text>
+            <text x="10" y="80" font-family="Arial" font-size="12" fill="#92400e">2. Statutory deductions</text>
+            <text x="10" y="100" font-family="Arial" font-size="12" fill="#92400e">3. Voluntary deductions</text>
+        </g>
+
+        <g transform="translate(680, 50)">
+            <rect width="200" height="120" rx="4" fill="#fff" stroke="#d97706"/>
+            <text x="100" y="30" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#92400e">
+                Final Calculation
+            </text>
+            <text x="10" y="60" font-family="Arial" font-size="12" fill="#92400e">1. Calculate gross pay</text>
+            <text x="10" y="80" font-family="Arial" font-size="12" fill="#92400e">2. Apply deductions</text>
+            <text x="10" y="100" font-family="Arial" font-size="12" fill="#92400e">3. Determine net pay</text>
+        </g>
+    </g>
+
+    <!-- Output Section -->
+    <g transform="translate(100, 600)">
+        <rect width="900" height="150" rx="8" fill="#fee2e2" stroke="#ef4444"/>
+        <text x="450" y="30" font-family="Arial" font-size="16" font-weight="bold" text-anchor="middle" fill="#991b1b">
+            Payroll Output
+        </text>
+
+        <!-- Output Components -->
+        <g transform="translate(20, 50)">
+            <rect width="200" height="80" rx="4" fill="#fff" stroke="#ef4444"/>
+            <text x="100" y="30" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#991b1b">
+                Gross Pay
+            </text>
+            <text x="100" y="55" font-family="Arial" font-size="12" text-anchor="middle" fill="#991b1b">
+                Base + Allowances + Bonuses
+            </text>
+        </g>
+
+        <g transform="translate(240, 50)">
+            <rect width="200" height="80" rx="4" fill="#fff" stroke="#ef4444"/>
+            <text x="100" y="30" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#991b1b">
+                Deductions
+            </text>
+            <text x="100" y="55" font-family="Arial" font-size="12" text-anchor="middle" fill="#991b1b">
+                Tax + Statutory + Voluntary
+            </text>
+        </g>
+
+        <g transform="translate(460, 50)">
+            <rect width="200" height="80" rx="4" fill="#fff" stroke="#ef4444"/>
+            <text x="100" y="30" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#991b1b">
+                Net Pay
+            </text>
+            <text x="100" y="55" font-family="Arial" font-size="12" text-anchor="middle" fill="#991b1b">
+                Gross Pay - Total Deductions
+            </text>
+        </g>
+
+        <g transform="translate(680, 50)">
+            <rect width="200" height="80" rx="4" fill="#fff" stroke="#ef4444"/>
+            <text x="100" y="30" font-family="Arial" font-size="14" font-weight="bold" text-anchor="middle" fill="#991b1b">
+                Usage Tracking
+            </text>
+            <text x="100" y="55" font-family="Arial" font-size="12" text-anchor="middle" fill="#991b1b">
+                Mark processed items as used
+            </text>
+        </g>
+    </g>
+
+    <!-- Connecting Arrows -->
+    <g stroke="#94a3b8" stroke-width="2" fill="none">
+        <!-- Input to Process -->
+        <path d="M200,220 L200,350"/>
+        <path d="M525,260 L525,350"/>
+        <path d="M875,260 L875,350"/>
+        
+        <!-- Process to Output -->
+        <path d="M550,550 L550,600"/>
+    </g>
+</svg>

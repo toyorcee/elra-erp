@@ -522,6 +522,20 @@ userSchema.pre("save", async function (next) {
             VIEWER: ["view"],
           },
         },
+        "Project Management": {
+          modules: [
+            "SELF_SERVICE",
+            "CUSTOMER_CARE",
+            "PROJECTS",
+            "COMMUNICATION",
+          ],
+          permissions: {
+            HOD: ["view", "create", "edit", "delete", "approve"],
+            MANAGER: ["view", "create", "edit", "approve"],
+            STAFF: ["view", "create"],
+            VIEWER: ["view", "create"],
+          },
+        },
       };
 
       const config = departmentModuleConfig[departmentDoc.name];
@@ -559,15 +573,8 @@ userSchema.pre("save", async function (next) {
             };
           }
 
-          // Special handling for PROJECTS module - all users except VIEWER can create personal projects
+          // Special handling for PROJECTS module - ALL roles can create projects (including VIEWERs!)
           if (module === "PROJECTS") {
-            if (roleDoc.name === "VIEWER") {
-              return {
-                module: module,
-                permissions: ["view"],
-                _id: new mongoose.Types.ObjectId(),
-              };
-            }
             return {
               module: module,
               permissions: ["view", "create"],
@@ -575,17 +582,10 @@ userSchema.pre("save", async function (next) {
             };
           }
 
-          // Special handling for SELF_SERVICE, CUSTOMER_CARE, COMMUNICATION - Staff can create
+          // Special handling for common modules - ALL roles can create (including VIEWERs!)
           if (
             ["SELF_SERVICE", "CUSTOMER_CARE", "COMMUNICATION"].includes(module)
           ) {
-            if (roleDoc.name === "VIEWER" && module === "SELF_SERVICE") {
-              return {
-                module: module,
-                permissions: ["view"],
-                _id: new mongoose.Types.ObjectId(),
-              };
-            }
             return {
               module: module,
               permissions: ["view", "create"],
@@ -599,9 +599,8 @@ userSchema.pre("save", async function (next) {
             _id: new mongoose.Types.ObjectId(),
           };
         })
-        .filter(Boolean); // Remove null entries (SYSTEM_ADMIN for non-SUPER_ADMIN)
+        .filter(Boolean);
 
-      // Add SYSTEM_ADMIN module specifically for SUPER_ADMIN users
       if (roleDoc.name === "SUPER_ADMIN") {
         userModuleAccess.push({
           module: "SYSTEM_ADMIN",
@@ -620,7 +619,6 @@ userSchema.pre("save", async function (next) {
       );
     } catch (error) {
       console.error("❌ Error assigning module access:", error);
-      // Don't fail the save, just log the error
     }
   }
 

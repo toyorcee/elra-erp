@@ -57,12 +57,12 @@ router.get("/:id/users", checkRole(600), getDepartmentUsers);
 // Get department by ID - Manager+
 router.get("/:id", checkRole(600), getDepartmentById);
 
-router.get("/", checkRole(600), getAllDepartments);
+router.get("/", getAllDepartments);
 
-// Super Admin only routes
-router.post("/", createDepartment);
-router.put("/:id", checkRole(1000), validateDepartment, updateDepartment);
-router.delete("/:id", checkRole(1000), deleteDepartment);
+// HR HOD+ and Super Admin routes
+router.post("/", validateDepartment, createDepartment);
+router.put("/:id", validateDepartment, updateDepartment);
+router.delete("/:id", deleteDepartment);
 router.delete("/bulk-delete", checkRole(1000), bulkDeleteDepartments);
 router.post("/bulk-create", checkRole(1000), bulkCreateDepartments);
 

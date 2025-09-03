@@ -28,10 +28,9 @@ export const getAllProcurement = async (req, res) => {
         });
       }
 
-      query.company = currentUser.company;
+      // Note: company field is commented out in Procurement model, so we show all procurement for HODs
       console.log(
-        "🔍 [PROCUREMENT] HOD - showing procurement for department:",
-        currentUser.department.name
+        "🔍 [PROCUREMENT] HOD - showing all procurement (company field not implemented)"
       );
     }
     // STAFF (300) - see procurement they created
@@ -131,7 +130,6 @@ export const createProcurement = async (req, res) => {
     const procurementData = {
       ...req.body,
       createdBy: currentUser._id,
-      company: currentUser.company,
     };
 
     const procurement = new Procurement(procurementData);
@@ -266,13 +264,14 @@ export const getProcurementStats = async (req, res) => {
     // Apply role-based filtering
     if (currentUser.role.level < 1000) {
       if (currentUser.role.level >= 700) {
-        query.company = currentUser.company;
+        // HOD can see all procurement (no company filtering since it's ELRA system)
+        console.log("🔍 [PROCUREMENT] HOD - showing all procurement");
       } else {
         query.createdBy = currentUser._id;
       }
     }
 
-    const stats = await Procurement.getProcurementStats(currentUser.company);
+    const stats = await Procurement.getProcurementStats();
     const totalProcurement = await Procurement.countDocuments(query);
 
     res.status(200).json({
@@ -303,15 +302,14 @@ export const getPendingApprovals = async (req, res) => {
     // Apply role-based filtering
     if (currentUser.role.level < 1000) {
       if (currentUser.role.level >= 700) {
-        query.company = currentUser.company;
+        // HOD can see all procurement (no company filtering since it's ELRA system)
+        console.log("🔍 [PROCUREMENT] HOD - showing all pending approvals");
       } else {
         query.createdBy = currentUser._id;
       }
     }
 
-    const pendingApprovals = await Procurement.getPendingApprovals(
-      currentUser.company
-    );
+    const pendingApprovals = await Procurement.getPendingApprovals();
 
     res.status(200).json({
       success: true,
@@ -339,15 +337,14 @@ export const getOverdueDeliveries = async (req, res) => {
     // Apply role-based filtering
     if (currentUser.role.level < 1000) {
       if (currentUser.role.level >= 700) {
-        query.company = currentUser.company;
+        // HOD can see all procurement (no company filtering since it's ELRA system)
+        console.log("🔍 [PROCUREMENT] HOD - showing all overdue deliveries");
       } else {
         query.createdBy = currentUser._id;
       }
     }
 
-    const overdueDeliveries = await Procurement.getOverdueDeliveries(
-      currentUser.company
-    );
+    const overdueDeliveries = await Procurement.getOverdueDeliveries();
 
     res.status(200).json({
       success: true,
@@ -515,9 +512,9 @@ const checkProcurementAccess = async (user, procurement) => {
   // SUPER_ADMIN can access everything
   if (user.role.level >= 1000) return true;
 
-  // HOD can access procurement in their company
+  // HOD can access all procurement (ELRA system)
   if (user.role.level >= 700) {
-    return procurement.company.toString() === user.company.toString();
+    return true;
   }
 
   // STAFF can access procurement they created
@@ -533,9 +530,9 @@ const checkProcurementEditAccess = async (user, procurement) => {
   // SUPER_ADMIN can edit everything
   if (user.role.level >= 1000) return true;
 
-  // HOD can edit procurement in their company
+  // HOD can edit all procurement (ELRA system)
   if (user.role.level >= 700) {
-    return procurement.company.toString() === user.company.toString();
+    return true;
   }
 
   // STAFF can only edit procurement they created
@@ -551,12 +548,9 @@ const checkProcurementDeleteAccess = async (user, procurement) => {
   // SUPER_ADMIN can delete everything
   if (user.role.level >= 1000) return true;
 
-  // HOD can delete procurement they created or manage
+  // HOD can delete any procurement (ELRA system)
   if (user.role.level >= 700) {
-    return (
-      procurement.createdBy.toString() === user._id.toString() ||
-      procurement.company.toString() === user.company.toString()
-    );
+    return true;
   }
 
   return false;

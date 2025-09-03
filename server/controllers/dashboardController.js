@@ -704,7 +704,7 @@ export const getSelfServiceDashboardData = async (req, res) => {
 
     // 3. Projects - Count user's projects (since no tickets yet)
     const totalProjects = await Project.countDocuments({
-      $or: [{ createdBy: userId }, { "teamMembers.member": userId }],
+      $or: [{ createdBy: userId }, { "teamMembers.user": userId }],
     });
 
     // 4. Documents - Count user's documents
@@ -769,16 +769,15 @@ export const getSelfServiceDashboardData = async (req, res) => {
 
     // Recent Projects
     const recentProjects = await Project.find({
-      $or: [{ createdBy: userId }, { "teamMembers.member": userId }],
+      $or: [{ createdBy: userId }, { "teamMembers.user": userId }],
     })
-      .populate("teamMembers.member", "firstName lastName")
+      .populate("teamMembers.user", "firstName lastName")
       .sort({ createdAt: -1 })
       .limit(5);
 
     res.json({
       success: true,
       data: {
-        // Summary Metrics
         summary: {
           totalPayslips,
           totalLeaveRequests,

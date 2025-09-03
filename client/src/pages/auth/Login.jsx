@@ -5,7 +5,7 @@ import { HiMail, HiLockClosed, HiKey } from "react-icons/hi";
 import { MdVisibility, MdVisibilityOff } from "react-icons/md";
 import { useAuth } from "../../context/AuthContext";
 import ELRALogo from "../../components/ELRALogo";
-import elraImage from "../../assets/Office4.jpg";
+import elraImage from "../../assets/ERPModuleLogin.jpeg";
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });
@@ -114,7 +114,7 @@ const Login = () => {
       style={{ backgroundImage: `url(${elraImage})` }}
     >
       {/* White overlay for better contrast */}
-      <div className="absolute inset-0 bg-white/30"></div>
+      <div className="absolute inset-0 bg-white/20"></div>
 
       {/* Content */}
       <div className="relative z-10 w-full max-w-md">

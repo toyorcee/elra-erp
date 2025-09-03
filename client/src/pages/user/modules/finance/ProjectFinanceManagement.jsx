@@ -35,7 +35,7 @@ const ProjectFinanceManagement = () => {
   // Access control - only Finance HOD+ can access
   if (
     !user ||
-    user.role.level < 700 ||
+    user.role.level >= 700 ||
     user.department?.name !== "Finance & Accounting"
   ) {
     return (
@@ -45,7 +45,7 @@ const ProjectFinanceManagement = () => {
             Access Denied
           </h2>
           <p className="text-gray-600">
-            Only Finance HOD can access Project Finance Management.
+            Only Finance HOD & Super Admin can access Project Finance Management.
           </p>
         </div>
       </div>

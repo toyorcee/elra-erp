@@ -1,342 +1,569 @@
 import React, { useState, useEffect } from "react";
-import {
-  BuildingOfficeIcon,
-  PlusIcon,
-  PencilIcon,
-  TrashIcon,
-  UsersIcon,
-  CheckIcon,
-  XMarkIcon,
-  ExclamationTriangleIcon,
-} from "@heroicons/react/24/outline";
-import { userModulesAPI } from "../../../../services/userModules.js";
+import { PlusIcon } from "@heroicons/react/24/outline";
+import DataTable from "../../../../components/common/DataTable";
+import ELRALogo from "../../../../components/ELRALogo";
+import { toast } from "react-toastify";
+import * as departmentsAPI from "../../../../services/departments";
 
 const DepartmentManagement = () => {
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState(null);
+  const [levelError, setLevelError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
   const [formData, setFormData] = useState({
     name: "",
-    description: "",
     code: "",
-    managerId: "",
-    status: "ACTIVE",
+    description: "",
+    level: 75,
+    isActive: true,
   });
 
+  // Fetch departments on component mount
   useEffect(() => {
-    loadDepartments();
+    fetchDepartments();
   }, []);
 
-  const loadDepartments = async () => {
+  const fetchDepartments = async () => {
     try {
       setLoading(true);
-      const response = await userModulesAPI.departments.getAllDepartments();
-      console.log("Departments response:", response);
-      setDepartments(response.data || []);
+      const result = await departmentsAPI.getDepartments();
+      if (result.success && result.data) {
+        setDepartments(result.data);
+      } else {
+        toast.error("Failed to fetch departments");
+      }
     } catch (error) {
-      console.error("Error loading departments:", error);
+      toast.error("Error fetching departments");
+      console.error("Error:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  const handleInputChange = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+
+    // Clear level error when user changes level
+    if (field === "level") {
+      setLevelError("");
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Validate level
+    if (formData.level < 1 || formData.level > 100) {
+      setLevelError("Level must be between 1 and 100");
+      return;
+    }
+
+    // Check if level already exists
+    const existingDept = departments.find(
+      (dept) =>
+        dept.level === formData.level &&
+        (!editingDepartment || dept._id !== editingDepartment._id)
+    );
+
+    if (existingDept) {
+      setLevelError("Level already exists");
+      return;
+    }
+
     try {
+      setIsSubmitting(true);
+
+      let result;
       if (editingDepartment) {
-        await userModulesAPI.departments.updateDepartment(
-          editingDepartment.id,
+        result = await departmentsAPI.updateDepartment(
+          editingDepartment._id,
           formData
         );
       } else {
-        await userModulesAPI.departments.createDepartment(formData);
+        result = await departmentsAPI.createDepartment(formData);
       }
-      setShowModal(false);
-      setEditingDepartment(null);
-      setFormData({
-        name: "",
-        description: "",
-        code: "",
-        managerId: "",
-        status: "ACTIVE",
-      });
-      loadDepartments();
+
+      if (result.success) {
+        toast.success(
+          editingDepartment
+            ? "Department updated successfully"
+            : "Department created successfully"
+        );
+        setShowModal(false);
+        resetForm();
+        fetchDepartments();
+      } else {
+        toast.error(result.message || "Operation failed");
+      }
     } catch (error) {
-      console.error("Error saving department:", error);
-      alert(error.response?.data?.message || "Error saving department");
+      console.error("Error:", error);
+
+      if (error.response?.data?.message) {
+        const errorMessage = error.response.data.message;
+        if (errorMessage.includes("level")) {
+          setLevelError("Level already exists");
+          toast.error("Department level must be unique");
+        } else if (errorMessage.includes("name")) {
+          toast.error("Department name must be unique");
+        } else if (errorMessage.includes("code")) {
+          toast.error("Department code must be unique");
+        } else {
+          toast.error(errorMessage);
+        }
+      } else {
+        toast.error("An error occurred");
+      }
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      code: "",
+      description: "",
+      level: 75,
+      isActive: true,
+    });
+    setEditingDepartment(null);
+    setLevelError("");
   };
 
   const handleEdit = (department) => {
+    console.log("Editing department:", department);
     setEditingDepartment(department);
     setFormData({
-      name: department.name,
-      description: department.description,
-      code: department.code,
-      managerId: department.managerId || "",
-      status: department.status,
+      name: department.name || "",
+      code: department.code || "",
+      description: department.description || "",
+      level: department.level || 75,
+      isActive: department.isActive !== undefined ? department.isActive : true,
     });
+    setLevelError("");
     setShowModal(true);
   };
 
-  const handleDelete = async (departmentId) => {
-    if (window.confirm("Are you sure you want to delete this department?")) {
-      try {
-        await userModulesAPI.departments.deleteDepartment(departmentId);
-        loadDepartments();
-      } catch (error) {
-        console.error("Error deleting department:", error);
-        alert(error.response?.data?.message || "Error deleting department");
+  const handleDelete = (department) => {
+    setDeleteTarget(department);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    try {
+      setIsSubmitting(true);
+      const result = await departmentsAPI.deleteDepartment(deleteTarget._id);
+
+      if (result.success) {
+        toast.success("Department deleted successfully");
+        fetchDepartments();
+        setShowDeleteModal(false);
+        setDeleteTarget(null);
+      } else {
+        toast.error(result.message || "Failed to delete department");
       }
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("An error occurred");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const openCreateModal = () => {
-    setEditingDepartment(null);
-    setFormData({
-      name: "",
-      description: "",
-      code: "",
-      managerId: "",
-      status: "ACTIVE",
-    });
-    setShowModal(true);
-  };
+  // Table columns configuration
+  const columns = [
+    {
+      header: "Department Name",
+      key: "name",
+      renderer: (dept) => (
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-[var(--elra-primary)] rounded-lg flex items-center justify-center">
+            <span className="text-white font-semibold text-sm">
+              {dept.code ? dept.code.slice(0, 3) : "N/A"}
+            </span>
+          </div>
+          <div>
+            <div className="font-medium text-gray-900">{dept.name}</div>
+            <div
+              className="text-sm text-gray-500 cursor-help"
+              title={dept.description || ""}
+            >
+              {dept.description
+                ? dept.description.slice(0, 30) +
+                  (dept.description.length > 30 ? "..." : "")
+                : ""}
+            </div>
+          </div>
+        </div>
+      ),
+      skeletonRenderer: () => (
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-gray-200 rounded-lg"></div>
+          <div>
+            <div className="h-4 bg-gray-200 rounded w-32 mb-2"></div>
+            <div className="h-3 bg-gray-200 rounded w-24"></div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: "Level",
+      key: "level",
+      renderer: (dept) => (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+          {dept.level}
+        </span>
+      ),
+      skeletonRenderer: () => (
+        <div className="h-6 bg-gray-200 rounded-full w-16"></div>
+      ),
+    },
+    {
+      header: "Status",
+      key: "isActive",
+      renderer: (dept) => (
+        <span
+          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+            dept.isActive
+              ? "bg-green-100 text-green-800"
+              : "bg-red-100 text-red-800"
+          }`}
+        >
+          {dept.isActive ? "Active" : "Inactive"}
+        </span>
+      ),
+      skeletonRenderer: () => (
+        <div className="h-6 bg-gray-200 rounded-full w-16"></div>
+      ),
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-[var(--elra-bg-light)] p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6 border border-[var(--elra-border-primary)]">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-[var(--elra-primary)] rounded-lg">
-                <BuildingOfficeIcon className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-[var(--elra-text-primary)]">
-                  Department Management
-                </h1>
-                <p className="text-[var(--elra-text-secondary)]">
-                  Manage company departments and their configurations
-                </p>
-              </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Department Management
+              </h1>
+              <p className="text-gray-600">
+                Manage company departments and structure
+              </p>
             </div>
             <button
-              onClick={openCreateModal}
-              className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:opacity-90 transition-colors flex items-center space-x-2"
+              onClick={() => setShowModal(true)}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--elra-primary)] transition-colors cursor-pointer"
             >
-              <PlusIcon className="h-5 w-5" />
-              <span>Add Department</span>
+              <PlusIcon className="w-4 h-4 mr-2" />
+              New Department
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Departments Grid */}
-        {loading ? (
-          <div className="bg-white rounded-xl shadow-lg p-12 border border-[var(--elra-border-primary)]">
-            <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--elra-primary)]"></div>
-              <span className="ml-3 text-[var(--elra-text-secondary)]">
-                Loading departments...
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {departments.map((department) => (
-              <div
-                key={department._id}
-                className="bg-white rounded-xl shadow-lg border border-[var(--elra-border-primary)] overflow-hidden hover:shadow-xl transition-shadow"
-              >
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-[var(--elra-bg-secondary)] rounded-lg">
-                        <BuildingOfficeIcon className="h-5 w-5 text-[var(--elra-primary)]" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-[var(--elra-text-primary)]">
-                          {department.name}
-                        </h3>
-                        {department.code && (
-                          <p className="text-sm text-[var(--elra-text-secondary)]">
-                            Code: {department.code}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleEdit(department)}
-                        className="p-1 text-[var(--elra-text-secondary)] hover:text-[var(--elra-primary)] rounded"
-                      >
-                        <PencilIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(department._id)}
-                        className="p-1 text-[var(--elra-text-secondary)] hover:text-red-500 rounded"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </div>
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-white rounded-lg shadow">
+          <DataTable
+            data={departments}
+            columns={columns}
+            loading={loading}
+            actions={{
+              onEdit: handleEdit,
+              onDelete: handleDelete,
+              showEdit: true,
+              showDelete: true,
+              showToggle: false,
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Department Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Header - ELRA Branded */}
+            <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-t-2xl flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <ELRALogo variant="dark" size="md" />
                   </div>
-
-                  <p className="text-[var(--elra-text-secondary)] text-sm mb-4 line-clamp-2">
-                    {department.description || "No description provided"}
-                  </p>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <UsersIcon className="h-4 w-4 text-[var(--elra-text-secondary)]" />
-                      <span className="text-sm text-[var(--elra-text-secondary)]">
-                        {department.employeeCount || 0} employees
-                      </span>
-                    </div>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        department.status === "ACTIVE"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {department.status}
-                    </span>
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">
+                      {editingDepartment
+                        ? "Edit Department"
+                        : "Create New Department"}
+                    </h2>
+                    <p className="text-white text-opacity-90 mt-1 text-sm">
+                      ELRA Department Management System
+                    </p>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!loading && departments.length === 0 && (
-          <div className="bg-white rounded-xl shadow-lg p-12 border border-[var(--elra-border-primary)] text-center">
-            <BuildingOfficeIcon className="h-12 w-12 text-[var(--elra-text-muted)] mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-[var(--elra-text-primary)] mb-2">
-              No departments found
-            </h3>
-            <p className="text-[var(--elra-text-secondary)] mb-6">
-              Get started by creating your first department
-            </p>
-            <button
-              onClick={openCreateModal}
-              className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:opacity-90 transition-colors flex items-center space-x-2 mx-auto"
-            >
-              <PlusIcon className="h-5 w-5" />
-              <span>Add Department</span>
-            </button>
-          </div>
-        )}
-
-        {/* Create/Edit Modal */}
-        {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-[var(--elra-text-primary)]">
-                    {editingDepartment
-                      ? "Edit Department"
-                      : "Create Department"}
-                  </h3>
-                  <button
-                    onClick={() => setShowModal(false)}
-                    className="p-1 text-[var(--elra-text-secondary)] hover:text-[var(--elra-text-primary)] rounded"
+                <button
+                  onClick={() => {
+                    setShowModal(false);
+                    resetForm();
+                  }}
+                  className="p-2 text-white hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
+                >
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <XMarkIcon className="h-5 w-5" />
-                  </button>
-                </div>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="p-6">
+              {/* Modal Form */}
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Basic Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
                       Department Name *
                     </label>
                     <input
                       type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
                       required
+                      value={formData.name}
+                      onChange={(e) =>
+                        handleInputChange("name", e.target.value)
+                      }
                       className="w-full p-3 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-border-focus)] focus:border-[var(--elra-border-focus)]"
-                      placeholder="e.g., Information Technology"
+                      placeholder="e.g., Project Management"
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
-                      Department Code
+                      Department Code *
                     </label>
                     <input
                       type="text"
-                      name="code"
+                      required
                       value={formData.code}
-                      onChange={handleInputChange}
+                      onChange={(e) =>
+                        handleInputChange("code", e.target.value.toUpperCase())
+                      }
                       className="w-full p-3 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-border-focus)] focus:border-[var(--elra-border-focus)]"
-                      placeholder="e.g., IT"
+                      placeholder="e.g., PM"
                     />
                   </div>
+                </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) =>
+                      handleInputChange("description", e.target.value)
+                    }
+                    rows={3}
+                    className="w-full p-3 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-border-focus)] focus:border-[var(--elra-border-focus)] resize-none"
+                    placeholder="Describe the department's purpose and responsibilities..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
-                      Description
+                      Department Level *
                     </label>
-                    <textarea
-                      name="description"
-                      value={formData.description}
-                      onChange={handleInputChange}
-                      rows={3}
-                      className="w-full p-3 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-border-focus)] focus:border-[var(--elra-border-focus)] resize-none"
-                      placeholder="Brief description of the department..."
+                    <input
+                      type="number"
+                      required
+                      value={formData.level}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        if (isNaN(value) || value < 1 || value > 100) {
+                          setLevelError("Level must be between 1 and 100");
+                        } else {
+                          setLevelError("");
+                          handleInputChange("level", value);
+                        }
+                      }}
+                      className="w-full p-3 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-border-focus)] focus:border-[var(--elra-border-focus)]"
+                      placeholder="e.g., 75"
+                      min="1"
+                      max="100"
                     />
+                    {levelError && (
+                      <p className="text-red-500 text-xs mt-1">{levelError}</p>
+                    )}
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
                       Status
                     </label>
                     <select
-                      name="status"
-                      value={formData.status}
-                      onChange={handleInputChange}
+                      value={formData.isActive}
+                      onChange={(e) =>
+                        handleInputChange("isActive", e.target.value === "true")
+                      }
                       className="w-full p-3 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-border-focus)] focus:border-[var(--elra-border-focus)]"
                     >
-                      <option value="ACTIVE">Active</option>
-                      <option value="INACTIVE">Inactive</option>
+                      <option value={true}>Active</option>
+                      <option value={false}>Inactive</option>
                     </select>
                   </div>
+                </div>
 
-                  <div className="flex justify-end space-x-4 pt-4">
-                    <button
-                      type="button"
-                      onClick={() => setShowModal(false)}
-                      className="px-4 py-2 text-[var(--elra-text-secondary)] hover:text-[var(--elra-text-primary)]"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-6 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:opacity-90 transition-colors flex items-center space-x-2"
-                    >
-                      <CheckIcon className="h-4 w-4" />
-                      <span>{editingDepartment ? "Update" : "Create"}</span>
-                    </button>
+                {/* Form Actions */}
+                <div className="flex items-center justify-end space-x-3 pt-4 border-t border-[var(--elra-border-primary)]">
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => {
+                      setShowModal(false);
+                      resetForm();
+                    }}
+                    className="px-6 py-3 text-sm font-medium text-[var(--elra-text-primary)] bg-white border border-[var(--elra-border-primary)] rounded-lg hover:bg-[var(--elra-secondary-3)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--elra-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-6 py-3 text-sm font-medium text-white bg-[var(--elra-primary)] border border-transparent rounded-lg hover:bg-[var(--elra-primary-dark)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--elra-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>
+                          {editingDepartment ? "Updating..." : "Creating..."}
+                        </span>
+                      </div>
+                    ) : editingDepartment ? (
+                      "Update Department"
+                    ) : (
+                      "Create Department"
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && deleteTarget && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-red-500 to-red-600 text-white p-6 rounded-t-2xl">
+              <div className="text-center">
+                <h3 className="text-xl font-bold text-white">
+                  Delete Department
+                </h3>
+                <p className="text-white text-opacity-90 mt-1">
+                  This action cannot be undone
+                </p>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="text-center">
+                <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
+                  <svg
+                    className="h-8 w-8 text-red-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Are you sure you want to delete this department?
+                </h3>
+                <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-900 mb-2">
+                      {deleteTarget.name}
+                    </div>
+                    {deleteTarget.code && (
+                      <div className="text-sm text-gray-600 mb-2">
+                        Code: {deleteTarget.code}
+                      </div>
+                    )}
+                    {deleteTarget.description && (
+                      <div className="text-sm text-gray-500">
+                        {deleteTarget.description}
+                      </div>
+                    )}
                   </div>
-                </form>
+                </div>
+                <p className="text-sm text-gray-500 mb-6">
+                  This will permanently remove the department and all associated
+                  data. This action cannot be undone.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end space-x-3">
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setDeleteTarget(null);
+                  }}
+                  className="px-6 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={confirmDelete}
+                  className="px-6 py-3 text-sm font-medium text-white bg-red-600 border border-transparent rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Deleting...</span>
+                    </div>
+                  ) : (
+                    "Delete Department"
+                  )}
+                </button>
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

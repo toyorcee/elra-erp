@@ -37,6 +37,7 @@ const projectSchema = new mongoose.Schema(
         "pending_legal_compliance_approval",
         "pending_finance_approval",
         "pending_executive_approval",
+        "pending_budget_allocation",
         "approved",
         "implementation",
         "active",
@@ -487,6 +488,7 @@ const projectSchema = new mongoose.Schema(
             "finance",
             "executive",
             "legal_compliance",
+            "budget_allocation",
           ],
           required: true,
         },
@@ -1056,25 +1058,31 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
 
     // Handle workflow based on project scope
     if (this.projectScope === "external") {
-      // External projects: Check budget allocation first
+      // External projects: Check if this is budget allocation approval
       console.log(
-        "🌐 [WORKFLOW] External project detected - checking budget allocation"
+        "🌐 [WORKFLOW] External project detected - checking approval type"
       );
 
-      if (this.requiresBudgetAllocation === true) {
-        // Budget allocation required - notify Finance HOD first
+      // Check if this is the budget allocation approval step
+      const budgetAllocationStep = this.approvalChain.find(
+        (step) =>
+          step.level === "budget_allocation" && step.status === "approved"
+      );
+
+      if (this.requiresBudgetAllocation === true && budgetAllocationStep) {
+        // Budget allocation just approved - proceed with procurement
         console.log(
-          "💰 [WORKFLOW] Budget allocation required - notifying Finance HOD"
-        );
-        await this.notifyFinanceHODForBudgetAllocation(triggeredByUser);
-        console.log(
-          "⏸️ [WORKFLOW] Waiting for Finance budget allocation before procurement"
+          "💰 [WORKFLOW] Budget allocation approved - proceeding with procurement"
         );
         console.log(
-          "📋 [WORKFLOW] Finance HOD must allocate budget before procurement can proceed"
+          "🛒 [WORKFLOW] Triggering Procurement for external project"
         );
-      } else {
-        // No budget allocation - proceed with procurement
+        await this.triggerProcurementCreation(triggeredByUser);
+
+        // Send notification to Operations HOD about pending inventory
+        await this.notifyOperationsHOD(triggeredByUser);
+      } else if (this.requiresBudgetAllocation === false) {
+        // No budget allocation required - proceed with procurement
         console.log(
           "💰 [WORKFLOW] No budget allocation required - proceeding with procurement"
         );
@@ -1085,6 +1093,14 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
 
         // Send notification to Operations HOD about pending inventory
         await this.notifyOperationsHOD(triggeredByUser);
+      } else {
+        // Still waiting for budget allocation
+        console.log(
+          "⏸️ [WORKFLOW] Waiting for budget allocation before procurement"
+        );
+        console.log(
+          "📋 [WORKFLOW] Budget allocation must be approved before procurement can proceed"
+        );
       }
 
       console.log("✅ [WORKFLOW] External project workflow triggered");
@@ -1126,9 +1142,9 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
 
         if (this.projectScope === "external") {
           if (this.requiresBudgetAllocation !== false) {
-            notificationMessage = `Project "${this.name}" approved! Finance will provide budget FOR implementation. Inventory & procurement processes will be initiated.`;
+            notificationMessage = `Project "${this.name}" approved! Finance will review budget calculations, then Executive will approve. After Executive approval, Finance will allocate budget and procurement will be initiated.`;
           } else {
-            notificationMessage = `Project "${this.name}" approved! HR department will provide budget FOR implementation. Inventory & procurement processes will be initiated.`;
+            notificationMessage = `Project "${this.name}" approved! Legal review completed. Project will proceed to Executive approval, then procurement will be initiated.`;
           }
           notificationsSent.operationsHOD = "Inventory setup notification sent";
           notificationsSent.procurementHOD =
@@ -1205,9 +1221,9 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
       let creatorMessage = "";
       if (this.projectScope === "external") {
         if (this.requiresBudgetAllocation !== false) {
-          creatorMessage = `Project "${this.name}" approved! Finance will provide budget FOR implementation. Inventory & procurement processes will be initiated.`;
+          creatorMessage = `Project "${this.name}" approved! Finance will review budget calculations, then Executive will approve. After Executive approval, Finance will allocate budget and procurement will be initiated.`;
         } else {
-          creatorMessage = `Project "${this.name}" approved! HR department will provide budget FOR implementation. Inventory & procurement processes will be initiated.`;
+          creatorMessage = `Project "${this.name}" approved! Legal review completed. Project will proceed to Executive approval, then procurement will be initiated.`;
         }
       } else if (this.projectScope === "departmental") {
         creatorMessage = `Congratulations! Your project "${this.name}" with reimbursement has been approved. Finance will handle reimbursement for implementation.`;
@@ -1256,14 +1272,25 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
           return;
         }
 
-        const financeHOD = await mongoose
+        let financeHOD = await mongoose
           .model("User")
           .findOne({
             department: financeDept._id,
-            role: hodRoleForFinance._id,
+            "role.name": "HOD",
             isActive: true,
           })
           .populate("role");
+
+        if (!financeHOD) {
+          financeHOD = await mongoose
+            .model("User")
+            .findOne({
+              department: financeDept._id,
+              "role.level": { $gte: 700 },
+              isActive: true,
+            })
+            .populate("role");
+        }
 
         if (financeHOD) {
           console.log(
@@ -1285,7 +1312,7 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
             // Create appropriate message based on project scope
             let financeMessage = "";
             if (this.projectScope === "external") {
-              financeMessage = `Project "${this.name}" (${this.code}) that you approved has been fully approved and is now in implementation phase. Finance will provide budget FOR implementation. Inventory and procurement processes will be initiated.`;
+              financeMessage = `Project "${this.name}" (${this.code}) that you reviewed has been fully approved and is now in implementation phase. Budget allocation will be required before procurement can proceed.`;
             } else if (this.projectScope === "departmental") {
               financeMessage = `Project "${this.name}" (${this.code}) that you approved has been fully approved and is now in implementation phase. Finance will handle reimbursement for implementation.`;
             } else {
@@ -1333,7 +1360,11 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
         // Create appropriate message based on project scope
         let executiveMessage = "";
         if (this.projectScope === "external") {
-          executiveMessage = `Project "${this.name}" (${this.code}) that you just approved is now in implementation phase. Finance will provide budget FOR implementation. Inventory and procurement processes will be initiated.`;
+          if (this.requiresBudgetAllocation !== false) {
+            executiveMessage = `Project "${this.name}" (${this.code}) that you just approved is now in implementation phase. Finance will allocate budget before procurement can proceed.`;
+          } else {
+            executiveMessage = `Project "${this.name}" (${this.code}) that you just approved is now in implementation phase. Procurement will be initiated.`;
+          }
         } else if (this.projectScope === "departmental") {
           executiveMessage = `Project "${this.name}" (${this.code}) that you just approved is now in implementation phase. Finance will handle reimbursement for implementation.`;
         } else {
@@ -1670,16 +1701,48 @@ projectSchema.methods.triggerProcurementCreation = async function (
     // Create standard procurement order for ANY project category
     if (triggeredByUser) {
       try {
-        await this.createStandardProcurementOrder(triggeredByUser);
+        console.log(
+          `🛒 [PROCUREMENT] Starting PO creation for project: ${this.name} (${this.code})`
+        );
+        console.log(
+          `🛒 [PROCUREMENT] Triggered by: ${triggeredByUser.firstName} ${triggeredByUser.lastName} (${triggeredByUser.email})`
+        );
+        console.log(
+          `🛒 [PROCUREMENT] Project budget: ₦${this.budget?.toLocaleString()}`
+        );
+        console.log(
+          `🛒 [PROCUREMENT] Project items count: ${
+            this.projectItems?.length || 0
+          }`
+        );
+
+        const createdPO = await this.createStandardProcurementOrder(
+          triggeredByUser
+        );
+        console.log(
+          `✅ [PROCUREMENT] PO created successfully: ${createdPO.poNumber}`
+        );
+        console.log(
+          `✅ [PROCUREMENT] PO total amount: ₦${createdPO.totalAmount?.toLocaleString()}`
+        );
+        console.log(
+          `✅ [PROCUREMENT] PO items count: ${createdPO.items?.length || 0}`
+        );
+
         await ProjectAuditService.logProcurementInitiated(
           this,
           triggeredByUser
         );
+        console.log(
+          `✅ [PROCUREMENT] Audit log created for procurement initiation`
+        );
       } catch (error) {
         console.error(
-          "❌ [AUDIT] Error creating standard procurement order:",
+          "❌ [PROCUREMENT] Error creating standard procurement order:",
           error
         );
+        console.error("❌ [PROCUREMENT] Error details:", error.message);
+        console.error("❌ [PROCUREMENT] Error stack:", error.stack);
       }
     }
 
@@ -1861,6 +1924,12 @@ projectSchema.methods.createStandardProcurementOrder = async function (
     let procurementItems = [];
     let calculatedSubtotal = 0;
 
+    console.log(
+      `🛒 [PROCUREMENT] Processing ${
+        this.projectItems?.length || 0
+      } project items for PO creation...`
+    );
+
     if (this.projectItems && this.projectItems.length > 0) {
       // Use actual project items for external projects
       console.log(
@@ -1870,6 +1939,14 @@ projectSchema.methods.createStandardProcurementOrder = async function (
       procurementItems = this.projectItems.map((item, index) => {
         const itemTotal = (item.quantity || 1) * (item.unitPrice || 0);
         calculatedSubtotal += itemTotal;
+
+        console.log(
+          `🛒 [PROCUREMENT] Converting project item ${index + 1}: ${
+            item.name
+          } - Qty: ${
+            item.quantity
+          } x ₦${item.unitPrice?.toLocaleString()} = ₦${itemTotal.toLocaleString()}`
+        );
 
         return {
           name: item.name || `Project Item ${index + 1}`,
@@ -1935,16 +2012,39 @@ projectSchema.methods.createStandardProcurementOrder = async function (
       shipping: 0,
       totalAmount: calculatedSubtotal,
       relatedProject: this._id,
+      requestedBy: createdBy._id,
       approvedBy: createdBy._id,
       createdBy: createdBy._id,
     });
 
+    console.log(`🛒 [PROCUREMENT] Saving procurement order to database...`);
+    console.log(`🛒 [PROCUREMENT] PO Number: ${poNumber}`);
+    console.log(
+      `🛒 [PROCUREMENT] Total Amount: ₦${calculatedSubtotal.toLocaleString()}`
+    );
+    console.log(`🛒 [PROCUREMENT] Items: ${procurementItems.length} items`);
+
     const savedOrder = await procurementOrder.save();
+
+    console.log(
+      `✅ [PROCUREMENT] Procurement order saved successfully to database!`
+    );
+    console.log(`✅ [PROCUREMENT] Saved PO ID: ${savedOrder._id}`);
 
     console.log(
       `✅ [PROCUREMENT] Created procurement order ${poNumber} with ₦${totalBudget.toLocaleString()} budget for project: ${
         this.code
       }`
+    );
+    console.log(`✅ [PROCUREMENT] PO Details:`);
+    console.log(`   - PO Number: ${poNumber}`);
+    console.log(`   - Total Amount: ₦${calculatedSubtotal.toLocaleString()}`);
+    console.log(`   - Items Count: ${procurementItems.length}`);
+    console.log(`   - Category: ${procurementCategory}`);
+    console.log(`   - Status: ${savedOrder.status}`);
+    console.log(`   - Related Project: ${this.name} (${this.code})`);
+    console.log(
+      `   - Created By: ${createdBy.firstName} ${createdBy.lastName}`
     );
 
     return savedOrder;
@@ -2163,6 +2263,85 @@ projectSchema.methods.notifyOperationsHODForInventory = async function (
   }
 };
 
+// Instance method to notify Finance HOD for budget review (not allocation)
+projectSchema.methods.notifyFinanceHODForBudgetReview = async function (
+  triggeredByUser
+) {
+  try {
+    console.log(
+      "📧 [NOTIFICATION] Sending budget review notification to Finance HOD..."
+    );
+
+    const NotificationService = await import(
+      "../services/notificationService.js"
+    );
+    const notification = new NotificationService.default();
+
+    // Find Finance HOD
+    const Department = mongoose.model("Department");
+    const User = mongoose.model("User");
+
+    const financeDept = await Department.findOne({
+      name: "Finance & Accounting",
+    });
+    if (!financeDept) {
+      console.log("⚠️ [NOTIFICATION] Finance department not found");
+      return;
+    }
+
+    // Try to find Finance HOD by role name first, then fall back to role level
+    let financeHOD = await User.findOne({
+      department: financeDept._id,
+      "role.name": "HOD",
+      isActive: true,
+    });
+
+    // If not found by role name, try by role level as backup
+    if (!financeHOD) {
+      financeHOD = await User.findOne({
+        department: financeDept._id,
+        "role.level": { $gte: 700 },
+        isActive: true,
+      });
+    }
+
+    if (financeHOD) {
+      console.log(
+        `📧 [NOTIFICATION] Found Finance HOD: ${financeHOD.firstName} ${financeHOD.lastName} (${financeHOD.email})`
+      );
+
+      await notification.createNotification({
+        recipient: financeHOD._id,
+        type: "BUDGET_REVIEW_REQUIRED",
+        title: "Budget Review Required",
+        message: `External project "${this.name}" (${
+          this.code
+        }) requires your budget review and validation of ₦${this.budget.toLocaleString()}. This is a REVIEW step - you will validate budget calculations before Executive approval.`,
+        priority: "high",
+        data: {
+          projectId: this._id,
+          projectName: this.name,
+          projectCode: this.code,
+          budget: this.budget,
+          category: this.category,
+          actionUrl: "/dashboard/modules/finance",
+          triggeredBy: triggeredByUser ? triggeredByUser._id : null,
+          workflowPhase: "budget_review_required",
+          requiresBudgetAllocation: this.requiresBudgetAllocation,
+        },
+      });
+
+      console.log(
+        `✅ [NOTIFICATION] Finance HOD notified for budget review: ${financeHOD.firstName} ${financeHOD.lastName}`
+      );
+    } else {
+      console.log("⚠️ [NOTIFICATION] No Finance HOD found to notify");
+    }
+  } catch (error) {
+    console.error("❌ [NOTIFICATION] Error notifying Finance HOD:", error);
+  }
+};
+
 // Instance method to notify Finance HOD for budget allocation
 projectSchema.methods.notifyFinanceHODForBudgetAllocation = async function (
   triggeredByUser
@@ -2189,13 +2368,14 @@ projectSchema.methods.notifyFinanceHODForBudgetAllocation = async function (
       return;
     }
 
-    const financeHOD = await User.findOne({
+    const financeHODs = await User.find({
       department: financeDept._id,
-      "role.level": { $gte: 700 },
-      isActive: true,
+      "role.name": "HOD",
     });
 
-    if (financeHOD) {
+    if (financeHODs.length > 0) {
+      const financeHOD = financeHODs[0];
+
       console.log(
         `📧 [NOTIFICATION] Found Finance HOD: ${financeHOD.firstName} ${financeHOD.lastName} (${financeHOD.email})`
       );
@@ -2206,7 +2386,7 @@ projectSchema.methods.notifyFinanceHODForBudgetAllocation = async function (
         title: "Budget Allocation Required",
         message: `External project "${this.name}" (${
           this.code
-        }) requires budget allocation of ₦${this.budget.toLocaleString()} before procurement can proceed.`,
+        }) has been approved by Executive and now requires budget allocation of ₦${this.budget.toLocaleString()} before procurement can proceed.`,
         priority: "high",
         data: {
           projectId: this._id,
@@ -2443,31 +2623,109 @@ projectSchema.methods.generateApprovalChain = async function () {
 
   // Different approval chains based on project scope
   if (this.projectScope === "personal") {
-    // Personal Project Workflow: Creator → Finance HOD → Executive HOD → Finance Reimbursement
+    // Personal Project Workflow: Creator → Department HOD → Project Management HOD → Finance HOD → Executive HOD → Finance Reimbursement
     console.log("👤 [APPROVAL] Personal Project Workflow");
 
-    // Finance HOD approval (skip if creator is Finance HOD)
-    if (creatorDepartment !== "Finance & Accounting") {
-      const financeDept = await mongoose
-        .model("Department")
-        .findOne({ name: "Finance & Accounting" });
-      if (financeDept) {
-        approvalChain.push({
-          level: "finance",
-          department: financeDept._id,
-          status: "pending",
-          required: true,
-          type: "personal_reimbursement",
-        });
+    // Department HOD approval first
+    // Skip if creator is Super Admin (1000) or HOD (700) of their own department
+    if (roleDoc.name === "SUPER_ADMIN") {
+      console.log(
+        "✅ [APPROVAL] Auto-approving Department HOD - creator is Super Admin"
+      );
+    } else if (isCreatorHOD && creatorDepartment === this.department?.name) {
+      console.log(
+        "✅ [APPROVAL] Auto-approving Department HOD - creator is HOD of their own department"
+      );
+    } else {
+      approvalChain.push({
+        level: "department_hod",
+        department: this.department,
+        status: "pending",
+        required: true,
+        type: "personal_department_approval",
+      });
+    }
+
+    // Project Management HOD approval
+    // Skip if creator is Super Admin (1000) or Project Management HOD (700)
+    // But if creator is from Project Management dept but NOT HOD, still need Project Management HOD approval
+    if (roleDoc.name === "SUPER_ADMIN") {
+      console.log(
+        "✅ [APPROVAL] Auto-approving Project Management - creator is Super Admin"
+      );
+    } else if (creatorDepartment === "Project Management") {
+      if (isCreatorHOD) {
+        console.log(
+          "✅ [APPROVAL] Auto-approving Project Management - creator is Project Management HOD"
+        );
+      } else {
+        // Creator is from Project Management dept but NOT HOD (level 600, 300, 100)
+        // They need Project Management HOD approval first
+        const projectMgmtDept = await mongoose
+          .model("Department")
+          .findOne({ name: "Project Management" });
+        if (projectMgmtDept) {
+          approvalChain.push({
+            level: "project_management",
+            department: projectMgmtDept._id,
+            status: "pending",
+            required: true,
+            type: "personal_project_management_approval",
+          });
+        }
       }
     } else {
+      // Creator is from other departments, need Project Management HOD approval
+      const projectMgmtDept = await mongoose
+        .model("Department")
+        .findOne({ name: "Project Management" });
+      if (projectMgmtDept) {
+        approvalChain.push({
+          level: "project_management",
+          department: projectMgmtDept._id,
+          status: "pending",
+          required: true,
+          type: "personal_project_approval",
+        });
+      }
+    }
+
+    // Finance HOD approval for budget allocation
+    if (this.requiresBudgetAllocation === true) {
+      // Budget allocation required - need Finance approval
+      if (roleDoc.name === "SUPER_ADMIN") {
+        console.log(
+          "✅ [APPROVAL] Auto-approving Finance Budget - creator is Super Admin"
+        );
+      } else {
+        // All other users need Finance approval
+        const financeDept = await mongoose
+          .model("Department")
+          .findOne({ name: "Finance & Accounting" });
+        if (financeDept) {
+          approvalChain.push({
+            level: "finance",
+            department: financeDept._id,
+            status: "pending",
+            required: true,
+            type: "personal_budget_allocation",
+          });
+        }
+      }
+    } else {
+      // No budget allocation required - skip Finance approval
       console.log(
-        "⚠️ [APPROVAL] Skipping Finance approval - creator is Finance HOD"
+        "ℹ️ [APPROVAL] Skipping Finance approval - no budget allocation required"
       );
     }
 
-    // Executive HOD approval (skip if creator is Executive HOD)
-    if (creatorDepartment !== "Executive Office") {
+    // Executive HOD approval
+    // Skip if creator is Super Admin (1000) or Executive HOD (700)
+    if (roleDoc.name === "SUPER_ADMIN") {
+      console.log(
+        "✅ [APPROVAL] Auto-approving Executive - creator is Super Admin"
+      );
+    } else if (creatorDepartment !== "Executive Office") {
       const execDept = await mongoose
         .model("Department")
         .findOne({ name: "Executive Office" });
@@ -2477,16 +2735,85 @@ projectSchema.methods.generateApprovalChain = async function () {
           department: execDept._id,
           status: "pending",
           required: true,
-          type: "personal_approval",
+          type: "personal_executive_approval",
         });
       }
     } else {
       console.log(
-        "⚠️ [APPROVAL] Skipping Executive approval - creator is Executive HOD"
+        "✅ [APPROVAL] Auto-approving Executive - creator is Executive HOD"
+      );
+    }
+
+    // Final Finance approval for reimbursement
+    if (this.requiresBudgetAllocation === true) {
+      // Budget allocation required - need Finance reimbursement approval
+      if (roleDoc.name === "SUPER_ADMIN") {
+        console.log(
+          "✅ [APPROVAL] Auto-approving Finance Reimbursement - creator is Super Admin"
+        );
+      } else {
+        // All other users need Finance reimbursement approval
+        const financeDept = await mongoose
+          .model("Department")
+          .findOne({ name: "Finance & Accounting" });
+        if (financeDept) {
+          approvalChain.push({
+            level: "finance_reimbursement",
+            department: financeDept._id,
+            status: "pending",
+            required: true,
+            type: "personal_finance_reimbursement",
+          });
+        }
+      }
+    } else {
+      // No budget allocation required - skip Finance reimbursement
+      console.log(
+        "ℹ️ [APPROVAL] Skipping Finance reimbursement - no budget allocation required"
       );
     }
   } else if (this.projectScope === "departmental") {
     console.log("🏢 [APPROVAL] Departmental Project Workflow");
+
+    // Project Management HOD approval
+    // Skip if creator is Project Management HOD (auto-approve)
+    // But if creator is from Project Management dept but NOT HOD, still need Project Management HOD approval
+    if (creatorDepartment === "Project Management") {
+      if (isCreatorHOD) {
+        console.log(
+          "✅ [APPROVAL] Auto-approving Project Management - creator is Project Management HOD"
+        );
+      } else {
+        // Creator is from Project Management dept but NOT HOD (level 600, 300, 100)
+        // They need Project Management HOD approval first
+        const projectMgmtDept = await mongoose
+          .model("Department")
+          .findOne({ name: "Project Management" });
+        if (projectMgmtDept) {
+          approvalChain.push({
+            level: "project_management",
+            department: projectMgmtDept._id,
+            status: "pending",
+            required: true,
+            type: "departmental_project_management_approval",
+          });
+        }
+      }
+    } else {
+      // Creator is from other departments, need Project Management HOD approval
+      const projectMgmtDept = await mongoose
+        .model("Department")
+        .findOne({ name: "Project Management" });
+      if (projectMgmtDept) {
+        approvalChain.push({
+          level: "project_management",
+          department: projectMgmtDept._id,
+          status: "pending",
+          required: true,
+          type: "departmental_project_approval",
+        });
+      }
+    }
 
     // HOD approval (skip if creator is HOD of the same department)
     if (!(isCreatorHOD && creatorDepartment === this.department?.name)) {
@@ -2499,7 +2826,7 @@ projectSchema.methods.generateApprovalChain = async function () {
       });
     } else {
       console.log(
-        "⚠️ [APPROVAL] Skipping HOD approval - creator is HOD of the same department"
+        "⚠️ [APPROVAL] Skipping HOD approval - creator is Project Management HOD"
       );
     }
 
@@ -2543,17 +2870,48 @@ projectSchema.methods.generateApprovalChain = async function () {
       );
     }
   } else if (this.projectScope === "external") {
-    // External Project Workflow: HR HOD (auto) → Legal → Finance → Executive → Implementation
+    // External Project Workflow: Project Management HOD → Legal → Finance → Executive → Implementation
     console.log("🌐 [APPROVAL] External Project Workflow");
 
-    // HR HOD approval (will be auto-approved if creator is HR HOD)
-    approvalChain.push({
-      level: "hod",
-      department: this.department,
-      status: "pending",
-      required: true,
-      type: "external_hr_approval",
-    });
+    // Project Management HOD approval
+    // Skip if creator is Project Management HOD (auto-approve)
+    // But if creator is from Project Management dept but NOT HOD, still need Project Management HOD approval
+    if (creatorDepartment === "Project Management") {
+      if (isCreatorHOD) {
+        console.log(
+          "✅ [APPROVAL] Auto-approving Project Management - creator is Project Management HOD"
+        );
+      } else {
+        // Creator is from Project Management dept but NOT HOD (level 600, 300, 100)
+        // They need Project Management HOD approval first
+        const projectMgmtDept = await mongoose
+          .model("Department")
+          .findOne({ name: "Project Management" });
+        if (projectMgmtDept) {
+          approvalChain.push({
+            level: "project_management",
+            department: projectMgmtDept._id,
+            status: "pending",
+            required: true,
+            type: "external_project_management_approval",
+          });
+        }
+      }
+    } else {
+      // Creator is from other departments, need Project Management HOD approval
+      const projectMgmtDept = await mongoose
+        .model("Department")
+        .findOne({ name: "Project Management" });
+      if (projectMgmtDept) {
+        approvalChain.push({
+          level: "project_management",
+          department: projectMgmtDept._id,
+          status: "pending",
+          required: true,
+          type: "external_project_approval",
+        });
+      }
+    }
 
     // Legal & Compliance approval (skip if creator is Legal HOD)
     if (creatorDepartment !== "Legal & Compliance") {
@@ -2589,7 +2947,7 @@ projectSchema.methods.generateApprovalChain = async function () {
           department: financeDept._id,
           status: "pending",
           required: true,
-          type: "external_finance",
+          type: "external_finance_review",
         });
       }
     } else {
@@ -2621,6 +2979,29 @@ projectSchema.methods.generateApprovalChain = async function () {
     } else {
       console.log(
         "⚠️ [APPROVAL] Skipping Executive approval - creator is Executive HOD"
+      );
+    }
+
+    // Budget allocation approval (AFTER Executive approval) - only for external projects requiring budget allocation
+    if (this.requiresBudgetAllocation === true) {
+      const financeDept = await mongoose
+        .model("Department")
+        .findOne({ name: "Finance & Accounting" });
+      if (financeDept) {
+        approvalChain.push({
+          level: "budget_allocation",
+          department: financeDept._id,
+          status: "pending",
+          required: true,
+          type: "external_budget_allocation",
+        });
+        console.log(
+          "💰 [APPROVAL] Added budget allocation step after Executive approval"
+        );
+      }
+    } else {
+      console.log(
+        "💰 [APPROVAL] No budget allocation required - skipping allocation step"
       );
     }
   }
@@ -2677,10 +3058,55 @@ projectSchema.methods.approveProject = async function (
       case "executive":
         this.status = "pending_executive_approval";
         break;
+      case "budget_allocation":
+        this.status = "pending_budget_allocation";
+        break;
     }
   }
 
   await this.save();
+
+  // Send notifications based on approval level
+  try {
+    const NotificationService = await import(
+      "../services/notificationService.js"
+    );
+    const notification = new NotificationService.default();
+
+    // Get approver details
+    const approver = await mongoose.model("User").findById(approverId);
+
+    if (level === "legal_compliance" && this.projectScope === "external") {
+      // Legal approved - notify Finance for budget review (if budget allocation required)
+      if (this.requiresBudgetAllocation !== false) {
+        console.log(
+          "📧 [APPROVAL] Legal approved - notifying Finance for budget review"
+        );
+        await this.notifyFinanceHODForBudgetReview(approver);
+      } else {
+        console.log(
+          "📧 [APPROVAL] Legal approved - no budget allocation required, proceeding to Executive"
+        );
+      }
+    } else if (level === "executive" && this.projectScope === "external") {
+      // Executive approved - notify Finance for budget allocation (if required)
+      if (this.requiresBudgetAllocation !== false) {
+        console.log(
+          "📧 [APPROVAL] Executive approved - notifying Finance for budget allocation"
+        );
+        await this.notifyFinanceHODForBudgetAllocation(approver);
+      } else {
+        console.log(
+          "📧 [APPROVAL] Executive approved - no budget allocation required, proceeding to procurement"
+        );
+      }
+    }
+  } catch (notificationError) {
+    console.error(
+      "❌ [APPROVAL] Error sending notifications:",
+      notificationError
+    );
+  }
 
   // Update project progress automatically
   await this.updateProgress();

@@ -750,6 +750,148 @@ export const getSalaryGrades = asyncHandler(async (req, res) => {
 // @desc    Create bulk invitations from email list
 // @route   POST /api/invitations/bulk-create
 // @access  Private (Super Admin)
+// @desc    Create single invitation
+// @route   POST /api/invitations/create-single
+// @access  Private (Super Admin)
+// export const createSingleInvitation = asyncHandler(async (req, res) => {
+//   const { email, departmentId, roleId } = req.body;
+  
+//   console.log("🚀 [SINGLE_INVITATION] Starting single invitation creation...");
+//   console.log("📋 [SINGLE_INVITATION] Request data:", { email, departmentId, roleId });
+  
+//   const currentUser = req.user;
+  
+//   // Check if user is super admin
+//   if (currentUser.role.level < 700) {
+//     console.log("❌ [SINGLE_INVITATION] Permission denied - insufficient role level");
+//     return res.status(403).json({
+//       success: false,
+//       message: "Access denied. Insufficient permissions.",
+//     });
+//   }
+
+//   // Check existing user
+//   const existingUser = await User.findByEmailOrUsername(email);
+//   if (existingUser) {
+//     console.log(`❌ [SINGLE_INVITATION] User already exists: ${email}`);
+//     return res.status(400).json({
+//       success: false,
+//       message: `User with email ${email} already exists`
+//     });
+//   }
+  
+//   // Check existing invitation
+//   const existingInvitation = await Invitation.findOne({
+//     email: email,
+//     status: { $in: ["active", "sent"] },
+//   });
+  
+//   if (existingInvitation) {
+//     console.log(`❌ [SINGLE_INVITATION] Active invitation exists: ${email}`);
+//     return res.status(400).json({
+//       success: false,
+//       message: `Active invitation already exists for ${email}`
+//     });
+//   }
+
+//   // Validate department
+//   const department = await Department.findById(departmentId);
+//   if (!department) {
+//     console.log("❌ [SINGLE_INVITATION] Invalid department:", departmentId);
+//     return res.status(400).json({
+//       success: false,
+//       message: "Invalid department",
+//     });
+//   }
+
+//   // Validate role
+//   const role = await Role.findById(roleId);
+//   if (!role) {
+//     console.log("❌ [SINGLE_INVITATION] Invalid role:", roleId);
+//     return res.status(400).json({
+//       success: false,
+//       message: "Invalid role",
+//     });
+//   }
+  
+//   // Generate username from email
+//   const username = email.split("@")[0];
+//   const firstName = username.split(".")[0] || username;
+//   const lastName = username.split(".")[1] || "User";
+  
+//   try {
+//     // Create invitation
+//     const invitation = await Invitation.create({
+//       email: email,
+//       firstName: firstName,
+//       lastName: lastName,
+//       department: departmentId,
+//       role: roleId,
+//       createdBy: currentUser._id
+//     });
+    
+//     // Send email
+//     console.log(`📧 [SINGLE_INVITATION] Sending email to ${email}...`);
+//     const emailResult = await sendInvitationEmail(
+//       invitation.email,
+//       `${invitation.firstName} ${invitation.lastName}`,
+//       invitation.code,
+//       role.name,
+//       department.name
+//     );
+    
+//     if (emailResult.success) {
+//       await invitation.markEmailSent();
+//       console.log(`✅ [SINGLE_INVITATION] Email sent successfully to ${email}`);
+      
+//       // Log audit
+//       await AuditService.logUserAction(
+//         currentUser._id,
+//         "SINGLE_INVITATION_CREATED",
+//         invitation._id,
+//         {
+//           email: email,
+//           department: department.name,
+//           role: role.name,
+//           ipAddress: req.ip,
+//           userAgent: req.get("User-Agent"),
+//         }
+//       );
+      
+//       return res.status(201).json({
+//         success: true,
+//         message: "Invitation created and sent successfully",
+//         data: {
+//           invitation: {
+//             id: invitation._id,
+//             email: invitation.email,
+//             firstName: invitation.firstName,
+//             lastName: invitation.lastName,
+//             code: invitation.code,
+//             status: invitation.status,
+//             emailSent: invitation.emailSent
+//           }
+//         }
+//       });
+//     } else {
+//       await invitation.markEmailFailed(emailResult.error);
+//       console.log(`❌ [SINGLE_INVITATION] Email failed for ${email}:`, emailResult.error);
+//       return res.status(500).json({
+//         success: false,
+//         message: "Failed to send invitation email",
+//         error: emailResult.error
+//       });
+//     }
+//   } catch (error) {
+//     console.error(`❌ [SINGLE_INVITATION] Error:`, error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to create invitation",
+//       error: error.message
+//     });
+//   }
+// });
+
 export const createBulkInvitations = asyncHandler(async (req, res) => {
   console.log("🚀 [BULK_INVITATION] Starting bulk invitation creation...");
   console.log("📋 [BULK_INVITATION] Request body:", req.body);

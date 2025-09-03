@@ -2,7 +2,7 @@ import api from "./api";
 
 // Get all departments with optional filters
 export const getDepartments = async (params = {}) => {
-  const response = await api.get("/departments/active", { params });
+  const response = await api.get("/departments", { params });
   console.log("[departments.js] getDepartments response:", response.data);
   return response.data;
 };

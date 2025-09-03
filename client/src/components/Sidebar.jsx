@@ -74,6 +74,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState({});
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Custom scrollbar styles
   const scrollbarStyles = `
@@ -227,6 +228,26 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
 
   const shouldShowExpanded = isOpen || isPinned || (isHovered && !isPinned);
 
+  // Handle sidebar toggle with smooth transitions
+  const handleToggle = () => {
+    setIsTransitioning(true);
+    onToggle();
+
+    // Close all sections when collapsing
+    if (isOpen) {
+      const allSections = {};
+      Object.keys(sections).forEach((section) => {
+        allSections[section] = true;
+      });
+      setCollapsedSections(allSections);
+    }
+
+    // Reset transitioning state after animation completes
+    setTimeout(() => {
+      setIsTransitioning(false);
+    }, 300);
+  };
+
   const togglePin = (itemId) => {
     setPinnedItems((prev) =>
       prev.includes(itemId)
@@ -270,7 +291,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     if (collapsedSections.hasOwnProperty(sectionTitle)) {
       return collapsedSections[sectionTitle];
     }
-    return true;
+    return !shouldShowExpanded; // Collapse by default when sidebar is closed
   };
 
   React.useEffect(() => {
@@ -278,6 +299,17 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
       setCollapsedSections({});
     }
   }, [currentModule, isModuleView]);
+
+  // Auto-collapse sections when sidebar is closed
+  useEffect(() => {
+    if (!shouldShowExpanded) {
+      const allSections = {};
+      Object.keys(sections).forEach((section) => {
+        allSections[section] = true;
+      });
+      setCollapsedSections(allSections);
+    }
+  }, [shouldShowExpanded]);
 
   const handleLogout = async () => {
     try {
@@ -407,36 +439,46 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
           onClick={handleClick}
           className={`group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-300 relative cursor-pointer ${
             isItemActive
-              ? isMostSpecific
-                ? "text-[var(--elra-primary)] font-semibold"
-                : "text-[var(--elra-primary)] font-semibold"
-              : "text-[var(--elra-text-primary)] hover:text-[var(--elra-primary)]"
+              ? "bg-white text-[var(--elra-primary)] font-semibold"
+              : "text-white hover:bg-white/20"
           } ${!shouldShowExpanded && "justify-center"}`}
         >
           {/* Active indicator */}
           {isItemActive && (
             <div
-              className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl bg-[var(--elra-primary)]`}
+              className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl bg-white`}
             />
           )}
           <div className="relative">
             <IconComponent
               className={`h-5 w-5 ${
+                isItemActive ? "text-[var(--elra-primary)]" : "text-white"
+              } ${
                 !shouldShowExpanded && "mx-auto"
               } transition-transform duration-200 group-hover:scale-110`}
             />
           </div>
           {shouldShowExpanded && (
             <>
-              <span className="ml-3 flex-1">{item.label}</span>
+              <span
+                className={`ml-3 flex-1 ${
+                  isItemActive ? "text-[var(--elra-primary)]" : "text-white"
+                }`}
+              >
+                {item.label}
+              </span>
               <div className="flex items-center space-x-2">
                 {isMostSpecific && (
-                  <span className="px-2 py-1 text-xs font-bold text-[var(--elra-primary)] rounded-full">
+                  <span className="px-2 py-1 text-xs font-bold text-[var(--elra-primary)] bg-white/20 rounded-full">
                     Active
                   </span>
                 )}
                 {isPinned && (
-                  <MapPinIcon className="h-4 w-4 text-[var(--elra-primary)]" />
+                  <MapPinIcon
+                    className={`h-4 w-4 ${
+                      isItemActive ? "text-[var(--elra-primary)]" : "text-white"
+                    }`}
+                  />
                 )}
               </div>
             </>
@@ -446,9 +488,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
           <button
             onClick={() => togglePin(item.label)}
             className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-md transition-all duration-200 cursor-pointer ${
-              isPinned
-                ? "text-[var(--elra-primary)]"
-                : "text-gray-400 hover:text-[var(--elra-primary)]"
+              isPinned ? "text-white" : "text-white/60 hover:text-white"
             }`}
           >
             <MapPinIcon className={`h-4 w-4 ${isPinned ? "rotate-45" : ""}`} />
@@ -474,7 +514,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
         {shouldShowExpanded && (
           <button
             onClick={(e) => toggleSectionCollapse(sectionTitle, e)}
-            className={`w-full px-4 text-sm font-bold uppercase tracking-wider mb-3 py-3 rounded-lg flex items-center justify-between transition-all duration-200 text-[var(--elra-primary)] cursor-pointer`}
+            className={`w-full px-4 text-sm font-bold uppercase tracking-wider mb-3 py-3 rounded-lg flex items-center justify-between transition-all duration-200 text-white cursor-pointer hover:bg-white/20`}
           >
             <div className="flex items-center">
               <span>{sectionTitle.toUpperCase()}</span>
@@ -490,6 +530,47 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
         )}
         {!isCollapsed && (
           <div className="space-y-2">{items.map(renderNavItem)}</div>
+        )}
+      </div>
+    );
+  };
+
+  // Special renderer for ERP modules when sidebar is collapsed
+  const renderCollapsedERPModules = () => {
+    if (shouldShowExpanded || sections.erp.length === 0) return null;
+
+    return (
+      <div className="mb-8 mt-8">
+        <div className="grid grid-cols-2 gap-2 px-2">
+          {sections.erp.slice(0, 8).map((item) => {
+            const IconComponent = getIconComponent(item.icon);
+            const isItemActive = isActive(item.path);
+
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex flex-col items-center p-2 rounded-lg transition-all duration-200 cursor-pointer ${
+                  isItemActive
+                    ? "bg-white text-[var(--elra-primary)]"
+                    : "text-white hover:bg-white/20"
+                }`}
+                title={item.label}
+              >
+                <IconComponent className="h-5 w-5 mb-1" />
+                <span className="text-xs text-center leading-tight truncate w-full">
+                  {item.label.split(" ")[0]}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+        {sections.erp.length > 8 && (
+          <div className="mt-2 text-center">
+            <button className="text-white/70 text-xs hover:text-white">
+              +{sections.erp.length - 8} more
+            </button>
+          </div>
         )}
       </div>
     );
@@ -514,13 +595,13 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
       {isMobile && isOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-          onClick={onToggle}
+          onClick={handleToggle}
         />
       )}
 
       {/* Sidebar */}
       <div
-        className={`fixed top-0 left-0 h-full bg-white/95 backdrop-blur-xl border-r border-[var(--elra-border-primary)] z-50 transition-all duration-500 ease-out ${
+        className={`fixed top-0 left-0 h-full bg-[var(--elra-primary)] backdrop-blur-xl border-r border-[var(--elra-primary-dark)] z-50 transition-all duration-300 ease-in-out ${
           shouldShowExpanded ? "w-64" : "w-16"
         } ${
           isMobile
@@ -530,16 +611,16 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             : ""
         } ${
           !isOpen && !isMobile ? "lg:translate-x-0" : ""
-        } shadow-2xl shadow-[var(--elra-primary)]/10 overflow-hidden`}
+        } shadow-2xl shadow-[var(--elra-primary-dark)]/20 overflow-hidden`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
         {/* Header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-[var(--elra-border-primary)] bg-white">
+        <div className="flex items-center justify-between h-16 px-4 border-b border-[var(--elra-primary-dark)] bg-[var(--elra-primary)]">
           {/* Section Title when expanded or hovered */}
           {shouldShowExpanded && (
             <div className="flex items-center">
-              <span className="font-bold text-[var(--elra-primary)] text-lg">
+              <span className="font-bold text-white text-lg">
                 {isModuleView && currentModule
                   ? getCurrentModuleInfo()?.label || currentModule
                   : "Dashboard"}
@@ -552,9 +633,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             <button
               onClick={toggleSidebarPin}
               className={`p-2 rounded-xl transition-all duration-200 hover:scale-110 cursor-pointer ${
-                isPinned
-                  ? "text-[var(--elra-primary)]"
-                  : "text-gray-400 hover:text-[var(--elra-primary)]"
+                isPinned ? "text-white" : "text-white/60 hover:text-white"
               }`}
               title={isPinned ? "Unpin sidebar" : "Pin sidebar"}
             >
@@ -564,8 +643,8 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             </button>
           ) : (
             <button
-              onClick={onToggle}
-              className="p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer"
+              onClick={handleToggle}
+              className="p-2 rounded-xl text-white hover:text-white/80 transition-all duration-200 hover:scale-110 cursor-pointer"
               title="Expand sidebar"
             >
               <Bars3Icon className="h-5 w-5" />
@@ -574,8 +653,8 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
 
           {/* Only show hamburger on mobile */}
           <button
-            onClick={onToggle}
-            className="p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer lg:hidden"
+            onClick={handleToggle}
+            className="p-2 rounded-xl text-white hover:text-white/80 transition-all duration-200 hover:scale-110 cursor-pointer lg:hidden"
           >
             {isOpen ? (
               <XMarkIcon className="h-5 w-5" />
@@ -587,8 +666,8 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
           {/* Desktop toggle button - only show when expanded */}
           {shouldShowExpanded && (
             <button
-              onClick={onToggle}
-              className="hidden lg:block p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer"
+              onClick={handleToggle}
+              className="hidden lg:block p-2 rounded-xl text-white hover:text-white/80 transition-all duration-200 hover:scale-110 cursor-pointer"
             >
               <XMarkIcon className="h-5 w-5" />
             </button>
@@ -596,18 +675,18 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
         </div>
 
         {/* User Profile */}
-        <div className="px-4 py-4 border-b border-[var(--elra-border-primary)] bg-[var(--elra-secondary-3)]">
+        <div className="px-4 py-4 border-b border-[var(--elra-primary-dark)] bg-[var(--elra-primary-dark)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div
                 className={`${
                   shouldShowExpanded ? "w-12 h-12" : "w-10 h-10"
-                } bg-[var(--elra-primary)] rounded-2xl flex items-center justify-center shadow-lg ${
+                } bg-white rounded-2xl flex items-center justify-center shadow-lg ${
                   !shouldShowExpanded ? "mx-auto" : ""
                 }`}
               >
                 <span
-                  className={`text-white font-bold ${
+                  className={`text-[var(--elra-primary)] font-bold ${
                     shouldShowExpanded ? "text-lg" : "text-base"
                   }`}
                 >
@@ -616,13 +695,13 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
               </div>
               {shouldShowExpanded && (
                 <div className="ml-4 flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">
+                  <p className="text-sm font-semibold text-white truncate">
                     {user?.firstName} {user?.lastName}
                   </p>
-                  <p className="text-sm  text-[var(--elra-primary)] font-semibold truncate">
+                  <p className="text-sm text-white/80 font-semibold truncate">
                     {user?.department?.name || "Department"}
                   </p>
-                  <p className="text-xs text-gray-900 font-medium">
+                  <p className="text-xs text-white/80 font-medium">
                     {typeof roleInfo?.title === "string"
                       ? roleInfo.title
                       : "Staff"}
@@ -642,135 +721,139 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
           }}
         >
           <div className="flex-1">
-            {/* Dashboard at the top */}
-            {sections.main.map(renderNavItem)}
+            {/* Dashboard at the top - only show when expanded */}
+            {shouldShowExpanded && sections.main.map(renderNavItem)}
 
-            {/* Other sections */}
-            {(() => {
-              return renderSection("erp", "ERP Modules", sections.erp);
-            })()}
+            {/* ERP Modules - special rendering when collapsed */}
+            {shouldShowExpanded
+              ? renderSection("erp", "ERP Modules", sections.erp)
+              : renderCollapsedERPModules()}
 
-            {/* Render module-specific navigation when in module view */}
-            {isModuleView && currentModule && (
+            {/* Other sections - only show when expanded */}
+            {shouldShowExpanded && (
               <>
-                {/* Module Header */}
-                {shouldShowExpanded && (
-                  <div className="mb-6 mt-4">
-                    <button
-                      onClick={(e) =>
-                        toggleSectionCollapse("Module Features", e)
-                      }
-                      className="w-full px-4 text-sm font-bold text-[var(--elra-primary)] uppercase tracking-wider mb-3 py-3 rounded-lg flex items-center justify-between transition-all duration-200 cursor-pointer"
-                    >
-                      <span>Module Features</span>
-                      <div className="flex items-center space-x-2">
-                        {isSectionCollapsed("Module Features", false) ? (
-                          <ChevronRightIcon className="h-4 w-4 transition-transform duration-200" />
-                        ) : (
-                          <ChevronDownIcon className="h-4 w-4 transition-transform duration-200" />
-                        )}
-                      </div>
-                    </button>
-                  </div>
-                )}
-
-                {/* Module-specific items */}
-                {!isSectionCollapsed("Module Features", false) && (
-                  <div className="space-y-4">
-                    {moduleSidebarItems.map((section, sectionIndex) => {
-                      const isCollapsed = isSectionCollapsed(
-                        section.title,
-                        section.defaultExpanded
-                      );
-                      const hasActiveItem = section.items.some((item) =>
-                        isActive(item.path)
-                      );
-
-                      return (
-                        <div key={sectionIndex} className="mb-4">
-                          {shouldShowExpanded && (
-                            <button
-                              onClick={(e) =>
-                                toggleSectionCollapse(section.title, e)
-                              }
-                              className="w-full px-4 text-xs font-semibold text-[var(--elra-primary)] uppercase tracking-wider mb-2 py-2 rounded-lg flex items-center justify-between transition-all duration-200 cursor-pointer"
-                            >
-                              <span>{section.title}</span>
-                              {section.collapsible && (
-                                <div className="flex items-center space-x-2">
-                                  {isCollapsed ? (
-                                    <ChevronRightIcon className="h-4 w-4 transition-transform duration-200" />
-                                  ) : (
-                                    <ChevronDownIcon className="h-4 w-4 transition-transform duration-200" />
-                                  )}
-                                </div>
-                              )}
-                            </button>
-                          )}
-                          {(!section.collapsible || !isCollapsed) && (
-                            <div className="space-y-1 ml-4">
-                              {section.items.map((item, itemIndex) => {
-                                const IconComponent = getIconComponent(
-                                  item.icon
-                                );
-                                const isItemActive = isActive(item.path);
-
-                                return (
-                                  <div key={itemIndex} className="relative">
-                                    <Link
-                                      to={item.path}
-                                      className={`group flex items-center px-4 py-2 text-xs font-medium rounded-lg transition-all duration-300 cursor-pointer ${
-                                        isItemActive
-                                          ? "text-[var(--elra-primary)] font-semibold"
-                                          : "text-[var(--elra-text-primary)] hover:text-[var(--elra-primary)]"
-                                      } ${
-                                        !shouldShowExpanded && "justify-center"
-                                      }`}
-                                    >
-                                      <div className="relative">
-                                        <IconComponent
-                                          className={`h-4 w-4 ${
-                                            !shouldShowExpanded && "mx-auto"
-                                          } transition-transform duration-200 group-hover:scale-110`}
-                                        />
-                                      </div>
-                                      {shouldShowExpanded && (
-                                        <span className="ml-3 flex-1">
-                                          {item.label}
-                                        </span>
-                                      )}
-                                    </Link>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                {/* Render module-specific navigation when in module view */}
+                {isModuleView && currentModule && (
+                  <>
+                    {/* Module Header */}
+                    <div className="mb-6 mt-4">
+                      <button
+                        onClick={(e) =>
+                          toggleSectionCollapse("Module Features", e)
+                        }
+                        className="w-full px-4 text-sm font-bold text-white uppercase tracking-wider mb-3 py-3 rounded-lg flex items-center justify-between transition-all duration-200 cursor-pointer hover:bg-white/20"
+                      >
+                        <span>Module Features</span>
+                        <div className="flex items-center space-x-2">
+                          {isSectionCollapsed("Module Features", false) ? (
+                            <ChevronRightIcon className="h-4 w-4 transition-transform duration-200" />
+                          ) : (
+                            <ChevronDownIcon className="h-4 w-4 transition-transform duration-200" />
                           )}
                         </div>
+                      </button>
+                    </div>
+
+                    {/* Module-specific items */}
+                    {!isSectionCollapsed("Module Features", false) && (
+                      <div className="space-y-4">
+                        {moduleSidebarItems.map((section, sectionIndex) => {
+                          const isCollapsed = isSectionCollapsed(
+                            section.title,
+                            section.defaultExpanded
+                          );
+                          const hasActiveItem = section.items.some((item) =>
+                            isActive(item.path)
+                          );
+
+                          return (
+                            <div key={sectionIndex} className="mb-4">
+                              <button
+                                onClick={(e) =>
+                                  toggleSectionCollapse(section.title, e)
+                                }
+                                className="w-full px-4 text-xs font-semibold text-white uppercase tracking-wider mb-2 py-2 rounded-lg flex items-center justify-between transition-all duration-200 cursor-pointer hover:bg-white/20"
+                              >
+                                <span>{section.title}</span>
+                                {section.collapsible && (
+                                  <div className="flex items-center space-x-2">
+                                    {isCollapsed ? (
+                                      <ChevronRightIcon className="h-4 w-4 transition-transform duration-200" />
+                                    ) : (
+                                      <ChevronDownIcon className="h-4 w-4 transition-transform duration-200" />
+                                    )}
+                                  </div>
+                                )}
+                              </button>
+                              {(!section.collapsible || !isCollapsed) && (
+                                <div className="space-y-1 ml-4">
+                                  {section.items.map((item, itemIndex) => {
+                                    const IconComponent = getIconComponent(
+                                      item.icon
+                                    );
+                                    const isItemActive = isActive(item.path);
+
+                                    return (
+                                      <div key={itemIndex} className="relative">
+                                        <Link
+                                          to={item.path}
+                                          className={`group flex items-center px-4 py-2 text-xs font-medium rounded-lg transition-all duration-300 cursor-pointer ${
+                                            isItemActive
+                                              ? "bg-white text-[var(--elra-primary)] font-semibold"
+                                              : "text-white hover:bg-white/20"
+                                          } ${
+                                            !shouldShowExpanded &&
+                                            "justify-center"
+                                          }`}
+                                        >
+                                          <div className="relative">
+                                            <IconComponent
+                                              className={`h-4 w-4 ${
+                                                isItemActive
+                                                  ? "text-[var(--elra-primary)]"
+                                                  : "text-white"
+                                              } ${
+                                                !shouldShowExpanded && "mx-auto"
+                                              } transition-transform duration-200 group-hover:scale-110`}
+                                            />
+                                          </div>
+                                          {shouldShowExpanded && (
+                                            <span className="ml-3 flex-1">
+                                              {item.label}
+                                            </span>
+                                          )}
+                                        </Link>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* System section after module features */}
+                {renderSection("system", "System", sections.system)}
+
+                {/* Pinned Items */}
+                {pinnedItems.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="px-4 text-xs font-bold text-white uppercase tracking-wider mb-3 py-2 rounded-lg">
+                      Pinned
+                    </h3>
+                    {pinnedItems.map((itemLabel) => {
+                      const item = sidebarConfig.find(
+                        (nav) => nav.label === itemLabel
                       );
+                      return item ? renderNavItem(item) : null;
                     })}
                   </div>
                 )}
               </>
-            )}
-
-            {/* System section after module features */}
-            {renderSection("system", "System", sections.system)}
-
-            {/* Pinned Items */}
-            {pinnedItems.length > 0 && (
-              <div className="mb-6">
-                {shouldShowExpanded && (
-                  <h3 className="px-4 text-xs font-bold text-[var(--elra-primary)] uppercase tracking-wider mb-3 py-2 rounded-lg">
-                    Pinned
-                  </h3>
-                )}
-                {pinnedItems.map((itemLabel) => {
-                  const item = sidebarConfig.find(
-                    (nav) => nav.label === itemLabel
-                  );
-                  return item ? renderNavItem(item) : null;
-                })}
-              </div>
             )}
           </div>
         </div>

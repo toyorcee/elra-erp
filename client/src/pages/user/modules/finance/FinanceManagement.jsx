@@ -6,8 +6,12 @@ const FinanceManagement = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Access control - only Manager+ can access
-  if (!user || user.role.level < 600) {
+    // Access control - only Finance HOD+ can access
+  if (
+    !user ||
+    user.role.level >= 700 ||
+    user.department?.name !== "Finance & Accounting"
+  ) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -15,7 +19,7 @@ const FinanceManagement = () => {
             Access Denied
           </h2>
           <p className="text-gray-600">
-            You don't have permission to access Finance Management.
+            Only Finance HOD & Super Admin can access Finance Management.
           </p>
         </div>
       </div>

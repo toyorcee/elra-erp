@@ -393,10 +393,6 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
     // Approval Workflow Section
     yPosition += 10;
 
-    // Check if we need a new page for the approval workflow
-    const approvalWorkflowSpace = 50; // Estimate space needed
-    yPosition = addPageIfNeeded(approvalWorkflowSpace);
-
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text("Approval Workflow", 20, yPosition);
@@ -424,11 +420,12 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
         approvalSteps = [
           "1. Head of Department (HOD) Approval",
           "2. Legal & Compliance Review",
-          "3. Finance Department Approval",
+          "3. Finance Department Review (Budget Validation)",
           "4. Executive Management Approval",
+          "5. Finance Department Budget Allocation",
         ];
         workflowDescription =
-          "This external project requires new budget allocation and will go through a comprehensive 4-level approval process.";
+          "This external project requires new budget allocation and will go through a comprehensive 5-level approval process. Finance will review budget calculations first, then Executive approves, and finally Finance allocates the budget.";
       } else {
         approvalSteps = [
           "1. Head of Department (HOD) Approval",

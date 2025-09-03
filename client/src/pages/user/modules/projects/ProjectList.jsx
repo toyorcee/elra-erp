@@ -407,7 +407,7 @@ const ProjectList = () => {
           };
         } else {
           return {
-            text: "Legal → Finance → Executive Approval",
+            text: "Legal → Finance Review → Executive → Budget Allocation",
             color: "text-blue-600",
           };
         }
@@ -448,7 +448,7 @@ const ProjectList = () => {
           };
         } else {
           return {
-            text: "Legal → Finance → Executive Approval",
+            text: "Legal → Finance Review → Executive → Budget Allocation",
             color: "text-blue-600",
           };
         }
@@ -486,7 +486,7 @@ const ProjectList = () => {
           };
         } else {
           return {
-            text: "Legal → Finance → Executive Approval",
+            text: "Legal → Finance Review → Executive → Budget Allocation",
             color: "text-orange-600",
           };
         }
@@ -526,7 +526,7 @@ const ProjectList = () => {
           };
         } else {
           return {
-            text: "Legal → Finance → Executive Approval",
+            text: "Legal → Finance Review → Executive → Budget Allocation",
             color: "text-red-600",
           };
         }
@@ -1731,7 +1731,8 @@ const ProjectList = () => {
               approvalMessage =
                 "Legal → Executive Approval (No Budget Allocation)";
             } else {
-              approvalMessage = "Legal → Finance → Executive Approval";
+              approvalMessage =
+                "Legal → Finance Review → Executive → Budget Allocation";
             }
           }
         } else if (budget <= 5000000) {
@@ -1823,7 +1824,8 @@ const ProjectList = () => {
               } else if (user.department?.name === "Executive Office") {
                 approvalMessage = "Legal → Finance Approval";
               } else {
-                approvalMessage = "Legal → Finance → Executive Approval";
+                approvalMessage =
+                  "Legal → Finance Review → Executive → Budget Allocation";
               }
             }
           }
@@ -2608,8 +2610,16 @@ const ProjectList = () => {
                       </div>
 
                       {/* Project Type Cards */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-                        {/* Personal Project Type */}
+                      <div
+                        className={`grid grid-cols-1 ${
+                          user?.role?.level >= 700 && canCreateExternalProjects
+                            ? "md:grid-cols-3"
+                            : user?.role?.level >= 700
+                            ? "md:grid-cols-2"
+                            : "md:grid-cols-1"
+                        } gap-6 max-w-4xl mx-auto`}
+                      >
+                        {/* Personal Project Type - Always visible */}
                         <motion.div
                           whileHover={{ scale: 1.05, y: -5 }}
                           whileTap={{ scale: 0.95 }}
@@ -2654,93 +2664,97 @@ const ProjectList = () => {
                           </div>
                         </motion.div>
 
-                        {/* Departmental Project Type */}
-                        <motion.div
-                          whileHover={{ scale: 1.05, y: -5 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white rounded-2xl p-8 shadow-xl cursor-pointer border-2 border-transparent hover:border-white/20 transition-all duration-300"
-                          onClick={() => handleScopeSelection("departmental")}
-                        >
-                          <div className="text-center">
-                            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                              <svg
-                                className="w-8 h-8"
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
-                              >
-                                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
-                              </svg>
+                        {/* Departmental Project Type - Only for HOD and above (level >= 700) */}
+                        {user?.role?.level >= 700 && (
+                          <motion.div
+                            whileHover={{ scale: 1.05, y: -5 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white rounded-2xl p-8 shadow-xl cursor-pointer border-2 border-transparent hover:border-white/20 transition-all duration-300"
+                            onClick={() => handleScopeSelection("departmental")}
+                          >
+                            <div className="text-center">
+                              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <svg
+                                  className="w-8 h-8"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
+                                </svg>
+                              </div>
+                              <h3 className="text-2xl font-bold mb-3">
+                                Departmental
+                              </h3>
+                              <p className="text-white/90 text-sm leading-relaxed">
+                                Team projects involving multiple team members
+                                within your department or cross-departmental
+                                collaboration.
+                              </p>
+                              <div className="mt-6 text-xs text-white/80">
+                                <div className="flex items-center justify-center space-x-2 mb-2">
+                                  <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                                  <span>Department approval</span>
+                                </div>
+                                <div className="flex items-center justify-center space-x-2 mb-2">
+                                  <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                                  <span>Team assignment</span>
+                                </div>
+                                <div className="flex items-center justify-center space-x-2">
+                                  <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                                  <span>Single-step form</span>
+                                </div>
+                              </div>
                             </div>
-                            <h3 className="text-2xl font-bold mb-3">
-                              Departmental
-                            </h3>
-                            <p className="text-white/90 text-sm leading-relaxed">
-                              Team projects involving multiple team members
-                              within your department or cross-departmental
-                              collaboration.
-                            </p>
-                            <div className="mt-6 text-xs text-white/80">
-                              <div className="flex items-center justify-center space-x-2 mb-2">
-                                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
-                                <span>Department approval</span>
-                              </div>
-                              <div className="flex items-center justify-center space-x-2 mb-2">
-                                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
-                                <span>Team assignment</span>
-                              </div>
-                              <div className="flex items-center justify-center space-x-2">
-                                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
-                                <span>Single-step form</span>
-                              </div>
-                            </div>
-                          </div>
-                        </motion.div>
+                          </motion.div>
+                        )}
 
-                        {/* External Project Type */}
-                        <motion.div
-                          whileHover={{ scale: 1.05, y: -5 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white rounded-2xl p-8 shadow-xl cursor-pointer border-2 border-transparent hover:border-white/20 transition-all duration-300"
-                          onClick={() => handleScopeSelection("external")}
-                        >
-                          <div className="text-center">
-                            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                              <svg
-                                className="w-8 h-8"
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
+                        {/* External Project Type - Only for HR HOD */}
+                        {canCreateExternalProjects && (
+                          <motion.div
+                            whileHover={{ scale: 1.05, y: -5 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white rounded-2xl p-8 shadow-xl cursor-pointer border-2 border-transparent hover:border-white/20 transition-all duration-300"
+                            onClick={() => handleScopeSelection("external")}
+                          >
+                            <div className="text-center">
+                              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <svg
+                                  className="w-8 h-8"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              </div>
+                              <h3 className="text-2xl font-bold mb-3">
+                                External
+                              </h3>
+                              <p className="text-white/90 text-sm leading-relaxed">
+                                Client projects involving external vendors,
+                                detailed specifications, and multi-level
+                                approval process.
+                              </p>
+                              <div className="mt-6 text-xs text-white/80">
+                                <div className="flex items-center justify-center space-x-2 mb-2">
+                                  <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                                  <span>Multi-step form</span>
+                                </div>
+                                <div className="flex items-center justify-center space-x-2 mb-2">
+                                  <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                                  <span>Vendor management</span>
+                                </div>
+                                <div className="flex items-center justify-center space-x-2">
+                                  <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                                  <span>Detailed specifications</span>
+                                </div>
+                              </div>
                             </div>
-                            <h3 className="text-2xl font-bold mb-3">
-                              External
-                            </h3>
-                            <p className="text-white/90 text-sm leading-relaxed">
-                              Client projects involving external vendors,
-                              detailed specifications, and multi-level approval
-                              process.
-                            </p>
-                            <div className="mt-6 text-xs text-white/80">
-                              <div className="flex items-center justify-center space-x-2 mb-2">
-                                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
-                                <span>Multi-step form</span>
-                              </div>
-                              <div className="flex items-center justify-center space-x-2 mb-2">
-                                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
-                                <span>Vendor management</span>
-                              </div>
-                              <div className="flex items-center justify-center space-x-2">
-                                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
-                                <span>Detailed specifications</span>
-                              </div>
-                            </div>
-                          </div>
-                        </motion.div>
+                          </motion.div>
+                        )}
                       </div>
 
                       {/* Back to Form Button */}
@@ -3069,7 +3083,7 @@ const ProjectList = () => {
                                           disabled={submitting}
                                         />
                                         <span className="text-sm">
-                                          Request new budget allocation for this
+                                          Request budget allocation for this
                                           project
                                         </span>
                                       </label>
@@ -3077,7 +3091,7 @@ const ProjectList = () => {
                                     <p className="mt-2 text-sm text-blue-600">
                                       {formData.requiresBudgetAllocation ===
                                       "true"
-                                        ? "Project will go through Legal → Finance → Executive approval."
+                                        ? "Project will go through Legal → Finance Review → Executive → Budget Allocation approval."
                                         : "Project will go through Legal → Executive approval (using existing budget)."}
                                     </p>
                                   </div>
@@ -3147,7 +3161,7 @@ const ProjectList = () => {
                                         ? "Project will go through Legal → Executive approval (No Budget Allocation)."
                                         : formData.requiresBudgetAllocation ===
                                           "true"
-                                        ? "Project will go through Legal → Finance → Executive approval workflow."
+                                        ? "Project will go through Legal → Finance Review → Executive → Budget Allocation approval workflow."
                                         : "Choose whether this project needs new budget allocation. If left unselected, defaults to No Budget Allocation."}
                                     </p>
                                   </div>
@@ -3724,7 +3738,7 @@ const ProjectList = () => {
                               </div>
 
                               {/* End Date Field */}
-                              <div className="lg:col-span-1">
+                              <div className="lg:col-span-2">
                                 <label className="block text-sm font-semibold text-gray-800 mb-2">
                                   End Date of Project{" "}
                                   <span className="text-red-500">*</span>
@@ -3746,35 +3760,6 @@ const ProjectList = () => {
                                   required
                                   disabled={submitting}
                                 />
-                              </div>
-
-                              {/* Priority Field */}
-                              <div className="lg:col-span-1">
-                                <label className="block text-sm font-semibold text-gray-800 mb-2">
-                                  Project Priority{" "}
-                                  <span className="text-red-500">*</span>
-                                </label>
-                                <select
-                                  value={formData.priority}
-                                  onChange={(e) =>
-                                    setFormData({
-                                      ...formData,
-                                      priority: e.target.value,
-                                    })
-                                  }
-                                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
-                                  required
-                                  disabled={submitting}
-                                >
-                                  <option value="low">Low Priority</option>
-                                  <option value="medium">
-                                    Medium Priority
-                                  </option>
-                                  <option value="high">High Priority</option>
-                                  <option value="urgent">
-                                    Urgent Priority
-                                  </option>
-                                </select>
                               </div>
                             </div>
 
@@ -3894,7 +3879,7 @@ const ProjectList = () => {
                                       disabled={submitting}
                                     />
                                     <span className="text-sm">
-                                      Request new budget allocation for this
+                                      Request budget allocation for this
                                       project
                                     </span>
                                   </label>
@@ -3902,7 +3887,7 @@ const ProjectList = () => {
                                 <p className="mt-2 text-sm text-gray-600">
                                   {formData.requiresBudgetAllocation === "true"
                                     ? formData.projectScope === "external"
-                                      ? "Project will go through Legal → Finance → Executive approval workflow."
+                                      ? "Project will go through Legal → Finance Review → Executive → Budget Allocation approval workflow."
                                       : "Project will go through Finance and Executive."
                                     : formData.projectScope === "personal"
                                     ? "Project will be auto-approved and use your existing budget."
@@ -5484,7 +5469,7 @@ const ProjectList = () => {
                     </span>
                     <p className="text-gray-900">
                       {formData.requiresBudgetAllocation === "true"
-                        ? "Request new budget allocation"
+                        ? "Request budget allocation"
                         : "Use existing budget"}
                     </p>
                   </div>

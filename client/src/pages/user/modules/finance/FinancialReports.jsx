@@ -13,8 +13,12 @@ const FinancialReports = () => {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Access control - only Manager+ can access
-  if (!user || user.role.level < 600) {
+    // Access control - only Finance HOD+ can access
+  if (
+    !user ||
+    user.role.level >= 700 ||
+    user.department?.name !== "Finance & Accounting"
+  ) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -22,7 +26,7 @@ const FinancialReports = () => {
             Access Denied
           </h2>
           <p className="text-gray-600">
-            You don't have permission to access Financial Reports.
+            Only Finance HOD & Super Admin can access Financial Reports.
           </p>
         </div>
       </div>

@@ -1,0 +1,567 @@
+import React, { useState, useEffect } from "react";
+import {
+  FolderIcon,
+  DocumentTextIcon,
+  CurrencyDollarIcon,
+  ShoppingCartIcon,
+  EyeIcon,
+  ArrowPathIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
+import { useAuth } from "../../../../context/AuthContext";
+import {
+  fetchPurchaseOrders,
+  getProcurementById,
+} from "../../../../services/procurementAPI";
+import { toast } from "react-toastify";
+import DataTable from "../../../../components/common/DataTable";
+import { formatCurrency, formatDate } from "../../../../utils/formatters";
+
+const ProcurementTracking = () => {
+  const { user } = useAuth();
+  const [projects, setProjects] = useState([]);
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState({
+    status: "all",
+    department: "all",
+  });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedPO, setSelectedPO] = useState(null);
+  const [showPOModal, setShowPOModal] = useState(false);
+  const [loadingPO, setLoadingPO] = useState(false);
+
+  // Access control - only Manager+ can access
+  if (!user || user.role.level < 600) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">
+            Access Denied
+          </h2>
+          <p className="text-gray-600">
+            You don't have permission to access Procurement Tracking.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const response = await fetchPurchaseOrders();
+      if (response.success) {
+        // Group POs by project
+        const projectMap = new Map();
+        response.data.forEach(po => {
+          if (!projectMap.has(po.relatedProject._id)) {
+            projectMap.set(po.relatedProject._id, {
+              _id: po.relatedProject._id,
+              name: po.relatedProject.name,
+              code: po.relatedProject.code,
+              budget: po.relatedProject.budget,
+              purchaseOrders: []
+            });
+          }
+          projectMap.get(po.relatedProject._id).purchaseOrders.push(po);
+        });
+        
+        setProjects(Array.from(projectMap.values()));
+        setPurchaseOrders(response.data);
+      } else {
+        toast.error("Failed to load procurement data");
+      }
+    } catch (error) {
+      console.error("Error loading procurement data:", error);
+      toast.error("Error loading procurement data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewPO = async (poId) => {
+    setLoadingPO(true);
+    try {
+      const response = await getProcurementById(poId);
+      if (response.success) {
+        setSelectedPO(response.data);
+        setShowPOModal(true);
+      } else {
+        toast.error("Failed to load PO details");
+      }
+    } catch (error) {
+      console.error("Error loading PO details:", error);
+      toast.error("Error loading PO details");
+    } finally {
+      setLoadingPO(false);
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    const statusColors = {
+      draft: "bg-gray-100 text-gray-800",
+      pending: "bg-yellow-100 text-yellow-800",
+      approved: "bg-blue-100 text-blue-800",
+      completed: "bg-green-100 text-green-800",
+      cancelled: "bg-red-100 text-red-800",
+    };
+
+    return (
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${
+          statusColors[status] || statusColors.draft
+        }`}
+      >
+        {status.replace("_", " ").toUpperCase()}
+      </span>
+    );
+  };
+
+  const getPriorityBadge = (priority) => {
+    const priorityColors = {
+      low: "bg-gray-100 text-gray-800",
+      medium: "bg-yellow-100 text-yellow-800",
+      high: "bg-red-100 text-red-800",
+    };
+
+    return (
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${
+          priorityColors[priority] || priorityColors.medium
+        }`}
+      >
+        {priority.toUpperCase()}
+      </span>
+    );
+  };
+
+  const columns = [
+    {
+      header: "Project Details",
+      accessor: "code",
+      cell: (project) => (
+        <div className="flex items-center">
+          <FolderIcon className="h-5 w-5 text-[var(--elra-primary)] mr-2" />
+          <div>
+            <div className="font-medium text-gray-900">
+              {project.name}
+            </div>
+            <div className="text-sm text-gray-500">
+              {project.code}
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: "Budget & Spending",
+      accessor: "budget",
+      cell: (project) => {
+        const totalPOAmount = project.purchaseOrders?.reduce((sum, po) => sum + (po.totalAmount || 0), 0) || 0;
+        const budgetUtilization = project.budget ? (totalPOAmount / project.budget) * 100 : 0;
+        
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center">
+              <CurrencyDollarIcon className="h-4 w-4 text-gray-500 mr-1" />
+              <span className="text-sm font-medium text-gray-900">
+                Budget: {formatCurrency(project.budget || 0)}
+              </span>
+            </div>
+            <div className="flex items-center">
+              <ShoppingCartIcon className="h-4 w-4 text-gray-500 mr-1" />
+              <span className="text-sm text-gray-600">
+                PO Total: {formatCurrency(totalPOAmount)}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-1.5">
+              <div
+                className={`h-1.5 rounded-full ${
+                  budgetUtilization > 90 ? 'bg-red-500' : 
+                  budgetUtilization > 70 ? 'bg-yellow-500' : 
+                  'bg-green-500'
+                }`}
+                style={{ width: `${Math.min(budgetUtilization, 100)}%` }}
+              ></div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      header: "Purchase Orders",
+      accessor: "purchaseOrders",
+      cell: (project) => {
+        const poCount = project.purchaseOrders?.length || 0;
+        const draftPOs = project.purchaseOrders?.filter(po => po.status === 'draft').length || 0;
+        const approvedPOs = project.purchaseOrders?.filter(po => po.status === 'approved').length || 0;
+        
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center">
+              <ShoppingCartIcon className="h-4 w-4 text-gray-400 mr-1" />
+              <span className="text-sm font-medium text-gray-900">
+                {poCount} PO{poCount !== 1 ? 's' : ''}
+              </span>
+            </div>
+            {poCount > 0 && (
+              <div className="text-xs text-gray-500">
+                {draftPOs > 0 && <span className="mr-2">Draft: {draftPOs}</span>}
+                {approvedPOs > 0 && <span>Approved: {approvedPOs}</span>}
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      header: "Latest PO",
+      accessor: "latestPO",
+      cell: (project) => {
+        const latestPO = project.purchaseOrders?.sort((a, b) => 
+          new Date(b.createdAt) - new Date(a.createdAt)
+        )[0];
+
+        if (!latestPO) return <span className="text-sm text-gray-500">No POs</span>;
+
+        return (
+          <div className="space-y-1 cursor-pointer" onClick={() => handleViewPO(latestPO._id)}>
+            <div className="text-sm font-medium text-gray-900">
+              {latestPO.poNumber}
+            </div>
+            <div className="flex items-center space-x-2">
+              {getStatusBadge(latestPO.status)}
+              {getPriorityBadge(latestPO.priority)}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      header: "Actions",
+      accessor: "actions",
+      cell: (project) => (
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => {
+              const latestPO = project.purchaseOrders?.[0];
+              if (latestPO) {
+                handleViewPO(latestPO._id);
+              } else {
+                toast.info("No purchase orders available");
+              }
+            }}
+            className="p-1 text-blue-600 hover:text-blue-800"
+            title="View Purchase Orders"
+          >
+            <EyeIcon className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => loadData()}
+            className="p-1 text-gray-600 hover:text-gray-800"
+            title="Refresh Data"
+          >
+            <ArrowPathIcon className="h-4 w-4" />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--elra-primary)]"></div>
+      </div>
+    );
+  }
+
+  const filteredProjects = projects.filter(project => {
+    if (filters.status !== 'all' && project.purchaseOrders?.some(po => po.status === filters.status)) {
+      return true;
+    }
+    return filters.status === 'all';
+  });
+
+  const totalPOs = purchaseOrders.length;
+  const draftPOs = purchaseOrders.filter(po => po.status === 'draft').length;
+  const approvedPOs = purchaseOrders.filter(po => po.status === 'approved').length;
+  const totalBudget = projects.reduce((sum, project) => sum + (project.budget || 0), 0);
+  const totalPOAmount = purchaseOrders.reduce((sum, po) => sum + (po.totalAmount || 0), 0);
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Procurement Tracking</h1>
+        <p className="text-gray-600">
+          Track procurement status and purchase orders across all projects
+        </p>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">Total Projects</p>
+              <p className="text-2xl font-bold text-gray-900">{projects.length}</p>
+            </div>
+            <FolderIcon className="h-8 w-8 text-[var(--elra-primary)]" />
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">Purchase Orders</p>
+              <p className="text-2xl font-bold text-gray-900">{totalPOs}</p>
+              <p className="text-xs text-gray-500">
+                {draftPOs} Draft · {approvedPOs} Approved
+              </p>
+            </div>
+            <ShoppingCartIcon className="h-8 w-8 text-[var(--elra-primary)]" />
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">Total Budget</p>
+              <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalBudget)}</p>
+            </div>
+            <CurrencyDollarIcon className="h-8 w-8 text-[var(--elra-primary)]" />
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">PO Amount</p>
+              <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalPOAmount)}</p>
+              <p className="text-xs text-gray-500">
+                {((totalPOAmount / totalBudget) * 100).toFixed(1)}% of Budget
+              </p>
+            </div>
+            <DocumentTextIcon className="h-8 w-8 text-[var(--elra-primary)]" />
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
+          <div className="flex items-center space-x-4">
+            <select
+              value={filters.status}
+              onChange={(e) =>
+                setFilters({ ...filters, status: e.target.value })
+              }
+              className="rounded-md border-gray-300 shadow-sm focus:border-[var(--elra-primary)] focus:ring focus:ring-[var(--elra-primary)] focus:ring-opacity-50"
+            >
+              <option value="all">All Statuses</option>
+              <option value="draft">Draft POs</option>
+              <option value="pending">Pending POs</option>
+              <option value="approved">Approved POs</option>
+              <option value="completed">Completed POs</option>
+              <option value="cancelled">Cancelled POs</option>
+            </select>
+            <button
+              onClick={loadData}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--elra-primary)]"
+            >
+              <ArrowPathIcon className="h-4 w-4 mr-2" />
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <DataTable
+          columns={columns}
+          data={filteredProjects}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          searchPlaceholder="Search by project name, code, or PO number..."
+        />
+      </div>
+
+      {/* PO Detail Modal */}
+      {showPOModal && selectedPO && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Purchase Order Details
+                  </h2>
+                  <p className="text-sm text-gray-500">
+                    {selectedPO.poNumber}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowPOModal(false);
+                    setSelectedPO(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">
+                    General Information
+                  </h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Status</label>
+                      <div className="mt-1">{getStatusBadge(selectedPO.status)}</div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Priority</label>
+                      <div className="mt-1">{getPriorityBadge(selectedPO.priority)}</div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Created By</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedPO.createdBy?.name || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Created Date</label>
+                      <p className="mt-1 text-sm text-gray-900">{formatDate(selectedPO.createdAt)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">
+                    Project & Supplier
+                  </h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Project</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedPO.relatedProject?.name || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Supplier</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedPO.supplier?.name || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Expected Delivery</label>
+                      <p className="mt-1 text-sm text-gray-900">{formatDate(selectedPO.expectedDeliveryDate)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                  Items
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead>
+                      <tr>
+                        <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Item
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Quantity
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Unit Price
+                        </th>
+                        <th className="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Total
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {selectedPO.items?.map((item, index) => (
+                        <tr key={index}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {item.name}
+                            <div className="text-xs text-gray-500">{item.description}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                            {item.quantity}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                            {formatCurrency(item.unitPrice)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                            {formatCurrency(item.quantity * item.unitPrice)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colSpan="3" className="px-6 py-4 text-sm font-medium text-gray-900 text-right">
+                          Subtotal
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                          {formatCurrency(selectedPO.subtotal)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colSpan="3" className="px-6 py-4 text-sm font-medium text-gray-900 text-right">
+                          Tax
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                          {formatCurrency(selectedPO.tax)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colSpan="3" className="px-6 py-4 text-sm font-medium text-gray-900 text-right">
+                          Shipping
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                          {formatCurrency(selectedPO.shipping)}
+                        </td>
+                      </tr>
+                      <tr className="bg-gray-50">
+                        <td colSpan="3" className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                          Total Amount
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
+                          {formatCurrency(selectedPO.totalAmount)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              {selectedPO.notes && selectedPO.notes.length > 0 && (
+                <div className="mt-8">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">
+                    Notes
+                  </h3>
+                  <div className="space-y-4">
+                    {selectedPO.notes.map((note, index) => (
+                      <div key={index} className="bg-gray-50 rounded-lg p-4">
+                        <div className="flex items-start">
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-900">{note.content}</p>
+                            <div className="mt-1 text-xs text-gray-500">
+                              By {note.createdBy?.name} on {formatDate(note.createdAt)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ProcurementTracking;

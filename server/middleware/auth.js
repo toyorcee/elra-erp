@@ -498,6 +498,48 @@ export const checkWorkflowAccess = checkDepartmentAccess({
     "Access denied. Only HOD (700) and Super Admin (1000) can manage workflow tasks.",
 });
 
+// Specific middleware for budget allocation (Finance HOD only)
+export const checkBudgetAllocationAccess = async (req, res, next) => {
+  try {
+    const user = req.user;
+
+    // Check minimum role level (HOD = 700, SUPER_ADMIN = 1000)
+    if (user.role.level < 700) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Only Finance HOD can manage budget allocations.",
+      });
+    }
+
+    // SUPER_ADMIN (level 1000) can access everything
+    if (user.role.level >= 1000) {
+      return next();
+    }
+
+    // HOD (level 700) can access only if they're in Finance department
+    if (user.role.level >= 700) {
+      const userDepartment = user.department?.name || user.department;
+
+      if (userDepartment === "Finance & Accounting") {
+        return next();
+      }
+    }
+
+    // If we reach here, user doesn't have sufficient permissions
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Only Finance HOD can manage budget allocations.",
+    });
+  } catch (error) {
+    console.error("Budget allocation access check error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during authorization check",
+    });
+  }
+};
+
 // Specific middleware for any other module
 export const checkModuleAccess = (moduleName) =>
   checkDepartmentAccess({

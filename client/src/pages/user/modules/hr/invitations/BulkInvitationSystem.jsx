@@ -634,9 +634,12 @@ const BulkInvitationSystem = () => {
   };
 
   const handleSubmit = async () => {
+    console.log("🚀 [FRONTEND] Starting invitation submission process");
     setSubmitting(true);
     setSubmissionProgress(0);
     setError(null);
+
+    console.log("📋 [FRONTEND] Current form data:", formData);
 
     const progressInterval = setInterval(() => {
       setSubmissionProgress((prev) => {
@@ -647,13 +650,18 @@ const BulkInvitationSystem = () => {
 
     try {
       let validEmails;
+      console.log("✉️ [FRONTEND] Email method:", emailMethod);
 
       if (emailMethod === "manual") {
+        console.log("📝 [FRONTEND] Processing manual emails");
         const validation = validateManualEmails(formData.manualEmails);
         validEmails = validation.validEmails;
+        console.log("✅ [FRONTEND] Valid manual emails:", validEmails);
       } else {
+        console.log("📎 [FRONTEND] Processing CSV emails");
         const validation = validateEmails(formData.emails);
         validEmails = validation.validEmails;
+        console.log("✅ [FRONTEND] Valid CSV emails:", validEmails);
       }
 
       const invitationData = {
@@ -663,17 +671,34 @@ const BulkInvitationSystem = () => {
         isBatch: formData.isBatch,
       };
 
-      const response = await userModulesAPI.invitations.createBulkInvitations(
-        invitationData
-      );
+      console.log("📤 [FRONTEND] Sending invitation request:", invitationData);
+
+      let response;
+      if (!invitationData.isBatch && invitationData.emails.length === 1) {
+        console.log("👤 [FRONTEND] Sending single invitation");
+        response = await userModulesAPI.invitations.createSingleInvitation({
+          email: invitationData.emails[0],
+          departmentId: invitationData.departmentId,
+          roleId: invitationData.roleId
+        });
+      } else {
+        console.log("👥 [FRONTEND] Sending bulk invitation");
+        response = await userModulesAPI.invitations.createBulkInvitations(invitationData);
+      }
+
+      console.log("📥 [FRONTEND] Received response:", response);
+      console.log("📊 [FRONTEND] Invitation statistics:", response.data?.statistics);
 
       setSubmissionProgress(100);
       setResult(response);
       setShowPreview(false);
       setShowSubmissionSummary(true);
 
+      console.log("🔄 [FRONTEND] Refreshing invitations list");
       await fetchInvitations(1, 10, true);
       setLastRefreshTime(new Date());
+      
+      console.log("✅ [FRONTEND] Invitation process completed successfully");
 
       toast.success(
         <div className="flex items-center space-x-3">

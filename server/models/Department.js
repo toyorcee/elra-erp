@@ -37,9 +37,16 @@ const departmentSchema = new mongoose.Schema(
     },
     level: {
       type: Number,
-      default: 50,
+      required: true,
+      unique: true,
       min: 1,
       max: 100,
+      validate: {
+        validator: function (v) {
+          return v >= 1 && v <= 100;
+        },
+        message: "Department level must be between 1 and 100",
+      },
     },
     parentDepartment: {
       type: mongoose.Schema.Types.ObjectId,
@@ -51,6 +58,7 @@ const departmentSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+
     isActive: {
       type: Boolean,
       default: true,
@@ -63,38 +71,6 @@ const departmentSchema = new mongoose.Schema(
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-    },
-
-    settings: {
-      allowDocumentUpload: {
-        type: Boolean,
-        default: true,
-      },
-      requireApproval: {
-        type: Boolean,
-        default: true,
-      },
-      maxFileSize: {
-        type: Number,
-        default: 10, 
-      },
-      allowedFileTypes: [
-        {
-          type: String,
-          enum: [
-            "pdf",
-            "doc",
-            "docx",
-            "xls",
-            "xlsx",
-            "ppt",
-            "pptx",
-            "txt",
-            "jpg",
-            "png",
-          ],
-        },
-      ],
     },
   },
   {
@@ -110,6 +86,7 @@ departmentSchema.pre("save", function (next) {
 
 // Index for better query performance
 departmentSchema.index({ isActive: 1 });
+departmentSchema.index({ level: 1 }, { unique: true });
 
 // Static method to get all active departments
 departmentSchema.statics.getActiveDepartments = function () {

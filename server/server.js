@@ -67,6 +67,7 @@ import financeRoutes from "./routes/finance.js";
 import documentApprovalRoutes from "./routes/documentApproval.js";
 import workflowTaskRoutes from "./routes/workflowTasks.js";
 import vendorRoutes from "./routes/vendors.js";
+import budgetAllocationRoutes from "./routes/budgetAllocationRoutes.js";
 
 const isValidObjectId = (id) => {
   return (
@@ -260,6 +261,7 @@ app.use("/api/finance", financeRoutes);
 app.use("/api/document-approval", documentApprovalRoutes);
 app.use("/api/workflow-tasks", workflowTaskRoutes);
 app.use("/api/vendors", vendorRoutes);
+app.use("/api/budget-allocations", budgetAllocationRoutes);
 
 const io = new SocketIOServer(httpServer, {
   cors: {

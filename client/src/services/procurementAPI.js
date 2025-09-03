@@ -1,56 +1,12 @@
 import api from "./api";
 
-// Get all purchase orders
+// Get all purchase orders with project details
 export const fetchPurchaseOrders = async (params = {}) => {
-  try {
-    const response = await api.get("/procurement/orders", { params });
-    return response.data;
-  } catch (error) {
-    console.error("Error fetching purchase orders:", error);
-    throw error;
-  }
-};
-
-// Create new purchase order
-export const createPurchaseOrder = async (orderData) => {
-  try {
-    const response = await api.post("/procurement/orders", orderData);
-    return response.data;
-  } catch (error) {
-    console.error("Error creating purchase order:", error);
-    throw error;
-  }
-};
-
-// Update purchase order
-export const updatePurchaseOrder = async (id, orderData) => {
-  try {
-    const response = await api.put(`/procurement/orders/${id}`, orderData);
-    return response.data;
-  } catch (error) {
-    console.error("Error updating purchase order:", error);
-    throw error;
-  }
-};
-
-// Delete purchase order
-export const deletePurchaseOrder = async (id) => {
-  try {
-    const response = await api.delete(`/procurement/orders/${id}`);
-    return response.data;
-  } catch (error) {
-    console.error("Error deleting purchase order:", error);
-    throw error;
-  }
-};
-
-// Get all procurement orders
-export const fetchProcurement = async (params = {}) => {
   try {
     const response = await api.get("/procurement", { params });
     return response.data;
   } catch (error) {
-    console.error("Error fetching procurement:", error);
+    console.error("Error fetching purchase orders:", error);
     throw error;
   }
 };
@@ -121,6 +77,17 @@ export const updateProcurement = async (id, procurementData) => {
   }
 };
 
+// Update procurement status
+export const updateProcurementStatus = async (id, status) => {
+  try {
+    const response = await api.patch(`/procurement/${id}/status`, { status });
+    return response.data;
+  } catch (error) {
+    console.error("Error updating procurement status:", error);
+    throw error;
+  }
+};
+
 // Delete procurement order
 export const deleteProcurement = async (id) => {
   try {
@@ -144,7 +111,7 @@ export const approveProcurement = async (id, approvalData) => {
 };
 
 // Receive items for procurement order
-export const receiveProcurementItems = async (id, receiptData) => {
+export const receiveItems = async (id, receiptData) => {
   try {
     const response = await api.post(`/procurement/${id}/receive`, receiptData);
     return response.data;

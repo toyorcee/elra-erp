@@ -555,7 +555,7 @@ const ForgotPassword = () => {
               className="bg-white backdrop-blur-xl border border-gray-200 rounded-3xl p-8 shadow-2xl"
               variants={fadeInVariants}
             >
-              <div className="text-center mb-8 mt-32">
+              <div className="text-center mt-32">
                 <h2 className="text-3xl font-bold text-[var(--elra-primary)] mb-2">
                   Reset Password
                 </h2>

@@ -30,13 +30,13 @@ export const moduleSidebarConfig = {
             required: { minLevel: 300 },
             description: "View, upload, and scan documents with OCR processing",
           },
-          {
-            label: "My Projects",
-            icon: "FolderIcon",
-            path: "/dashboard/modules/self-service/projects",
-            required: { minLevel: 300 },
-            description: "View projects assigned to you",
-          },
+          // {
+          //   label: "My Projects",
+          //   icon: "FolderIcon",
+          //   path: "/dashboard/modules/self-service/projects",
+          //   required: { minLevel: 300 },
+          //   description: "View projects assigned to you",
+          // },
           {
             label: "My Leave Requests",
             icon: "ClipboardDocumentListIcon",
@@ -51,13 +51,13 @@ export const moduleSidebarConfig = {
         collapsible: true,
         defaultExpanded: false,
         items: [
-          {
-            label: "Submit Ticket",
-            icon: "TicketIcon",
-            path: "/dashboard/modules/self-service/tickets",
-            required: { minLevel: 300 },
-            description: "Submit support tickets and service requests",
-          },
+          // {
+          //   label: "Submit Ticket",
+          //   icon: "TicketIcon",
+          //   path: "/dashboard/modules/self-service/tickets",
+          //   required: { minLevel: 300 },
+          //   description: "Submit support tickets and service requests",
+          // },
           {
             label: "My Tickets",
             icon: "ClipboardDocumentListIcon",
@@ -78,6 +78,40 @@ export const moduleSidebarConfig = {
             path: "/dashboard/modules/self-service/equipment",
             required: { minLevel: 300 },
             description: "Request office equipment and supplies",
+          },
+        ],
+      },
+      {
+        title: "Department Approvals",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Leave Approvals",
+            icon: "ClipboardDocumentCheckIcon",
+            path: "/dashboard/modules/self-service/department-approvals",
+            required: { minLevel: 700 },
+            description: "Approve leave requests for your department team",
+            hidden: (user) => {
+              if (!user || !user.role || !user.department) return false;
+
+              if (user.role.level !== 700) return false;
+
+              const userDeptName =
+                user.department?.name ||
+                user.department?.departmentName ||
+                user.department;
+              const isHRHOD = userDeptName === "Human Resources";
+
+              console.log("🔍 [Sidebar] HR HOD check:", {
+                userLevel: user.role.level,
+                userDept: userDeptName,
+                isHRHOD: isHRHOD,
+                shouldHide: isHRHOD,
+              });
+
+              return isHRHOD; // Hide if user is HR HOD
+            },
           },
         ],
       },
@@ -102,7 +136,7 @@ export const moduleSidebarConfig = {
             label: "Employee Invitation",
             icon: "UserPlusIcon",
             path: "/dashboard/modules/hr/invitation",
-            required: { minLevel: 700 },
+            required: { minLevel: 700, department: "Human Resources" },
             description: "Invite and onboard new employees",
           },
         ],
@@ -116,14 +150,14 @@ export const moduleSidebarConfig = {
             label: "Onboarding Management",
             icon: "ClipboardDocumentCheckIcon",
             path: "/dashboard/modules/hr/onboarding",
-            required: { minLevel: 700 },
+            required: { minLevel: 700, department: "Human Resources" },
             description: "Manage onboarding tasks and checklists",
           },
           {
             label: "Offboarding Management",
             icon: "ArrowRightOnRectangleIcon",
             path: "/dashboard/modules/hr/offboarding",
-            required: { minLevel: 700 },
+            required: { minLevel: 700, department: "Human Resources" },
             description: "Handle employee exit processes",
           },
         ],
@@ -133,18 +167,18 @@ export const moduleSidebarConfig = {
         collapsible: true,
         defaultExpanded: false,
         items: [
-          {
-            label: "Leave Requests",
-            icon: "PlusIcon",
-            path: "/dashboard/modules/hr/leave/requests",
-            required: { minLevel: 300 },
-            description: "Submit and manage your leave requests",
-          },
+          // {
+          //   label: "Leave Requests",
+          //   icon: "PlusIcon",
+          //   path: "/dashboard/modules/hr/leave/requests",
+          //   required: { minLevel: 300 },
+          //   description: "Submit and manage your leave requests",
+          // },
           {
             label: "Leave Management",
             icon: "ClipboardDocumentCheckIcon",
             path: "/dashboard/modules/hr/leave/management",
-            required: { minLevel: 700 },
+            required: { minLevel: 700, department: "Human Resources" },
             description: "Approve and manage leave requests",
           },
           // {
@@ -179,22 +213,22 @@ export const moduleSidebarConfig = {
             label: "User Management",
             icon: "UserGroupIcon",
             path: "/dashboard/modules/hr/users",
-            required: { minLevel: 700 },
+            required: { minLevel: 700, department: "Human Resources" },
             description: "View and manage all users across departments",
           },
           {
             label: "Department Management",
             icon: "BuildingOfficeIcon",
             path: "/dashboard/modules/hr/departments",
-            required: { minLevel: 1000 },
-            description: "Manage company departments and structure",
+            required: { minLevel: 700, department: "Human Resources" },
+            description: "Manage company departments and module access",
           },
           {
             label: "Role Management",
             icon: "ShieldCheckIcon",
             path: "/dashboard/modules/hr/roles",
-            required: { minLevel: 700 },
-            description: "Manage user roles and permissions",
+            required: { minLevel: 700, department: "Human Resources" },
+            description: "Manage user roles and permissions within modules",
           },
           // {
           //   label: "HR Reports",
@@ -313,18 +347,28 @@ export const moduleSidebarConfig = {
         defaultExpanded: false,
         items: [
           {
-            label: "All Projects",
+            label: "My Projects",
             icon: "FolderIcon",
             path: "/dashboard/modules/projects/list",
             required: { minLevel: 300 },
             description: "View and manage all projects",
           },
           {
-            label: "Approval Dashboard",
+            label: "Approval Management",
             icon: "CheckIcon",
             path: "/dashboard/modules/projects/approvals",
             required: { minLevel: 700 },
             description: "Review and approve project requests",
+          },
+          {
+            label: "Budget Allocation",
+            icon: "CurrencyDollarIcon",
+            path: "/dashboard/modules/projects/budget-allocation",
+            required: {
+              minLevel: 700,
+              department: "Finance & Accounting",
+            },
+            description: "Manage project budget allocations and funding",
           },
         ],
       },
@@ -454,6 +498,7 @@ export const moduleSidebarConfig = {
   },
 
   // ===== PROCUREMENT MODULE =====
+  // In the procurement module section
   procurement: {
     label: "Procurement",
     icon: "ShoppingCartIcon",
@@ -468,12 +513,19 @@ export const moduleSidebarConfig = {
         defaultExpanded: true,
         items: [
           {
-            label: "Purchase Orders & Workflows",
+            label: "Purchase Orders",
             icon: "ShoppingBagIcon",
-            path: "/dashboard/modules/procurement",
+            path: "/dashboard/modules/procurement/orders",
+            required: { minLevel: 600 },
+            description: "Manage purchase orders",
+          },
+          {
+            label: "Procurement Tracking",
+            icon: "ClipboardDocumentListIcon",
+            path: "/dashboard/modules/procurement/tracking",
             required: { minLevel: 600 },
             description:
-              "Manage purchase orders and project procurement workflows",
+              "Track procurement status and purchase orders by project",
           },
         ],
       },
@@ -709,7 +761,12 @@ export const moduleExists = (moduleKey) => {
 };
 
 // Helper function to get module navigation items for a specific role
-export const getModuleNavigationForRole = (moduleKey, roleLevel) => {
+export const getModuleNavigationForRole = (
+  moduleKey,
+  roleLevel,
+  userDepartment = null,
+  user = null
+) => {
   const moduleConfig = getModuleSidebarConfig(moduleKey);
   if (!moduleConfig) return [];
 
@@ -725,6 +782,20 @@ export const getModuleNavigationForRole = (moduleKey, roleLevel) => {
       // Check minimum level requirement
       if (item.required.minLevel && roleLevel < item.required.minLevel) {
         return false;
+      }
+
+      // Check department requirement
+      if (item.required.department && userDepartment) {
+        if (item.required.department !== userDepartment) {
+          return false;
+        }
+      }
+
+      // Check hidden property (if it's a function, call it with user object)
+      if (item.hidden && typeof item.hidden === "function") {
+        if (item.hidden(user)) {
+          return false; // Hide this item
+        }
       }
 
       return true;

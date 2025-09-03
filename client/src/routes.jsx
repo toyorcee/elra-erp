@@ -15,7 +15,7 @@ import LeaveManagement from "./pages/user/modules/hr/leave/LeaveManagement";
 import LeaveRequests from "./pages/user/modules/hr/leave/LeaveRequests";
 import AttendanceTracking from "./pages/user/modules/hr/attendance/AttendanceTracking";
 import LeaveCalendar from "./pages/user/modules/hr/leave/LeaveCalendar";
-import HRDepartments from "./pages/user/modules/hr/HRDepartments";
+import DepartmentManagement from "./pages/user/modules/hr/DepartmentManagement";
 import HRRoles from "./pages/user/modules/hr/HRRoles";
 import HRUsers from "./pages/user/modules/hr/HRUsers";
 import PolicyManagement from "./pages/user/modules/hr/policies/PolicyManagement";
@@ -35,6 +35,7 @@ import MyLeaveRequests from "./pages/user/modules/self-service/MyLeaveRequests";
 import MyDocuments from "./pages/user/modules/self-service/MyDocuments";
 import MyProjectTasks from "./pages/user/modules/self-service/MyProjectTasks";
 import MyProjects from "./pages/user/modules/self-service/MyProjects";
+import DepartmentApprovals from "./pages/user/modules/self-service/DepartmentApprovals";
 import PayrollReports from "./pages/user/modules/payroll/PayrollReports";
 import Notifications from "./pages/shared/Notifications";
 import Settings from "./pages/shared/Settings";
@@ -45,6 +46,7 @@ import ProjectReports from "./pages/user/modules/projects/ProjectReports";
 import ProjectProgress from "./pages/user/modules/projects/ProjectProgress";
 import ProjectResources from "./pages/user/modules/projects/ProjectResources";
 import ApprovalDashboard from "./pages/user/modules/projects/ApprovalDashboard";
+import BudgetAllocation from "./pages/user/modules/projects/BudgetAllocation";
 import TaskList from "./pages/user/modules/tasks/TaskList";
 import TaskAnalytics from "./pages/user/modules/tasks/TaskAnalytics";
 import TaskAssignments from "./pages/user/modules/tasks/TaskAssignments";
@@ -54,6 +56,7 @@ import RevenueManagement from "./pages/user/modules/finance/RevenueManagement";
 import ExpenseManagement from "./pages/user/modules/finance/ExpenseManagement";
 import FinancialReports from "./pages/user/modules/finance/FinancialReports";
 import ProjectFinanceManagement from "./pages/user/modules/finance/ProjectFinanceManagement";
+import ProcurementManagement from "./pages/user/modules/procurement/ProcurementManagement";
 import { PendingReviews, ComplianceHistory } from "./pages/user/modules/legal";
 import SystemSetupOnboarding from "./pages/shared/SystemSetupOnboarding";
 import DashboardLayout from "./layouts/DashboardLayout";
@@ -66,6 +69,8 @@ import ModuleSelector from "./components/ModuleSelector";
 import Wireframe from "./pages/Wireframe";
 import ERPFlowchart from "./pages/ERPFlowchart";
 import Profile from "./pages/user/Profile";
+import PurchaseOrders from "./pages/user/modules/procurement/PurchaseOrders";
+import ProcurementTracking from "./pages/user/modules/procurement/ProcurementTracking";
 
 const AppRoutes = () => {
   return (
@@ -138,7 +143,10 @@ const AppRoutes = () => {
 
         {/* HR Module specific sub-routes */}
         <Route path="modules/hr/users" element={<HRUsers />} />
-        <Route path="modules/hr/departments" element={<HRDepartments />} />
+        <Route
+          path="modules/hr/departments"
+          element={<DepartmentManagement />}
+        />
         <Route path="modules/hr/roles" element={<HRRoles />} />
         <Route path="modules/hr/invitation" element={<HRInvitations />} />
         <Route
@@ -205,6 +213,13 @@ const AppRoutes = () => {
           path="modules/self-service/project-tasks"
           element={<MyProjectTasks />}
         />
+
+        {/* Department Approvals Routes */}
+        <Route
+          path="modules/self-service/department-approvals"
+          element={<DepartmentApprovals />}
+        />
+
         <Route path="modules/payroll/reports" element={<PayrollReports />} />
 
         {/* New ERP Module Routes */}
@@ -223,6 +238,10 @@ const AppRoutes = () => {
         <Route
           path="modules/projects/approvals"
           element={<ApprovalDashboard />}
+        />
+        <Route
+          path="modules/projects/budget-allocation"
+          element={<BudgetAllocation />}
         />
 
         <Route path="modules/tasks/list" element={<TaskList />} />
@@ -245,16 +264,23 @@ const AppRoutes = () => {
           element={<ProjectFinanceManagement />}
         />
 
-        {/* Legal & Compliance Module Routes */}
+        {/* Procurement Module Routes */}
+        <Route path="modules/procurement" element={<ProcurementManagement />} />
+        <Route path="modules/procurement/orders" element={<PurchaseOrders />} />
         <Route
-          path="modules/legal/pending-reviews"
-          element={<PendingReviews />}
+          path="modules/procurement/tracking"
+          element={<ProcurementTracking />}
         />
+
+        {/* Legal Module Routes */}
+        <Route path="modules/legal/reviews" element={<PendingReviews />} />
         <Route
           path="modules/legal/compliance-history"
           element={<ComplianceHistory />}
         />
       </Route>
+
+      {/* Remove conflicting procurement routes - they're already defined above */}
 
       {/* Admin routes - commented out - admin folder deleted */}
       {/* <Route

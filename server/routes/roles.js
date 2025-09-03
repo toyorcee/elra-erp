@@ -5,12 +5,12 @@ import Role from "../models/Role.js";
 
 const router = express.Router();
 
-// Get all roles (Manager+ can access)
+// Get all roles (HOD+ can access)
 router.get("/", protect, async (req, res) => {
-  if (req.user.role.level < 600) {
+  if (req.user.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Manager level required.",
+      message: "Access denied. HOD level required.",
     });
   }
   try {
@@ -22,11 +22,11 @@ router.get("/", protect, async (req, res) => {
 });
 
 router.post("/", protect, async (req, res) => {
-  // Check if user has sufficient role level (Manager = 600, HOD = 700, Super Admin = 1000)
-  if (req.user.role.level < 600) {
+  // Check if user has sufficient role level (HOD = 700, Super Admin = 1000)
+  if (req.user.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Manager level required.",
+      message: "Access denied. HOD level required.",
     });
   }
   try {
@@ -37,6 +37,7 @@ router.post("/", protect, async (req, res) => {
       permissions,
       departmentAccess,
       canManageRoles,
+      moduleAccess,
     } = req.body;
 
     // Check if role name already exists
@@ -71,13 +72,13 @@ router.post("/", protect, async (req, res) => {
   }
 });
 
-// Update role (Manager+ can update)
+// Update role (HOD+ can update)
 router.put("/:id", protect, async (req, res) => {
-  // Check if user has sufficient role level (Manager = 600, HOD = 700, Super Admin = 1000)
-  if (req.user.role.level < 600) {
+  // Check if user has sufficient role level (HOD = 700, Super Admin = 1000)
+  if (req.user.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Manager level required.",
+      message: "Access denied. HOD level required.",
     });
   }
   try {
@@ -88,6 +89,7 @@ router.put("/:id", protect, async (req, res) => {
       permissions,
       departmentAccess,
       canManageRoles,
+      moduleAccess,
     } = req.body;
     const roleId = req.params.id;
 
@@ -142,13 +144,13 @@ router.put("/:id", protect, async (req, res) => {
   }
 });
 
-// Delete role (Manager+ can delete)
+// Delete role (HOD+ can delete)
 router.delete("/:id", protect, async (req, res) => {
-  // Check if user has sufficient role level (Manager = 600, HOD = 700, Super Admin = 1000)
-  if (req.user.role.level < 600) {
+  // Check if user has sufficient role level (HOD = 700, Super Admin = 1000)
+  if (req.user.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Manager level required.",
+      message: "Access denied. HOD level required.",
     });
   }
   try {
@@ -187,11 +189,11 @@ router.delete("/:id", protect, async (req, res) => {
 
 // Get role by ID
 router.get("/:id", protect, async (req, res) => {
-  // Check if user has sufficient role level (Manager = 600, HOD = 700, Super Admin = 1000)
-  if (req.user.role.level < 600) {
+  // Check if user has sufficient role level (HOD = 700, Super Admin = 1000)
+  if (req.user.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Manager level required.",
+      message: "Access denied. HOD level required.",
     });
   }
   try {

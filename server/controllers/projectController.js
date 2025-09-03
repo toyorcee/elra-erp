@@ -1249,7 +1249,7 @@ export const createProject = async (req, res) => {
                     recipient: approver._id,
                     type: "PROJECT_READY_FOR_APPROVAL",
                     title: "Project Approval Required",
-                    message: `A new ${project.projectScope} project "${project.name}" requires your approval at ${nextApproval.level} level.`,
+                    message: `A new ${project.projectScope} project "${project.name}" requires your approval.`,
                     data: {
                       projectId: project._id,
                       projectName: project.name,
@@ -2635,6 +2635,24 @@ export const approveProject = async (req, res) => {
       }
     }
 
+    // Get next department name for creator notification
+    let nextDepartmentName = "";
+    const nextPendingStep = project.approvalChain.find(
+      (step) => step.status === "pending"
+    );
+
+    if (nextPendingStep) {
+      if (nextPendingStep.level === "legal_compliance") {
+        nextDepartmentName = "Legal & Compliance";
+      } else if (nextPendingStep.level === "finance") {
+        nextDepartmentName = "Finance & Accounting";
+      } else if (nextPendingStep.level === "executive") {
+        nextDepartmentName = "Executive Office";
+      } else if (nextPendingStep.level === "hod") {
+        nextDepartmentName = project.department?.name || "Department HOD";
+      }
+    }
+
     // Send notification to project creator
     let creatorMessage = `Your project "${project.name}" has been approved at ${level} level by ${currentUser.firstName} ${currentUser.lastName} (${currentUser.department?.name}).`;
 
@@ -2664,24 +2682,6 @@ export const approveProject = async (req, res) => {
 
     // Send notification to next approver if there is one
     if (project.status !== "approved") {
-      const nextPendingStep = project.approvalChain.find(
-        (step) => step.status === "pending"
-      );
-
-      // Get next department name for creator notification
-      let nextDepartmentName = "";
-      if (nextPendingStep) {
-        if (nextPendingStep.level === "legal_compliance") {
-          nextDepartmentName = "Legal & Compliance";
-        } else if (nextPendingStep.level === "finance") {
-          nextDepartmentName = "Finance & Accounting";
-        } else if (nextPendingStep.level === "executive") {
-          nextDepartmentName = "Executive Office";
-        } else if (nextPendingStep.level === "hod") {
-          nextDepartmentName = project.department?.name || "Department HOD";
-        }
-      }
-
       if (nextPendingStep) {
         try {
           console.log(

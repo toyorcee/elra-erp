@@ -94,9 +94,12 @@ export const DynamicSidebarProvider = ({ children }) => {
           const moduleConfig = getModuleSidebarConfig(configKey);
           if (moduleConfig) {
             const roleLevel = getUserRoleLevel();
+            const userDepartment = user?.department?.name;
             const filteredSections = getModuleNavigationForRole(
               configKey,
-              roleLevel
+              roleLevel,
+              userDepartment,
+              user
             );
             setModuleSidebarItems(filteredSections);
           }
@@ -162,9 +165,12 @@ export const DynamicSidebarProvider = ({ children }) => {
       const moduleConfig = getModuleSidebarConfig(configKey);
       if (moduleConfig) {
         const roleLevel = getUserRoleLevel();
+        const userDepartment = user?.department?.name;
         const filteredSections = getModuleNavigationForRole(
           configKey,
-          roleLevel
+          roleLevel,
+          userDepartment,
+          user
         );
         setModuleSidebarItems(filteredSections);
       }

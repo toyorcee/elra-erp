@@ -378,7 +378,6 @@ userSchema.pre("save", async function (next) {
           modules: [
             "SELF_SERVICE",
             "CUSTOMER_CARE",
-            "PROJECTS",
             "HR",
             "PAYROLL",
             "COMMUNICATION",
@@ -391,13 +390,7 @@ userSchema.pre("save", async function (next) {
           },
         },
         "Legal & Compliance": {
-          modules: [
-            "SELF_SERVICE",
-            "CUSTOMER_CARE",
-            "PROJECTS",
-            "LEGAL",
-            "COMMUNICATION",
-          ],
+          modules: ["SELF_SERVICE", "CUSTOMER_CARE", "LEGAL", "COMMUNICATION"],
           permissions: {
             HOD: ["view", "create", "edit", "delete", "approve"],
             MANAGER: ["view", "edit", "approve"],
@@ -409,7 +402,6 @@ userSchema.pre("save", async function (next) {
           modules: [
             "SELF_SERVICE",
             "CUSTOMER_CARE",
-            "PROJECTS",
             "FINANCE",
             "PAYROLL",
             "COMMUNICATION",
@@ -425,7 +417,6 @@ userSchema.pre("save", async function (next) {
           modules: [
             "SELF_SERVICE",
             "CUSTOMER_CARE",
-            "PROJECTS",
             "INVENTORY",
             "COMMUNICATION",
           ],
@@ -440,7 +431,6 @@ userSchema.pre("save", async function (next) {
           modules: [
             "SELF_SERVICE",
             "CUSTOMER_CARE",
-            "PROJECTS",
             "PROCUREMENT",
             "COMMUNICATION",
           ],
@@ -452,13 +442,7 @@ userSchema.pre("save", async function (next) {
           },
         },
         "Sales & Marketing": {
-          modules: [
-            "SELF_SERVICE",
-            "CUSTOMER_CARE",
-            "PROJECTS",
-            "SALES",
-            "COMMUNICATION",
-          ],
+          modules: ["SELF_SERVICE", "CUSTOMER_CARE", "SALES", "COMMUNICATION"],
           permissions: {
             HOD: ["view", "create", "edit", "delete", "approve"],
             MANAGER: ["view", "edit", "approve"],
@@ -467,12 +451,7 @@ userSchema.pre("save", async function (next) {
           },
         },
         "Executive Office": {
-          modules: [
-            "SELF_SERVICE",
-            "CUSTOMER_CARE",
-            "PROJECTS",
-            "COMMUNICATION",
-          ],
+          modules: ["SELF_SERVICE", "CUSTOMER_CARE", "COMMUNICATION"],
           permissions: {
             HOD: ["view", "create", "edit", "delete", "approve"],
             MANAGER: ["view", "edit", "approve"],
@@ -481,12 +460,7 @@ userSchema.pre("save", async function (next) {
           },
         },
         "Information Technology": {
-          modules: [
-            "SELF_SERVICE",
-            "CUSTOMER_CARE",
-            "PROJECTS",
-            "COMMUNICATION",
-          ],
+          modules: ["SELF_SERVICE", "CUSTOMER_CARE", "COMMUNICATION"],
           permissions: {
             HOD: ["view", "create", "edit", "delete", "approve"],
             MANAGER: ["view", "edit", "approve"],
@@ -495,12 +469,7 @@ userSchema.pre("save", async function (next) {
           },
         },
         "Customer Service": {
-          modules: [
-            "SELF_SERVICE",
-            "CUSTOMER_CARE",
-            "PROJECTS",
-            "COMMUNICATION",
-          ],
+          modules: ["SELF_SERVICE", "CUSTOMER_CARE", "COMMUNICATION"],
           permissions: {
             HOD: ["view", "create", "edit", "delete", "approve"],
             MANAGER: ["view", "edit", "approve"],
@@ -509,12 +478,7 @@ userSchema.pre("save", async function (next) {
           },
         },
         "System Administration": {
-          modules: [
-            "SELF_SERVICE",
-            "CUSTOMER_CARE",
-            "PROJECTS",
-            "COMMUNICATION",
-          ],
+          modules: ["SELF_SERVICE", "CUSTOMER_CARE", "COMMUNICATION"],
           permissions: {
             HOD: ["view", "create", "edit", "delete", "approve"],
             MANAGER: ["view", "edit", "approve"],
@@ -561,6 +525,7 @@ userSchema.pre("save", async function (next) {
           if (roleDoc.name === "SUPER_ADMIN") {
             return {
               module: module,
+              code: module,
               permissions: [
                 "view",
                 "create",
@@ -573,13 +538,24 @@ userSchema.pre("save", async function (next) {
             };
           }
 
-          // Special handling for PROJECTS module - ALL roles can create projects (including VIEWERs!)
           if (module === "PROJECTS") {
-            return {
-              module: module,
-              permissions: ["view", "create"],
-              _id: new mongoose.Types.ObjectId(),
-            };
+            const isProjectManagementUser =
+              departmentDoc.name === "Project Management";
+
+            if (isProjectManagementUser) {
+              return {
+                module: module,
+                code: module,
+                permissions: ["view", "create", "edit", "delete", "approve"],
+                _id: new mongoose.Types.ObjectId(),
+              };
+            } else {
+              // User not in Project Management department - no access to PROJECTS module
+              console.log(
+                `❌ [User] ${this.email} denied PROJECTS access - not in Project Management department`
+              );
+              return null;
+            }
           }
 
           // Special handling for common modules - ALL roles can create (including VIEWERs!)
@@ -588,6 +564,7 @@ userSchema.pre("save", async function (next) {
           ) {
             return {
               module: module,
+              code: module, // Add code field for API lookup
               permissions: ["view", "create"],
               _id: new mongoose.Types.ObjectId(),
             };
@@ -595,6 +572,7 @@ userSchema.pre("save", async function (next) {
 
           return {
             module: module,
+            code: module,
             permissions: permissions,
             _id: new mongoose.Types.ObjectId(),
           };
@@ -604,6 +582,7 @@ userSchema.pre("save", async function (next) {
       if (roleDoc.name === "SUPER_ADMIN") {
         userModuleAccess.push({
           module: "SYSTEM_ADMIN",
+          code: "SYSTEM_ADMIN",
           permissions: ["view", "create", "edit", "delete", "approve", "admin"],
           _id: new mongoose.Types.ObjectId(),
         });

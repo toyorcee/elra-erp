@@ -629,8 +629,19 @@ export const createProject = async (req, res) => {
       // For personal/departmental projects, check if budget allocation is required
       if (req.body.projectScope !== "external") {
         if (req.body.requiresBudgetAllocation === false) {
-          // No budget allocation needed - auto-approve
-          projectStatus = "approved";
+          // No budget allocation needed - but personal projects still need approval workflow
+          if (req.body.projectScope === "personal") {
+            projectStatus = "pending_approval";
+            console.log(
+              `⏸️ [PROJECT STATUS] Pending approval: Personal project with no budget allocation (budget: ${req.body.budget}) - needs HOD + Project Management approval`
+            );
+          } else {
+            // Departmental projects with no budget allocation can be auto-approved
+            projectStatus = "approved";
+            console.log(
+              `✅ [PROJECT STATUS] Auto-approved: Departmental project with no budget allocation (budget: ${req.body.budget})`
+            );
+          }
         } else {
           // Budget allocation required - go through approval workflow
           projectStatus = "pending_approval";
@@ -643,11 +654,19 @@ export const createProject = async (req, res) => {
       // For budgets >₦1M, also check budget allocation for personal/departmental projects
       if (req.body.projectScope !== "external") {
         if (req.body.requiresBudgetAllocation === false) {
-          // No budget allocation needed - auto-approve regardless of budget amount
-          projectStatus = "approved";
-          console.log(
-            `✅ [PROJECT STATUS] Auto-approved: ${req.body.projectScope} project with no budget allocation (budget: ${req.body.budget})`
-          );
+          // No budget allocation needed - but personal projects still need approval workflow
+          if (req.body.projectScope === "personal") {
+            projectStatus = "pending_approval";
+            console.log(
+              `⏸️ [PROJECT STATUS] Pending approval: Personal project with no budget allocation (budget: ${req.body.budget}) - needs HOD + Project Management approval`
+            );
+          } else {
+            // Departmental projects with no budget allocation can be auto-approved
+            projectStatus = "approved";
+            console.log(
+              `✅ [PROJECT STATUS] Auto-approved: Departmental project with no budget allocation (budget: ${req.body.budget})`
+            );
+          }
         } else {
           // Budget allocation required - go through approval workflow
           projectStatus = "pending_approval";

@@ -112,16 +112,24 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
   const [backendModules, setBackendModules] = useState([]);
   const [loadingModules, setLoadingModules] = useState(false);
 
-  // Fetch backend modules
   const fetchBackendModules = async () => {
     try {
       setLoadingModules(true);
       const response = await userModulesAPI.getUserModules();
+      console.log("🔍 [Sidebar] Raw API response:", response);
+
       if (response.success && response.data) {
-        setBackendModules(response.data);
+        const transformedModules = userModulesAPI.transformModules(
+          response.data
+        );
+        setBackendModules(transformedModules);
         console.log(
-          "✅ [Sidebar] Backend modules loaded:",
-          response.data.length
+          "✅ [Sidebar] Transformed modules loaded:",
+          transformedModules.length
+        );
+        console.log(
+          "🔍 [Sidebar] First transformed module:",
+          transformedModules[0]
         );
       }
     } catch (error) {
@@ -131,32 +139,51 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     }
   };
 
-  // Fetch modules when user is available
   useEffect(() => {
     if (user) {
       fetchBackendModules();
     }
   }, [user]);
 
-  // Use backend API data if available, otherwise fall back to frontend filtering
   const getAccessibleModules = () => {
+    console.log("🔍 [Sidebar] getAccessibleModules called");
+    console.log("🔍 [Sidebar] backendModules:", backendModules);
+
     if (backendModules && backendModules.length > 0) {
-      // Use backend API data - convert to sidebar format
-      return backendModules.map((module) => {
-        const moduleKey = module.code.toLowerCase().replace(/_/g, "-");
-        return {
-          label: module.name,
-          icon: getIconForModule(moduleKey),
-          path: `/dashboard/modules/${moduleKey}`,
-          required: { minLevel: module.requiredRoleLevel || 300 },
-          section: "erp",
-          badge: module.name.split(" ")[0],
-          permissions: module.permissions,
-        };
-      });
+      console.log("🔍 [Sidebar] Processing backend modules...");
+
+      return backendModules
+        .map((module, index) => {
+          console.log(`🔍 [Sidebar] Processing module ${index}:`, module);
+
+          const moduleName = module.name || module.title;
+          if (!module.code || !moduleName) {
+            console.warn(
+              `⚠️ [Sidebar] Module ${index} missing required fields:`,
+              module
+            );
+            return null;
+          }
+
+          const moduleKey = module.code.toLowerCase().replace(/_/g, "-");
+          const sidebarModule = {
+            label: moduleName,
+            icon: getIconForModule(moduleKey),
+            path: `/dashboard/modules/${moduleKey}`,
+            required: { minLevel: module.requiredRoleLevel || 300 },
+            section: "erp",
+            badge: moduleName.split(" ")[0],
+            permissions: module.permissions,
+          };
+
+          console.log(`✅ [Sidebar] Created sidebar module:`, sidebarModule);
+          return sidebarModule;
+        })
+        .filter(Boolean);
     }
 
     // Fallback to frontend filtering
+    console.log("🔍 [Sidebar] No backend modules, using fallback...");
     const userRoleLevel = user?.role?.level || user?.roleLevel || 300;
     const userDepartment = user?.department?.name || null;
     const userPermissions = user?.permissions || [];
@@ -170,9 +197,12 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
       userModuleAccess
     );
 
-    return fallbackNavigation
+    const fallbackModules = fallbackNavigation
       ? fallbackNavigation.filter((item) => item.section === "erp")
       : [];
+
+    console.log("🔍 [Sidebar] Fallback modules:", fallbackModules);
+    return fallbackModules;
   };
 
   // Helper function to get icon for module

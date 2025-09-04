@@ -16,7 +16,9 @@ export const getAllTasks = async (req, res) => {
 
     // SUPER_ADMIN (1000) - see all tasks across all departments
     if (currentUser.role.level >= 1000) {
-      console.log("🔍 [TASKS] Super Admin - showing all tasks across all departments");
+      console.log(
+        "🔍 [TASKS] Super Admin - showing all tasks across all departments"
+      );
     }
     // HOD (700) - see tasks in their department or where they're assigned
     else if (currentUser.role.level >= 700) {
@@ -30,16 +32,18 @@ export const getAllTasks = async (req, res) => {
       query.$or = [
         { assignedTo: currentUser._id },
         { assignedBy: currentUser._id },
-        { company: currentUser.company }
       ];
 
-      console.log("🔍 [TASKS] HOD - showing tasks for department:", currentUser.department.name);
+      console.log(
+        "🔍 [TASKS] HOD - showing tasks for department:",
+        currentUser.department.name
+      );
     }
     // STAFF (300) - see tasks they're assigned to
     else if (currentUser.role.level >= 300) {
       query.$or = [
         { assignedTo: currentUser._id },
-        { assignedBy: currentUser._id }
+        { assignedBy: currentUser._id },
       ];
 
       console.log("🔍 [TASKS] Staff - showing assigned tasks only");
@@ -138,7 +142,6 @@ export const createTask = async (req, res) => {
       ...req.body,
       assignedBy: currentUser._id,
       createdBy: currentUser._id,
-      company: currentUser.company,
     };
 
     const task = new Task(taskData);
@@ -239,7 +242,8 @@ export const deleteTask = async (req, res) => {
     if (!canDelete) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. You don't have permission to delete this task.",
+        message:
+          "Access denied. You don't have permission to delete this task.",
       });
     }
 
@@ -277,18 +281,17 @@ export const getTaskStats = async (req, res) => {
         query.$or = [
           { assignedTo: currentUser._id },
           { assignedBy: currentUser._id },
-          { company: currentUser.company }
         ];
       } else {
         // STAFF - only their assigned tasks
         query.$or = [
           { assignedTo: currentUser._id },
-          { assignedBy: currentUser._id }
+          { assignedBy: currentUser._id },
         ];
       }
     }
 
-    const stats = await Task.getTaskStats(currentUser.company);
+    const stats = await Task.getTaskStats();
     const totalTasks = await Task.countDocuments(query);
 
     res.status(200).json({
@@ -322,17 +325,16 @@ export const getOverdueTasks = async (req, res) => {
         query.$or = [
           { assignedTo: currentUser._id },
           { assignedBy: currentUser._id },
-          { company: currentUser.company }
         ];
       } else {
         query.$or = [
           { assignedTo: currentUser._id },
-          { assignedBy: currentUser._id }
+          { assignedBy: currentUser._id },
         ];
       }
     }
 
-    const overdueTasks = await Task.getOverdueTasks(currentUser.company);
+    const overdueTasks = await Task.getOverdueTasks();
 
     res.status(200).json({
       success: true,
@@ -371,7 +373,8 @@ export const addComment = async (req, res) => {
     if (!hasAccess) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. You don't have permission to access this task.",
+        message:
+          "Access denied. You don't have permission to access this task.",
       });
     }
 
@@ -477,6 +480,142 @@ export const completeChecklistItem = async (req, res) => {
   }
 };
 
+// @desc    Create base tasks for personal project implementation
+// @route   POST /api/tasks/personal/:projectId
+// @access  Private (STAFF+)
+export const createPersonalProjectTasks = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const currentUser = req.user;
+
+    if (!projectId) {
+      return res.status(400).json({
+        success: false,
+        message: "Project ID is required",
+      });
+    }
+
+    // Check if user can create tasks
+    if (currentUser.role.level < 300) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only STAFF and above can create tasks.",
+      });
+    }
+
+    // Get project details to calculate dynamic timelines
+    const Project = mongoose.model("Project");
+    const project = await Project.findById(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    // Calculate dynamic timelines based on project start/end dates
+    const projectStartDate = new Date(project.startDate);
+    const projectEndDate = new Date(project.endDate);
+    const totalDuration = projectEndDate.getTime() - projectStartDate.getTime();
+
+    // AI-powered timeline distribution: 20% setup, 60% implementation, 20% review
+    const setupDuration = totalDuration * 0.2;
+    const implementationDuration = totalDuration * 0.6;
+    const reviewDuration = totalDuration * 0.2;
+
+    const setupEndDate = new Date(projectStartDate.getTime() + setupDuration);
+    const implementationEndDate = new Date(
+      setupEndDate.getTime() + implementationDuration
+    );
+    const reviewEndDate = new Date(
+      implementationEndDate.getTime() + reviewDuration
+    );
+
+    // Dynamic base tasks with calculated timelines
+    const baseTasks = [
+      {
+        title: "Project Setup & Planning",
+        description:
+          "Set up project workspace, gather resources, and create detailed implementation plan",
+        category: "project_setup",
+        priority: "high",
+        status: "pending",
+        startDate: projectStartDate,
+        dueDate: setupEndDate,
+        project: projectId,
+        assignedTo: currentUser._id,
+        createdBy: currentUser._id,
+        estimatedHours: Math.ceil((setupDuration / (24 * 60 * 60 * 1000)) * 8), // Convert days to hours
+        projectType: "personal",
+        implementationPhase: "setup",
+        milestoneOrder: 1,
+        isBaseTask: true,
+        tags: ["setup", "planning", "personal"],
+        notes: `Timeline: ${setupEndDate.toLocaleDateString()} - Based on project duration: ${Math.ceil(
+          totalDuration / (24 * 60 * 60 * 1000)
+        )} days`,
+      },
+      {
+        title: "Core Implementation",
+        description: "Execute the main project work and deliverables",
+        category: "core_implementation",
+        priority: "high",
+        status: "pending",
+        startDate: setupEndDate,
+        dueDate: implementationEndDate,
+        project: projectId,
+        assignedTo: currentUser._id,
+        createdBy: currentUser._id,
+        estimatedHours: Math.ceil(
+          (implementationDuration / (24 * 60 * 60 * 1000)) * 8
+        ), // Convert days to hours
+        projectType: "personal",
+        implementationPhase: "execution",
+        milestoneOrder: 2,
+        isBaseTask: true,
+        tags: ["implementation", "core", "personal"],
+        notes: `Timeline: ${implementationEndDate.toLocaleDateString()} - Main work phase`,
+      },
+      {
+        title: "Quality Review & Project Closure",
+        description:
+          "Test deliverables, gather feedback, and complete project documentation",
+        category: "quality_check",
+        priority: "medium",
+        status: "pending",
+        startDate: implementationEndDate,
+        dueDate: reviewEndDate,
+        project: projectId,
+        assignedTo: currentUser._id,
+        createdBy: currentUser._id,
+        estimatedHours: Math.ceil((reviewDuration / (24 * 60 * 60 * 1000)) * 8), // Convert days to hours
+        projectType: "personal",
+        implementationPhase: "closure",
+        milestoneOrder: 3,
+        isBaseTask: true,
+        tags: ["review", "quality", "closure", "personal"],
+        notes: `Timeline: ${reviewEndDate.toLocaleDateString()} - Final review and closure`,
+      },
+    ];
+
+    const createdTasks = await Task.insertMany(baseTasks);
+
+    res.status(201).json({
+      success: true,
+      message: "Base tasks created successfully",
+      data: createdTasks,
+    });
+  } catch (error) {
+    console.error("❌ [TASKS] Create personal project tasks error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error creating base tasks",
+      error: error.message,
+    });
+  }
+};
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -490,8 +629,7 @@ const checkTaskAccess = async (user, task) => {
   if (user.role.level >= 700) {
     return (
       task.assignedTo.toString() === user._id.toString() ||
-      task.assignedBy.toString() === user._id.toString() ||
-      task.company.toString() === user.company.toString()
+      task.assignedBy.toString() === user._id.toString()
     );
   }
 
@@ -516,8 +654,7 @@ const checkTaskEditAccess = async (user, task) => {
     return (
       task.assignedTo.toString() === user._id.toString() ||
       task.assignedBy.toString() === user._id.toString() ||
-      task.createdBy.toString() === user._id.toString() ||
-      task.company.toString() === user.company.toString()
+      task.createdBy.toString() === user._id.toString()
     );
   }
 

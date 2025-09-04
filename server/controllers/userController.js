@@ -35,7 +35,7 @@ export const getAllUsers = async (req, res) => {
         "🔍 [USER MANAGEMENT] Super Admin - showing all users across all departments"
       );
     }
-    // For HODs (level 700), only show users in their own department
+    // For HODs (level 700), show users based on department
     else if (currentUser.role.level >= 700) {
       if (!currentUser.department) {
         return res.status(403).json({
@@ -44,12 +44,26 @@ export const getAllUsers = async (req, res) => {
         });
       }
 
-      query.department = currentUser.department._id;
-      query.isActive = true;
-      console.log(
-        "🔍 [USER MANAGEMENT] HOD - showing users only in department:",
-        currentUser.department.name
-      );
+      // HR HOD can see ALL users across all departments
+      if (currentUser.department.name === "Human Resources") {
+        query.$or = [
+          { isActive: true },
+          { status: "PENDING_REGISTRATION" },
+          { status: "INVITED" },
+          { status: "ACTIVE" },
+        ];
+        console.log(
+          "🔍 [USER MANAGEMENT] HR HOD - showing all users across all departments"
+        );
+      } else {
+        // Other HODs can only see users in their own department
+        query.department = currentUser.department._id;
+        query.isActive = true;
+        console.log(
+          "🔍 [USER MANAGEMENT] HOD - showing users only in department:",
+          currentUser.department.name
+        );
+      }
     }
     // For other roles, deny access
     else {

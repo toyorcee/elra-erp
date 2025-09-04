@@ -103,138 +103,143 @@ const Dashboard = () => {
     return roleLevel >= minLevel;
   };
 
-  // Module configuration map for beautiful styling
-  const moduleMap = {
-    "self-service": {
-      key: "self-service",
-      label: "Self-Service",
-      icon: UserIcon,
-      color: "text-[var(--elra-primary)]",
-      bgColor: "bg-gradient-to-br from-blue-50 to-blue-100",
-      borderColor: "border-transparent",
-      description: "Personal services and self-management tools",
-    },
-    hr: {
-      key: "hr",
-      label: "HR Management",
-      icon: UsersIcon,
-      color: "text-[var(--elra-primary)]",
-      bgColor: "bg-gradient-to-br from-purple-50 to-purple-100",
-      borderColor: "border-transparent",
-      description: "Employee records and HR processes",
-    },
-    payroll: {
-      key: "payroll",
-      label: "Payroll Management",
-      icon: CurrencyDollarIcon,
-      color: "text-[var(--elra-primary)]",
-      bgColor: "bg-gradient-to-br from-green-50 to-green-100",
-      borderColor: "border-transparent",
-      description: "Employee payroll processing and management",
-    },
-    finance: {
-      key: "finance",
-      label: "Financial Management",
-      icon: CalculatorIcon,
-      color: "text-[var(--elra-primary)]",
-      bgColor: "bg-gradient-to-br from-emerald-50 to-emerald-100",
-      borderColor: "border-transparent",
-      description: "Financial reporting and analysis",
-    },
-    procurement: {
-      key: "procurement",
-      label: "Procurement",
-      icon: ShoppingCartIcon,
-      color: "text-[var(--elra-primary)]",
-      bgColor: "bg-gradient-to-br from-orange-50 to-orange-100",
-      borderColor: "border-transparent",
-      description: "Purchase requisitions and vendor management",
-    },
-
-    projects: {
-      key: "projects",
-      label: "Project Management",
-      icon: FolderIcon,
-      color: "text-[var(--elra-primary)]",
-      bgColor: "bg-gradient-to-br from-indigo-50 to-indigo-100",
-      borderColor: "border-transparent",
-      description: "Project planning and task management",
-    },
-    inventory: {
-      key: "inventory",
-      label: "Inventory Management",
-      icon: CubeIcon,
-      color: "text-[var(--elra-primary)]",
-      bgColor: "bg-gradient-to-br from-cyan-50 to-cyan-100",
-      borderColor: "border-transparent",
-      description: "Stock management and asset tracking",
-    },
-    "customer-care": {
-      key: "customer-care",
-      label: "Customer Care",
-      icon: PhoneIcon,
-      color: "text-[var(--elra-primary)]",
-      bgColor: "bg-gradient-to-br from-pink-50 to-pink-100",
-      borderColor: "border-transparent",
-      description: "Customer support, ticket management, and service requests",
-    },
-    it: {
-      key: "it",
-      label: "IT Management",
-      icon: CogIcon,
-      color: "text-[var(--elra-primary)]",
-      bgColor: "bg-gradient-to-br from-gray-50 to-gray-100",
-      borderColor: "border-transparent",
-      description: "IT infrastructure and technical support management",
-    },
-    operations: {
-      key: "operations",
-      label: "Operations Management",
-      icon: CogIcon,
-      color: "text-[var(--elra-primary)]",
-      bgColor: "bg-gradient-to-br from-teal-50 to-teal-100",
-      borderColor: "border-transparent",
-      description: "Business operations and process management",
-    },
-    sales: {
-      key: "sales",
-      label: "Sales & Marketing",
-      icon: ChartBarIcon,
-      color: "text-[var(--elra-primary)]",
-      bgColor: "bg-gradient-to-br from-rose-50 to-rose-100",
-      borderColor: "border-transparent",
-      description: "Sales, marketing and customer acquisition",
-    },
-    legal: {
-      key: "legal",
-      label: "Legal & Compliance",
-      icon: ShieldCheckIcon,
-      color: "text-[var(--elra-primary)]",
-      bgColor: "bg-gradient-to-br from-amber-50 to-amber-100",
-      borderColor: "border-transparent",
-      description: "Legal affairs and regulatory compliance",
-    },
-    "system-admin": {
-      key: "system-admin",
-      label: "System Administration",
-      icon: CogIcon,
-      color: "text-[var(--elra-primary)]",
-      bgColor: "bg-gradient-to-br from-violet-50 to-violet-100",
-      borderColor: "border-transparent",
-      description: "System administration and management",
-    },
+  // Icon mapping for ERP modules
+  const getModuleIcon = (moduleKey) => {
+    const iconMap = {
+      "self-service": UserIcon,
+      hr: UsersIcon,
+      payroll: CurrencyDollarIcon,
+      finance: CalculatorIcon,
+      procurement: ShoppingCartIcon,
+      projects: FolderIcon,
+      inventory: CubeIcon,
+      "customer-care": PhoneIcon,
+      it: CogIcon,
+      operations: CogIcon,
+      sales: ChartBarIcon,
+      legal: ShieldCheckIcon,
+      "system-admin": CogIcon,
+    };
+    return iconMap[moduleKey] || CogIcon;
   };
 
-  // Fetch backend modules
+  // Color mapping for ERP modules
+  const getModuleColors = (moduleKey) => {
+    const colorMap = {
+      "self-service": {
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-gradient-to-br from-blue-50 to-blue-100",
+        borderColor: "border-transparent",
+      },
+      hr: {
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-gradient-to-br from-purple-50 to-purple-100",
+        borderColor: "border-transparent",
+      },
+      payroll: {
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-gradient-to-br from-green-50 to-green-100",
+        borderColor: "border-transparent",
+      },
+      finance: {
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-gradient-to-br from-emerald-50 to-emerald-100",
+        borderColor: "border-transparent",
+      },
+      procurement: {
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-gradient-to-br from-orange-50 to-orange-100",
+        borderColor: "border-transparent",
+      },
+      projects: {
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-gradient-to-br from-indigo-50 to-indigo-100",
+        borderColor: "border-transparent",
+      },
+      inventory: {
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-gradient-to-br from-cyan-50 to-cyan-100",
+        borderColor: "border-transparent",
+      },
+      "customer-care": {
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-gradient-to-br from-pink-50 to-pink-100",
+        borderColor: "border-transparent",
+      },
+      it: {
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-gradient-to-br from-gray-50 to-gray-100",
+        borderColor: "border-transparent",
+      },
+      operations: {
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-gradient-to-br from-teal-50 to-teal-100",
+        borderColor: "border-transparent",
+      },
+      sales: {
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-gradient-to-br from-rose-50 to-rose-100",
+        borderColor: "border-transparent",
+      },
+      legal: {
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-gradient-to-br from-amber-50 to-amber-100",
+        borderColor: "border-transparent",
+      },
+      "system-admin": {
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-gradient-to-br from-violet-50 to-violet-100",
+        borderColor: "border-transparent",
+      },
+    };
+    return (
+      colorMap[moduleKey] || {
+        color: "text-[var(--elra-primary)]",
+        bgColor: "bg-gradient-to-br from-gray-50 to-gray-100",
+        borderColor: "border-transparent",
+      }
+    );
+  };
+
+  // Description mapping for ERP modules
+  const getModuleDescription = (moduleKey) => {
+    const descriptionMap = {
+      "self-service": "Personal services and self-management tools",
+      hr: "Employee records and HR processes",
+      payroll: "Employee payroll processing and management",
+      finance: "Financial reporting and analysis",
+      procurement: "Purchase requisitions and vendor management",
+      projects: "Project planning and task management",
+      inventory: "Stock management and asset tracking",
+      "customer-care":
+        "Customer support, ticket management, and service requests",
+      it: "IT infrastructure and technical support management",
+      operations: "Business operations and process management",
+      sales: "Sales, marketing and customer acquisition",
+      legal: "Legal affairs and regulatory compliance",
+      "system-admin": "System administration and management",
+    };
+    return descriptionMap[moduleKey] || "Business operations module";
+  };
+
   const fetchBackendModules = async () => {
     try {
       setModulesLoading(true);
       const response = await userModulesAPI.getUserModules();
+      console.log("🔍 [Dashboard] Raw API response:", response);
+
       if (response.success && response.data) {
-        setBackendModules(response.data);
+        const transformedModules = userModulesAPI.transformModules(
+          response.data
+        );
+        setBackendModules(transformedModules);
         console.log(
-          "✅ [Dashboard] Backend modules loaded:",
-          response.data.length
+          "✅ [Dashboard] Transformed modules loaded:",
+          transformedModules.length
+        );
+        console.log(
+          "🔍 [Dashboard] First transformed module:",
+          transformedModules[0]
         );
       }
     } catch (error) {
@@ -249,25 +254,29 @@ const Dashboard = () => {
       return backendModules
         .map((module) => {
           const moduleKey = module.code.toLowerCase().replace(/_/g, "-");
-          const mappedModule = moduleMap[moduleKey];
+          const colors = getModuleColors(moduleKey);
+          const icon = getModuleIcon(moduleKey);
+          const description = getModuleDescription(moduleKey);
 
-          if (mappedModule) {
-            return {
-              ...mappedModule,
-              path: `/dashboard/modules/${moduleKey}`,
-              section: "erp",
-              required: { minLevel: module.requiredRoleLevel || 300 },
-              badge: module.name.split(" ")[0],
-              permissions: module.permissions,
-            };
-          }
-          return null;
+          return {
+            key: moduleKey,
+            label: module.title || module.name,
+            icon: icon,
+            ...colors,
+            description: description,
+            path: `/dashboard/modules/${moduleKey}`,
+            section: "erp",
+            required: { minLevel: module.requiredRoleLevel || 300 },
+            badge: module.name?.split(" ")[0] || moduleKey,
+            permissions: module.permissions,
+          };
         })
         .filter(Boolean);
     }
 
-    // Fallback to frontend filtering
-    const userRoleLevel = user?.role?.level || user?.roleLevel || 300;
+    // Fallback to frontend filtering using the same logic as sidebar
+    const userRoleLevel =
+      user?.role?.level || user?.roleLevel || getUserRoleLevel();
     const userDepartment = user?.department?.name || null;
     const userPermissions = user?.permissions || [];
     const userModuleAccess = user?.moduleAccess || [];
@@ -287,18 +296,21 @@ const Dashboard = () => {
       .map((module) => {
         const path = module.path;
         const moduleKey = path.split("/").pop();
-        const mappedModule = moduleMap[moduleKey];
+        const colors = getModuleColors(moduleKey);
+        const icon = getModuleIcon(moduleKey);
+        const description = getModuleDescription(moduleKey);
 
-        if (mappedModule) {
-          return {
-            ...mappedModule,
-            path: module.path,
-            section: module.section,
-            required: module.required,
-            badge: module.badge,
-          };
-        }
-        return null;
+        return {
+          key: moduleKey,
+          label: module.label,
+          icon: icon,
+          ...colors,
+          description: description,
+          path: module.path,
+          section: module.section,
+          required: module.required,
+          badge: module.badge,
+        };
       })
       .filter(Boolean);
   };
@@ -354,6 +366,8 @@ const Dashboard = () => {
       fetchHRDashboardData();
     } else if (module === "self-service" || module === "self_service") {
       fetchSelfServiceDashboardData();
+    } else if (module === "department-management") {
+      setLoading(false);
     }
   }, [module]);
 
@@ -642,7 +656,6 @@ const Dashboard = () => {
         key: m.key,
         path: m.path,
       })),
-      moduleMapKeys: Object.keys(moduleMap),
     });
 
     // Find the current module data by matching the path or key
@@ -656,29 +669,27 @@ const Dashboard = () => {
     );
 
     if (!currentModuleData) {
-      if (module && moduleMap[module]) {
-        currentModuleData = moduleMap[module];
+      // Try to find module using the helper functions
+      const moduleKey = module.replace(/_/g, "-");
+      const icon = getModuleIcon(moduleKey);
+      const colors = getModuleColors(moduleKey);
+      const description = getModuleDescription(moduleKey);
+
+      if (icon && colors && description) {
+        currentModuleData = {
+          key: moduleKey,
+          label: moduleKey
+            .split("-")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" "),
+          icon: icon,
+          ...colors,
+          description: description,
+        };
         console.log(
-          "🔍 [Dashboard] Found in moduleMap (exact):",
+          "🔍 [Dashboard] Created module data from helper functions:",
           currentModuleData
         );
-      } else if (module) {
-        const hyphenVersion = module.replace(/_/g, "-");
-        const underscoreVersion = module.replace(/-/g, "_");
-
-        if (moduleMap[hyphenVersion]) {
-          currentModuleData = moduleMap[hyphenVersion];
-          console.log(
-            "🔍 [Dashboard] Found in moduleMap (hyphen):",
-            currentModuleData
-          );
-        } else if (moduleMap[underscoreVersion]) {
-          currentModuleData = moduleMap[underscoreVersion];
-          console.log(
-            "🔍 [Dashboard] Found in moduleMap (underscore):",
-            currentModuleData
-          );
-        }
       }
     }
 
@@ -774,7 +785,10 @@ const Dashboard = () => {
 
         {/* Module Statistics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {(module === "self-service" || module === "self_service") && loading
+          {(module === "self-service" ||
+            module === "self_service" ||
+            module === "department-management") &&
+          loading
             ? Array.from({ length: 4 }).map((_, index) => (
                 <div
                   key={index}
@@ -881,6 +895,73 @@ const Dashboard = () => {
                               </span>
                             </div>
                           )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Enhanced Department Management-specific details */}
+                  {module === "department-management" && (
+                    <div className="space-y-2">
+                      {stat.label === "Team Size" && (
+                        <div className="text-xs text-white/80 space-y-1">
+                          <div className="flex justify-between items-center">
+                            <span>Active:</span>
+                            <span className="font-medium text-white">12</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span>On Leave:</span>
+                            <span className="font-medium text-yellow-300">
+                              2
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {stat.label === "Active Projects" && (
+                        <div className="text-xs text-white/80 space-y-1">
+                          <div className="flex justify-between items-center">
+                            <span>In Progress:</span>
+                            <span className="font-medium text-white">6</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span>Pending Approval:</span>
+                            <span className="font-medium text-yellow-300">
+                              2
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {stat.label === "Pending Approvals" && (
+                        <div className="text-xs text-white/80 space-y-1">
+                          <div className="flex justify-between items-center">
+                            <span>Projects:</span>
+                            <span className="font-medium text-white">2</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span>Leave Requests:</span>
+                            <span className="font-medium text-yellow-300">
+                              1
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {stat.label === "Budget Used" && (
+                        <div className="text-xs text-white/80 space-y-1">
+                          <div className="flex justify-between items-center">
+                            <span>Allocated:</span>
+                            <span className="font-medium text-white">
+                              ₦2.5M
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span>Remaining:</span>
+                            <span className="font-medium text-green-300">
+                              ₦540K
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1086,6 +1167,52 @@ const Dashboard = () => {
           },
         ];
       }
+    } else if (moduleKey === "department-management") {
+      // Department Management module statistics
+      return [
+        {
+          label: "Team Size",
+          value: "12",
+          icon: UsersIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Active Projects",
+          value: "8",
+          icon: FolderIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Pending Approvals",
+          value: "3",
+          icon: ClipboardDocumentCheckIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Leave Requests",
+          value: "5",
+          icon: ClockIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+        },
+        {
+          label: "Budget Used",
+          value: "78.5%",
+          icon: ChartBarIcon,
+          color: "text-green-600",
+          bgColor: "bg-green-50",
+        },
+        {
+          label: "Success Rate",
+          value: "92.3%",
+          icon: CheckCircleIcon,
+          color: "text-purple-600",
+          bgColor: "bg-purple-50",
+        },
+      ];
     }
 
     const stats = {
@@ -1667,6 +1794,62 @@ const Dashboard = () => {
           onClick: () => console.log("View Reports"),
         },
       ],
+      "department-management": [
+        {
+          label: "Project Approvals",
+          description: "Review and approve projects",
+          icon: ClipboardDocumentCheckIcon,
+          iconColor: "text-[var(--elra-primary)]",
+          iconBgColor: "bg-[var(--elra-secondary-3)]",
+          borderColor: "border-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-primary)]",
+          color: "text-white",
+          onClick: () =>
+            navigate(
+              "/dashboard/modules/department-management/project-approvals"
+            ),
+        },
+        {
+          label: "Leave Management",
+          description: "Approve leave requests",
+          icon: ClockIcon,
+          iconColor: "text-[var(--elra-primary)]",
+          iconBgColor: "bg-[var(--elra-secondary-3)]",
+          borderColor: "border-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-primary)]",
+          color: "text-white",
+          onClick: () =>
+            navigate(
+              "/dashboard/modules/department-management/leave-management"
+            ),
+        },
+        {
+          label: "Team Management",
+          description: "Manage department staff",
+          icon: UsersIcon,
+          iconColor: "text-[var(--elra-primary)]",
+          iconBgColor: "bg-[var(--elra-secondary-3)]",
+          borderColor: "border-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-primary)]",
+          color: "text-white",
+          onClick: () =>
+            navigate(
+              "/dashboard/modules/department-management/team-management"
+            ),
+        },
+        {
+          label: "Analytics",
+          description: "View department metrics",
+          icon: ChartBarIcon,
+          iconColor: "text-[var(--elra-primary)]",
+          iconBgColor: "bg-[var(--elra-secondary-3)]",
+          borderColor: "border-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-primary)]",
+          color: "text-white",
+          onClick: () =>
+            navigate("/dashboard/modules/department-management/analytics"),
+        },
+      ],
       finance: [
         {
           label: "Add Transaction",
@@ -1799,6 +1982,46 @@ const Dashboard = () => {
       return showAllActivities ? activities : activities.slice(0, 3);
     }
 
+    // For Department Management module, provide mock activity data
+    if (moduleKey === "department-management") {
+      const mockActivities = [
+        {
+          title: "Project Approved",
+          description: "Approved 'Department Website Redesign' project",
+          icon: CheckIcon,
+          color: "text-green-600",
+          bgColor: "bg-green-50",
+          time: "2 hours ago",
+        },
+        {
+          title: "Leave Request Processed",
+          description: "Approved annual leave request from John Doe",
+          icon: ClockIcon,
+          color: "text-blue-600",
+          bgColor: "bg-blue-50",
+          time: "4 hours ago",
+        },
+        {
+          title: "Team Member Added",
+          description: "Added new team member Sarah Wilson",
+          icon: UserPlusIcon,
+          color: "text-purple-600",
+          bgColor: "bg-purple-50",
+          time: "1 day ago",
+        },
+        {
+          title: "Budget Review",
+          description: "Completed monthly budget utilization review",
+          icon: ChartBarIcon,
+          color: "text-orange-600",
+          bgColor: "bg-orange-50",
+          time: "2 days ago",
+        },
+      ];
+
+      return showAllActivities ? mockActivities : mockActivities.slice(0, 3);
+    }
+
     // For Self-Service module, use real data from API
     if (
       (moduleKey === "self-service" || moduleKey === "self_service") &&
@@ -1834,6 +2057,19 @@ const Dashboard = () => {
       ];
     }
 
+    if (moduleKey === "department-management") {
+      return [
+        {
+          title: "Loading...",
+          description: "Fetching recent activities",
+          icon: ClockIcon,
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+          time: "Just now",
+        },
+      ];
+    }
+
     // Fallback to hardcoded activities for Self-Service when API data not loaded
     if (moduleKey === "self-service" || moduleKey === "self_service") {
       return [
@@ -1850,6 +2086,32 @@ const Dashboard = () => {
 
     // Fallback to hardcoded activities for other modules
     const activities = {
+      "department-management": [
+        {
+          title: "Project Approved",
+          description: "Approved 'Department Website Redesign' project",
+          icon: CheckIcon,
+          color: "text-green-600",
+          bgColor: "bg-green-50",
+          time: "2 hours ago",
+        },
+        {
+          title: "Leave Request Processed",
+          description: "Approved annual leave request from John Doe",
+          icon: ClockIcon,
+          color: "text-blue-600",
+          bgColor: "bg-blue-50",
+          time: "4 hours ago",
+        },
+        {
+          title: "Team Member Added",
+          description: "Added new team member Sarah Wilson",
+          icon: UserPlusIcon,
+          color: "text-purple-600",
+          bgColor: "bg-purple-50",
+          time: "1 day ago",
+        },
+      ],
       payroll: [
         {
           title: "Payroll Processed",
@@ -1911,6 +2173,9 @@ const Dashboard = () => {
   const hasMoreActivities = () => {
     if (module === "hr" && hrDashboardData?.recentActivity) {
       return hrDashboardData.recentActivity.length > 3;
+    }
+    if (module === "department-management") {
+      return 4 > 3; // Mock data has 4 activities
     }
     return false;
   };

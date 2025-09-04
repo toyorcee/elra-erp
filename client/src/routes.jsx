@@ -35,7 +35,14 @@ import MyLeaveRequests from "./pages/user/modules/self-service/MyLeaveRequests";
 import MyDocuments from "./pages/user/modules/self-service/MyDocuments";
 import MyProjectTasks from "./pages/user/modules/self-service/MyProjectTasks";
 import MyProjects from "./pages/user/modules/self-service/MyProjects";
-import DepartmentApprovals from "./pages/user/modules/self-service/DepartmentApprovals";
+
+import {
+  DepartmentManagement as DeptManagement,
+  LeaveManagement as DeptLeaveManagement,
+  ProjectApprovals,
+  TeamManagement,
+  Analytics,
+} from "./pages/user/modules/department-management";
 import PayrollReports from "./pages/user/modules/payroll/PayrollReports";
 import Notifications from "./pages/shared/Notifications";
 import Settings from "./pages/shared/Settings";
@@ -46,7 +53,6 @@ import ProjectReports from "./pages/user/modules/projects/ProjectReports";
 import ProjectProgress from "./pages/user/modules/projects/ProjectProgress";
 import ProjectResources from "./pages/user/modules/projects/ProjectResources";
 import ApprovalDashboard from "./pages/user/modules/projects/ApprovalDashboard";
-import BudgetAllocation from "./pages/user/modules/projects/BudgetAllocation";
 import TaskList from "./pages/user/modules/tasks/TaskList";
 import TaskAnalytics from "./pages/user/modules/tasks/TaskAnalytics";
 import TaskAssignments from "./pages/user/modules/tasks/TaskAssignments";
@@ -55,7 +61,7 @@ import FinancialTransactions from "./pages/user/modules/finance/FinancialTransac
 import RevenueManagement from "./pages/user/modules/finance/RevenueManagement";
 import ExpenseManagement from "./pages/user/modules/finance/ExpenseManagement";
 import FinancialReports from "./pages/user/modules/finance/FinancialReports";
-import ProjectFinanceManagement from "./pages/user/modules/finance/ProjectFinanceManagement";
+import BudgetAllocation from "./pages/user/modules/finance/BudgetAllocation";
 import ProcurementManagement from "./pages/user/modules/procurement/ProcurementManagement";
 import { PendingReviews, ComplianceHistory } from "./pages/user/modules/legal";
 import SystemSetupOnboarding from "./pages/shared/SystemSetupOnboarding";
@@ -193,7 +199,10 @@ const AppRoutes = () => {
 
         {/* Self-Service Module routes */}
         <Route path="modules/self-service/payslips" element={<MyPayslips />} />
-        <Route path="modules/self-service/projects" element={<MyProjects />} />
+        <Route
+          path="modules/self-service/my-projects"
+          element={<MyProjects />}
+        />
         <Route
           path="modules/self-service/leave-requests"
           element={<MyLeaveRequests />}
@@ -214,10 +223,26 @@ const AppRoutes = () => {
           element={<MyProjectTasks />}
         />
 
-        {/* Department Approvals Routes */}
+        {/* Department Management Module Routes */}
         <Route
-          path="modules/self-service/department-approvals"
-          element={<DepartmentApprovals />}
+          path="modules/department-management"
+          element={<DeptManagement />}
+        />
+        <Route
+          path="modules/department-management/project-approvals"
+          element={<ProjectApprovals />}
+        />
+        <Route
+          path="modules/department-management/leave-management"
+          element={<DeptLeaveManagement />}
+        />
+        <Route
+          path="modules/department-management/team-management"
+          element={<TeamManagement />}
+        />
+        <Route
+          path="modules/department-management/analytics"
+          element={<Analytics />}
         />
 
         <Route path="modules/payroll/reports" element={<PayrollReports />} />
@@ -239,10 +264,6 @@ const AppRoutes = () => {
           path="modules/projects/approvals"
           element={<ApprovalDashboard />}
         />
-        <Route
-          path="modules/projects/budget-allocation"
-          element={<BudgetAllocation />}
-        />
 
         <Route path="modules/tasks/list" element={<TaskList />} />
         <Route path="modules/tasks/analytics" element={<TaskAnalytics />} />
@@ -260,8 +281,8 @@ const AppRoutes = () => {
         />
         <Route path="modules/finance/reports" element={<FinancialReports />} />
         <Route
-          path="modules/finance/projects"
-          element={<ProjectFinanceManagement />}
+          path="modules/finance/budget-allocation"
+          element={<BudgetAllocation />}
         />
 
         {/* Procurement Module Routes */}

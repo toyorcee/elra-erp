@@ -11,6 +11,7 @@ import {
   addComment,
   addChecklistItem,
   completeChecklistItem,
+  createPersonalProjectTasks,
 } from "../controllers/taskController.js";
 import { protect, checkRole } from "../middleware/auth.js";
 
@@ -33,10 +34,17 @@ const validateTask = [
   body("project").isMongoId().withMessage("Project must be a valid project ID"),
   body("category")
     .isIn([
+      // Personal Project Implementation Tasks
+      "project_setup",
+      "resource_preparation",
+      "core_implementation",
+      "quality_check",
+      "documentation",
+      "project_closure",
+      // Legacy Categories (for backward compatibility)
       "equipment_setup",
       "vehicle_maintenance",
       "property_inspection",
-      "documentation",
       "customer_service",
       "billing",
       "compliance",
@@ -106,5 +114,12 @@ router.put(
   checkRole(600),
   completeChecklistItem
 );
+
+// ============================================================================
+// PERSONAL PROJECT TASK ROUTES
+// ============================================================================
+
+// Create base tasks for personal project implementation - Staff+
+router.post("/personal/:projectId", checkRole(300), createPersonalProjectTasks);
 
 export default router;

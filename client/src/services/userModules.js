@@ -18,9 +18,7 @@ export const userModulesAPI = {
     }
   },
 
-  // Dashboard API
   dashboard: {
-    // Get HR dashboard data
     getHRDashboardData: async () => {
       try {
         console.log("🔍 [dashboardAPI] Fetching HR dashboard data...");
@@ -250,6 +248,41 @@ export const userModulesAPI = {
         return response.data;
       } catch (error) {
         console.error("❌ [invitationsAPI] Error creating invitation:", error);
+        throw error;
+      }
+    },
+
+    createSingleInvitation: async (invitationData) => {
+      try {
+        console.log(
+          "🚀 [invitationsAPI] Creating single invitation:",
+          invitationData
+        );
+        console.log(
+          "🔗 [invitationsAPI] Making POST request to /invitations/create-single"
+        );
+
+        const response = await api.post(
+          "/invitations/create-single",
+          invitationData
+        );
+
+        console.log(
+          "✅ [invitationsAPI] Single invitation created successfully:",
+          response.data
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [invitationsAPI] Error creating single invitation:",
+          error
+        );
+        console.error("🔍 [invitationsAPI] Error details:", {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+        });
         throw error;
       }
     },
@@ -1382,6 +1415,8 @@ export const userModulesAPI = {
       UsersIcon: "FaUsers",
       ChartBarIcon: "FaChartBar",
       CustomerServiceIcon: "FaHeadset",
+      BuildingOfficeIcon: "FaBuilding",
+      BuildingOffice2Icon: "FaBuilding",
     };
 
     const colorMap = {

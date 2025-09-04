@@ -117,10 +117,10 @@ export const getImageUrl = (img, backendUrl) => {
 export const formatNumberWithCommas = (value) => {
   if (!value) return "";
 
-  // Remove all non-digit characters except decimal point
-  const cleanValue = value.replace(/[^\d.]/g, "");
+  const stringValue = typeof value === "number" ? value.toString() : value;
 
-  // If it's a valid number, format with commas
+  const cleanValue = stringValue.replace(/[^\d.]/g, "");
+
   if (cleanValue && !isNaN(cleanValue)) {
     const parts = cleanValue.split(".");
     parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -154,7 +154,7 @@ export const isNumberField = (fieldName) => {
 
 /**
  * Parse a formatted number string back to a number
- * @param {string} formattedValue - The formatted string (e.g., "1,234,567")
+ * @param {string} formattedValue -
  * @returns {number} - The parsed number
  */
 export const parseFormattedNumber = (formattedValue) => {

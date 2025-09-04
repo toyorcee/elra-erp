@@ -78,9 +78,57 @@ const departmentSchema = new mongoose.Schema(
   }
 );
 
-// Pre-save middleware to update timestamps
-departmentSchema.pre("save", function (next) {
+// Pre-save middleware to update timestamps and auto-add to module access
+departmentSchema.pre("save", async function (next) {
   this.updatedAt = new Date();
+
+  // If this is a new department, add it to relevant modules' departmentAccess
+  if (this.isNew) {
+    try {
+      console.log(
+        `🔧 [Department] New department created: ${this.name}, auto-adding to module access...`
+      );
+
+      const Module = mongoose.model("Module");
+
+      const universalModules = await Module.find({
+        code: { $in: ["SELF_SERVICE", "CUSTOMER_CARE", "PROJECTS"] },
+        isActive: true,
+      });
+
+      for (const module of universalModules) {
+        // Check if department is already in the access list
+        const hasAccess = module.departmentAccess?.some(
+          (deptId) => deptId.toString() === this._id.toString()
+        );
+
+        if (!hasAccess) {
+          if (!module.departmentAccess) {
+            module.departmentAccess = [];
+          }
+
+          module.departmentAccess.push(this._id);
+          module.markModified("departmentAccess");
+          await module.save();
+
+          console.log(
+            `   ✅ Added ${this.name} to ${module.name} (${module.code}) department access`
+          );
+        }
+      }
+
+      console.log(
+        `✅ [Department] Auto-module access setup completed for ${this.name}`
+      );
+    } catch (error) {
+      console.error(
+        `❌ [Department] Error setting up auto-module access for ${this.name}:`,
+        error.message
+      );
+      // Don't fail the department creation if module access setup fails
+    }
+  }
+
   next();
 });
 

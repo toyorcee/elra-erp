@@ -36,6 +36,8 @@ const UserManagement = () => {
   const [isSubmittingSalary, setIsSubmittingSalary] = useState(false);
   const [isOpeningModal, setIsOpeningModal] = useState(false);
   const [salaryGrades, setSalaryGrades] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [usersPerPage] = useState(12); // Show 12 users per page (3x4 grid)
   const { openChatWithUser } = useMessageContext();
 
   useEffect(() => {
@@ -267,6 +269,20 @@ const UserManagement = () => {
     return matchesSearch && matchesDepartment && matchesRole && matchesStatus;
   });
 
+  const indexOfLastUser = currentPage * usersPerPage;
+  const indexOfFirstUser = indexOfLastUser - usersPerPage;
+  const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+  const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, departmentFilter, roleFilter, statusFilter]);
+
+  const goToPage = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case "active":
@@ -405,7 +421,7 @@ const UserManagement = () => {
 
         {/* Users Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredUsers.map((user) => (
+          {currentUsers.map((user) => (
             <div
               key={user._id}
               className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow"
@@ -514,6 +530,57 @@ const UserManagement = () => {
           ))}
         </div>
 
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-700">
+                Showing {indexOfFirstUser + 1} to{" "}
+                {Math.min(indexOfLastUser, filteredUsers.length)} of{" "}
+                {filteredUsers.length} users
+              </div>
+              <div className="flex items-center space-x-2">
+                {/* Previous Button */}
+                <button
+                  onClick={() => goToPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {/* Page Numbers */}
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (page) => (
+                      <button
+                        key={page}
+                        onClick={() => goToPage(page)}
+                        className={`px-3 py-2 text-sm font-medium rounded-md ${
+                          currentPage === page
+                            ? "bg-[var(--elra-primary)] text-white"
+                            : "text-gray-500 bg-white border border-gray-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  )}
+                </div>
+
+                {/* Next Button */}
+                <button
+                  onClick={() => goToPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Empty State */}
         {filteredUsers.length === 0 && (
           <div className="bg-white rounded-2xl p-12 shadow-lg border border-gray-100 text-center">
@@ -536,7 +603,9 @@ const UserManagement = () => {
         {filteredUsers.length > 0 && (
           <div className="mt-6 bg-white rounded-xl p-4 shadow-lg border border-gray-100">
             <p className="text-sm text-gray-600 text-center">
-              Showing {filteredUsers.length} of {users.length} users
+              Showing {indexOfFirstUser + 1} to{" "}
+              {Math.min(indexOfLastUser, filteredUsers.length)} of{" "}
+              {filteredUsers.length} filtered users (Total: {users.length})
             </p>
           </div>
         )}

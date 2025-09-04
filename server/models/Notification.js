@@ -170,7 +170,6 @@ const notificationSchema = new mongoose.Schema(
       previousApproverDepartment: String,
       approvalChain: [String],
       totalApprovalSteps: Number,
-      approvalLevel: Number,
       isFirstApproval: Boolean,
       isFinalApproval: Boolean,
       rejecterName: String,

@@ -39,12 +39,13 @@ const taskSchema = new mongoose.Schema(
     },
 
     // Task Timeline
-    dueDate: {
+    startDate: {
       type: Date,
       required: true,
     },
-    startDate: {
+    dueDate: {
       type: Date,
+      required: true,
     },
     completedDate: {
       type: Date,
@@ -86,15 +87,23 @@ const taskSchema = new mongoose.Schema(
       default: Date.now,
     },
 
-    // Task Categories (relevant for leasing business)
+    // Task Categories (Personal Project Implementation)
     category: {
       type: String,
       required: true,
       enum: [
+        // Personal Project Implementation Tasks
+        "project_setup",
+        "resource_preparation",
+        "core_implementation",
+        "quality_check",
+        "documentation",
+        "project_closure",
+
+        // Legacy Categories (for backward compatibility)
         "equipment_setup",
         "vehicle_maintenance",
         "property_inspection",
-        "documentation",
         "customer_service",
         "billing",
         "compliance",
@@ -114,6 +123,46 @@ const taskSchema = new mongoose.Schema(
       min: 0,
       max: 100,
       default: 0,
+    },
+
+    // Personal Project Implementation Fields
+    projectType: {
+      type: String,
+      enum: ["personal", "departmental", "external"],
+      default: "personal",
+    },
+
+    implementationPhase: {
+      type: String,
+      enum: ["setup", "preparation", "execution", "review", "closure"],
+      default: "setup",
+    },
+
+    milestoneOrder: {
+      type: Number,
+      min: 1,
+      default: 1,
+    },
+
+    isBaseTask: {
+      type: Boolean,
+      default: false,
+    },
+
+    baseTaskTemplate: {
+      type: String,
+      enum: [
+        "project_setup_planning",
+        "resource_gathering",
+        "main_implementation",
+        "quality_testing",
+        "final_documentation",
+      ],
+    },
+
+    notes: {
+      type: String,
+      trim: true,
     },
 
     // Task Comments
@@ -177,11 +226,7 @@ const taskSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
-    company: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Company",
-      required: true,
-    },
+
     isActive: {
       type: Boolean,
       default: true,
@@ -195,10 +240,11 @@ const taskSchema = new mongoose.Schema(
 );
 
 // Indexes for better performance
-taskSchema.index({ company: 1, project: 1 });
-taskSchema.index({ company: 1, assignedTo: 1 });
-taskSchema.index({ company: 1, status: 1 });
+taskSchema.index({ project: 1 });
+taskSchema.index({ assignedTo: 1 });
+taskSchema.index({ status: 1 });
 taskSchema.index({ code: 1 }, { unique: true });
+taskSchema.index({ startDate: 1 });
 taskSchema.index({ dueDate: 1 });
 
 // Virtual for task duration
@@ -226,17 +272,15 @@ taskSchema.virtual("timeVariance").get(function () {
 // Pre-save middleware to generate task code if not provided
 taskSchema.pre("save", async function (next) {
   if (!this.code) {
-    const count = await this.constructor.countDocuments({
-      company: this.company,
-    });
+    const count = await this.constructor.countDocuments();
     this.code = `TASK${String(count + 1).padStart(4, "0")}`;
   }
   next();
 });
 
 // Static method to get task statistics
-taskSchema.statics.getTaskStats = async function (companyId, projectId = null) {
-  const match = { company: companyId, isActive: true };
+taskSchema.statics.getTaskStats = async function (projectId = null) {
+  const match = { isActive: true };
   if (projectId) match.project = projectId;
 
   const stats = await this.aggregate([
@@ -262,17 +306,16 @@ taskSchema.statics.getTaskStats = async function (companyId, projectId = null) {
 };
 
 // Static method to get tasks by status
-taskSchema.statics.getByStatus = function (companyId, status) {
-  return this.find({ company: companyId, isActive: true, status })
+taskSchema.statics.getByStatus = function (status) {
+  return this.find({ isActive: true, status })
     .populate("assignedTo", "firstName lastName email")
     .populate("project", "name code")
     .sort({ dueDate: 1 });
 };
 
 // Static method to get overdue tasks
-taskSchema.statics.getOverdueTasks = function (companyId) {
+taskSchema.statics.getOverdueTasks = function () {
   return this.find({
-    company: companyId,
     isActive: true,
     dueDate: { $lt: new Date() },
     status: { $nin: ["completed", "cancelled"] },

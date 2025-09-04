@@ -2,6 +2,81 @@
 // This file defines the sidebar items that appear when a specific module is selected
 
 export const moduleSidebarConfig = {
+  // ===== DEPARTMENT MANAGEMENT MODULE =====
+  departmentManagement: {
+    label: "Department Management",
+    icon: "BuildingOfficeIcon",
+    path: "/dashboard/modules/department-management",
+    color: "text-[var(--elra-primary)]",
+    bgColor: "bg-[var(--elra-secondary-3)]",
+    borderColor: "border-[var(--elra-primary)]",
+    sections: [
+      {
+        title: "Project Approvals",
+        collapsible: true,
+        defaultExpanded: true,
+        items: [
+          {
+            label: "Pending Approvals",
+            icon: "ClockIcon",
+            path: "/dashboard/modules/department-management/project-approvals",
+            required: { minLevel: 700 },
+            description: "Review and approve department project requests",
+          },
+          {
+            label: "Approval History",
+            icon: "DocumentCheckIcon",
+            path: "/dashboard/modules/department-management/approval-history",
+            required: { minLevel: 700 },
+            description: "View all project approval decisions and history",
+          },
+        ],
+      },
+      {
+        title: "Leave Management",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Leave Management",
+            icon: "CalendarDaysIcon",
+            path: "/dashboard/modules/department-management/leave-management",
+            required: { minLevel: 700 },
+            description: "Review and approve employee leave requests",
+          },
+        ],
+      },
+      {
+        title: "Team Management",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Team Management",
+            icon: "UsersIcon",
+            path: "/dashboard/modules/department-management/team-management",
+            required: { minLevel: 700 },
+            description: "Manage department staff and roles",
+          },
+        ],
+      },
+      {
+        title: "Department Analytics",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Analytics",
+            icon: "ChartPieIcon",
+            path: "/dashboard/modules/department-management/analytics",
+            required: { minLevel: 700 },
+            description: "Department overview and key metrics",
+          },
+        ],
+      },
+    ],
+  },
+
   // ===== SELF-SERVICE MODULE =====
   selfService: {
     label: "Self-Service",
@@ -30,13 +105,13 @@ export const moduleSidebarConfig = {
             required: { minLevel: 300 },
             description: "View, upload, and scan documents with OCR processing",
           },
-          // {
-          //   label: "My Projects",
-          //   icon: "FolderIcon",
-          //   path: "/dashboard/modules/self-service/projects",
-          //   required: { minLevel: 300 },
-          //   description: "View projects assigned to you",
-          // },
+          {
+            label: "My Projects",
+            icon: "FolderIcon",
+            path: "/dashboard/modules/self-service/my-projects",
+            required: { minLevel: 300 },
+            description: "Create and manage your personal projects",
+          },
           {
             label: "My Leave Requests",
             icon: "ClipboardDocumentListIcon",
@@ -575,11 +650,12 @@ export const moduleSidebarConfig = {
         defaultExpanded: false,
         items: [
           {
-            label: "Project Reimbursements",
-            icon: "FolderIcon",
-            path: "/dashboard/modules/finance/projects",
-            required: { minLevel: 700 },
-            description: "Manage project reimbursements and fund disbursements",
+            label: "Budget Allocation",
+            icon: "CurrencyDollarIcon",
+            path: "/dashboard/modules/finance/budget-allocation",
+            required: { minLevel: 600 },
+            description:
+              "Manage budget allocations for projects and operational funding",
           },
         ],
       },

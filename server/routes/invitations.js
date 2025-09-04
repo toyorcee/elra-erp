@@ -19,6 +19,7 @@ import {
   getNextBatchNumber,
   retryFailedEmails,
   retrySingleEmail,
+  createSingleInvitation,
 } from "../controllers/invitationController.js";
 import {
   protect,
@@ -67,6 +68,14 @@ router.post(
   checkDepartmentAccess,
   createInvitationValidation,
   createInvitation
+);
+
+router.post(
+  "/create-single",
+  checkRole(700),
+  checkDepartmentAccess,
+  createInvitationValidation,
+  createSingleInvitation
 );
 router.get("/", checkRole(700), getInvitations);
 router.get("/user", checkRole(700), getUserInvitations);

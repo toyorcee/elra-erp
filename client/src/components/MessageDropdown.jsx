@@ -233,7 +233,6 @@ const MessageDropdown = ({ isOpen, onClose }) => {
     }
   }, [searchTerm]);
 
-  // Filter available users based on search term
   const getFilteredAvailableUsers = () => {
     if (!searchTerm.trim()) {
       const result = availableUsers.slice(0, 10);

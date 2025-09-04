@@ -414,9 +414,11 @@ export const checkDepartmentAccess = (options = {}) => {
           const resourceDepartmentId =
             req.body[resourceField] || req.params[resourceField];
 
+          // HR HOD can invite users to any department
           if (
             resourceDepartmentId &&
-            resourceDepartmentId !== userDepartmentId
+            resourceDepartmentId !== userDepartmentId &&
+            user.department?.name !== "Human Resources"
           ) {
             return res.status(403).json({
               success: false,

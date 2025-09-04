@@ -1472,7 +1472,6 @@ export const getAllModules = async (req, res) => {
   try {
     console.log("🔍 [getAllModules] Fetching all modules...");
 
-    // Get all active modules
     const Module = (await import("../models/Module.js")).default;
     const allModules = await Module.find({ isActive: true }).sort({ order: 1 });
 
@@ -1514,14 +1513,6 @@ export const getUserModules = async (req, res) => {
     }
 
     let availableModules = [];
-
-    console.log("🔍 [getUserModules] User role:", user.role?.name);
-    console.log("🔍 [getUserModules] User department:", user.department?.name);
-    console.log("🔍 [getUserModules] User moduleAccess:", user.moduleAccess);
-    console.log(
-      "🔍 [getUserModules] Role moduleAccess:",
-      user.role?.moduleAccess
-    );
 
     const moduleAccessList = user.moduleAccess || [];
 

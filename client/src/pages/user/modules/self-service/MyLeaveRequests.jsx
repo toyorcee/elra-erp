@@ -43,13 +43,18 @@ const MyLeaveRequests = () => {
   const filteredRequests = React.useMemo(() => {
     console.log("🔍 [Filtering] Current filters:", filters);
     console.log("🔍 [Filtering] Current search:", searchTerm);
-    console.log("🔍 [Filtering] All requests:", requests.map(r => ({ id: r.id || r._id, status: r.status })));
-    
+    console.log(
+      "🔍 [Filtering] All requests:",
+      requests.map((r) => ({ id: r.id || r._id, status: r.status }))
+    );
+
     return requests.filter((request) => {
       if (filters.status !== "all") {
         const requestStatus = request.status?.toLowerCase() || "";
         const filterStatus = filters.status.toLowerCase();
-        console.log(`🔍 [Filtering] Comparing status: "${requestStatus}" vs "${filterStatus}"`);
+        console.log(
+          `🔍 [Filtering] Comparing status: "${requestStatus}" vs "${filterStatus}"`
+        );
         if (requestStatus !== filterStatus) {
           return false;
         }
@@ -589,8 +594,8 @@ const MyLeaveRequests = () => {
                 setFilters((prev) => ({ ...prev, status: e.target.value }))
               }
               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] ${
-                filters.status !== "all" 
-                  ? "border-blue-300 bg-blue-50" 
+                filters.status !== "all"
+                  ? "border-blue-300 bg-blue-50"
                   : "border-gray-300"
               }`}
             >
@@ -616,8 +621,8 @@ const MyLeaveRequests = () => {
                 setFilters((prev) => ({ ...prev, type: e.target.value }))
               }
               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] ${
-                filters.type !== "all" 
-                  ? "border-blue-300 bg-blue-50" 
+                filters.type !== "all"
+                  ? "border-blue-300 bg-blue-50"
                   : "border-gray-300"
               }`}
             >
@@ -643,14 +648,12 @@ const MyLeaveRequests = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] ${
-                searchTerm 
-                  ? "border-blue-300 bg-blue-50" 
-                  : "border-gray-300"
+                searchTerm ? "border-blue-300 bg-blue-50" : "border-gray-300"
               }`}
             />
           </div>
         </div>
-        
+
         {/* Clear Filters Button */}
         {(filters.status !== "all" || filters.type !== "all" || searchTerm) && (
           <div className="mt-4 flex justify-between items-center">

@@ -90,6 +90,15 @@ export const sidebarConfig = [
     departments: ["System Administration", "IT", "Information Technology"], // System admin and IT departments
   },
   {
+    label: "Department Management",
+    icon: "HiOutlineBuildingOffice2",
+    path: "/dashboard/modules/department-management",
+    required: { minLevel: 700 },
+    section: "erp",
+    badge: "HOD",
+    departments: ["all"],
+  },
+  {
     label: "Payroll Management",
     icon: "HiOutlineCurrencyDollar",
     path: "/dashboard/modules/payroll",
@@ -125,7 +134,7 @@ export const sidebarConfig = [
     required: { minLevel: 300 },
     section: "erp",
     badge: "Proj",
-    departments: ["all"], // Cross-functional - all departments can access
+    departments: ["Project Management"], // Only Project Management department can access
   },
   {
     label: "Inventory Management",
@@ -309,6 +318,7 @@ export const getNavigationForRole = (
     inventory: "INVENTORY",
     "customer-care": "CUSTOMER_CARE",
     communication: "COMMUNICATION",
+    "department-management": "DEPARTMENT_MANAGEMENT",
   };
 
   // Debug logging removed for production
@@ -537,6 +547,14 @@ export const getModulesForUser = (user) => {
         section: "erp",
         badge: "Inv",
       },
+      {
+        label: "Department Management",
+        icon: "HiOutlineBuildingOffice2",
+        path: "/dashboard/modules/department-management",
+        required: { minLevel: 700 },
+        section: "erp",
+        badge: "HOD",
+      },
     ],
     "Human Resources": [
       {
@@ -555,6 +573,14 @@ export const getModulesForUser = (user) => {
         section: "erp",
         badge: "Payroll",
       },
+      {
+        label: "Department Management",
+        icon: "HiOutlineBuildingOffice2",
+        path: "/dashboard/modules/department-management",
+        required: { minLevel: 700 },
+        section: "erp",
+        badge: "HOD",
+      },
     ],
     "Information Technology": [
       {
@@ -572,6 +598,14 @@ export const getModulesForUser = (user) => {
         required: { minLevel: 700 },
         section: "erp",
         badge: "Admin",
+      },
+      {
+        label: "Department Management",
+        icon: "HiOutlineBuildingOffice2",
+        path: "/dashboard/modules/department-management",
+        required: { minLevel: 700 },
+        section: "erp",
+        badge: "HOD",
       },
     ],
     Operations: [
@@ -633,6 +667,14 @@ export const getModulesForUser = (user) => {
         required: { minLevel: 700 },
         section: "erp",
         badge: "Admin",
+      },
+      {
+        label: "Department Management",
+        icon: "HiOutlineBuildingOffice2",
+        path: "/dashboard/modules/department-management",
+        required: { minLevel: 700 },
+        section: "erp",
+        badge: "HOD",
       },
     ],
   };

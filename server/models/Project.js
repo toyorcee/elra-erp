@@ -39,6 +39,7 @@ const projectSchema = new mongoose.Schema(
         "pending_executive_approval",
         "pending_budget_allocation",
         "approved",
+        "in_progress",
         "implementation",
         "active",
         "on_hold",
@@ -317,7 +318,9 @@ const projectSchema = new mongoose.Schema(
         // Currency is always NGN - removed for simplicity
         deliveryTimeline: {
           type: String,
-          required: true,
+          required: function () {
+            return this.projectScope === "external";
+          },
           trim: true,
         },
       },
@@ -410,6 +413,74 @@ const projectSchema = new mongoose.Schema(
       min: 0,
       max: 100,
       default: 0,
+    },
+
+    // Implementation Tracking (for Personal Projects)
+    implementation: {
+      startDate: {
+        type: Date,
+      },
+      progress: {
+        type: Number,
+        min: 0,
+        max: 100,
+        default: 0,
+      },
+      milestones: [
+        {
+          title: {
+            type: String,
+            required: true,
+            trim: true,
+          },
+          description: {
+            type: String,
+            trim: true,
+          },
+          dueDate: {
+            type: Date,
+            required: true,
+          },
+          completed: {
+            type: Boolean,
+            default: false,
+          },
+          completedDate: {
+            type: Date,
+          },
+          priority: {
+            type: String,
+            enum: ["low", "medium", "high", "critical"],
+            default: "medium",
+          },
+        },
+      ],
+      implementationNotes: {
+        type: String,
+        trim: true,
+      },
+      closureRequested: {
+        type: Boolean,
+        default: false,
+      },
+      closureApproved: {
+        type: Boolean,
+        default: false,
+      },
+      closureRequestedAt: {
+        type: Date,
+      },
+      closureRequestedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      closureApprovedAt: {
+        type: Date,
+      },
+      closureApprovedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
     },
 
     // Workflow Tracking Fields (Phase 1 Enhancement)
@@ -2628,7 +2699,7 @@ projectSchema.methods.generateApprovalChain = async function () {
 
     // Department HOD approval first
     // Skip if creator is Super Admin (1000) or HOD (700) of their own department
-    if (roleDoc.name === "SUPER_ADMIN") {
+    if (creator?.role?.level === 1000) {
       console.log(
         "✅ [APPROVAL] Auto-approving Department HOD - creator is Super Admin"
       );
@@ -2638,7 +2709,7 @@ projectSchema.methods.generateApprovalChain = async function () {
       );
     } else {
       approvalChain.push({
-        level: "department_hod",
+        level: "hod",
         department: this.department,
         status: "pending",
         required: true,
@@ -2649,7 +2720,7 @@ projectSchema.methods.generateApprovalChain = async function () {
     // Project Management HOD approval
     // Skip if creator is Super Admin (1000) or Project Management HOD (700)
     // But if creator is from Project Management dept but NOT HOD, still need Project Management HOD approval
-    if (roleDoc.name === "SUPER_ADMIN") {
+    if (creator?.role?.level === 1000) {
       console.log(
         "✅ [APPROVAL] Auto-approving Project Management - creator is Super Admin"
       );
@@ -2666,7 +2737,7 @@ projectSchema.methods.generateApprovalChain = async function () {
           .findOne({ name: "Project Management" });
         if (projectMgmtDept) {
           approvalChain.push({
-            level: "project_management",
+            level: "department",
             department: projectMgmtDept._id,
             status: "pending",
             required: true,
@@ -2681,7 +2752,7 @@ projectSchema.methods.generateApprovalChain = async function () {
         .findOne({ name: "Project Management" });
       if (projectMgmtDept) {
         approvalChain.push({
-          level: "project_management",
+          level: "department",
           department: projectMgmtDept._id,
           status: "pending",
           required: true,
@@ -2690,10 +2761,28 @@ projectSchema.methods.generateApprovalChain = async function () {
       }
     }
 
-    // Finance HOD approval for budget allocation
     if (this.requiresBudgetAllocation === true) {
-      // Budget allocation required - need Finance approval
-      if (roleDoc.name === "SUPER_ADMIN") {
+      if (creator?.role?.level === 1000) {
+        console.log(
+          "✅ [APPROVAL] Auto-approving Legal Compliance - creator is Super Admin"
+        );
+      } else {
+        const legalDept = await mongoose
+          .model("Department")
+          .findOne({ name: "Legal & Compliance" });
+        if (legalDept) {
+          approvalChain.push({
+            level: "legal_compliance",
+            department: legalDept._id,
+            status: "pending",
+            required: true,
+            type: "personal_legal_compliance",
+          });
+        }
+      }
+
+      // Finance HOD approval after legal compliance
+      if (creator?.role?.level === 1000) {
         console.log(
           "✅ [APPROVAL] Auto-approving Finance Budget - creator is Super Admin"
         );
@@ -2713,52 +2802,56 @@ projectSchema.methods.generateApprovalChain = async function () {
         }
       }
     } else {
-      // No budget allocation required - skip Finance approval
+      // No budget allocation required - skip Legal and Finance approval
       console.log(
-        "ℹ️ [APPROVAL] Skipping Finance approval - no budget allocation required"
+        "ℹ️ [APPROVAL] Skipping Legal and Finance approval - no budget allocation required"
       );
     }
 
-    // Executive HOD approval
-    // Skip if creator is Super Admin (1000) or Executive HOD (700)
-    if (roleDoc.name === "SUPER_ADMIN") {
-      console.log(
-        "✅ [APPROVAL] Auto-approving Executive - creator is Super Admin"
-      );
-    } else if (creatorDepartment !== "Executive Office") {
-      const execDept = await mongoose
-        .model("Department")
-        .findOne({ name: "Executive Office" });
-      if (execDept) {
-        approvalChain.push({
-          level: "executive",
-          department: execDept._id,
-          status: "pending",
-          required: true,
-          type: "personal_executive_approval",
-        });
+    // Executive HOD approval (only for funded projects)
+    if (this.requiresBudgetAllocation === true) {
+      // Budget allocation required - need Executive approval after Finance
+      if (creator?.role?.level === 1000) {
+        console.log(
+          "✅ [APPROVAL] Auto-approving Executive - creator is Super Admin"
+        );
+      } else if (creatorDepartment !== "Executive Office") {
+        const execDept = await mongoose
+          .model("Department")
+          .findOne({ name: "Executive Office" });
+        if (execDept) {
+          approvalChain.push({
+            level: "executive",
+            department: execDept._id,
+            status: "pending",
+            required: true,
+            type: "personal_executive_approval",
+          });
+        }
+      } else {
+        console.log(
+          "✅ [APPROVAL] Auto-approving Executive - creator is Executive HOD"
+        );
       }
     } else {
+      // No budget allocation required - skip Executive approval
       console.log(
-        "✅ [APPROVAL] Auto-approving Executive - creator is Executive HOD"
+        "ℹ️ [APPROVAL] Skipping Executive approval - no budget allocation required"
       );
     }
 
-    // Final Finance approval for reimbursement
     if (this.requiresBudgetAllocation === true) {
-      // Budget allocation required - need Finance reimbursement approval
-      if (roleDoc.name === "SUPER_ADMIN") {
+      if (creator?.role?.level === 1000) {
         console.log(
           "✅ [APPROVAL] Auto-approving Finance Reimbursement - creator is Super Admin"
         );
       } else {
-        // All other users need Finance reimbursement approval
         const financeDept = await mongoose
           .model("Department")
           .findOne({ name: "Finance & Accounting" });
         if (financeDept) {
           approvalChain.push({
-            level: "finance_reimbursement",
+            level: "finance",
             department: financeDept._id,
             status: "pending",
             required: true,
@@ -2767,7 +2860,6 @@ projectSchema.methods.generateApprovalChain = async function () {
         }
       }
     } else {
-      // No budget allocation required - skip Finance reimbursement
       console.log(
         "ℹ️ [APPROVAL] Skipping Finance reimbursement - no budget allocation required"
       );
@@ -2791,7 +2883,7 @@ projectSchema.methods.generateApprovalChain = async function () {
           .findOne({ name: "Project Management" });
         if (projectMgmtDept) {
           approvalChain.push({
-            level: "project_management",
+            level: "department",
             department: projectMgmtDept._id,
             status: "pending",
             required: true,
@@ -2806,11 +2898,11 @@ projectSchema.methods.generateApprovalChain = async function () {
         .findOne({ name: "Project Management" });
       if (projectMgmtDept) {
         approvalChain.push({
-          level: "project_management",
+          level: "department",
           department: projectMgmtDept._id,
           status: "pending",
           required: true,
-          type: "departmental_project_approval",
+          type: "personal_project_approval",
         });
       }
     }
@@ -2889,7 +2981,7 @@ projectSchema.methods.generateApprovalChain = async function () {
           .findOne({ name: "Project Management" });
         if (projectMgmtDept) {
           approvalChain.push({
-            level: "project_management",
+            level: "department",
             department: projectMgmtDept._id,
             status: "pending",
             required: true,
@@ -2904,7 +2996,7 @@ projectSchema.methods.generateApprovalChain = async function () {
         .findOne({ name: "Project Management" });
       if (projectMgmtDept) {
         approvalChain.push({
-          level: "project_management",
+          level: "department",
           department: projectMgmtDept._id,
           status: "pending",
           required: true,

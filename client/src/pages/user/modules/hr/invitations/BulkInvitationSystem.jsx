@@ -644,7 +644,7 @@ const BulkInvitationSystem = () => {
     const progressInterval = setInterval(() => {
       setSubmissionProgress((prev) => {
         if (prev >= 90) return prev;
-        return prev + Math.random() * 15;
+        return Math.min(prev + Math.random() * 15, 90);
       });
     }, 200);
 
@@ -676,18 +676,32 @@ const BulkInvitationSystem = () => {
       let response;
       if (!invitationData.isBatch && invitationData.emails.length === 1) {
         console.log("👤 [FRONTEND] Sending single invitation");
-        response = await userModulesAPI.invitations.createSingleInvitation({
-          email: invitationData.emails[0],
-          departmentId: invitationData.departmentId,
-          roleId: invitationData.roleId
-        });
+        try {
+          response = await userModulesAPI.invitations.createSingleInvitation({
+            email: invitationData.emails[0],
+            departmentId: invitationData.departmentId,
+            roleId: invitationData.roleId,
+          });
+          console.log(
+            "✅ [FRONTEND] Single invitation response received:",
+            response
+          );
+        } catch (singleError) {
+          console.error("❌ [FRONTEND] Single invitation failed:", singleError);
+          throw singleError;
+        }
       } else {
         console.log("👥 [FRONTEND] Sending bulk invitation");
-        response = await userModulesAPI.invitations.createBulkInvitations(invitationData);
+        response = await userModulesAPI.invitations.createBulkInvitations(
+          invitationData
+        );
       }
 
       console.log("📥 [FRONTEND] Received response:", response);
-      console.log("📊 [FRONTEND] Invitation statistics:", response.data?.statistics);
+      console.log(
+        "📊 [FRONTEND] Invitation statistics:",
+        response.data?.statistics
+      );
 
       setSubmissionProgress(100);
       setResult(response);
@@ -697,7 +711,7 @@ const BulkInvitationSystem = () => {
       console.log("🔄 [FRONTEND] Refreshing invitations list");
       await fetchInvitations(1, 10, true);
       setLastRefreshTime(new Date());
-      
+
       console.log("✅ [FRONTEND] Invitation process completed successfully");
 
       toast.success(

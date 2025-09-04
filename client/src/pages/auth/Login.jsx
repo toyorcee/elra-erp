@@ -127,7 +127,7 @@ const Login = () => {
 
         {/* Card Form */}
         <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8">
-          <h2 className="text-3xl font-bold text-center text-[var(--elra-primary)] mb-6">
+          <h2 className="text-xl font-bold text-center text-[var(--elra-primary)] mb-6">
             Login to your account
           </h2>
 

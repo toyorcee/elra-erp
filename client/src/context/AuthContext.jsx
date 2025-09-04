@@ -180,13 +180,17 @@ export const AuthProvider = ({ children }) => {
   }, [initializeAuth]);
 
   const login = useCallback(async (credentials) => {
+    console.log(
+      "🔍 [AuthContext] Login started with credentials:",
+      credentials
+    );
     dispatch({ type: AUTH_ACTIONS.LOGIN_START });
 
     try {
       const response = await authAPI.login(credentials);
-      setHasLoggedIn(true); // Set login flag
+      console.log("✅ [AuthContext] Login API response:", response.data);
+      setHasLoggedIn(true); 
 
-      // Handle the correct response structure
       const userData = response.data.data?.user || response.data.user;
 
       dispatch({
@@ -195,6 +199,7 @@ export const AuthProvider = ({ children }) => {
       });
       return { success: true };
     } catch (error) {
+      console.error("❌ [AuthContext] Login failed:", error);
       const errorData = handleApiError(error);
       dispatch({
         type: AUTH_ACTIONS.LOGIN_FAILURE,

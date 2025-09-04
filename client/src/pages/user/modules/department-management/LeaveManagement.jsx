@@ -11,7 +11,7 @@ import { leaveRequests } from "../../../../services/leave";
 import DataTable from "../../../../components/common/DataTable";
 import LeaveDetailsModal from "../../../../components/modals/LeaveDetailsModal";
 
-const DepartmentApprovals = () => {
+const LeaveManagement = () => {
   const { user } = useAuth();
   const [leaveRequestsList, setLeaveRequestsList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -234,7 +234,7 @@ const DepartmentApprovals = () => {
           row.status?.toLowerCase() === "pending" &&
           row.approvals &&
           row.approvals.length > 0 &&
-          row.approvals.some(approval => approval.status === "Approved")
+          row.approvals.some((approval) => approval.status === "Approved")
         ) {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
@@ -331,7 +331,11 @@ const DepartmentApprovals = () => {
           // Pending status - show current approver
           return (
             <div className="text-sm">
-              {row.approvals && row.approvals.length > 0 && row.approvals.some(approval => approval.status === "Approved") ? (
+              {row.approvals &&
+              row.approvals.length > 0 &&
+              row.approvals.some(
+                (approval) => approval.status === "Approved"
+              ) ? (
                 <>
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                     Pending HR HOD Approval
@@ -377,7 +381,11 @@ const DepartmentApprovals = () => {
           </button>
           {/* Only show Approve/Reject buttons if status is pending AND no approved approvals yet (meaning it hasn't been approved by HOD yet) */}
           {(row.status === "pending" || row.status === "Pending") &&
-            (!row.approvals || row.approvals.length === 0 || !row.approvals.some(approval => approval.status === "Approved")) && (
+            (!row.approvals ||
+              row.approvals.length === 0 ||
+              !row.approvals.some(
+                (approval) => approval.status === "Approved"
+              )) && (
               <>
                 <button
                   onClick={() => handleApprove(row)}

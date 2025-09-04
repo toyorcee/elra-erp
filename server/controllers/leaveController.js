@@ -1020,24 +1020,24 @@ Your request is now with ${nextApprover.firstName} ${
           nextApprover.lastName
         } for final approval. You'll be notified once it's fully approved.`;
       }
-          } else {
-        // Final approval
-        if (
-          userRole?.level === 700 &&
-          req.user.department?.name === "Human Resources"
-        ) {
-          // HR HOD final approval - skip notification here since it's already sent above
-          return; // Skip this notification to avoid duplicates
-        } else {
-          // Other final approvals
-          employeeTitle = "Leave Request Fully Approved! 🎉";
-          employeeMessage = `Congratulations! Your leave request has been fully approved by ${
-            req.user.firstName
-          } ${req.user.lastName} (${getRoleName(req.user.role?.level)}).
+    } else {
+      // Final approval
+      if (
+        userRole?.level === 700 &&
+        req.user.department?.name === "Human Resources"
+      ) {
+        // HR HOD final approval - skip notification here since it's already sent above
+        return; // Skip this notification to avoid duplicates
+      } else {
+        // Other final approvals
+        employeeTitle = "Leave Request Fully Approved! 🎉";
+        employeeMessage = `Congratulations! Your leave request has been fully approved by ${
+          req.user.firstName
+        } ${req.user.lastName} (${getRoleName(req.user.role?.level)}).
 
 ✅ Your leave is now approved and ready to use!`;
-        }
       }
+    }
   } else {
     // Rejected - Different messages based on who rejected and at what level
     if (

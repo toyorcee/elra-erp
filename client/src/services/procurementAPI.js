@@ -153,3 +153,42 @@ export const addProcurementNote = async (id, noteData) => {
     throw error;
   }
 };
+
+// Mark procurement order as issued
+export const markProcurementAsIssued = async (id, confirmationNotes = "") => {
+  try {
+    const response = await api.put(`/procurement/${id}/mark-issued`, {
+      confirmationNotes,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error marking procurement as issued:", error);
+    throw error;
+  }
+};
+
+// Mark procurement order as paid
+export const markProcurementAsPaid = async (id, paymentNotes = "") => {
+  try {
+    const response = await api.put(`/procurement/${id}/mark-paid`, {
+      paymentNotes,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error marking procurement as paid:", error);
+    throw error;
+  }
+};
+
+// Mark procurement order as delivered
+export const markProcurementAsDelivered = async (id, deliveryNotes = "") => {
+  try {
+    const response = await api.put(`/procurement/${id}/mark-delivered`, {
+      deliveryNotes,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error marking procurement as delivered:", error);
+    throw error;
+  }
+};

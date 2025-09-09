@@ -15,6 +15,8 @@ import {
   EnvelopeIcon,
   PhoneIcon,
   TrashIcon,
+  DocumentCheckIcon,
+  PencilIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../../../context/AuthContext";
 import {
@@ -24,6 +26,9 @@ import {
   deleteProcurement,
   completeProcurementOrder,
   resendProcurementEmail,
+  markProcurementAsIssued,
+  markProcurementAsPaid,
+  markProcurementAsDelivered,
 } from "../../../../services/procurementAPI";
 import { toast } from "react-toastify";
 import DataTable from "../../../../components/common/DataTable";
@@ -46,6 +51,31 @@ const PurchaseOrders = () => {
   const [showResendModal, setShowResendModal] = useState(false);
   const [orderToResend, setOrderToResend] = useState(null);
   const [isResending, setIsResending] = useState(false);
+  const [showMarkIssuedModal, setShowMarkIssuedModal] = useState(false);
+  const [orderToMarkIssued, setOrderToMarkIssued] = useState(null);
+  const [showMarkIssuedConfirmModal, setShowMarkIssuedConfirmModal] =
+    useState(false);
+  const [showMarkPaidModal, setShowMarkPaidModal] = useState(false);
+  const [orderToMarkPaid, setOrderToMarkPaid] = useState(null);
+  const [showMarkPaidConfirmModal, setShowMarkPaidConfirmModal] =
+    useState(false);
+  const [showMarkDeliveredModal, setShowMarkDeliveredModal] = useState(false);
+  const [orderToMarkDelivered, setOrderToMarkDelivered] = useState(null);
+  const [showMarkDeliveredConfirmModal, setShowMarkDeliveredConfirmModal] =
+    useState(false);
+  const [confirmationNotes, setConfirmationNotes] = useState("");
+  const [paymentNotes, setPaymentNotes] = useState("");
+  const [deliveryNotes, setDeliveryNotes] = useState("");
+  const [isMarkingIssued, setIsMarkingIssued] = useState(false);
+  const [isMarkingPaid, setIsMarkingPaid] = useState(false);
+  const [isMarkingDelivered, setIsMarkingDelivered] = useState(false);
+  const [orderToEdit, setOrderToEdit] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [stats, setStats] = useState({
+    pending: 0,
+    delivered: 0,
+    total: 0,
+  });
 
   const [completeFormData, setCompleteFormData] = useState({
     supplier: {
@@ -133,19 +163,24 @@ const PurchaseOrders = () => {
       color: "bg-yellow-100 text-yellow-800",
     },
     {
-      value: "approved",
-      label: "Approved",
-      color: "bg-green-100 text-green-800",
+      value: "issued",
+      label: "Issued",
+      color: "bg-blue-100 text-blue-800",
     },
     {
-      value: "rejected",
-      label: "Rejected",
-      color: "bg-red-100 text-red-800",
+      value: "paid",
+      label: "Paid",
+      color: "bg-emerald-100 text-emerald-800",
     },
     {
       value: "delivered",
       label: "Delivered",
-      color: "bg-blue-100 text-blue-800",
+      color: "bg-green-100 text-green-800",
+    },
+    {
+      value: "cancelled",
+      label: "Cancelled",
+      color: "bg-red-100 text-red-800",
     },
   ];
 
@@ -182,12 +217,28 @@ const PurchaseOrders = () => {
     loadPurchaseOrders();
   }, []);
 
+  const calculateStats = (orders) => {
+    const pending = orders.filter((order) =>
+      ["pending", "issued", "paid"].includes(order.status)
+    ).length;
+    const delivered = orders.filter(
+      (order) => order.status === "delivered"
+    ).length;
+
+    return {
+      pending,
+      delivered,
+      total: orders.length,
+    };
+  };
+
   const loadPurchaseOrders = async () => {
     setLoading(true);
     try {
       const response = await fetchPurchaseOrders();
       if (response.success) {
         setPurchaseOrders(response.data);
+        setStats(calculateStats(response.data));
       } else {
         toast.error("Failed to load purchase orders");
       }
@@ -281,6 +332,173 @@ const PurchaseOrders = () => {
     }
   };
 
+  const handleMarkAsIssued = (order) => {
+    setOrderToMarkIssued(order);
+    setConfirmationNotes("");
+    setShowMarkIssuedModal(true);
+  };
+
+  const handleMarkAsIssuedSubmit = () => {
+    setShowMarkIssuedModal(false);
+    setShowMarkIssuedConfirmModal(true);
+  };
+
+  const confirmMarkAsIssued = async () => {
+    if (!orderToMarkIssued) return;
+
+    setIsMarkingIssued(true);
+    try {
+      await markProcurementAsIssued(orderToMarkIssued._id, confirmationNotes);
+      toast.success("Order marked as issued successfully!");
+      setShowMarkIssuedConfirmModal(false);
+      setOrderToMarkIssued(null);
+      setConfirmationNotes("");
+      loadPurchaseOrders();
+    } catch (error) {
+      console.error("Error marking as issued:", error);
+      toast.error(error.response?.data?.message || "Failed to mark as issued");
+    } finally {
+      setIsMarkingIssued(false);
+    }
+  };
+
+  const handleMarkAsPaid = (order) => {
+    setOrderToMarkPaid(order);
+    setPaymentNotes("");
+    setShowMarkPaidModal(true);
+  };
+
+  const handleMarkAsPaidSubmit = () => {
+    setShowMarkPaidModal(false);
+    setShowMarkPaidConfirmModal(true);
+  };
+
+  const confirmMarkAsPaid = async () => {
+    if (!orderToMarkPaid) return;
+
+    setIsMarkingPaid(true);
+    try {
+      await markProcurementAsPaid(orderToMarkPaid._id, paymentNotes);
+      toast.success("Order marked as paid successfully!");
+      setShowMarkPaidConfirmModal(false);
+      setOrderToMarkPaid(null);
+      setPaymentNotes("");
+      loadPurchaseOrders();
+    } catch (error) {
+      console.error("Error marking as paid:", error);
+      toast.error(error.response?.data?.message || "Failed to mark as paid");
+    } finally {
+      setIsMarkingPaid(false);
+    }
+  };
+
+  const handleMarkAsDelivered = (order) => {
+    setOrderToMarkDelivered(order);
+    setDeliveryNotes("");
+    setShowMarkDeliveredModal(true);
+  };
+
+  const handleMarkAsDeliveredSubmit = () => {
+    setShowMarkDeliveredModal(false);
+    setShowMarkDeliveredConfirmModal(true);
+  };
+
+  const confirmMarkAsDelivered = async () => {
+    if (!orderToMarkDelivered) return;
+
+    setIsMarkingDelivered(true);
+    try {
+      await markProcurementAsDelivered(orderToMarkDelivered._id, deliveryNotes);
+      toast.success("Order marked as delivered successfully!");
+      setShowMarkDeliveredConfirmModal(false);
+      setOrderToMarkDelivered(null);
+      setDeliveryNotes("");
+      loadPurchaseOrders();
+    } catch (error) {
+      console.error("Error marking as delivered:", error);
+      toast.error(
+        error.response?.data?.message || "Failed to mark as delivered"
+      );
+    } finally {
+      setIsMarkingDelivered(false);
+    }
+  };
+
+  const handleEditOrder = (order) => {
+    setOrderToEdit(order);
+    setShowEditModal(true);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!orderToEdit) return;
+
+    setIsEditing(true);
+    try {
+      const form = document.getElementById("edit-procurement-form");
+      if (!form) {
+        throw new Error("Edit form not found");
+      }
+
+      const formData = new FormData(form);
+
+      const updatedSupplier = {
+        ...orderToEdit.supplier,
+        name: formData.get("supplierName") || orderToEdit.supplier?.name,
+        contactPerson:
+          formData.get("supplierContactPerson") ||
+          orderToEdit.supplier?.contactPerson,
+        email: formData.get("supplierEmail") || orderToEdit.supplier?.email,
+        phone: formData.get("supplierPhone") || orderToEdit.supplier?.phone,
+      };
+
+      // Build updated delivery address data
+      const updatedDeliveryAddress = {
+        ...orderToEdit.deliveryAddress,
+        contactPerson:
+          formData.get("deliveryContactPerson") ||
+          orderToEdit.deliveryAddress?.contactPerson,
+        phone:
+          formData.get("deliveryPhone") || orderToEdit.deliveryAddress?.phone,
+        street:
+          formData.get("deliveryStreet") || orderToEdit.deliveryAddress?.street,
+        city: formData.get("deliveryCity") || orderToEdit.deliveryAddress?.city,
+        state:
+          formData.get("deliveryState") || orderToEdit.deliveryAddress?.state,
+        postalCode:
+          formData.get("deliveryPostalCode") ||
+          orderToEdit.deliveryAddress?.postalCode,
+      };
+
+      // Items are not editable - they remain as they are
+
+      // Update the procurement order
+      await updateProcurement(orderToEdit._id, {
+        title: orderToEdit.title,
+        description: formData.get("description") || orderToEdit.description,
+        supplier: updatedSupplier,
+        deliveryAddress: updatedDeliveryAddress,
+        items: orderToEdit.items, // Keep original items since they're not editable
+        totalAmount: orderToEdit.totalAmount, // Keep original total since items aren't editable
+        expectedDeliveryDate:
+          formData.get("expectedDeliveryDate") ||
+          orderToEdit.expectedDeliveryDate,
+      });
+
+      // Resend email and PDF to supplier after update
+      await resendProcurementEmail(orderToEdit._id);
+
+      toast.success("Order updated and email sent to supplier successfully!");
+      setShowEditModal(false);
+      setOrderToEdit(null);
+      loadPurchaseOrders();
+    } catch (error) {
+      console.error("Error updating order:", error);
+      toast.error(error.response?.data?.message || "Failed to update order");
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
@@ -357,15 +575,20 @@ const PurchaseOrders = () => {
       accessor: "items",
       renderer: (order) => (
         <div className="space-y-1">
-          {order.items?.slice(0, 2).map((item, index) => (
-            <div key={index} className="text-xs">
-              <span className="font-medium text-gray-900">{item.name}</span>
-              <span className="text-gray-500 ml-1">({item.quantity}x)</span>
+          {order.items && order.items.length > 0 && (
+            <div className="text-xs">
+              <span className="font-medium text-gray-900">
+                {order.items[0].name}
+              </span>
+              <span className="text-gray-500 ml-1">
+                ({order.items[0].quantity}x)
+              </span>
             </div>
-          ))}
-          {order.items?.length > 2 && (
+          )}
+          {order.items && order.items.length > 1 && (
             <div className="text-xs text-gray-500">
-              +{order.items.length - 2} more items
+              +{order.items.length - 1} more item
+              {order.items.length - 1 > 1 ? "s" : ""}
             </div>
           )}
         </div>
@@ -431,32 +654,93 @@ const PurchaseOrders = () => {
       accessor: "actions",
       renderer: (order) => (
         <div className="flex items-center space-x-2">
+          {/* Status-specific action button */}
           {order.status === "draft" && (
             <button
-              onClick={() => handleCompleteOrder(order)}
-              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCompleteOrder(order);
+              }}
+              className="bg-green-500 hover:bg-green-600 text-white p-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
               title="Complete Order"
             >
               <CheckCircleIcon className="w-4 h-4" />
-              Complete
             </button>
           )}
+          {order.status === "pending" && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleMarkAsIssued(order);
+              }}
+              className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
+              title="Mark as Issued"
+            >
+              <DocumentCheckIcon className="w-4 h-4" />
+            </button>
+          )}
+          {order.status === "issued" && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleMarkAsPaid(order);
+              }}
+              className="bg-emerald-500 hover:bg-emerald-600 text-white p-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
+              title="Mark as Paid"
+            >
+              <BanknotesIcon className="w-4 h-4" />
+            </button>
+          )}
+          {order.status === "paid" && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleMarkAsDelivered(order);
+              }}
+              className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
+              title="Mark as Delivered"
+            >
+              <CheckCircleIcon className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Show Edit button for non-paid orders */}
+          {order.status !== "paid" && order.status !== "delivered" && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEditOrder(order);
+              }}
+              className="bg-purple-500 hover:bg-purple-600 text-white p-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
+              title="Edit Order"
+            >
+              <PencilIcon className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Always show View button */}
           <button
-            onClick={() => handleViewDetails(order)}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleViewDetails(order);
+            }}
+            className="bg-gray-500 hover:bg-gray-600 text-white p-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
             title="View Details"
           >
             <UserIcon className="w-4 h-4" />
-            View
           </button>
+
+          {/* Show Resend button when applicable */}
           {order.supplier?.email && order.status !== "draft" && (
             <button
-              onClick={() => handleResendEmail(order)}
-              className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleResendEmail(order);
+              }}
+              className="bg-orange-500 hover:bg-orange-600 text-white p-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
               title="Resend Email to Supplier"
             >
               <ArrowPathIcon className="w-4 h-4" />
-              Resend
             </button>
           )}
         </div>
@@ -689,7 +973,7 @@ const PurchaseOrders = () => {
 
       <div className="bg-white rounded-lg shadow-sm p-6">
         {/* Summary Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center">
               <ShoppingBagIcon className="h-8 w-8 text-[var(--elra-primary)] mr-3" />
@@ -732,12 +1016,20 @@ const PurchaseOrders = () => {
             <div className="flex items-center">
               <ClockIcon className="h-8 w-8 text-orange-600 mr-3" />
               <div>
-                <p className="text-sm text-gray-500">Pending Approval</p>
+                <p className="text-sm text-gray-500">Pending</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {
-                    purchaseOrders.filter((po) => po.status === "pending")
-                      .length
-                  }
+                  {stats.pending}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="flex items-center">
+              <CheckCircleIcon className="h-8 w-8 text-green-600 mr-3" />
+              <div>
+                <p className="text-sm text-gray-500">Delivered</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.delivered}
                 </p>
               </div>
             </div>
@@ -837,6 +1129,7 @@ const PurchaseOrders = () => {
           )}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
+          onRowClick={(order) => handleViewDetails(order)}
           actions={{
             showEdit: false,
             showDelete: false,
@@ -944,27 +1237,255 @@ const PurchaseOrders = () => {
                 </div>
               </div>
 
-              <div className="mb-6">
-                <h4 className="font-medium text-gray-900 mb-3">
-                  Supplier Information
-                </h4>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p>
-                    <span className="text-gray-600">Name:</span>{" "}
-                    {selectedOrder.supplier?.name}
-                  </p>
-                  <p>
-                    <span className="text-gray-600">Contact Person:</span>{" "}
-                    {selectedOrder.supplier?.contactPerson}
-                  </p>
-                  <p>
-                    <span className="text-gray-600">Email:</span>{" "}
-                    {selectedOrder.supplier?.email}
-                  </p>
-                  <p>
-                    <span className="text-gray-600">Phone:</span>{" "}
-                    {selectedOrder.supplier?.phone}
-                  </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">
+                    Supplier Information
+                  </h4>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p>
+                      <span className="text-gray-600">Name:</span>{" "}
+                      {selectedOrder.supplier?.name}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Contact Person:</span>{" "}
+                      {selectedOrder.supplier?.contactPerson}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Email:</span>{" "}
+                      {selectedOrder.supplier?.email}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Phone:</span>{" "}
+                      {selectedOrder.supplier?.phone}
+                    </p>
+                    {selectedOrder.supplier?.address && (
+                      <div className="mt-3">
+                        <span className="text-gray-600">Address:</span>
+                        <div className="text-sm text-gray-700 mt-1">
+                          {selectedOrder.supplier.address.street && (
+                            <p>{selectedOrder.supplier.address.street}</p>
+                          )}
+                          {selectedOrder.supplier.address.city && (
+                            <p>{selectedOrder.supplier.address.city}</p>
+                          )}
+                          {selectedOrder.supplier.address.state && (
+                            <p>{selectedOrder.supplier.address.state}</p>
+                          )}
+                          {selectedOrder.supplier.address.postalCode && (
+                            <p>{selectedOrder.supplier.address.postalCode}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">
+                    Delivery Information
+                  </h4>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    {selectedOrder.deliveryAddress ? (
+                      <>
+                        {selectedOrder.deliveryAddress.contactPerson && (
+                          <p>
+                            <span className="text-gray-600">
+                              Contact Person:
+                            </span>{" "}
+                            {selectedOrder.deliveryAddress.contactPerson}
+                          </p>
+                        )}
+                        {selectedOrder.deliveryAddress.phone && (
+                          <p>
+                            <span className="text-gray-600">Phone:</span>{" "}
+                            {selectedOrder.deliveryAddress.phone}
+                          </p>
+                        )}
+                        <div className="mt-3">
+                          <span className="text-gray-600">Address:</span>
+                          <div className="text-sm text-gray-700 mt-1">
+                            {selectedOrder.deliveryAddress.street && (
+                              <p>{selectedOrder.deliveryAddress.street}</p>
+                            )}
+                            {selectedOrder.deliveryAddress.city && (
+                              <p>{selectedOrder.deliveryAddress.city}</p>
+                            )}
+                            {selectedOrder.deliveryAddress.state && (
+                              <p>{selectedOrder.deliveryAddress.state}</p>
+                            )}
+                            {selectedOrder.deliveryAddress.postalCode && (
+                              <p>{selectedOrder.deliveryAddress.postalCode}</p>
+                            )}
+                          </div>
+                        </div>
+                        {selectedOrder.expectedDeliveryDate && (
+                          <p className="mt-3">
+                            <span className="text-gray-600">
+                              Expected Delivery:
+                            </span>{" "}
+                            {new Date(
+                              selectedOrder.expectedDeliveryDate
+                            ).toLocaleDateString()}
+                          </p>
+                        )}
+                        {selectedOrder.actualDeliveryDate && (
+                          <p>
+                            <span className="text-gray-600">
+                              Actual Delivery:
+                            </span>{" "}
+                            {new Date(
+                              selectedOrder.actualDeliveryDate
+                            ).toLocaleDateString()}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-gray-500 italic">
+                        No delivery address specified
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">
+                    Project Information
+                  </h4>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    {selectedOrder.relatedProject ? (
+                      <>
+                        <p>
+                          <span className="text-gray-600">Project Name:</span>{" "}
+                          {selectedOrder.relatedProject.name}
+                        </p>
+                        <p>
+                          <span className="text-gray-600">Project Code:</span>{" "}
+                          {selectedOrder.relatedProject.code}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-gray-500 italic">No related project</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">
+                    Approval Information
+                  </h4>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    {selectedOrder.approvedBy ? (
+                      <>
+                        <p>
+                          <span className="text-gray-600">Approved By:</span>{" "}
+                          {selectedOrder.approvedBy?.firstName}{" "}
+                          {selectedOrder.approvedBy?.lastName}
+                        </p>
+                        {selectedOrder.approvedDate && (
+                          <p>
+                            <span className="text-gray-600">
+                              Approved Date:
+                            </span>{" "}
+                            {new Date(
+                              selectedOrder.approvedDate
+                            ).toLocaleDateString()}
+                          </p>
+                        )}
+                        {selectedOrder.approvalNotes && (
+                          <div className="mt-3">
+                            <span className="text-gray-600">
+                              Approval Notes:
+                            </span>
+                            <p className="text-sm text-gray-700 mt-1">
+                              {selectedOrder.approvalNotes}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-gray-500 italic">Not yet approved</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">
+                    Payment & Delivery Tracking
+                  </h4>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    {selectedOrder.markedAsIssuedBy && (
+                      <p>
+                        <span className="text-gray-600">Issued By:</span>{" "}
+                        {selectedOrder.markedAsIssuedBy?.firstName}{" "}
+                        {selectedOrder.markedAsIssuedBy?.lastName}
+                      </p>
+                    )}
+                    {selectedOrder.issuedDate && (
+                      <p>
+                        <span className="text-gray-600">Issued Date:</span>{" "}
+                        {new Date(
+                          selectedOrder.issuedDate
+                        ).toLocaleDateString()}
+                      </p>
+                    )}
+                    {selectedOrder.markedAsPaidBy && (
+                      <p>
+                        <span className="text-gray-600">Paid By:</span>{" "}
+                        {selectedOrder.markedAsPaidBy?.firstName}{" "}
+                        {selectedOrder.markedAsPaidBy?.lastName}
+                      </p>
+                    )}
+                    {selectedOrder.paymentDate && (
+                      <p>
+                        <span className="text-gray-600">Payment Date:</span>{" "}
+                        {new Date(
+                          selectedOrder.paymentDate
+                        ).toLocaleDateString()}
+                      </p>
+                    )}
+                    {selectedOrder.markedAsDeliveredBy && (
+                      <p>
+                        <span className="text-gray-600">Delivered By:</span>{" "}
+                        {selectedOrder.markedAsDeliveredBy?.firstName}{" "}
+                        {selectedOrder.markedAsDeliveredBy?.lastName}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">
+                    Additional Information
+                  </h4>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p>
+                      <span className="text-gray-600">Currency:</span>{" "}
+                      {selectedOrder.currency || "NGN"}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Subtotal:</span>{" "}
+                      {formatCurrency(selectedOrder.subtotal)}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Tax:</span>{" "}
+                      {formatCurrency(selectedOrder.tax || 0)}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Shipping:</span>{" "}
+                      {formatCurrency(selectedOrder.shipping || 0)}
+                    </p>
+                    {selectedOrder.receivedPercentage !== undefined && (
+                      <p>
+                        <span className="text-gray-600">Received %:</span>{" "}
+                        {selectedOrder.receivedPercentage}%
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1022,8 +1543,15 @@ const PurchaseOrders = () => {
                   <h4 className="font-medium text-gray-900 mb-3">Notes</h4>
                   <div className="space-y-2">
                     {selectedOrder.notes.map((note, index) => (
-                      <div key={index} className="bg-gray-50 p-3 rounded">
-                        <p className="text-sm text-gray-600">{note}</p>
+                      <div
+                        key={note._id || index}
+                        className="bg-gray-50 p-3 rounded"
+                      >
+                        <p className="text-sm text-gray-600">{note.content}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {new Date(note.createdAt).toLocaleDateString()} -{" "}
+                          {note.author?.firstName} {note.author?.lastName}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -1872,12 +2400,12 @@ const PurchaseOrders = () => {
             {/* Header */}
             <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white p-6 rounded-t-xl">
               <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center mr-4">
-                    <ArrowPathIcon className="w-6 h-6 text-white" />
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <ArrowPathIcon className="w-8 h-8 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold">Resend Email</h2>
+                    <h2 className="text-2xl font-bold">Resend Email</h2>
                     <p className="text-white text-opacity-90 text-sm">
                       Confirm resending to supplier
                     </p>
@@ -1944,6 +2472,1090 @@ const PurchaseOrders = () => {
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mark as Issued Modal - ELRA Branded */}
+      {showMarkIssuedModal && orderToMarkIssued && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] flex flex-col">
+            {/* Header - ELRA Branded */}
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-t-2xl flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <DocumentCheckIcon className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">Mark as Issued</h2>
+                    <p className="text-white text-opacity-90 mt-1 text-sm">
+                      {orderToMarkIssued.poNumber} - Confirm supplier acceptance
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowMarkIssuedModal(false)}
+                  className="text-white hover:text-gray-200 transition-colors"
+                >
+                  <XMarkIcon className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 flex-1 overflow-y-auto">
+              <div className="space-y-6">
+                {/* Order Summary */}
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                    <ShoppingBagIcon className="w-5 h-5 mr-2 text-blue-500" />
+                    Order Summary
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">PO Number:</span>
+                      <span className="ml-2 font-medium">
+                        {orderToMarkIssued.poNumber}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Total Amount:</span>
+                      <span className="ml-2 font-medium text-green-600">
+                        ₦{orderToMarkIssued.totalAmount?.toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Supplier:</span>
+                      <span className="ml-2 font-medium">
+                        {orderToMarkIssued.supplier?.name}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Status:</span>
+                      <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                        {orderToMarkIssued.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Confirmation Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Confirmation Notes (Optional)
+                  </label>
+                  <textarea
+                    value={confirmationNotes}
+                    onChange={(e) => setConfirmationNotes(e.target.value)}
+                    placeholder="Add any notes about supplier confirmation, delivery timeline, or special instructions..."
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    rows={4}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    These notes will be added to the order history
+                  </p>
+                </div>
+
+                {/* Warning Message */}
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <DocumentCheckIcon className="w-5 h-5 text-blue-500" />
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-blue-800">
+                        Confirm Supplier Acceptance
+                      </h3>
+                      <p className="text-sm text-blue-700 mt-1">
+                        This action confirms that the supplier has accepted the
+                        order and will proceed with fulfillment. Make sure you
+                        have received confirmation from the supplier before
+                        proceeding.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-200 flex-shrink-0">
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowMarkIssuedModal(false)}
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleMarkAsIssuedSubmit}
+                  className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl transition-colors font-medium flex items-center space-x-2"
+                >
+                  <DocumentCheckIcon className="w-4 h-4" />
+                  <span>Continue to Confirm</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mark as Issued Confirmation Modal - ELRA Branded */}
+      {showMarkIssuedConfirmModal && orderToMarkIssued && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] flex flex-col">
+            {/* Header - ELRA Branded */}
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-t-2xl flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <DocumentCheckIcon className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">
+                      Confirm Order Issuance
+                    </h2>
+                    <p className="text-white text-opacity-90 mt-1 text-sm">
+                      {orderToMarkIssued.poNumber} - Final confirmation
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowMarkIssuedConfirmModal(false)}
+                  className="text-white hover:text-gray-200 transition-colors"
+                >
+                  <XMarkIcon className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 flex-1 overflow-y-auto">
+              <div className="space-y-6">
+                {/* Order Details */}
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                    <ShoppingBagIcon className="w-5 h-5 mr-2 text-blue-500" />
+                    Order Details
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">PO Number:</span>
+                      <span className="ml-2 font-medium">
+                        {orderToMarkIssued.poNumber}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Total Amount:</span>
+                      <span className="ml-2 font-medium text-green-600">
+                        ₦{orderToMarkIssued.totalAmount?.toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Supplier:</span>
+                      <span className="ml-2 font-medium">
+                        {orderToMarkIssued.supplier?.name}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Contact:</span>
+                      <span className="ml-2 font-medium">
+                        {orderToMarkIssued.supplier?.email}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Confirmation Notes Display */}
+                {confirmationNotes && (
+                  <div className="bg-blue-50 rounded-xl p-4">
+                    <h3 className="font-semibold text-blue-900 mb-2 flex items-center">
+                      <DocumentCheckIcon className="w-4 h-4 mr-2" />
+                      Confirmation Notes
+                    </h3>
+                    <p className="text-blue-800 text-sm">{confirmationNotes}</p>
+                  </div>
+                )}
+
+                {/* Warning Message */}
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <ClockIcon className="w-5 h-5 text-yellow-500" />
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-yellow-800">
+                        Final Confirmation Required
+                      </h3>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        This will mark the order as officially issued to the
+                        supplier. The supplier has confirmed acceptance and will
+                        proceed with fulfillment. This action cannot be undone.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-200 flex-shrink-0">
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowMarkIssuedConfirmModal(false)}
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                  disabled={isMarkingIssued}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmMarkAsIssued}
+                  disabled={isMarkingIssued}
+                  className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl transition-colors font-medium flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isMarkingIssued ? (
+                    <>
+                      <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                      <span>Confirming...</span>
+                    </>
+                  ) : (
+                    <>
+                      <DocumentCheckIcon className="w-4 h-4" />
+                      <span>Confirm Issuance</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mark as Paid Modal - ELRA Branded */}
+      {showMarkPaidModal && orderToMarkPaid && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] flex flex-col">
+            {/* Header - ELRA Branded */}
+            <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white p-6 rounded-t-2xl flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <BanknotesIcon className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">Mark as Paid</h2>
+                    <p className="text-white text-opacity-90 mt-1 text-sm">
+                      {orderToMarkPaid.poNumber} - Confirm payment completion
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowMarkPaidModal(false)}
+                  className="text-white hover:text-gray-200 transition-colors p-2 hover:bg-white hover:bg-opacity-10 rounded-full"
+                  disabled={loading}
+                >
+                  <XMarkIcon className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-8 bg-white">
+              <div className="space-y-6">
+                {/* Order Summary */}
+                <div className="bg-gray-50 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                    Order Summary
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-sm text-gray-600">PO Number:</span>
+                      <p className="font-medium">{orderToMarkPaid.poNumber}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm text-gray-600">Supplier:</span>
+                      <p className="font-medium">
+                        {orderToMarkPaid.supplier?.name}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-sm text-gray-600">
+                        Total Amount:
+                      </span>
+                      <p className="font-medium text-emerald-600">
+                        {formatCurrency(orderToMarkPaid.totalAmount)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-sm text-gray-600">
+                        Current Status:
+                      </span>
+                      <p className="font-medium capitalize">
+                        {orderToMarkPaid.status}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payment Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Payment Notes (Optional)
+                  </label>
+                  <textarea
+                    value={paymentNotes}
+                    onChange={(e) => setPaymentNotes(e.target.value)}
+                    rows={4}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors resize-none"
+                    placeholder="Add any notes about the payment (e.g., payment method, reference number, etc.)"
+                  />
+                </div>
+
+                {/* Confirmation Message */}
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <CheckCircleIcon className="w-5 h-5 text-emerald-500 mt-0.5 mr-3 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-medium text-emerald-800">
+                        Confirm Payment Completion
+                      </h4>
+                      <p className="text-sm text-emerald-700 mt-1">
+                        This action will mark the order as paid and update the
+                        payment status. The supplier will be notified of the
+                        payment completion.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end space-x-3 p-6 bg-gray-50 rounded-b-2xl">
+              <button
+                type="button"
+                onClick={() => setShowMarkPaidModal(false)}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMarkAsPaidSubmit}
+                disabled={loading}
+                className="px-6 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              >
+                <BanknotesIcon className="h-4 w-4 mr-2" />
+                Continue to Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mark as Delivered Modal - ELRA Branded */}
+      {showMarkDeliveredModal && orderToMarkDelivered && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] flex flex-col">
+            {/* Header - ELRA Branded */}
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-t-2xl flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <CheckCircleIcon className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">Mark as Delivered</h2>
+                    <p className="text-white text-opacity-90 mt-1 text-sm">
+                      {orderToMarkDelivered.poNumber} - Confirm delivery
+                      completion
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowMarkDeliveredModal(false)}
+                  className="text-white hover:text-gray-200 transition-colors p-2 hover:bg-white hover:bg-opacity-10 rounded-full"
+                  disabled={loading}
+                >
+                  <XMarkIcon className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-8 bg-white">
+              <div className="space-y-6">
+                {/* Order Summary */}
+                <div className="bg-gray-50 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                    Order Summary
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-sm text-gray-600">PO Number:</span>
+                      <p className="font-medium">
+                        {orderToMarkDelivered.poNumber}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-sm text-gray-600">Supplier:</span>
+                      <p className="font-medium">
+                        {orderToMarkDelivered.supplier?.name}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-sm text-gray-600">
+                        Total Amount:
+                      </span>
+                      <p className="font-medium text-blue-600">
+                        {formatCurrency(orderToMarkDelivered.totalAmount)}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-sm text-gray-600">
+                        Current Status:
+                      </span>
+                      <p className="font-medium capitalize">
+                        {orderToMarkDelivered.status}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Delivery Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Delivery Notes (Optional)
+                  </label>
+                  <textarea
+                    value={deliveryNotes}
+                    onChange={(e) => setDeliveryNotes(e.target.value)}
+                    rows={4}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
+                    placeholder="Add any notes about the delivery (e.g., delivery method, condition of items, etc.)"
+                  />
+                </div>
+
+                {/* Confirmation Message */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <CheckCircleIcon className="w-5 h-5 text-blue-500 mt-0.5 mr-3 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-medium text-blue-800">
+                        Confirm Delivery Completion
+                      </h4>
+                      <p className="text-sm text-blue-700 mt-1">
+                        This action will mark the order as delivered and update
+                        the delivery status. The order will be considered
+                        completed and ready for inventory.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end space-x-3 p-6 bg-gray-50 rounded-b-2xl">
+              <button
+                type="button"
+                onClick={() => setShowMarkDeliveredModal(false)}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMarkAsDeliveredSubmit}
+                disabled={loading}
+                className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              >
+                <CheckCircleIcon className="h-4 w-4 mr-2" />
+                Continue to Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mark as Paid Confirmation Modal - ELRA Branded */}
+      {showMarkPaidConfirmModal && orderToMarkPaid && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[95vh] flex flex-col">
+            {/* Header - ELRA Branded */}
+            <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white p-6 rounded-t-2xl flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <BanknotesIcon className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">Confirm Payment</h2>
+                    <p className="text-white text-opacity-90 mt-1 text-sm">
+                      Final confirmation to mark as paid
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowMarkPaidConfirmModal(false)}
+                  className="text-white hover:text-gray-200 transition-colors p-2 hover:bg-white hover:bg-opacity-10 rounded-full"
+                  disabled={isMarkingPaid}
+                >
+                  <XMarkIcon className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-8 bg-white">
+              <div className="space-y-6">
+                {/* Order Summary */}
+                <div className="bg-gray-50 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                    Order Details
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">PO Number:</span>
+                      <span className="font-medium">
+                        {orderToMarkPaid.poNumber}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Supplier:</span>
+                      <span className="font-medium">
+                        {orderToMarkPaid.supplier?.name}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">
+                        Total Amount:
+                      </span>
+                      <span className="font-medium text-emerald-600">
+                        {formatCurrency(orderToMarkPaid.totalAmount)}
+                      </span>
+                    </div>
+                    {paymentNotes && (
+                      <div className="pt-3 border-t border-gray-200">
+                        <span className="text-sm text-gray-600">
+                          Payment Notes:
+                        </span>
+                        <p className="text-sm text-gray-800 mt-1 italic">
+                          "{paymentNotes}"
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Warning Message */}
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <div className="w-5 h-5 text-amber-500 mt-0.5 mr-3 flex-shrink-0">
+                      ⚠️
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-amber-800">
+                        Are you sure you want to mark this order as paid?
+                      </h4>
+                      <p className="text-sm text-amber-700 mt-1">
+                        This action cannot be undone. Please ensure you have
+                        received payment confirmation from the supplier.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end space-x-3 p-6 bg-gray-50 rounded-b-2xl">
+              <button
+                type="button"
+                onClick={() => setShowMarkPaidConfirmModal(false)}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                disabled={isMarkingPaid}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmMarkAsPaid}
+                disabled={isMarkingPaid}
+                className="px-6 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              >
+                {isMarkingPaid ? (
+                  <>
+                    <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <BanknotesIcon className="h-4 w-4 mr-2" />
+                    Confirm Payment
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mark as Delivered Confirmation Modal - ELRA Branded */}
+      {showMarkDeliveredConfirmModal && orderToMarkDelivered && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[95vh] flex flex-col">
+            {/* Header - ELRA Branded */}
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-t-2xl flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <CheckCircleIcon className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">Confirm Delivery</h2>
+                    <p className="text-white text-opacity-90 mt-1 text-sm">
+                      Final confirmation to mark as delivered
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowMarkDeliveredConfirmModal(false)}
+                  className="text-white hover:text-gray-200 transition-colors p-2 hover:bg-white hover:bg-opacity-10 rounded-full"
+                  disabled={isMarkingDelivered}
+                >
+                  <XMarkIcon className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-8 bg-white">
+              <div className="space-y-6">
+                {/* Order Summary */}
+                <div className="bg-gray-50 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                    Order Details
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">PO Number:</span>
+                      <span className="font-medium">
+                        {orderToMarkDelivered.poNumber}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Supplier:</span>
+                      <span className="font-medium">
+                        {orderToMarkDelivered.supplier?.name}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">
+                        Total Amount:
+                      </span>
+                      <span className="font-medium text-blue-600">
+                        {formatCurrency(orderToMarkDelivered.totalAmount)}
+                      </span>
+                    </div>
+                    {deliveryNotes && (
+                      <div className="pt-3 border-t border-gray-200">
+                        <span className="text-sm text-gray-600">
+                          Delivery Notes:
+                        </span>
+                        <p className="text-sm text-gray-800 mt-1 italic">
+                          "{deliveryNotes}"
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Warning Message */}
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <div className="w-5 h-5 text-amber-500 mt-0.5 mr-3 flex-shrink-0">
+                      ⚠️
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-amber-800">
+                        Are you sure you want to mark this order as delivered?
+                      </h4>
+                      <p className="text-sm text-amber-700 mt-1">
+                        This action cannot be undone. Please ensure all items
+                        have been received and are in good condition.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end space-x-3 p-6 bg-gray-50 rounded-b-2xl">
+              <button
+                type="button"
+                onClick={() => setShowMarkDeliveredConfirmModal(false)}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                disabled={isMarkingDelivered}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmMarkAsDelivered}
+                disabled={isMarkingDelivered}
+                className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              >
+                {isMarkingDelivered ? (
+                  <>
+                    <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircleIcon className="h-4 w-4 mr-2" />
+                    Confirm Delivery
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Order Modal - ELRA Branded */}
+      {showEditModal && orderToEdit && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[95vh] flex flex-col">
+            {/* Header - ELRA Branded */}
+            <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6 rounded-t-2xl flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <PencilIcon className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">
+                      Edit Procurement Order
+                    </h2>
+                    <p className="text-white text-opacity-90 mt-1 text-sm">
+                      {orderToEdit.poNumber} - Update order details
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="text-white hover:text-gray-200 transition-colors"
+                  disabled={isEditing}
+                >
+                  <XMarkIcon className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 flex-1 overflow-y-auto">
+              <div className="space-y-6">
+                {/* Order Summary */}
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                    <ShoppingBagIcon className="w-5 h-5 mr-2 text-purple-500" />
+                    Current Order Details
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">PO Number:</span>
+                      <span className="ml-2 font-medium">
+                        {orderToEdit.poNumber}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Total Amount:</span>
+                      <span className="ml-2 font-medium text-green-600">
+                        ₦{orderToEdit.totalAmount?.toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Supplier:</span>
+                      <span className="ml-2 font-medium">
+                        {orderToEdit.supplier?.name}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Status:</span>
+                      <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                        {orderToEdit.status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Project Items - Uneditable (OUTSIDE FORM) */}
+                {orderToEdit.relatedProject && (
+                  <div className="mb-6">
+                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <BuildingOfficeIcon className="w-5 h-5 mr-2 text-blue-500" />
+                      Project Items (Read Only)
+                    </h3>
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600">Project Name:</span>
+                          <span className="ml-2 font-medium">
+                            {orderToEdit.relatedProject.name}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Project Code:</span>
+                          <span className="ml-2 font-medium">
+                            {orderToEdit.relatedProject.code}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <span className="text-gray-600">Project Items:</span>
+                        <div className="mt-2 space-y-2">
+                          {orderToEdit.items?.map((item, index) => (
+                            <div
+                              key={index}
+                              className="bg-white p-3 rounded-lg border"
+                            >
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <span className="font-medium text-gray-900">
+                                    {item.name}
+                                  </span>
+                                  <p className="text-sm text-gray-600 mt-1">
+                                    {item.description}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-sm text-gray-600">
+                                    Qty: {item.quantity}
+                                  </span>
+                                  <p className="text-sm font-medium text-green-600">
+                                    ₦{item.unitPrice?.toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Edit Form */}
+                <form id="edit-procurement-form" className="space-y-6">
+                  {/* Supplier Information */}
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-3">
+                      Supplier Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Supplier Name
+                        </label>
+                        <input
+                          type="text"
+                          name="supplierName"
+                          defaultValue={orderToEdit.supplier?.name || ""}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Contact Person
+                        </label>
+                        <input
+                          type="text"
+                          name="supplierContactPerson"
+                          defaultValue={
+                            orderToEdit.supplier?.contactPerson || ""
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Email
+                        </label>
+                        <input
+                          type="email"
+                          name="supplierEmail"
+                          defaultValue={orderToEdit.supplier?.email || ""}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Phone
+                        </label>
+                        <input
+                          type="tel"
+                          name="supplierPhone"
+                          defaultValue={orderToEdit.supplier?.phone || ""}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Delivery Information */}
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-3">
+                      Delivery Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Delivery Contact Person
+                        </label>
+                        <input
+                          type="text"
+                          name="deliveryContactPerson"
+                          defaultValue={
+                            orderToEdit.deliveryAddress?.contactPerson || ""
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Delivery Phone
+                        </label>
+                        <input
+                          type="tel"
+                          name="deliveryPhone"
+                          defaultValue={
+                            orderToEdit.deliveryAddress?.phone || ""
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Street Address
+                        </label>
+                        <input
+                          type="text"
+                          name="deliveryStreet"
+                          defaultValue={
+                            orderToEdit.deliveryAddress?.street || ""
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          City
+                        </label>
+                        <input
+                          type="text"
+                          name="deliveryCity"
+                          defaultValue={orderToEdit.deliveryAddress?.city || ""}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          State
+                        </label>
+                        <input
+                          type="text"
+                          name="deliveryState"
+                          defaultValue={
+                            orderToEdit.deliveryAddress?.state || ""
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Postal Code
+                        </label>
+                        <input
+                          type="text"
+                          name="deliveryPostalCode"
+                          defaultValue={
+                            orderToEdit.deliveryAddress?.postalCode || ""
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Expected Delivery Date
+                        </label>
+                        <input
+                          type="date"
+                          name="expectedDeliveryDate"
+                          defaultValue={
+                            orderToEdit.expectedDeliveryDate
+                              ? new Date(orderToEdit.expectedDeliveryDate)
+                                  .toISOString()
+                                  .split("T")[0]
+                              : ""
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Order Description */}
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-3">
+                      Order Description
+                    </h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Description
+                      </label>
+                      <textarea
+                        rows={3}
+                        name="description"
+                        defaultValue={orderToEdit.description || ""}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                        placeholder="Enter order description..."
+                      />
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-200 flex-shrink-0">
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+                  disabled={isEditing}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEditSubmit}
+                  disabled={isEditing}
+                  className="px-6 py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl transition-colors font-medium flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isEditing ? (
+                    <>
+                      <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                      <span>Updating & Sending Email...</span>
+                    </>
+                  ) : (
+                    <>
+                      <PencilIcon className="w-4 h-4" />
+                      <span>Update & Send Email</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

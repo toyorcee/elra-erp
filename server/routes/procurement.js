@@ -14,8 +14,15 @@ import {
   addNote,
   completeProcurementOrder,
   resendProcurementEmail,
+  markAsIssued,
+  markAsPaid,
+  markAsDelivered,
 } from "../controllers/procurementController.js";
-import { protect, checkRole, checkProcurementAccess } from "../middleware/auth.js";
+import {
+  protect,
+  checkRole,
+  checkProcurementAccess,
+} from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -115,16 +122,30 @@ router.get("/overdue-deliveries", checkRole(600), getOverdueDeliveries);
 router.get("/:id", checkRole(600), getProcurementById);
 
 // Create new procurement - Procurement HOD+
-router.post("/", checkProcurementAccess, validateProcurement, createProcurement);
+router.post(
+  "/",
+  checkProcurementAccess,
+  validateProcurement,
+  createProcurement
+);
 
 // Update procurement - Procurement HOD+
-router.put("/:id", checkProcurementAccess, validateProcurement, updateProcurement);
+router.put(
+  "/:id",
+  checkProcurementAccess,
+  validateProcurement,
+  updateProcurement
+);
 
 // Complete draft procurement order - Procurement HOD+
 router.put("/:id/complete", checkProcurementAccess, completeProcurementOrder);
 
 // Resend procurement email - Procurement HOD+
-router.post("/:id/resend-email", checkProcurementAccess, resendProcurementEmail);
+router.post(
+  "/:id/resend-email",
+  checkProcurementAccess,
+  resendProcurementEmail
+);
 
 // Delete procurement - Procurement HOD+
 router.delete("/:id", checkProcurementAccess, deleteProcurement);
@@ -137,5 +158,14 @@ router.post("/:id/receive", checkRole(600), validateReceipt, receiveItems);
 
 // Notes routes - Manager+
 router.post("/:id/notes", checkRole(600), validateNote, addNote);
+
+// Mark as issued - Procurement HOD+
+router.put("/:id/mark-issued", checkProcurementAccess, markAsIssued);
+
+// Mark as paid - Procurement HOD+
+router.put("/:id/mark-paid", checkProcurementAccess, markAsPaid);
+
+// Mark as delivered - Procurement HOD+
+router.put("/:id/mark-delivered", checkProcurementAccess, markAsDelivered);
 
 export default router;

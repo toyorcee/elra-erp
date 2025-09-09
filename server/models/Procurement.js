@@ -27,15 +27,7 @@ const procurementSchema = new mongoose.Schema(
     // Purchase Order Status
     status: {
       type: String,
-      enum: [
-        "draft",
-        "pending",
-        "approved",
-        "issued",
-        "delivered",
-        "completed",
-        "cancelled",
-      ],
+      enum: ["draft", "pending", "issued", "paid", "delivered", "cancelled"],
       default: "draft",
       required: true,
     },
@@ -178,6 +170,24 @@ const procurementSchema = new mongoose.Schema(
     },
     actualDeliveryDate: {
       type: Date,
+    },
+    issuedDate: {
+      type: Date,
+    },
+    markedAsIssuedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    paymentDate: {
+      type: Date,
+    },
+    markedAsPaidBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    markedAsDeliveredBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
     },
 
     // Approval Information

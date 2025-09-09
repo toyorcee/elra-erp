@@ -1,8 +1,10 @@
 import Procurement from "../models/Procurement.js";
 import User from "../models/User.js";
+import Transaction from "../models/Transaction.js";
 import { sendEmail } from "../services/emailService.js";
 import { generateProcurementOrderPDF } from "../utils/pdfUtils.js";
 import nodemailer from "nodemailer";
+import mongoose from "mongoose";
 
 // ============================================================================
 // EMAIL FUNCTIONS
@@ -260,6 +262,9 @@ export const getAllProcurement = async (req, res) => {
     const procurement = await Procurement.find(query)
       .populate("createdBy", "firstName lastName email")
       .populate("approvedBy", "firstName lastName email")
+      .populate("markedAsIssuedBy", "firstName lastName email")
+      .populate("markedAsPaidBy", "firstName lastName email")
+      .populate("markedAsDeliveredBy", "firstName lastName email")
       .populate("relatedProject", "name code")
       .sort({ createdAt: -1 });
 
@@ -289,6 +294,9 @@ export const getProcurementById = async (req, res) => {
     const procurement = await Procurement.findById(id)
       .populate("createdBy", "firstName lastName email")
       .populate("approvedBy", "firstName lastName email")
+      .populate("markedAsIssuedBy", "firstName lastName email")
+      .populate("markedAsPaidBy", "firstName lastName email")
+      .populate("markedAsDeliveredBy", "firstName lastName email")
       .populate("relatedProject", "name code")
       .populate("notes.author", "firstName lastName");
 
@@ -954,6 +962,322 @@ export const resendProcurementEmail = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error resending email",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Mark procurement order as issued (supplier confirmed)
+// @route   PUT /api/procurement/:id/mark-issued
+// @access  Private (Procurement HOD+)
+export const markAsIssued = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const { id } = req.params;
+    const { confirmationNotes } = req.body;
+
+    console.log(
+      `\n📋 [PROCUREMENT] Marking as issued - PO ID: ${id} by ${currentUser.firstName} ${currentUser.lastName}`
+    );
+
+    // Find the procurement order
+    const procurement = await Procurement.findById(id);
+
+    if (!procurement) {
+      return res.status(404).json({
+        success: false,
+        message: "Procurement order not found",
+      });
+    }
+
+    // Check if already issued
+    if (procurement.status === "issued") {
+      return res.status(400).json({
+        success: false,
+        message: "This procurement order is already marked as issued",
+      });
+    }
+
+    // Check if order is in a valid state to be marked as issued
+    if (procurement.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Only pending orders can be marked as issued",
+      });
+    }
+
+    // Update the procurement order
+    procurement.status = "issued";
+    procurement.issuedDate = new Date();
+    procurement.markedAsIssuedBy = currentUser._id;
+    procurement.updatedBy = currentUser._id;
+
+    // Add confirmation note if provided
+    if (confirmationNotes) {
+      procurement.notes.push({
+        content: `Order confirmed by supplier: ${confirmationNotes}`,
+        author: currentUser._id,
+        isPrivate: false,
+      });
+    } else {
+      procurement.notes.push({
+        content: "Order confirmed by supplier and marked as issued",
+        author: currentUser._id,
+        isPrivate: false,
+      });
+    }
+
+    await procurement.save();
+
+    // Populate the updated procurement order
+    const updatedProcurement = await Procurement.findById(id).populate([
+      { path: "createdBy", select: "firstName lastName email" },
+      { path: "approvedBy", select: "firstName lastName email" },
+      { path: "markedAsIssuedBy", select: "firstName lastName email" },
+      { path: "relatedProject", select: "name code" },
+    ]);
+
+    console.log(
+      `✅ [PROCUREMENT] Order ${procurement.poNumber} marked as issued successfully`
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Procurement order marked as issued successfully",
+      data: updatedProcurement,
+    });
+  } catch (error) {
+    console.error("❌ [PROCUREMENT] Error marking as issued:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Mark procurement order as paid
+// @route   PUT /api/procurement/:id/mark-paid
+// @access  Private (Procurement HOD+)
+export const markAsPaid = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const { id } = req.params;
+    const { paymentNotes } = req.body;
+
+    console.log(
+      `\n💰 [PROCUREMENT] Marking as paid - PO ID: ${id} by ${currentUser.firstName} ${currentUser.lastName}`
+    );
+
+    // Find the procurement order
+    const procurement = await Procurement.findById(id);
+
+    if (!procurement) {
+      return res.status(404).json({
+        success: false,
+        message: "Procurement order not found",
+      });
+    }
+
+    // Check if already paid
+    if (procurement.status === "paid") {
+      return res.status(400).json({
+        success: false,
+        message: "This procurement order is already marked as paid",
+      });
+    }
+
+    // Check if order is in a valid state to be marked as paid
+    if (!["issued"].includes(procurement.status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Only issued orders can be marked as paid",
+      });
+    }
+
+    // Update the procurement order
+    procurement.status = "paid";
+    procurement.paidAmount = procurement.totalAmount;
+    procurement.paymentDate = new Date();
+    procurement.markedAsPaidBy = currentUser._id;
+    procurement.updatedBy = currentUser._id;
+
+    // Add payment note if provided
+    if (paymentNotes) {
+      procurement.notes.push({
+        content: `Payment completed: ${paymentNotes}`,
+        author: currentUser._id,
+        isPrivate: false,
+      });
+    } else {
+      procurement.notes.push({
+        content: "Order marked as paid",
+        author: currentUser._id,
+        isPrivate: false,
+      });
+    }
+
+    await procurement.save();
+
+    // Create transaction record for audit trail
+    try {
+      const paymentData = {
+        procurementOrder: procurement._id,
+        amount: procurement.totalAmount,
+        currency: procurement.currency || 'NGN',
+        description: `Payment for Procurement Order ${procurement.poNumber}`,
+        paymentMethod: 'manual',
+        supplier: {
+          name: procurement.supplier.name,
+          email: procurement.supplier.email,
+          contactPerson: procurement.supplier.contactPerson,
+          phone: procurement.supplier.phone,
+        },
+        processedBy: currentUser._id,
+        notes: paymentNotes || 'Payment marked as completed',
+      };
+
+      await Transaction.createProcurementPayment(paymentData);
+      console.log(`✅ [TRANSACTION] Payment transaction created for PO: ${procurement.poNumber}`);
+    } catch (transactionError) {
+      console.error("❌ [TRANSACTION] Error creating payment transaction:", transactionError);
+    }
+
+    const updatedProcurement = await Procurement.findById(id)
+      .populate("createdBy", "firstName lastName email")
+      .populate("approvedBy", "firstName lastName email")
+      .populate("markedAsPaidBy", "firstName lastName email")
+      .populate("relatedProject", "name code");
+
+    console.log(
+      `✅ [PROCUREMENT] Successfully marked as paid - PO: ${procurement.poNumber}`
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Procurement order marked as paid successfully",
+      data: updatedProcurement,
+    });
+  } catch (error) {
+    console.error("❌ [PROCUREMENT] Mark as paid error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error marking procurement order as paid",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Mark procurement order as delivered
+// @route   PUT /api/procurement/:id/mark-delivered
+// @access  Private (Procurement HOD+)
+export const markAsDelivered = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const { id } = req.params;
+    const { deliveryNotes } = req.body;
+
+    console.log(
+      `\n📦 [PROCUREMENT] Marking as delivered - PO ID: ${id} by ${currentUser.firstName} ${currentUser.lastName}`
+    );
+
+    // Find the procurement order
+    const procurement = await Procurement.findById(id);
+
+    if (!procurement) {
+      return res.status(404).json({
+        success: false,
+        message: "Procurement order not found",
+      });
+    }
+
+    // Check if already delivered
+    if (procurement.status === "delivered") {
+      return res.status(400).json({
+        success: false,
+        message: "This procurement order is already marked as delivered",
+      });
+    }
+
+    // Check if order is in a valid state to be marked as delivered
+    if (!["paid", "issued"].includes(procurement.status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Only paid or issued orders can be marked as delivered",
+      });
+    }
+
+    // Update the procurement order
+    procurement.status = "delivered";
+    procurement.actualDeliveryDate = new Date();
+    procurement.markedAsDeliveredBy = currentUser._id;
+    procurement.updatedBy = currentUser._id;
+
+    // Add delivery note if provided
+    if (deliveryNotes) {
+      procurement.notes.push({
+        content: `Delivery completed: ${deliveryNotes}`,
+        author: currentUser._id,
+        isPrivate: false,
+      });
+    } else {
+      procurement.notes.push({
+        content: "Order marked as delivered",
+        author: currentUser._id,
+        isPrivate: false,
+      });
+    }
+
+    await procurement.save();
+
+    // Populate the updated procurement order
+    const updatedProcurement = await Procurement.findById(id)
+      .populate("createdBy", "firstName lastName email")
+      .populate("approvedBy", "firstName lastName email")
+      .populate("markedAsPaidBy", "firstName lastName email")
+      .populate("markedAsDeliveredBy", "firstName lastName email")
+      .populate("relatedProject", "name code");
+
+    console.log(
+      `✅ [PROCUREMENT] Successfully marked as delivered - PO: ${procurement.poNumber}`
+    );
+
+    if (procurement.relatedProject) {
+      try {
+        console.log(
+          `📦 [INVENTORY] Triggering inventory creation for project: ${procurement.relatedProject}`
+        );
+
+        const Project = mongoose.model("Project");
+        const project = await Project.findById(procurement.relatedProject);
+
+        if (project) {
+          await project.createInventoryFromProcurement(
+            procurement,
+            currentUser
+          );
+          console.log(
+            `✅ [INVENTORY] Inventory creation triggered successfully for project: ${project.name}`
+          );
+        }
+      } catch (inventoryError) {
+        console.error(
+          "❌ [INVENTORY] Error triggering inventory creation:",
+          inventoryError
+        );
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Procurement order marked as delivered successfully",
+      data: updatedProcurement,
+    });
+  } catch (error) {
+    console.error("❌ [PROCUREMENT] Mark as delivered error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error marking procurement order as delivered",
       error: error.message,
     });
   }

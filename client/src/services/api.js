@@ -195,6 +195,16 @@ export const authAPI = {
     }
   },
 
+  verifyInvitation: async (code) => {
+    try {
+      const response = await api.post("/invitations/verify", { code });
+      return response.data;
+    } catch (error) {
+      console.error("[authAPI.verifyInvitation] Error:", error);
+      throw error;
+    }
+  },
+
   refreshToken: async () => {
     try {
       const response = await api.post("/auth/refresh");

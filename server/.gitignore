@@ -128,4 +128,7 @@ uploads/*
 
 # Backup files
 *.bak
-*.backup 
+*.backup
+
+# Scripts directory (development/maintenance scripts)
+scripts/ 

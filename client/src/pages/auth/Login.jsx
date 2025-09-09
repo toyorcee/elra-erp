@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { HiMail, HiLockClosed, HiKey } from "react-icons/hi";
 import { MdVisibility, MdVisibilityOff } from "react-icons/md";
 import { useAuth } from "../../context/AuthContext";
+import { authAPI } from "../../services/api";
 import ELRALogo from "../../components/ELRALogo";
 import elraImage from "../../assets/ERPModuleLogin.jpeg";
 
@@ -85,15 +86,9 @@ const Login = () => {
 
     setVerifyingCode(true);
     try {
-      const response = await fetch("/api/invitations/verify", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ code: invitationCode.trim().toUpperCase() }),
-      });
-
-      const data = await response.json();
+      const data = await authAPI.verifyInvitation(
+        invitationCode.trim().toUpperCase()
+      );
 
       if (data.success) {
         navigate(`/welcome?code=${invitationCode.trim().toUpperCase()}`);
@@ -112,7 +107,7 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-gray-50 md:bg-cover md:bg-center relative">
       {/* Background image only visible on medium screens and above */}
       <div className="hidden md:block absolute inset-0 bg-white/20 z-0"></div>
-      <div 
+      <div
         className="hidden md:block absolute inset-0 z-0"
         style={{ backgroundImage: `url(${elraImage})` }}
       ></div>
@@ -160,9 +155,7 @@ const Login = () => {
                 />
               </div>
               {errors.email && (
-                <p className="mt-2 text-sm text-red-600">
-                  {errors.email}
-                </p>
+                <p className="mt-2 text-sm text-red-600">{errors.email}</p>
               )}
             </div>
 
@@ -194,9 +187,7 @@ const Login = () => {
                 </button>
               </div>
               {errors.password && (
-                <p className="mt-2 text-sm text-red-600">
-                  {errors.password}
-                </p>
+                <p className="mt-2 text-sm text-red-600">{errors.password}</p>
               )}
             </div>
 
@@ -267,10 +258,7 @@ const Login = () => {
               </h2>
             </div>
 
-            <form
-              onSubmit={handleJoinWithCode}
-              className="space-y-6"
-            >
+            <form onSubmit={handleJoinWithCode} className="space-y-6">
               <div className="relative">
                 <HiKey className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--elra-secondary-2)]" />
                 <input

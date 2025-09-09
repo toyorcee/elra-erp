@@ -52,7 +52,7 @@ const DashboardLayout = () => {
     if (avatarPath.startsWith("http")) return avatarPath;
 
     const baseUrl = (
-      import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+      import.meta.env.VITE_API_URL || "/api"
     ).replace("/api", "");
     return `${baseUrl}${avatarPath}`;
   };
@@ -403,3 +403,408 @@ const DashboardLayout = () => {
 };
 
 export default DashboardLayout;
+
+
+                      strokeLinecap="round"
+
+                      strokeLinejoin="round"
+
+                      strokeWidth={2}
+
+                      d="M4 6h16M4 12h16M4 18h16"
+
+                    />
+
+                  </svg>
+
+                </button>
+
+
+
+                {/* Spacer for desktop sidebar toggle */}
+
+                <div className="hidden lg:block w-12 mr-2"></div>
+
+
+
+                {/* ELRA Logo - Now clickable */}
+
+                <div
+
+                  className="cursor-pointer hover:scale-105 transition-transform duration-200"
+
+                  onClick={handleLogoClick}
+
+                  title={user && !loading ? "Go to Modules" : "Go to Home"}
+
+                >
+
+                  <ELRALogo variant="dark" size="sm" />
+
+                </div>
+
+              </div>
+
+
+
+              {/* Right side */}
+
+              <div className="flex items-center space-x-4">
+
+                {/* Message Icon - Always visible like other icons */}
+
+                <div className="relative">
+
+                  <button
+
+                    onClick={toggleUnreadMessagesDropdown}
+
+                    className="p-2 rounded-xl text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] transition-all duration-200 hover:scale-105 relative cursor-pointer"
+
+                  >
+
+                    <ChatBubbleLeftRightIcon className="h-6 w-6" />
+
+                    <span
+
+                      className={`absolute -top-1 -right-1 w-5 h-5 text-white text-xs rounded-full flex items-center justify-center font-bold transition-all duration-200 ${
+
+                        totalUnreadMessages === 0
+
+                          ? "bg-[var(--elra-primary)] scale-90"
+
+                          : "bg-red-500 scale-100 animate-pulse"
+
+                      }`}
+
+                    >
+
+                      {totalUnreadMessages > 99 ? "99+" : totalUnreadMessages}
+
+                    </span>
+
+                  </button>
+
+
+
+                  {/* Unread Messages Dropdown */}
+
+                  {showUnreadMessagesDropdown && (
+
+                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-[var(--elra-border-primary)] z-50 message-dropdown-container">
+
+                      <div className="p-4 border-b border-[var(--elra-border-primary)]">
+
+                        <div className="flex items-center justify-between">
+
+                          <h3 className="text-sm font-semibold text-[var(--elra-text-primary)]">
+
+                            Unread Messages
+
+                          </h3>
+
+                          <div className="flex items-center gap-2">
+
+                            <button
+
+                              onClick={() => {
+
+                                setShowUnreadMessagesDropdown(false);
+
+                                setShowMessageDropdown(true);
+
+                              }}
+
+                              className="flex items-center gap-1 text-xs text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] font-medium transition-colors"
+
+                              title="Open Full Chat"
+
+                            >
+
+                              <ChatBubbleLeftRightIcon className="w-3 h-3" />
+
+                              Chat
+
+                            </button>
+
+                            <button
+
+                              onClick={() =>
+
+                                setShowUnreadMessagesDropdown(false)
+
+                              }
+
+                              className="text-[var(--elra-text-muted)] hover:text-[var(--elra-text-primary)]"
+
+                            >
+
+                              ×
+
+                            </button>
+
+                          </div>
+
+                        </div>
+
+                      </div>
+
+
+
+                      <div className="max-h-96 overflow-y-auto">
+
+                        {isLoadingUnread ? (
+
+                          <div className="p-4 text-center text-[var(--elra-text-muted)]">
+
+                            Loading...
+
+                          </div>
+
+                        ) : unreadMessages.length === 0 ? (
+
+                          <div className="p-4 text-center text-[var(--elra-text-muted)]">
+
+                            No unread messages
+
+                          </div>
+
+                        ) : (
+
+                          unreadMessages.map((message) => (
+
+                            <div
+
+                              key={message._id}
+
+                              onClick={() => handleUnreadMessageClick(message)}
+
+                              className="p-4 border-b border-[var(--elra-border-primary)] hover:bg-[var(--elra-secondary-3)] cursor-pointer transition-colors"
+
+                            >
+
+                              <div className="flex items-start space-x-3">
+
+                                <div className="w-8 h-8 rounded-full overflow-hidden">
+
+                                  {getAvatarDisplay(message.sender)}
+
+                                </div>
+
+                                <div className="flex-1 min-w-0">
+
+                                  <div className="flex items-center justify-between">
+
+                                    <p className="text-sm font-medium text-[var(--elra-text-primary)] truncate">
+
+                                      {message.sender.firstName}{" "}
+
+                                      {message.sender.lastName}
+
+                                    </p>
+
+                                    <span className="text-xs text-[var(--elra-text-muted)]">
+
+                                      {new Date(
+
+                                        message.createdAt
+
+                                      ).toLocaleTimeString([], {
+
+                                        hour: "2-digit",
+
+                                        minute: "2-digit",
+
+                                      })}
+
+                                    </span>
+
+                                  </div>
+
+                                  <p className="text-sm text-[var(--elra-text-muted)] truncate mt-1">
+
+                                    {message.content}
+
+                                  </p>
+
+                                </div>
+
+                              </div>
+
+                            </div>
+
+                          ))
+
+                        )}
+
+                      </div>
+
+
+
+                      {unreadMessages.length > 0 && (
+
+                        <div className="p-3 border-t border-[var(--elra-border-primary)]">
+
+                          <button
+
+                            onClick={() => {
+
+                              setShowUnreadMessagesDropdown(false);
+
+                              setShowMessageDropdown(true);
+
+                            }}
+
+                            className="w-full text-sm text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] font-medium"
+
+                          >
+
+                            View all messages
+
+                          </button>
+
+                        </div>
+
+                      )}
+
+                    </div>
+
+                  )}
+
+                </div>
+
+
+
+                <NotificationBell />
+
+
+
+                <ProfileMenu />
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </nav>
+
+
+
+        {/* Message Dropdown */}
+
+        <MessageDropdown
+
+          isOpen={showMessageDropdown}
+
+          onClose={() => setShowMessageDropdown(false)}
+
+        />
+
+
+
+        {/* Main Content Area */}
+
+        <div className="flex flex-1 pt-16 min-h-screen">
+
+          <DynamicSidebarProvider>
+
+            {/* Sidebar */}
+
+            <Sidebar
+
+              isOpen={sidebarOpen}
+
+              onToggle={toggleSidebar}
+
+              isMobile={isMobile}
+
+            />
+
+            {/* Content - Now responsive to sidebar state and mobile */}
+
+            <div
+
+              className={`flex-1 transition-all duration-300 ease-in-out ${
+
+                sidebarOpen ? "lg:ml-64" : "lg:ml-16"
+
+              } ${isMobile ? "ml-0" : ""}`}
+
+            >
+
+              {/* Mobile overlay */}
+
+              {isMobile && sidebarOpen && (
+
+                <div
+
+                  className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+
+                  onClick={toggleSidebar}
+
+                />
+
+              )}
+
+
+
+              {/* Main content area */}
+
+              <div className="min-h-screen bg-gray-50">
+
+                <Outlet />
+
+              </div>
+
+            </div>
+
+          </DynamicSidebarProvider>
+
+        </div>
+
+      </div>
+
+
+
+      {/* Password Change Modal */}
+
+      <PasswordChangeModal
+
+        isOpen={showPasswordModal}
+
+        onClose={() => {
+
+          if (user?.passwordChangeRequired || user?.isTemporaryPassword) {
+
+            return;
+
+          }
+
+          setShowPasswordModal(false);
+
+        }}
+
+        onSuccess={() => {
+
+          console.log("✅ Password changed successfully");
+
+          setShowPasswordModal(false);
+
+        }}
+
+        userData={user}
+
+      />
+
+    </SidebarContext.Provider>
+
+  );
+
+};
+
+
+
+export default DashboardLayout;
+
+

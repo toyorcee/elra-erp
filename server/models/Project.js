@@ -1,4 +1,8 @@
 import mongoose from "mongoose";
+import {
+  UNIFIED_CATEGORIES,
+  mapToUnifiedCategory,
+} from "../constants/unifiedCategories.js";
 import ProjectAuditService from "../services/projectAuditService.js";
 import ProjectDocumentService from "../services/projectDocumentService.js";
 
@@ -158,77 +162,7 @@ const projectSchema = new mongoose.Schema(
     category: {
       type: String,
       required: true,
-      enum: [
-        // SOFTWARE & TECHNOLOGY
-        "software_development",
-        "system_maintenance",
-        "infrastructure_upgrade",
-        "digital_transformation",
-        "data_management",
-        "security_enhancement",
-        "process_automation",
-        "integration_project",
-
-        // EQUIPMENT & FACILITIES
-        "equipment_purchase",
-        "equipment_lease",
-        "facility_improvement",
-        "infrastructure_development",
-        "equipment_maintenance",
-
-        // TRAINING & DEVELOPMENT
-        "training_program",
-        "capacity_building",
-        "skill_development",
-        "professional_development",
-        "industry_training",
-
-        // CONSULTING & SERVICES
-        "consulting_service",
-        "advisory_service",
-        "technical_support",
-        "implementation_service",
-
-        // REGULATORY & COMPLIANCE
-        "regulatory_compliance",
-        "compliance_audit",
-        "regulatory_enforcement",
-        "policy_development",
-        "standards_implementation",
-
-        // MONITORING & OVERSIGHT
-        "monitoring_system",
-        "oversight_program",
-        "verification_service",
-        "inspection_program",
-
-        // FINANCIAL & ADMINISTRATIVE
-        "financial_management",
-        "budget_optimization",
-        "cost_reduction",
-        "administrative_improvement",
-
-        // MARKETPLACE & EXCHANGE
-        "marketplace_development",
-        "exchange_platform",
-        "trading_system",
-        "market_analysis",
-
-        // PUBLIC & COMMUNICATION
-        "public_awareness",
-        "communication_campaign",
-        "stakeholder_engagement",
-        "public_relations",
-
-        // RESEARCH & ANALYSIS
-        "research_project",
-        "market_research",
-        "feasibility_study",
-        "impact_assessment",
-
-        // OTHER
-        "other",
-      ],
+      enum: UNIFIED_CATEGORIES,
     },
 
     // Project Scope (Personal, Departmental, External)
@@ -1761,61 +1695,7 @@ projectSchema.methods.createStandardInventoryItems = async function (
 
     // Map project categories to inventory categories (matching Inventory.js enum exactly)
     const getInventoryCategory = (projectCategory) => {
-      const categoryMap = {
-        // Equipment leases → Equipment categories
-        equipment_lease: "industrial_equipment",
-        vehicle_lease: "passenger_vehicle",
-        property_lease: "office_space",
-        financial_lease: "office_equipment",
-        training_equipment_lease: "office_equipment",
-        compliance_lease: "office_equipment",
-        service_equipment_lease: "industrial_equipment",
-        strategic_lease: "industrial_equipment",
-
-        // Development & IT → Electronics
-        software_development: "electronics",
-        system_maintenance: "electronics",
-
-        // Services → Office equipment
-        consulting: "office_equipment",
-        training: "office_equipment",
-
-        // Default
-        other: "other",
-      };
-
-      // Ensure we only return valid inventory categories from Inventory.js enum
-      const validInventoryCategories = [
-        "construction_equipment",
-        "office_equipment",
-        "medical_equipment",
-        "agricultural_equipment",
-        "industrial_equipment",
-        "passenger_vehicle",
-        "commercial_vehicle",
-        "construction_vehicle",
-        "agricultural_vehicle",
-        "office_space",
-        "warehouse",
-        "residential",
-        "commercial_space",
-        "furniture",
-        "electronics",
-        "tools",
-        "other",
-      ];
-
-      const mappedCategory = categoryMap[projectCategory] || "office_equipment";
-
-      // Validate that the mapped category exists in Inventory model
-      if (!validInventoryCategories.includes(mappedCategory)) {
-        console.warn(
-          `⚠️ [INVENTORY] Invalid category mapping: ${projectCategory} → ${mappedCategory}, using "office_equipment"`
-        );
-        return "office_equipment";
-      }
-
-      return mappedCategory;
+      return mapToUnifiedCategory(projectCategory);
     };
 
     const totalBudget = this.budget || 0;
@@ -2037,53 +1917,9 @@ projectSchema.methods.createStandardProcurementOrder = async function (
 
     const Procurement = mongoose.model("Procurement");
 
-    // Map project categories to procurement categories
+    // Map project categories to procurement categories using unified system
     const getProcurementCategory = (projectCategory) => {
-      const categoryMap = {
-        // Equipment leases → Equipment
-        equipment_lease: "equipment",
-        vehicle_lease: "vehicle",
-        property_lease: "property",
-        financial_lease: "equipment",
-        training_equipment_lease: "equipment",
-        compliance_lease: "equipment",
-        service_equipment_lease: "equipment",
-        strategic_lease: "equipment",
-
-        // Development & IT → Electronics
-        software_development: "electronics",
-        system_maintenance: "electronics",
-
-        // Services → Office supplies
-        consulting: "office_supplies",
-        training: "office_supplies",
-
-        // Default
-        other: "other",
-      };
-
-      // Ensure we only return valid procurement categories
-      const validProcurementCategories = [
-        "equipment",
-        "vehicle",
-        "property",
-        "furniture",
-        "electronics",
-        "office_supplies",
-        "maintenance_parts",
-        "other",
-      ];
-
-      const mappedCategory = categoryMap[projectCategory] || "equipment";
-
-      if (!validProcurementCategories.includes(mappedCategory)) {
-        console.warn(
-          `⚠️ [PROCUREMENT] Invalid category mapping: ${projectCategory} → ${mappedCategory}, using "equipment"`
-        );
-        return "equipment";
-      }
-
-      return mappedCategory;
+      return mapToUnifiedCategory(projectCategory);
     };
 
     const totalBudget = this.budget || 0;
@@ -2274,12 +2110,36 @@ projectSchema.methods.createInventoryFromProcurement = async function (
       const inventoryCount = await Inventory.countDocuments();
       const inventoryCode = `INV${String(inventoryCount + 1).padStart(4, "0")}`;
 
+      // Map project category to valid inventory category
+      const getInventoryCategory = (projectCategory) => {
+        const categoryMap = {
+          equipment_lease: "industrial_equipment",
+          vehicle_lease: "passenger_vehicle",
+          property_lease: "office_space",
+          financial_lease: "office_equipment",
+          training_equipment_lease: "office_equipment",
+          compliance_lease: "office_equipment",
+          service_equipment_lease: "industrial_equipment",
+          strategic_lease: "industrial_equipment",
+
+          software_development: "software_development",
+          system_maintenance: "it_equipment",
+
+          consulting: "office_equipment",
+          training: "office_equipment",
+
+          other: "other",
+        };
+
+        return categoryMap[projectCategory] || "office_equipment";
+      };
+
       const inventoryItem = {
         name: procurementItem.name,
         description: procurementItem.description,
         code: inventoryCode,
         type: "equipment",
-        category: this.category || "office_equipment",
+        category: getInventoryCategory(this.category),
         status: "available",
         specifications: {
           brand: procurementItem.specifications?.brand || "TBD",
@@ -2303,21 +2163,21 @@ projectSchema.methods.createInventoryFromProcurement = async function (
       inventoryItems.push(inventoryItem);
     }
 
-    // Create the inventory items
     const createdItems = await Inventory.insertMany(inventoryItems);
 
-    // Update procurement order with created inventory items
     procurementOrder.createdInventoryItems = createdItems.map(
       (item) => item._id
     );
     await procurementOrder.save();
-
-    // Update project workflow triggers
-    this.workflowTriggers.inventoryCompleted = true;
     await this.save();
 
     console.log(
       `✅ [INVENTORY] Created ${createdItems.length} inventory items from procurement order ${procurementOrder.poNumber}`
+    );
+
+    await this.notifyOperationsHODForInventory(
+      procurementOrder,
+      triggeredByUser
     );
 
     return createdItems;

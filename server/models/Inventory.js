@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { UNIFIED_CATEGORIES } from "../constants/unifiedCategories.js";
 
 const inventorySchema = new mongoose.Schema(
   {
@@ -40,32 +41,7 @@ const inventorySchema = new mongoose.Schema(
     category: {
       type: String,
       required: true,
-      enum: [
-        // Equipment categories
-        "construction_equipment",
-        "office_equipment",
-        "medical_equipment",
-        "agricultural_equipment",
-        "industrial_equipment",
-
-        // Vehicle categories
-        "passenger_vehicle",
-        "commercial_vehicle",
-        "construction_vehicle",
-        "agricultural_vehicle",
-
-        // Property categories
-        "office_space",
-        "warehouse",
-        "residential",
-        "commercial_space",
-
-        // Other categories
-        "furniture",
-        "electronics",
-        "tools",
-        "other",
-      ],
+      enum: UNIFIED_CATEGORIES,
     },
 
     // Item Status

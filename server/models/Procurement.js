@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { UNIFIED_CATEGORIES } from "../constants/unifiedCategories.js";
 
 const procurementSchema = new mongoose.Schema(
   {
@@ -106,16 +107,7 @@ const procurementSchema = new mongoose.Schema(
         category: {
           type: String,
           required: true,
-          enum: [
-            "equipment",
-            "vehicle",
-            "property",
-            "furniture",
-            "electronics",
-            "office_supplies",
-            "maintenance_parts",
-            "other",
-          ],
+          enum: UNIFIED_CATEGORIES,
         },
         specifications: {
           brand: String,

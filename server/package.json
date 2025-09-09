@@ -1,5 +1,5 @@
 {
-  "name": "edms-server",
+  "name": "ELR-ERP-Server",
   "version": "1.0.0",
   "description": "Secure Document Management System Backend",
   "main": "server.js",

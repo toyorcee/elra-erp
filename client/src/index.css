@@ -91,10 +91,24 @@
   line-clamp: 3;
 }
 
-body {
+/* body {
   height: 100vh;
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
     "Oxygen", "Ubuntu", "Cantarell", sans-serif;
+} */
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* Smooth transitions for all interactive elements */
+* {
+  transition: color 0.2s ease, background-color 0.2s ease,
+    border-color 0.2s ease;
 }
 
 /* Global select dropdown styling */
@@ -221,152 +235,6 @@ div:has([class*="GradientSpinner"]) {
   background-color: white !important;
   background: white !important;
 }
-
-/* :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif; anything we ned to adjust here? 
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-} */
-
-/* a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-} */
-
-/* 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
-} */
-
-/* @import "tailwindcss/preflight";
-@tailwind utilities; */
-
-/* Custom skeleton animations */
-/* @keyframes shimmer {
-  0% {
-    background-position: -200px 0;
-  }
-  100% {
-    background-position: calc(200px + 100%) 0;
-  }
-}
-
-@keyframes pulse-shimmer {
-  0% {
-    opacity: 1;
-    background-position: -200px 0;
-  }
-  50% {
-    opacity: 0.7;
-    background-position: calc(200px + 100%) 0;
-  }
-  100% {
-    opacity: 1;
-    background-position: calc(400px + 100%) 0;
-  }
-}
-
-@keyframes wave {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-.animate-shimmer {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200px 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-.animate-pulse-shimmer {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200px 100%;
-  animation: pulse-shimmer 2s infinite;
-}
-
-.animate-wave {
-  position: relative;
-  overflow: hidden;
-}
-
-.animate-wave::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.4) 50%,
-    transparent 100%
-  );
-  animation: wave 1.5s infinite;
-} */
-
-/* Modern skeleton variants */
-/* .skeleton-modern {
-  background: linear-gradient(
-    90deg,
-    #f3f4f6 0%,
-    #e5e7eb 20%,
-    #f3f4f6 40%,
-    #e5e7eb 60%,
-    #f3f4f6 80%,
-    #e5e7eb 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-}
-
-.skeleton-glass {
-  background: linear-gradient(
-    90deg,
-    rgba(243, 244, 246, 0.8) 0%,
-    rgba(229, 231, 235, 0.9) 50%,
-    rgba(243, 244, 246, 0.8) 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 2s ease-in-out infinite;
-  backdrop-filter: blur(10px);
-}
-.skeleton-gradient {
-  background: linear-gradient(
-    90deg,
-    #f3f4f6 0%,
-    #d1d5db 25%,
-    #9ca3af 50%,
-    #d1d5db 75%,
-    #f3f4f6 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.8s ease-in-out infinite;
-} */
 
 /* Custom Loading Animation */
 @keyframes scale {

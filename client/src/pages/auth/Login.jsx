@@ -109,24 +109,25 @@ const Login = () => {
   };
 
   return (
-    <div
-      className="h-[120vh] flex flex-col items-center justify-center px-6 bg-cover bg-center relative"
-      style={{ backgroundImage: `url(${elraImage})` }}
-    >
-      {/* White overlay for better contrast */}
-      <div className="absolute inset-0 bg-white/20"></div>
+    <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-gray-50 md:bg-cover md:bg-center relative">
+      {/* Background image only visible on medium screens and above */}
+      <div className="hidden md:block absolute inset-0 bg-white/20 z-0"></div>
+      <div 
+        className="hidden md:block absolute inset-0 z-0"
+        style={{ backgroundImage: `url(${elraImage})` }}
+      ></div>
 
       {/* Content */}
       <div className="relative z-10 w-full max-w-md">
         {/* Logo big on top with its own white backing */}
-        <div className="flex justify-center mb-8">
-          <div className="bg-white p-6 rounded-2xl shadow-lg">
-            <ELRALogo size="3xl" />
+        <div className="flex justify-center mb-6 md:mb-8">
+          <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl shadow-lg">
+            <ELRALogo className="h-10 md:h-14 w-auto" />
           </div>
         </div>
 
         {/* Card Form */}
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8">
+        <div className="bg-white/95 backdrop-blur-sm rounded-xl md:rounded-2xl shadow-2xl p-6 md:p-8">
           <h2 className="text-xl font-bold text-center text-[var(--elra-primary)] mb-6">
             Login to your account
           </h2>
@@ -150,7 +151,7 @@ const Login = () => {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] ${
+                  className={`w-full pl-10 pr-4 py-3 text-base border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] ${
                     errors.email
                       ? "border-red-400 focus:ring-red-200"
                       : "border-[var(--elra-border-primary)]"
@@ -159,7 +160,9 @@ const Login = () => {
                 />
               </div>
               {errors.email && (
-                <p className="mt-2 text-sm text-red-600">{errors.email}</p>
+                <p className="mt-2 text-sm text-red-600">
+                  {errors.email}
+                </p>
               )}
             </div>
 
@@ -175,7 +178,7 @@ const Login = () => {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`w-full pl-10 pr-10 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] ${
+                  className={`w-full pl-10 pr-10 py-3 text-base border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] ${
                     errors.password
                       ? "border-red-400 focus:ring-red-200"
                       : "border-[var(--elra-border-primary)]"
@@ -185,13 +188,15 @@ const Login = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-[var(--elra-primary)]"
                 >
                   {showPassword ? <MdVisibilityOff /> : <MdVisibility />}
                 </button>
               </div>
               {errors.password && (
-                <p className="mt-2 text-sm text-red-600">{errors.password}</p>
+                <p className="mt-2 text-sm text-red-600">
+                  {errors.password}
+                </p>
               )}
             </div>
 
@@ -199,7 +204,7 @@ const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[var(--elra-primary-dark)] hover:bg-[var(--elra-primary)] text-white py-3 px-4 rounded-xl font-semibold transition-all duration-300 disabled:opacity-50 shadow-lg"
+              className="w-full bg-[var(--elra-primary-dark)] hover:bg-[var(--elra-primary)] text-white py-3 px-4 text-base rounded-lg font-semibold transition-all duration-300 disabled:opacity-50 shadow-lg"
             >
               {loading ? "Signing in..." : "Login"}
             </button>
@@ -242,25 +247,30 @@ const Login = () => {
       {/* Invitation Code Modal */}
       {showJoinWithCode && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 relative">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => {
                 setShowJoinWithCode(false);
                 setInvitationCode("");
               }}
-              className="absolute top-4 right-4 text-gray-500 hover:text-[var(--elra-primary)]"
+              className="absolute top-4 right-4 text-gray-500 hover:text-[var(--elra-primary)] text-lg"
             >
               ✕
             </button>
 
             <div className="text-center mb-6">
-              <ELRALogo size="lg" className="mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-[var(--elra-primary)]">
+              <div className="bg-white p-3 rounded-lg inline-block mb-4">
+                <ELRALogo className="h-8 w-auto mx-auto" />
+              </div>
+              <h2 className="text-xl font-bold text-[var(--elra-primary)]">
                 Enter Invitation Code
               </h2>
             </div>
 
-            <form onSubmit={handleJoinWithCode} className="space-y-6">
+            <form
+              onSubmit={handleJoinWithCode}
+              className="space-y-6"
+            >
               <div className="relative">
                 <HiKey className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--elra-secondary-2)]" />
                 <input
@@ -269,7 +279,7 @@ const Login = () => {
                   onChange={(e) =>
                     setInvitationCode(e.target.value.toUpperCase())
                   }
-                  className="w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
+                  className="w-full pl-10 pr-4 py-3 text-base border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
                   placeholder="Enter your invitation code"
                   maxLength={16}
                   autoFocus
@@ -279,7 +289,7 @@ const Login = () => {
               <button
                 type="submit"
                 disabled={verifyingCode || !invitationCode.trim()}
-                className="w-full bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white py-3 rounded-xl font-semibold transition-all duration-300 disabled:opacity-50"
+                className="w-full bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white py-3 text-base rounded-lg font-semibold transition-all duration-300 disabled:opacity-50"
               >
                 {verifyingCode ? "Verifying..." : "Join with Code"}
               </button>
@@ -290,7 +300,7 @@ const Login = () => {
                   setShowJoinWithCode(false);
                   setInvitationCode("");
                 }}
-                className="w-full border-2 border-[var(--elra-primary)] text-[var(--elra-primary)] hover:bg-[var(--elra-primary)] hover:text-white py-3 rounded-xl font-semibold transition-all duration-300"
+                className="w-full border-2 border-[var(--elra-primary)] text-[var(--elra-primary)] hover:bg-[var(--elra-primary)] hover:text-white py-3 text-base rounded-lg font-semibold transition-all duration-300"
               >
                 Cancel
               </button>

@@ -1588,55 +1588,43 @@ projectSchema.methods.triggerInventoryCreation = async function (
         console.log(
           `📧 [INVENTORY] Found Operations department: ${operationsDept.name}`
         );
-        const approverUsers = await mongoose
+        let approverUsers = await mongoose
           .model("User")
           .find({
             department: operationsDept._id,
-            "role.level": { $gte: 700 },
+            "role.name": "HOD",
+            isActive: true,
           })
           .populate("department")
           .populate("role");
 
         console.log(
-          `🔍 [INVENTORY] Found ${approverUsers.length} approver users in department ${operationsDept.name}`
+          `🔍 [INVENTORY] Found ${approverUsers.length} HOD users by role name in department ${operationsDept.name}`
         );
 
+        // If not found by role name, try by role level as backup
         if (approverUsers.length === 0) {
           console.log(
-            `⚠️ [INVENTORY] No approver users found with role filter. Getting all users and filtering manually...`
+            `⚠️ [INVENTORY] No HOD found by role name, trying by role level...`
           );
 
-          const allDeptUsers = await mongoose
+          approverUsers = await mongoose
             .model("User")
             .find({
               department: operationsDept._id,
+              "role.level": { $gte: 700 },
+              isActive: true,
             })
+            .populate("department")
             .populate("role");
 
           console.log(
-            `🔍 [INVENTORY] Total users in department: ${allDeptUsers.length}`
+            `🔍 [INVENTORY] Found ${approverUsers.length} approver users by role level in department ${operationsDept.name}`
           );
-
-          // Filter users manually based on role level
-          const manualFilteredUsers = allDeptUsers.filter((user) => {
-            const hasValidRole = user.role && user.role.level >= 700;
-            console.log(
-              `  ${user.firstName} ${user.lastName} - Role: ${user.role?.name} (Level: ${user.role?.level}) - Valid: ${hasValidRole}`
-            );
-            return hasValidRole;
-          });
-
-          console.log(
-            `🔍 [INVENTORY] Manual filtering found ${manualFilteredUsers.length} valid approvers`
-          );
-
-          // Use the manually filtered users
-          approverUsers.length = 0; // Clear the array
-          approverUsers.push(...manualFilteredUsers); // Add the filtered users
         }
 
         if (approverUsers.length > 0) {
-          const operationsHOD = approverUsers[0]; // Use the first HOD found
+          const operationsHOD = approverUsers[0];
           console.log(
             `📧 [INVENTORY] Found Operations HOD: ${operationsHOD.firstName} ${operationsHOD.lastName} (${operationsHOD.email})`
           );
@@ -2180,6 +2168,11 @@ projectSchema.methods.createInventoryFromProcurement = async function (
       triggeredByUser
     );
 
+    await this.notifyProcurementHODOfDeliveryCompletion(
+      procurementOrder,
+      triggeredByUser
+    );
+
     return createdItems;
   } catch (error) {
     console.error(
@@ -2210,11 +2203,21 @@ projectSchema.methods.notifyOperationsHOD = async function (triggeredByUser) {
       return;
     }
 
-    const operationsHOD = await User.findOne({
+    // Try to find Operations HOD by role name first, then fall back to role level
+    let operationsHOD = await User.findOne({
       department: operationsDept._id,
-      "role.level": { $gte: 700 }, // HOD level or higher
+      "role.name": "HOD",
       isActive: true,
     });
+
+    // If not found by role name, try by role level as backup
+    if (!operationsHOD) {
+      operationsHOD = await User.findOne({
+        department: operationsDept._id,
+        "role.level": { $gte: 700 }, // HOD level or higher
+        isActive: true,
+      });
+    }
 
     if (operationsHOD) {
       console.log(
@@ -2275,11 +2278,18 @@ projectSchema.methods.notifyOperationsHODForInventory = async function (
       return;
     }
 
+    const hodRole = await mongoose.model("Role").findOne({ name: "HOD" });
+    if (!hodRole) {
+      console.log("❌ [NOTIFICATION] HOD role not found in system");
+      return;
+    }
+
     const operationsHOD = await User.findOne({
       department: operationsDept._id,
-      "role.level": { $gte: 700 }, // HOD level or higher
+      role: hodRole._id,
       isActive: true,
-    });
+    }).populate("role").populate("department");
+
 
     if (operationsHOD) {
       console.log(
@@ -2315,6 +2325,82 @@ projectSchema.methods.notifyOperationsHODForInventory = async function (
   } catch (error) {
     console.error(
       "❌ [NOTIFICATION] Error notifying Operations HOD for inventory:",
+      error
+    );
+  }
+};
+
+projectSchema.methods.notifyProcurementHODOfDeliveryCompletion = async function (
+  procurementOrder,
+  deliveredBy
+) {
+  try {
+    console.log(
+      "📧 [NOTIFICATION] Notifying Procurement HOD of delivery completion..."
+    );
+
+    const NotificationService = await import(
+      "../services/notificationService.js"
+    );
+    const notification = new NotificationService.default();
+
+    // Find Procurement HOD
+    const Department = mongoose.model("Department");
+    const User = mongoose.model("User");
+
+    const procurementDept = await Department.findOne({ name: "Procurement" });
+    if (!procurementDept) {
+      console.log("⚠️ [NOTIFICATION] Procurement department not found");
+      return;
+    }
+
+    // Get HOD role ID first (same approach as other HOD queries)
+    const hodRole = await mongoose.model("Role").findOne({ name: "HOD" });
+    if (!hodRole) {
+      console.log("❌ [NOTIFICATION] HOD role not found in system");
+      return;
+    }
+
+    const procurementHOD = await User.findOne({
+      department: procurementDept._id,
+      role: hodRole._id,
+      isActive: true,
+    }).populate("role").populate("department");
+
+    if (procurementHOD) {
+      console.log(
+        `📧 [NOTIFICATION] Found Procurement HOD: ${procurementHOD.firstName} ${procurementHOD.lastName} (${procurementHOD.email})`
+      );
+
+      await notification.createNotification({
+        recipient: procurementHOD._id,
+        type: "PROCUREMENT_DELIVERY_COMPLETED",
+        title: "Procurement Delivery Completed",
+        message: `Procurement order ${procurementOrder.poNumber} has been successfully delivered and inventory has been created. Operations HOD has been notified for inventory setup.`,
+        priority: "medium",
+        data: {
+          projectId: this._id,
+          projectName: this.name,
+          projectCode: this.code,
+          procurementOrderId: procurementOrder._id,
+          procurementOrderNumber: procurementOrder.poNumber,
+          budget: this.budget,
+          category: this.category,
+          actionUrl: "/dashboard/modules/procurement",
+          deliveredBy: deliveredBy ? deliveredBy._id : null,
+          workflowPhase: "delivery_completed",
+        },
+      });
+
+      console.log(
+        `✅ [NOTIFICATION] Procurement HOD notified of delivery completion: ${procurementHOD.firstName} ${procurementHOD.lastName}`
+      );
+    } else {
+      console.log("⚠️ [NOTIFICATION] No Procurement HOD found to notify");
+    }
+  } catch (error) {
+    console.error(
+      "❌ [NOTIFICATION] Error notifying Procurement HOD of delivery completion:",
       error
     );
   }
@@ -2399,7 +2485,6 @@ projectSchema.methods.notifyFinanceHODForBudgetReview = async function (
   }
 };
 
-// Instance method to notify Finance HOD for budget allocation
 projectSchema.methods.notifyFinanceHODForBudgetAllocation = async function (
   triggeredByUser
 ) {

@@ -1063,7 +1063,7 @@ export const markAsPaid = async (req, res) => {
   try {
     const currentUser = req.user;
     const { id } = req.params;
-    const { paymentNotes } = req.body;
+    const { paymentNotes, paymentMethod } = req.body;
 
     console.log(
       `\n💰 [PROCUREMENT] Marking as paid - PO ID: ${id} by ${currentUser.firstName} ${currentUser.lastName}`
@@ -1124,9 +1124,9 @@ export const markAsPaid = async (req, res) => {
       const paymentData = {
         procurementOrder: procurement._id,
         amount: procurement.totalAmount,
-        currency: procurement.currency || 'NGN',
+        currency: procurement.currency || "NGN",
         description: `Payment for Procurement Order ${procurement.poNumber}`,
-        paymentMethod: 'manual',
+        paymentMethod: paymentMethod || "manual",
         supplier: {
           name: procurement.supplier.name,
           email: procurement.supplier.email,
@@ -1134,13 +1134,18 @@ export const markAsPaid = async (req, res) => {
           phone: procurement.supplier.phone,
         },
         processedBy: currentUser._id,
-        notes: paymentNotes || 'Payment marked as completed',
+        notes: paymentNotes || "Payment marked as completed",
       };
 
       await Transaction.createProcurementPayment(paymentData);
-      console.log(`✅ [TRANSACTION] Payment transaction created for PO: ${procurement.poNumber}`);
+      console.log(
+        `✅ [TRANSACTION] Payment transaction created for PO: ${procurement.poNumber}`
+      );
     } catch (transactionError) {
-      console.error("❌ [TRANSACTION] Error creating payment transaction:", transactionError);
+      console.error(
+        "❌ [TRANSACTION] Error creating payment transaction:",
+        transactionError
+      );
     }
 
     const updatedProcurement = await Procurement.findById(id)

@@ -168,10 +168,15 @@ export const markProcurementAsIssued = async (id, confirmationNotes = "") => {
 };
 
 // Mark procurement order as paid
-export const markProcurementAsPaid = async (id, paymentNotes = "") => {
+export const markProcurementAsPaid = async (
+  id,
+  paymentNotes = "",
+  paymentMethod = "manual"
+) => {
   try {
     const response = await api.put(`/procurement/${id}/mark-paid`, {
       paymentNotes,
+      paymentMethod,
     });
     return response.data;
   } catch (error) {

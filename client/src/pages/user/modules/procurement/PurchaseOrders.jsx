@@ -65,6 +65,7 @@ const PurchaseOrders = () => {
     useState(false);
   const [confirmationNotes, setConfirmationNotes] = useState("");
   const [paymentNotes, setPaymentNotes] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("manual");
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const [isMarkingIssued, setIsMarkingIssued] = useState(false);
   const [isMarkingPaid, setIsMarkingPaid] = useState(false);
@@ -72,7 +73,7 @@ const PurchaseOrders = () => {
   const [orderToEdit, setOrderToEdit] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [stats, setStats] = useState({
-    pending: 0,
+    paid: 0,
     delivered: 0,
     total: 0,
   });
@@ -218,15 +219,13 @@ const PurchaseOrders = () => {
   }, []);
 
   const calculateStats = (orders) => {
-    const pending = orders.filter((order) =>
-      ["pending", "issued", "paid"].includes(order.status)
-    ).length;
+    const paid = orders.filter((order) => order.status === "paid").length;
     const delivered = orders.filter(
       (order) => order.status === "delivered"
     ).length;
 
     return {
-      pending,
+      paid,
       delivered,
       total: orders.length,
     };
@@ -365,6 +364,7 @@ const PurchaseOrders = () => {
   const handleMarkAsPaid = (order) => {
     setOrderToMarkPaid(order);
     setPaymentNotes("");
+    setPaymentMethod("manual");
     setShowMarkPaidModal(true);
   };
 
@@ -378,11 +378,16 @@ const PurchaseOrders = () => {
 
     setIsMarkingPaid(true);
     try {
-      await markProcurementAsPaid(orderToMarkPaid._id, paymentNotes);
+      await markProcurementAsPaid(
+        orderToMarkPaid._id,
+        paymentNotes,
+        paymentMethod
+      );
       toast.success("Order marked as paid successfully!");
       setShowMarkPaidConfirmModal(false);
       setOrderToMarkPaid(null);
       setPaymentNotes("");
+      setPaymentMethod("manual");
       loadPurchaseOrders();
     } catch (error) {
       console.error("Error marking as paid:", error);
@@ -514,6 +519,17 @@ const PurchaseOrders = () => {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
+  };
+
+  const formatPaymentMethod = (method) => {
+    const methodMap = {
+      bank_transfer: "Bank Transfer",
+      cash: "Cash",
+      check: "Check",
+      manual: "Manual Entry",
+      other: "Other",
+    };
+    return methodMap[method] || method;
   };
 
   const columns = [
@@ -1014,12 +1030,10 @@ const PurchaseOrders = () => {
           </div>
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center">
-              <ClockIcon className="h-8 w-8 text-orange-600 mr-3" />
+              <BanknotesIcon className="h-8 w-8 text-emerald-600 mr-3" />
               <div>
-                <p className="text-sm text-gray-500">Pending</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats.pending}
-                </p>
+                <p className="text-sm text-gray-500">Paid</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.paid}</p>
               </div>
             </div>
           </div>
@@ -2799,6 +2813,24 @@ const PurchaseOrders = () => {
                   </div>
                 </div>
 
+                {/* Payment Method */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Payment Method *
+                  </label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                  >
+                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="cash">Cash</option>
+                    <option value="check">Check</option>
+                    <option value="manual">Manual Entry</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
                 {/* Payment Notes */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2809,7 +2841,7 @@ const PurchaseOrders = () => {
                     onChange={(e) => setPaymentNotes(e.target.value)}
                     rows={4}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors resize-none"
-                    placeholder="Add any notes about the payment (e.g., payment method, reference number, etc.)"
+                    placeholder="Add any notes about the payment (e.g., reference number, transaction ID, etc.)"
                   />
                 </div>
 
@@ -3036,6 +3068,14 @@ const PurchaseOrders = () => {
                       <span className="font-medium text-emerald-600">
                         {formatCurrency(orderToMarkPaid.totalAmount)}
                       </span>
+                    </div>
+                    <div className="pt-3 border-t border-gray-200">
+                      <span className="text-sm text-gray-600">
+                        Payment Method:
+                      </span>
+                      <p className="text-sm text-gray-800 mt-1 font-medium">
+                        {formatPaymentMethod(paymentMethod)}
+                      </p>
                     </div>
                     {paymentNotes && (
                       <div className="pt-3 border-t border-gray-200">

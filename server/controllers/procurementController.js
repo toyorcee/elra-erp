@@ -1,5 +1,216 @@
 import Procurement from "../models/Procurement.js";
 import User from "../models/User.js";
+import { sendEmail } from "../services/emailService.js";
+import { generateProcurementOrderPDF } from "../utils/pdfUtils.js";
+import nodemailer from "nodemailer";
+
+// ============================================================================
+// EMAIL FUNCTIONS
+// ============================================================================
+
+// Send procurement order email to supplier
+const sendProcurementEmailToSupplier = async (procurement, currentUser) => {
+  const { supplier, items, poNumber, title, totalAmount, priority } =
+    procurement;
+
+  let pdfBuffer = null;
+  try {
+    console.log(`📄 [PROCUREMENT] Generating PDF for PO: ${poNumber}...`);
+    pdfBuffer = await generateProcurementOrderPDF(procurement, currentUser);
+    console.log(
+      `✅ [PROCUREMENT] PDF generated successfully for PO: ${poNumber}`
+    );
+    console.log(`   - PDF Size: ${(pdfBuffer.length / 1024).toFixed(2)} KB`);
+    console.log(`   - Filename: Purchase_Order_${poNumber}.pdf`);
+  } catch (pdfError) {
+    console.error(
+      `❌ [PROCUREMENT] PDF generation failed for PO: ${poNumber}:`,
+      pdfError
+    );
+    console.error(`   - Error: ${pdfError.message}`);
+    // Continue without PDF if generation fails
+  }
+
+  // Generate items list for email
+  const itemsList = items
+    .map(
+      (item, index) => `
+    <tr style="border-bottom: 1px solid #e5e7eb;">
+      <td style="padding: 12px; text-align: left;">${index + 1}</td>
+      <td style="padding: 12px; text-align: left;">${item.name}</td>
+      <td style="padding: 12px; text-align: left;">${item.description}</td>
+      <td style="padding: 12px; text-align: center;">${item.quantity}</td>
+      <td style="padding: 12px; text-align: right;">₦${item.unitPrice.toLocaleString()}</td>
+      <td style="padding: 12px; text-align: right;">₦${item.totalPrice.toLocaleString()}</td>
+    </tr>
+  `
+    )
+    .join("");
+
+  const emailSubject = `Purchase Order ${poNumber} - ${title}`;
+
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Purchase Order ${poNumber}</title>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .header { background: linear-gradient(135deg, #0D6449 0%, #059669 100%); color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; }
+        .order-details { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; }
+        .items-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .items-table th { background: #0D6449; color: white; padding: 12px; text-align: left; }
+        .items-table td { padding: 12px; border-bottom: 1px solid #e5e7eb; }
+        .total-section { background: #e8f4fd; padding: 15px; border-radius: 8px; margin: 20px 0; }
+        .contact-info { background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 20px 0; }
+        .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #666; }
+        .priority-high { color: #dc2626; font-weight: bold; }
+        .priority-urgent { color: #ea580c; font-weight: bold; }
+        .priority-critical { color: #991b1b; font-weight: bold; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>ELRA Procurement System</h1>
+        <h2>Purchase Order ${poNumber}</h2>
+      </div>
+      
+      <div class="content">
+        <p>Dear ${supplier.contactPerson || "Supplier"},</p>
+        
+        <p>We are pleased to send you the following purchase order for your review and processing:</p>
+        
+        <div class="order-details">
+          <h3>Order Information</h3>
+          <p><strong>PO Number:</strong> ${poNumber}</p>
+          <p><strong>Title:</strong> ${title}</p>
+          <p><strong>Priority:</strong> <span class="priority-${priority}">${priority.toUpperCase()}</span></p>
+          <p><strong>Total Amount:</strong> ₦${totalAmount.toLocaleString()}</p>
+          <p><strong>Currency:</strong> NGN (Nigerian Naira)</p>
+        </div>
+        
+        <h3>Items Required</h3>
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>S/N</th>
+              <th>Item Name</th>
+              <th>Description</th>
+              <th>Quantity</th>
+              <th>Unit Price</th>
+              <th>Total Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsList}
+          </tbody>
+        </table>
+        
+        <div class="total-section">
+          <h3>Order Summary</h3>
+          <p><strong>Subtotal:</strong> ₦${procurement.subtotal.toLocaleString()}</p>
+          <p><strong>Total Amount:</strong> ₦${totalAmount.toLocaleString()}</p>
+        </div>
+        
+        <div class="contact-info">
+          <h3>Contact Information & Next Steps</h3>
+          <p><strong>For inquiries and order confirmation, please contact:</strong></p>
+          <ul>
+            <li><strong>Procurement HOD:</strong> ${currentUser.firstName} ${
+    currentUser.lastName
+  }</li>
+            <li><strong>Email:</strong> ${currentUser.email}</li>
+            <li><strong>Phone:</strong> +234 800 ELRA (3572)</li>
+            <li><strong>Company:</strong> ELRA (Equipment Leasing Registration Authority)</li>
+            <li><strong>Human Resources Department:</strong></li>
+            <li><strong>Email:</strong> hod.hr@elra.com</li>
+            <li><strong>Name:</strong> Lisa Davis</li>
+            <li><strong>Procurement Department:</strong></li>
+            <li><strong>Email:</strong> hod.proc@elra.com</li>
+          </ul>
+          
+          <div class="contact-info">
+            <h3>Next Steps</h3>
+            <p><strong>Please respond within 48 hours with:</strong></p>
+            <p>• Confirmation of order acceptance<br>
+            • Expected delivery timeline<br>
+            • Any questions or clarifications needed<br>
+            • Invoice for payment processing<br>
+            • <strong>Signed copy of this purchase order</strong></p>
+            
+            <p><strong>For inquiries and support:</strong></p>
+            <p><strong>Human Resources Department:</strong> For any personnel-related queries<br>
+            <strong>Procurement Department:</strong> For order modifications or clarifications</p>
+            <p>Both departments will work together to ensure smooth order processing.</p>
+          </div>
+        </div>
+        
+        <p>We look forward to a successful business relationship.</p>
+        
+        <p>Best regards,<br>
+        <strong>${currentUser.firstName} ${currentUser.lastName}</strong><br>
+        Procurement HOD<br>
+        ELRA (Equipment Leasing Registration Authority)</p>
+      </div>
+      
+      <div class="footer">
+        <p>This is an automated message from ELRA Procurement System. Please do not reply to this email.</p>
+        <p>For support, contact: support@elra.com</p>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const emailOptions = {
+    to: supplier.email,
+    subject: emailSubject,
+    html: emailHtml,
+  };
+
+  if (pdfBuffer) {
+    emailOptions.attachments = [
+      {
+        filename: `Purchase_Order_${poNumber}.pdf`,
+        content: pdfBuffer,
+        contentType: "application/pdf",
+      },
+    ];
+  }
+
+  const transporter = nodemailer.createTransport({
+    service: process.env.EMAIL_SERVICE || "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD,
+    },
+  });
+
+  const mailOptions = {
+    from: process.env.EMAIL_FROM,
+    to: emailOptions.to,
+    subject: emailOptions.subject,
+    html: emailOptions.html,
+    attachments: emailOptions.attachments || [],
+  };
+
+  console.log(`📧 [PROCUREMENT] Sending email to supplier...`);
+  console.log(`   - From: ${process.env.EMAIL_FROM}`);
+  console.log(`   - To: ${supplier.email}`);
+  console.log(`   - Subject: ${emailSubject}`);
+  console.log(`   - Has PDF Attachment: ${pdfBuffer ? "Yes" : "No"}`);
+  console.log(`   - Items in email: ${items.length}`);
+
+  const result = await transporter.sendMail(mailOptions);
+  console.log(`✅ [PROCUREMENT] Email sent successfully!`);
+  console.log(`   - Message ID: ${result.messageId}`);
+  console.log(`   - Response: ${result.response}`);
+  console.log(`   - Accepted: ${result.accepted}`);
+  console.log(`   - Rejected: ${result.rejected}`);
+
+  return { success: true, messageId: result.messageId };
+};
 
 // ============================================================================
 // PROCUREMENT CONTROLLERS
@@ -119,13 +330,7 @@ export const createProcurement = async (req, res) => {
   try {
     const currentUser = req.user;
 
-    // Check if user can create procurement
-    if (currentUser.role.level < 700) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. Only HOD and above can create procurement.",
-      });
-    }
+    // Access control handled by middleware
 
     const procurementData = {
       ...req.body,
@@ -148,6 +353,131 @@ export const createProcurement = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error creating procurement",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Complete draft procurement order (add supplier details and send to supplier)
+// @route   PUT /api/procurement/:id/complete
+// @access  Private (HOD+)
+export const completeProcurementOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUser = req.user;
+    const { supplier, deliveryAddress, expectedDeliveryDate, notes } = req.body;
+
+    // Access control handled by middleware
+
+    const procurement = await Procurement.findById(id);
+    if (!procurement) {
+      return res.status(404).json({
+        success: false,
+        message: "Procurement order not found",
+      });
+    }
+
+    if (procurement.status !== "draft") {
+      return res.status(400).json({
+        success: false,
+        message: "Only draft orders can be completed",
+      });
+    }
+
+    procurement.supplier = {
+      name: supplier.name,
+      contactPerson: supplier.contactPerson,
+      email: supplier.email,
+      phone: supplier.phone,
+      address: supplier.address || {},
+    };
+    procurement.deliveryAddress = deliveryAddress || {};
+    procurement.expectedDeliveryDate = expectedDeliveryDate;
+    procurement.status = "pending";
+    procurement.approvedBy = currentUser._id;
+    procurement.approvedDate = new Date();
+    procurement.approvalNotes = notes || "Order completed by Procurement HOD";
+
+    procurement.notes.push({
+      content: `Order completed by ${currentUser.firstName} ${currentUser.lastName}.`,
+      author: currentUser._id,
+      createdAt: new Date(),
+      isPrivate: false,
+    });
+
+    await procurement.save();
+
+    await procurement.populate([
+      { path: "createdBy", select: "firstName lastName email" },
+      { path: "approvedBy", select: "firstName lastName email" },
+      { path: "relatedProject", select: "name code" },
+    ]);
+
+    console.log(
+      `\n🚀 [PROCUREMENT] Starting completion process for PO: ${procurement.poNumber}`
+    );
+    console.log(`📋 [PROCUREMENT] Order Details:`);
+    console.log(`   - PO Number: ${procurement.poNumber}`);
+    console.log(`   - Title: ${procurement.title}`);
+    console.log(
+      `   - Total Amount: ₦${procurement.totalAmount?.toLocaleString()}`
+    );
+    console.log(`   - Items Count: ${procurement.items?.length || 0}`);
+    console.log(`   - Priority: ${procurement.priority}`);
+    console.log(
+      `   - Project: ${procurement.relatedProject?.name || "No Project"}`
+    );
+
+    console.log(`\n👤 [PROCUREMENT] Supplier Information:`);
+    console.log(`   - Company: ${supplier.name}`);
+    console.log(
+      `   - Contact Person: ${supplier.contactPerson || "Not specified"}`
+    );
+    console.log(`   - Email: ${supplier.email}`);
+    console.log(`   - Phone: ${supplier.phone || "Not specified"}`);
+    console.log(`   - Expected Delivery: ${expectedDeliveryDate}`);
+
+    console.log(
+      `\n📧 [PROCUREMENT] Preparing to send email and PDF to supplier...`
+    );
+
+    try {
+      const emailResult = await sendProcurementEmailToSupplier(
+        procurement,
+        currentUser
+      );
+      console.log(`✅ [PROCUREMENT] Email and PDF sent successfully!`);
+      console.log(`   - Recipient: ${supplier.email}`);
+      console.log(`   - Message ID: ${emailResult.messageId || "N/A"}`);
+      console.log(
+        `   - PDF Attachment: Purchase_Order_${procurement.poNumber}.pdf`
+      );
+    } catch (emailError) {
+      console.error(`❌ [PROCUREMENT] Email/PDF sending failed:`, emailError);
+      console.error(`   - Error details: ${emailError.message}`);
+      console.error(`   - Supplier email: ${supplier.email}`);
+    }
+
+    console.log(`\n🎯 [PROCUREMENT] What happens next:`);
+    console.log(`   1. Supplier receives email with PDF purchase order`);
+    console.log(`   2. Supplier reviews items and pricing`);
+    console.log(`   3. Supplier can contact ELRA for clarifications`);
+    console.log(`   4. Supplier confirms order acceptance`);
+    console.log(`   5. Delivery scheduled for: ${expectedDeliveryDate}`);
+    console.log(
+      `   6. Order status will be updated to 'approved' upon supplier confirmation\n`
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Procurement order completed successfully",
+      data: procurement,
+    });
+  } catch (error) {
+    console.error("❌ [PROCUREMENT] Complete procurement order error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error completing procurement order",
       error: error.message,
     });
   }
@@ -554,4 +884,77 @@ const checkProcurementDeleteAccess = async (user, procurement) => {
   }
 
   return false;
+};
+
+// @desc    Resend procurement email to supplier
+// @route   POST /api/procurement/:id/resend-email
+// @access  Private (HOD+)
+export const resendProcurementEmail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUser = req.user;
+
+    const procurement = await Procurement.findById(id);
+    if (!procurement) {
+      return res.status(404).json({
+        success: false,
+        message: "Procurement order not found",
+      });
+    }
+
+    if (!procurement.supplier?.email) {
+      return res.status(400).json({
+        success: false,
+        message: "No supplier email found for this procurement order",
+      });
+    }
+
+    console.log(
+      `\n🔄 [PROCUREMENT] Resending email for PO: ${procurement.poNumber}`
+    );
+    console.log(`   - Supplier: ${procurement.supplier.email}`);
+    console.log(
+      `   - Resent by: ${currentUser.firstName} ${currentUser.lastName}`
+    );
+
+    const emailResult = await sendProcurementEmailToSupplier(
+      procurement,
+      currentUser
+    );
+
+    if (emailResult.success) {
+      console.log(`✅ [PROCUREMENT] Email resent successfully!`);
+      console.log(`   - Recipient: ${procurement.supplier.email}`);
+      console.log(`   - Message ID: ${emailResult.messageId || "N/A"}`);
+
+      res.status(200).json({
+        success: true,
+        message: "Email resent successfully to supplier",
+        data: {
+          messageId: emailResult.messageId,
+          recipient: procurement.supplier.email,
+          resentAt: new Date(),
+          resentBy: {
+            id: currentUser._id,
+            name: `${currentUser.firstName} ${currentUser.lastName}`,
+          },
+        },
+      });
+    } else {
+      console.error(`❌ [PROCUREMENT] Email resend failed:`, emailResult.error);
+
+      res.status(500).json({
+        success: false,
+        message: "Failed to resend email",
+        error: emailResult.error,
+      });
+    }
+  } catch (error) {
+    console.error("❌ [PROCUREMENT] Resend email error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error resending email",
+      error: error.message,
+    });
+  }
 };

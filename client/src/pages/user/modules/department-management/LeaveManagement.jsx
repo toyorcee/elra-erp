@@ -887,4 +887,4 @@ const LeaveManagement = () => {
   );
 };
 
-export default DepartmentApprovals;
+export default LeaveManagement;

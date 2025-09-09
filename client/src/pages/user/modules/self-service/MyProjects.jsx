@@ -3,6 +3,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../../../../context/AuthContext";
 import { toast } from "react-toastify";
 import {
+  fetchProjectTasks,
+  updateTaskStatus,
+} from "../../../../services/taskAPI";
+import {
   PlusIcon,
   PencilIcon,
   TrashIcon,
@@ -14,6 +18,8 @@ import {
   FolderIcon,
   XMarkIcon,
   ArrowUpTrayIcon,
+  CalendarIcon,
+  UserIcon,
 } from "@heroicons/react/24/outline";
 import { HiDocument } from "react-icons/hi2";
 import DataTable from "../../../../components/common/DataTable";
@@ -26,6 +32,10 @@ import {
   fetchProjectCategories,
   fetchProjects,
 } from "../../../../services/projectAPI.js";
+import {
+  uploadDocument,
+  getProjectDocuments,
+} from "../../../../services/documents.js";
 import { formatNumberWithCommas } from "../../../../utils/formatters.js";
 
 const MyProjects = () => {
@@ -75,15 +85,19 @@ const MyProjects = () => {
 
   const [selectedProject, setSelectedProject] = useState(null);
 
-  // Document management state
   const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [selectedProjectForDocument, setSelectedProjectForDocument] =
     useState(null);
+  const [selectedProjectForDocuments, setSelectedProjectForDocuments] =
+    useState(null);
+  const [projectDocuments, setProjectDocuments] = useState({});
+  const [loadingDocuments, setLoadingDocuments] = useState({});
   const [documentFormData, setDocumentFormData] = useState({
     title: "",
     description: "",
     category: "Project Documentation",
-    documentType: "Project Document",
+    documentType: "",
     priority: "Medium",
     tags: "",
     isConfidential: false,
@@ -97,6 +111,14 @@ const MyProjects = () => {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState(null);
+  const [showImplementationModal, setShowImplementationModal] = useState(false);
+  const [
+    selectedProjectForImplementation,
+    setSelectedProjectForImplementation,
+  ] = useState(null);
+  const [projectTasks, setProjectTasks] = useState([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [updatingTaskId, setUpdatingTaskId] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -367,30 +389,52 @@ const MyProjects = () => {
     const numBudget = parseFloat(budget.replace(/,/g, "")) || 0;
 
     if (!requiresBudgetAllocation || requiresBudgetAllocation === "false") {
-      return {
-        text: "HOD → Project Management (Self-funded Project)",
-        color: "text-green-600",
-        description:
-          "Project will start after HOD and Project Management HOD approve",
-      };
-    } else {
-      // Budget allocation requested - standard approval workflow with legal compliance
-      if (numBudget <= 500000) {
+      // Self-funded projects
+      if (numBudget <= 1000000) {
         return {
-          text: "HOD → Project Management → Legal → Finance → Executive",
-          color: "text-blue-600",
+          text: "HOD → Project Management",
+          color: "text-green-600",
           description:
-            "Standard approval workflow with legal compliance for budget allocation",
+            "Project starts after HOD and Project Management approvals",
+        };
+      } else if (numBudget <= 5000000) {
+        return {
+          text: "HOD → Project Management",
+          color: "text-green-600",
+          description:
+            "Project starts after HOD and Project Management approvals",
+        };
+      } else if (numBudget > 5000000) {
+        return {
+          text: "HOD → Project Management → Legal → Executive",
+          color: "text-orange-600",
+          description: "Large self-funded project requires Legal and Executive",
+        };
+      }
+    } else {
+      // Budget allocation required
+      if (numBudget <= 1000000) {
+        return {
+          text: "HOD → Project Management → Legal → Finance → Budget Allocation",
+          color: "text-blue-600",
+          description: "Legal review required before Finance allocation",
+        };
+      } else if (numBudget <= 5000000) {
+        return {
+          text: "HOD → Project Management → Legal → Finance → Budget Allocation",
+          color: "text-blue-600",
+          description: "Legal review required before Finance allocation",
         };
       } else {
         return {
-          text: "HOD → Project Management → Legal → Finance → Executive → Budget Committee",
+          text: "HOD → Project Management → Legal → Finance → Executive → Budget Allocation",
           color: "text-orange-600",
-          description:
-            "Extended approval workflow with legal compliance for large budget requests",
+          description: "Executive approval required before allocation",
         };
       }
     }
+
+    return { text: "HOD → Project Management", color: "text-green-600" };
   };
 
   // Form validation
@@ -404,12 +448,38 @@ const MyProjects = () => {
       formData.category &&
       formData.priority;
 
-    // For ALL projects: check budget if items exist
+    console.log("🔍 [VALIDATION] Form validation check:", {
+      name: !!formData.name,
+      description: !!formData.description,
+      startDate: !!formData.startDate,
+      endDate: !!formData.endDate,
+      budget: !!formData.budget,
+      category: !!formData.category,
+      priority: !!formData.priority,
+      basicFieldsValid,
+      projectItemsLength: projectItems.length,
+      requiresBudgetAllocation: formData.requiresBudgetAllocation,
+      itemsValid: validateProjectItems(),
+      budgetValid:
+        projectItems.length > 0
+          ? getTotalItemsCost() <=
+            parseFloat(formData.budget.replace(/,/g, "") || 0)
+          : true,
+    });
+
     if (projectItems.length > 0) {
       const itemsValid = validateProjectItems();
       const budgetValid =
         getTotalItemsCost() <=
         parseFloat(formData.budget.replace(/,/g, "") || 0);
+
+      console.log("🔍 [VALIDATION] Items validation:", {
+        itemsValid,
+        budgetValid,
+        totalItemsCost: getTotalItemsCost(),
+        budget: parseFloat(formData.budget.replace(/,/g, "") || 0),
+      });
+
       return basicFieldsValid && itemsValid && budgetValid;
     }
 
@@ -441,7 +511,6 @@ const MyProjects = () => {
 
     setSubmitting(true);
     try {
-      // Prepare submit data exactly like ProjectList
       const submitData = {
         name: formData.name,
         description: formData.description,
@@ -449,6 +518,7 @@ const MyProjects = () => {
         endDate: formData.endDate,
         budget: parseFloat(formData.budget.replace(/,/g, "")) || 0,
         category: formData.category,
+        priority: formData.priority,
         projectScope: "personal",
         requiresBudgetAllocation:
           formData.requiresBudgetAllocation === "true" ? true : false,
@@ -456,7 +526,6 @@ const MyProjects = () => {
         department: user.department?._id || user.department,
       };
 
-      // Add project items for all personal projects (planning and organization)
       if (projectItems.length > 0) {
         submitData.projectItems = projectItems.map((item) => ({
           name: item.name,
@@ -619,10 +688,10 @@ const MyProjects = () => {
   };
 
   const validateProjectItems = () => {
-    if (formData.requiresBudgetAllocation === "true") {
-      // For funded projects, items are required
-      if (projectItems.length === 0) return false;
-
+    if (
+      formData.requiresBudgetAllocation === "true" &&
+      projectItems.length > 0
+    ) {
       return projectItems.every(
         (item) =>
           item.name.trim() &&
@@ -631,7 +700,7 @@ const MyProjects = () => {
           parseFloat(item.unitPrice) > 0
       );
     }
-    return true; // For self-funded projects, items are optional
+    return true;
   };
 
   const handleEditProject = () => {
@@ -729,12 +798,19 @@ const MyProjects = () => {
     setShowViewModal(true);
   };
 
-  const openDocumentsModal = (project) => {
-    setSelectedProjectForDocument(project);
-    setShowDocumentModal(true);
+  const openDocumentsModal = async (project) => {
+    setSelectedProjectForDocuments(project);
+    setShowDocumentsModal(true);
+    await fetchProjectDocuments(project.id);
   };
 
-  const closeDocumentModal = () => {
+  const openImplementationModal = async (project) => {
+    setSelectedProjectForImplementation(project);
+    setShowImplementationModal(true);
+    await loadProjectTasks(project);
+  };
+
+  const closeDocumentModal = async () => {
     setShowDocumentModal(false);
     setSelectedProjectForDocument(null);
     setSelectedFile(null);
@@ -742,12 +818,15 @@ const MyProjects = () => {
       title: "",
       description: "",
       category: "Project Documentation",
-      documentType: "Project Document",
+      documentType: "",
       priority: "Medium",
       tags: "",
       isConfidential: false,
     });
     setIsReplacingDocument(false);
+
+    // Refresh projects data when closing upload modal
+    await refreshData();
   };
 
   const handleFileSelect = (e) => {
@@ -847,8 +926,18 @@ const MyProjects = () => {
         });
       }, 200);
 
-      // TODO: Implement actual document upload API call
-      await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate API call
+      const uploadData = new FormData();
+      uploadData.append("document", selectedFile);
+      uploadData.append("title", documentFormData.title);
+      uploadData.append("description", documentFormData.description);
+      uploadData.append("documentType", documentFormData.documentType);
+      uploadData.append("projectId", selectedProjectForDocument.id);
+      uploadData.append("isConfidential", documentFormData.isConfidential);
+
+      const result = await uploadDocument(uploadData);
+      if (!result.success) {
+        throw new Error(result.message || "Failed to upload document");
+      }
 
       clearInterval(progressInterval);
       setUploadProgress(100);
@@ -857,7 +946,12 @@ const MyProjects = () => {
         `Document "${documentFormData.title}" uploaded successfully for project "${selectedProjectForDocument.name}"!`
       );
 
-      // Reset form and close modal
+      if (selectedProjectForDocuments) {
+        await fetchProjectDocuments(selectedProjectForDocuments.id);
+      }
+
+      await refreshData();
+
       closeDocumentModal();
     } catch (error) {
       console.error("Document upload error:", error);
@@ -925,6 +1019,162 @@ const MyProjects = () => {
       default:
         return <ClockIcon className="w-5 h-5 text-blue-600" />;
     }
+  };
+
+  // Helper function to get document type label
+  const getDocumentTypeLabel = (documentType) => {
+    const labels = {
+      project_proposal: "Project Proposal Document",
+      budget_breakdown: "Budget & Financial Plan",
+      technical_specifications: "Technical & Implementation Plan",
+    };
+    return labels[documentType] || documentType;
+  };
+
+  // Helper function to get document type description
+  const getDocumentTypeDescription = (documentType) => {
+    const descriptions = {
+      project_proposal:
+        "Complete project proposal with objectives, scope, and detailed description",
+      budget_breakdown:
+        "Detailed budget breakdown, cost analysis, and financial justification",
+      technical_specifications:
+        "Technical specifications, timeline, milestones, and implementation strategy",
+    };
+    return descriptions[documentType] || "";
+  };
+
+  // Helper function to get uploaded document by type
+  const getUploadedDocument = (documentType) => {
+    if (
+      !selectedProjectForDocuments ||
+      !projectDocuments[selectedProjectForDocuments.id]
+    ) {
+      return null;
+    }
+    return projectDocuments[selectedProjectForDocuments.id].find(
+      (doc) => doc.documentType === documentType
+    );
+  };
+
+  // Function to fetch project documents
+  const fetchProjectDocuments = async (projectId) => {
+    try {
+      setLoadingDocuments((prev) => ({ ...prev, [projectId]: true }));
+      const response = await getProjectDocuments(projectId);
+      if (response.success) {
+        setProjectDocuments((prev) => ({
+          ...prev,
+          [projectId]: response.data.documents || [],
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching project documents:", error);
+      toast.error("Failed to fetch project documents");
+    } finally {
+      setLoadingDocuments((prev) => ({ ...prev, [projectId]: false }));
+    }
+  };
+
+  // Function to fetch project tasks
+  const loadProjectTasks = async (project) => {
+    try {
+      setLoadingTasks(true);
+      const projectId = project._id || project.id;
+      console.log("🔍 [FRONTEND] Fetching tasks for project ID:", projectId);
+
+      const response = await fetchProjectTasks(projectId);
+      console.log("🔍 [FRONTEND] API Response:", response);
+
+      // Handle the response structure properly
+      const tasks = response.data?.tasks || response.tasks || [];
+      console.log("🔍 [FRONTEND] Extracted tasks:", tasks);
+
+      setProjectTasks(tasks);
+    } catch (error) {
+      console.error("Error fetching project tasks:", error);
+      toast.error("Error loading project tasks");
+      setProjectTasks([]);
+    } finally {
+      setLoadingTasks(false);
+    }
+  };
+
+  // Function to mark task as in progress
+  const markTaskAsInProgress = async (taskId) => {
+    try {
+      setUpdatingTaskId(taskId);
+      await updateTaskStatus(taskId, "in_progress");
+      toast.success(
+        "🚀 Task started successfully! You can now work on this task."
+      );
+      if (selectedProjectForImplementation) {
+        await loadProjectTasks(selectedProjectForImplementation);
+        await refreshData();
+        // Refresh the selected project data to get updated progress
+        const updatedProject = projects.find(
+          (p) => p._id === selectedProjectForImplementation._id
+        );
+        if (updatedProject) {
+          setSelectedProjectForImplementation(updatedProject);
+        }
+      }
+    } catch (error) {
+      console.error("Error starting task:", error);
+      toast.error("❌ Error starting task. Please try again.");
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  };
+
+  // Function to mark task as completed
+  const markTaskAsCompleted = async (taskId) => {
+    try {
+      setUpdatingTaskId(taskId);
+      await updateTaskStatus(taskId, "completed");
+      toast.success(
+        "🎉 Task completed successfully! Great work! Project progress updated."
+      );
+      if (selectedProjectForImplementation) {
+        await loadProjectTasks(selectedProjectForImplementation);
+        await refreshData();
+        const updatedProject = projects.find(
+          (p) => p._id === selectedProjectForImplementation._id
+        );
+        if (updatedProject) {
+          setSelectedProjectForImplementation(updatedProject);
+        }
+      }
+    } catch (error) {
+      console.error("Error completing task:", error);
+      toast.error("❌ Error completing task. Please try again.");
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  };
+
+  // Function to refresh tasks
+  const refreshTasks = async () => {
+    if (selectedProjectForImplementation) {
+      await loadProjectTasks(selectedProjectForImplementation);
+    }
+  };
+
+  // Function to start document replacement
+  const startDocumentReplacement = (documentType, project) => {
+    setShowDocumentsModal(false);
+    setSelectedProjectForDocument(project);
+    setDocumentFormData({
+      title: getDocumentTypeLabel(documentType),
+      description: getDocumentTypeDescription(documentType),
+      category: "Project Documentation",
+      documentType: documentType,
+      priority: "Medium",
+      tags: "",
+      isConfidential: false,
+    });
+    setIsReplacingDocument(true);
+    setShowDocumentModal(true);
   };
 
   if (loading) {
@@ -1142,7 +1392,7 @@ const MyProjects = () => {
                 accessor: "budget",
                 renderer: (project) => (
                   <span className="font-medium text-gray-900">
-                    ${project.budget.toLocaleString()}
+                    ₦{project.budget.toLocaleString()}
                   </span>
                 ),
               },
@@ -1184,22 +1434,37 @@ const MyProjects = () => {
                         openDocumentsModal(project);
                       }}
                       className={`p-2 rounded-lg transition-colors cursor-pointer relative ${
-                        project.documents && project.documents.length > 0
+                        project.requiredDocuments &&
+                        project.requiredDocuments.some((doc) => doc.isSubmitted)
                           ? "text-green-600 hover:text-green-800 hover:bg-green-50"
                           : "text-blue-600 hover:text-blue-800 hover:bg-blue-50"
                       }`}
                       title={
-                        project.documents && project.documents.length > 0
-                          ? `View ${project.documents.length} uploaded documents`
+                        project.requiredDocuments &&
+                        project.requiredDocuments.some((doc) => doc.isSubmitted)
+                          ? `View ${
+                              project.requiredDocuments.filter(
+                                (doc) => doc.isSubmitted
+                              ).length
+                            }/${
+                              project.requiredDocuments.length
+                            } uploaded documents`
                           : "View Documents to Upload"
                       }
                     >
                       <HiDocument className="h-4 w-4" />
-                      {project.documents && project.documents.length > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                          {project.documents.length}
-                        </span>
-                      )}
+                      {project.requiredDocuments &&
+                        project.requiredDocuments.some(
+                          (doc) => doc.isSubmitted
+                        ) && (
+                          <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                            {
+                              project.requiredDocuments.filter(
+                                (doc) => doc.isSubmitted
+                              ).length
+                            }
+                          </span>
+                        )}
                     </button>
 
                     {/* Edit Project - Only show if project is still in planning stage */}
@@ -1227,6 +1492,25 @@ const MyProjects = () => {
                         title="Delete Project"
                       >
                         <TrashIcon className="h-4 w-4" />
+                      </button>
+                    )}
+
+                    {/* Implement Project - Show for approved projects */}
+                    {[
+                      "approved",
+                      "in_progress",
+                      "implementation",
+                      "active",
+                    ].includes(project.status) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openImplementationModal(project);
+                        }}
+                        className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors cursor-pointer"
+                        title="Implement Project"
+                      >
+                        <CheckCircleIcon className="h-4 w-4" />
                       </button>
                     )}
                   </div>
@@ -1306,6 +1590,7 @@ const MyProjects = () => {
               {/* Content - Scrollable */}
               <div className="p-8 bg-white overflow-y-auto flex-1">
                 <form
+                  id="create-project-form"
                   onSubmit={(e) => {
                     e.preventDefault();
                     handleCreateProject();
@@ -1803,60 +2088,105 @@ const MyProjects = () => {
                               management
                             </div>
                           )}
+
+                        {/* Budget Allocation Notice for Create Modal */}
+                        {formData.requiresBudgetAllocation === "true" &&
+                          (() => {
+                            const totalItemsCost = getTotalItemsCost();
+                            const budget = parseFloat(
+                              formData.budget.replace(/,/g, "") || 0
+                            );
+
+                            if (totalItemsCost < budget && totalItemsCost > 0) {
+                              return (
+                                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                  <div className="flex items-start space-x-2">
+                                    <div className="flex-shrink-0">
+                                      <svg
+                                        className="w-5 h-5 text-blue-600 mt-0.5"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                      >
+                                        <path
+                                          fillRule="evenodd"
+                                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                          clipRule="evenodd"
+                                        />
+                                      </svg>
+                                    </div>
+                                    <div className="flex-1">
+                                      <p className="text-sm text-blue-800">
+                                        <span className="font-medium">
+                                          Budget Allocation Notice:
+                                        </span>{" "}
+                                        Finance will allocate ₦
+                                        {formatNumberWithCommas(totalItemsCost)}{" "}
+                                        (total items cost) instead of the full
+                                        project budget of ₦
+                                        {formatNumberWithCommas(budget)}.
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                       </div>
                     </div>
-
-                    {/* Submit Button - Only show when creating or editing */}
-                    {!selectedProject || isEditMode ? (
-                      <div className="flex justify-end pt-6">
-                        <button
-                          type="submit"
-                          className={`px-6 py-3 rounded-lg transition-all duration-200 flex items-center space-x-2 ${
-                            isFormValid() && !isBudgetExceeded() && !submitting
-                              ? "bg-[var(--elra-primary)] text-white hover:bg-[var(--elra-primary-dark)]"
-                              : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                          }`}
-                          disabled={
-                            submitting || !isFormValid() || isBudgetExceeded()
-                          }
-                        >
-                          {submitting ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                              <span>
-                                {isEditMode
-                                  ? "Updating Project..."
-                                  : "Creating Project..."}
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <span>
-                                {isEditMode
-                                  ? "Update Project"
-                                  : "Create Project"}
-                              </span>
-                              <svg
-                                className="w-5 h-5"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                                />
-                              </svg>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    ) : null}
                   </motion.div>
                 </form>
               </div>
+
+              {/* Fixed Footer with Submit Button */}
+              {(!selectedProject || isEditMode) && (
+                <div className="bg-white border-t border-gray-200 p-6 flex-shrink-0">
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      form="create-project-form"
+                      className={`px-6 py-3 rounded-lg transition-all duration-200 flex items-center space-x-2 ${
+                        isFormValid() && !isBudgetExceeded() && !submitting
+                          ? "bg-[var(--elra-primary)] text-white hover:bg-[var(--elra-primary-dark)]"
+                          : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      }`}
+                      disabled={
+                        submitting || !isFormValid() || isBudgetExceeded()
+                      }
+                    >
+                      {submitting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <span>
+                            {isEditMode
+                              ? "Updating Project..."
+                              : "Creating Project..."}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span>
+                            {isEditMode ? "Update Project" : "Create Project"}
+                          </span>
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                            />
+                          </svg>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}
@@ -2026,7 +2356,7 @@ const MyProjects = () => {
                     <div className="flex items-center space-x-3">
                       <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                         <span className="text-blue-600 font-semibold text-sm">
-                          $
+                          ₦
                         </span>
                       </div>
                       <div>
@@ -2144,6 +2474,54 @@ const MyProjects = () => {
                           </div>
                         ))}
                       </div>
+
+                      {/* Budget Allocation Notice */}
+                      {selectedProject.requiresBudgetAllocation &&
+                        (() => {
+                          const totalItemsCost =
+                            selectedProject.projectItems.reduce(
+                              (sum, item) =>
+                                sum + (parseFloat(item.totalPrice) || 0),
+                              0
+                            );
+                          const budget =
+                            parseFloat(selectedProject.budget) || 0;
+
+                          if (totalItemsCost < budget && totalItemsCost > 0) {
+                            return (
+                              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div className="flex items-start space-x-2">
+                                  <div className="flex-shrink-0">
+                                    <svg
+                                      className="w-5 h-5 text-blue-600 mt-0.5"
+                                      fill="currentColor"
+                                      viewBox="0 0 20 20"
+                                    >
+                                      <path
+                                        fillRule="evenodd"
+                                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                        clipRule="evenodd"
+                                      />
+                                    </svg>
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="text-sm text-blue-800">
+                                      <span className="font-medium">
+                                        Budget Allocation Notice:
+                                      </span>{" "}
+                                      Finance will allocate ₦
+                                      {formatNumberWithCommas(totalItemsCost)}{" "}
+                                      (total items cost) instead of the full
+                                      project budget of ₦
+                                      {formatNumberWithCommas(budget)}.
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
                     </div>
                   )}
               </div>
@@ -2177,6 +2555,15 @@ const MyProjects = () => {
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowDocumentModal(false);
+                      setShowDocumentsModal(true);
+                    }}
+                    className="bg-white text-[var(--elra-primary)] px-4 py-2 rounded-lg hover:bg-gray-50 transition-all duration-300 font-medium border border-white"
+                  >
+                    Back to Documents
+                  </button>
                   <button
                     onClick={closeDocumentModal}
                     className="bg-white text-[var(--elra-primary)] px-4 py-2 rounded-lg hover:bg-gray-50 transition-all duration-300 font-medium border border-white"
@@ -2384,6 +2771,569 @@ const MyProjects = () => {
                       )}
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Project Documents Modal */}
+      {showDocumentsModal && selectedProjectForDocuments && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-[90vw] w-full max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-20 h-20 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <ELRALogo variant="light" size="md" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">
+                      Project Documents - {selectedProjectForDocuments.name}
+                    </h2>
+                    <p className="text-white text-opacity-80">
+                      Code: {selectedProjectForDocuments.code} • Budget: ₦
+                      {selectedProjectForDocuments.budget?.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={async () => {
+                      setShowDocumentsModal(false);
+                      // Refresh projects data when closing documents modal
+                      await refreshData();
+                    }}
+                    className="text-white hover:text-gray-200 transition-colors"
+                  >
+                    <XMarkIcon className="w-8 h-8" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-8 bg-white">
+              {/* Project Information */}
+              <div className="mb-8">
+                <div className="bg-[var(--elra-primary-light)] border border-[var(--elra-primary)] p-4 rounded-lg">
+                  <div className="flex">
+                    <FolderIcon className="h-5 w-5 text-[var(--elra-primary)] mr-3 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm text-[var(--elra-primary-dark)] font-medium mb-2">
+                        Required Documents for Project Approval
+                      </p>
+                      <p className="text-sm text-[var(--elra-primary-dark)] mb-4">
+                        The following documents are required for project
+                        approval. Upload completed documents to proceed with
+                        approval.
+                      </p>
+
+                      {/* Required Documents List */}
+                      <div className="space-y-4">
+                        {[
+                          {
+                            title: "Project Proposal Document",
+                            description:
+                              "Complete project proposal with objectives, scope, and detailed description",
+                            documentType: "project_proposal",
+                            isSubmitted:
+                              projectDocuments[
+                                selectedProjectForDocuments.id
+                              ]?.some(
+                                (uploadedDoc) =>
+                                  uploadedDoc.documentType ===
+                                  "project_proposal"
+                              ) || false,
+                          },
+                          {
+                            title: "Budget & Financial Plan",
+                            description:
+                              "Detailed budget breakdown, cost analysis, and financial justification",
+                            documentType: "budget_breakdown",
+                            isSubmitted:
+                              projectDocuments[
+                                selectedProjectForDocuments.id
+                              ]?.some(
+                                (uploadedDoc) =>
+                                  uploadedDoc.documentType ===
+                                  "budget_breakdown"
+                              ) || false,
+                          },
+                          {
+                            title: "Technical & Implementation Plan",
+                            description:
+                              "Technical specifications, timeline, milestones, and implementation strategy",
+                            documentType: "technical_specifications",
+                            isSubmitted:
+                              projectDocuments[
+                                selectedProjectForDocuments.id
+                              ]?.some(
+                                (uploadedDoc) =>
+                                  uploadedDoc.documentType ===
+                                  "technical_specifications"
+                              ) || false,
+                          },
+                        ].map((doc, index) => (
+                          <div
+                            key={index}
+                            className={`rounded-lg p-6 transition-colors border ${
+                              doc.isSubmitted
+                                ? "bg-green-50 border-green-200 hover:bg-green-100"
+                                : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-start space-x-4 flex-1">
+                                <div
+                                  className={`w-12 h-12 rounded-lg flex items-center justify-center shadow-sm border ${
+                                    doc.isSubmitted
+                                      ? "bg-green-100 border-green-300"
+                                      : "bg-white border-gray-200"
+                                  }`}
+                                >
+                                  {doc.isSubmitted ? (
+                                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                                      <svg
+                                        className="w-4 h-4 text-white"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                      >
+                                        <path
+                                          fillRule="evenodd"
+                                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                          clipRule="evenodd"
+                                        />
+                                      </svg>
+                                    </div>
+                                  ) : (
+                                    <HiDocument className="w-6 h-6 text-[var(--elra-primary)]" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                                    {doc.title}
+                                  </h3>
+                                  <p className="text-sm text-gray-600 mb-3">
+                                    {doc.description}
+                                  </p>
+                                  <div className="flex items-center space-x-4 text-sm">
+                                    <span
+                                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                        doc.isSubmitted
+                                          ? "bg-green-100 text-green-800"
+                                          : "bg-yellow-100 text-yellow-800"
+                                      }`}
+                                    >
+                                      {doc.isSubmitted
+                                        ? "✓ UPLOADED"
+                                        : "REQUIRED"}
+                                    </span>
+                                    <span className="text-gray-500">
+                                      Type:{" "}
+                                      {doc.documentType
+                                        .replace(/_/g, " ")
+                                        .toUpperCase()}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                {doc.isSubmitted ? (
+                                  <div className="flex items-center space-x-2">
+                                    <button
+                                      onClick={() => {
+                                        const uploadedDoc = getUploadedDocument(
+                                          doc.documentType
+                                        );
+                                        if (uploadedDoc) {
+                                          toast.info(
+                                            "View document functionality coming soon"
+                                          );
+                                        } else {
+                                          toast.error(
+                                            "Document not found. Please try uploading again."
+                                          );
+                                        }
+                                      }}
+                                      className="px-4 py-2 rounded-lg transition-colors font-medium flex items-center space-x-2 bg-green-600 text-white hover:bg-green-700"
+                                    >
+                                      <EyeIcon className="w-4 h-4" />
+                                      <span>View Document</span>
+                                    </button>
+
+                                    {/* Hide replace button after first approval */}
+                                    {![
+                                      "approved",
+                                      "in_progress",
+                                      "implementation",
+                                      "active",
+                                      "completed",
+                                    ].includes(
+                                      selectedProjectForDocuments.status
+                                    ) && (
+                                      <button
+                                        onClick={() =>
+                                          startDocumentReplacement(
+                                            doc.documentType,
+                                            selectedProjectForDocuments
+                                          )
+                                        }
+                                        className="px-4 py-2 rounded-lg transition-colors font-medium flex items-center space-x-2 bg-blue-600 text-white hover:bg-blue-700"
+                                        title="Replace document"
+                                      >
+                                        <ArrowUpTrayIcon className="w-4 h-4" />
+                                        <span>Replace</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      setShowDocumentsModal(false);
+                                      setSelectedProjectForDocument(
+                                        selectedProjectForDocuments
+                                      );
+                                      setDocumentFormData({
+                                        title: `${doc.title} - ${selectedProjectForDocuments.name}`,
+                                        description: `${doc.description}`,
+                                        category: "Project Documentation",
+                                        documentType: doc.documentType,
+                                        priority: "Medium",
+                                        tags: "",
+                                        isConfidential: false,
+                                      });
+                                      setIsReplacingDocument(false);
+                                      setShowDocumentModal(true);
+                                    }}
+                                    className="px-4 py-2 rounded-lg transition-colors font-medium flex items-center space-x-2 bg-[var(--elra-primary)] text-white hover:bg-[var(--elra-primary-dark)]"
+                                  >
+                                    <ArrowUpTrayIcon className="w-4 h-4" />
+                                    <span>Upload Document</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Project Implementation Modal */}
+      {showImplementationModal && selectedProjectForImplementation && (
+        <div className="fixed inset-0 modal-backdrop-enhanced flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl modal-shadow-enhanced max-w-[90vw] w-full max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-20 h-20 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <ELRALogo variant="light" size="md" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">
+                      Project Implementation -{" "}
+                      {selectedProjectForImplementation.name}
+                    </h2>
+                    <p className="text-white text-opacity-80">
+                      Code: {selectedProjectForImplementation.code} • Budget: ₦
+                      {selectedProjectForImplementation.budget?.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setShowImplementationModal(false)}
+                    className="text-white hover:text-gray-200 transition-colors"
+                  >
+                    <XMarkIcon className="w-8 h-8" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {loadingTasks ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+                  <span className="ml-3 text-gray-600">Loading tasks...</span>
+                </div>
+              ) : projectTasks.length === 0 ? (
+                <div className="text-center py-12">
+                  <CheckCircleIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    No Tasks Available
+                  </h3>
+                  <p className="text-gray-500">
+                    Tasks will be automatically generated for this project.
+                    Please check back later.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Progress Overview */}
+                  <div className="bg-[var(--elra-primary-light)] border border-[var(--elra-primary)] rounded-xl p-6">
+                    <div className="flex items-center mb-4">
+                      <CheckCircleIcon className="h-5 w-5 text-[var(--elra-primary)] mr-3" />
+                      <h3 className="text-lg font-semibold text-[var(--elra-primary-dark)]">
+                        Implementation Progress (60% → 100%)
+                      </h3>
+                    </div>
+                    <p className="text-sm text-[var(--elra-primary-dark)] mb-4">
+                      Tasks manage the remaining 40% to complete project
+                      implementation. Complete all tasks to reach 100% project
+                      completion.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-[var(--elra-primary)]">
+                          {
+                            projectTasks.filter(
+                              (task) => task.status === "completed"
+                            ).length
+                          }
+                        </div>
+                        <div className="text-sm text-[var(--elra-primary-dark)]">
+                          Completed
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {
+                            projectTasks.filter(
+                              (task) => task.status === "in_progress"
+                            ).length
+                          }
+                        </div>
+                        <div className="text-sm text-blue-700">In Progress</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-gray-600">
+                          {
+                            projectTasks.filter(
+                              (task) => task.status === "pending"
+                            ).length
+                          }
+                        </div>
+                        <div className="text-sm text-gray-700">Pending</div>
+                      </div>
+                    </div>
+                    {/* Progress Bar */}
+                    <div className="mt-4">
+                      <div className="flex justify-between text-sm text-[var(--elra-primary-dark)] mb-2">
+                        <span>Current Progress</span>
+                        <span>
+                          {selectedProjectForImplementation.progress || 0}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-[var(--elra-primary)] h-2 rounded-full transition-all duration-300"
+                          style={{
+                            width: `${
+                              selectedProjectForImplementation.progress || 0
+                            }%`,
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tasks List */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Project Tasks (Ordered by Priority)
+                    </h3>
+                    {projectTasks
+                      .sort((a, b) => {
+                        // Sort by milestoneOrder first, then by creation date
+                        const orderA = a.milestoneOrder || 999;
+                        const orderB = b.milestoneOrder || 999;
+                        if (orderA !== orderB) {
+                          return orderA - orderB;
+                        }
+                        return new Date(a.createdAt) - new Date(b.createdAt);
+                      })
+                      .map((task, index) => (
+                        <div
+                          key={task._id || index}
+                          className={`border rounded-xl p-4 transition-all duration-200 ${
+                            task.status === "completed"
+                              ? "bg-green-50 border-green-200"
+                              : task.status === "in_progress"
+                              ? "bg-blue-50 border-blue-200"
+                              : "bg-gray-50 border-gray-200"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-3 mb-2">
+                                <div
+                                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                    task.status === "completed"
+                                      ? "bg-green-100 text-green-600"
+                                      : task.status === "in_progress"
+                                      ? "bg-[var(--elra-primary-light)] text-[var(--elra-primary)]"
+                                      : "bg-gray-100 text-gray-600"
+                                  }`}
+                                >
+                                  {task.status === "completed" ? (
+                                    <CheckCircleIcon className="w-5 h-5" />
+                                  ) : task.status === "in_progress" ? (
+                                    <ClockIcon className="w-5 h-5" />
+                                  ) : (
+                                    <ExclamationTriangleIcon className="w-5 h-5" />
+                                  )}
+                                </div>
+                                <h4 className="font-semibold text-gray-900">
+                                  {task.title}
+                                </h4>
+                                <span
+                                  className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    task.status === "completed"
+                                      ? "bg-green-100 text-green-800"
+                                      : task.status === "in_progress"
+                                      ? "bg-[var(--elra-primary-light)] text-[var(--elra-primary-dark)]"
+                                      : "bg-orange-100 text-orange-800"
+                                  }`}
+                                >
+                                  {task.status?.replace("_", " ").toUpperCase()}
+                                </span>
+                              </div>
+                              <p className="text-gray-600 text-sm mb-3">
+                                {task.description}
+                              </p>
+                              <div className="flex items-center space-x-4 text-xs text-gray-500">
+                                <div className="flex items-center space-x-1">
+                                  <CalendarIcon className="w-4 h-4 text-[var(--elra-primary)]" />
+                                  <span>
+                                    Due:{" "}
+                                    {new Date(
+                                      task.dueDate
+                                    ).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                  <UserIcon className="w-4 h-4 text-[var(--elra-primary)]" />
+                                  <span>
+                                    Assigned to: {task.assignedTo?.firstName}{" "}
+                                    {task.assignedTo?.lastName}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="ml-4">
+                              {task.status === "pending" && (
+                                <button
+                                  onClick={() => markTaskAsInProgress(task._id)}
+                                  disabled={updatingTaskId === task._id}
+                                  className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium cursor-pointer flex items-center space-x-2 ${
+                                    updatingTaskId === task._id
+                                      ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                                      : "bg-[var(--elra-primary)] text-white hover:bg-[var(--elra-primary-dark)]"
+                                  }`}
+                                >
+                                  {updatingTaskId === task._id ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                      <span>Starting...</span>
+                                    </>
+                                  ) : (
+                                    <span>Start Task</span>
+                                  )}
+                                </button>
+                              )}
+                              {task.status === "in_progress" && (
+                                <button
+                                  onClick={() => markTaskAsCompleted(task._id)}
+                                  disabled={updatingTaskId === task._id}
+                                  className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium flex items-center space-x-2 ${
+                                    updatingTaskId === task._id
+                                      ? "bg-gray-400 text-gray-200 cursor-not-allowed"
+                                      : "bg-green-600 text-white hover:bg-green-700 cursor-pointer"
+                                  }`}
+                                >
+                                  {updatingTaskId === task._id ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                      <span>Completing...</span>
+                                    </>
+                                  ) : (
+                                    <span>Complete Task</span>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-gray-200 p-6 bg-gray-50 rounded-b-2xl">
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-gray-600">
+                  {projectTasks.length > 0 && (
+                    <div className="flex flex-col">
+                      <span>
+                        {
+                          projectTasks.filter(
+                            (task) => task.status === "completed"
+                          ).length
+                        }{" "}
+                        of {projectTasks.length} tasks completed
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        Overall Progress:{" "}
+                        {Math.round(
+                          60 +
+                            (projectTasks.filter(
+                              (task) => task.status === "completed"
+                            ).length /
+                              projectTasks.length) *
+                              40
+                        )}
+                        % (60% base +{" "}
+                        {Math.round(
+                          (projectTasks.filter(
+                            (task) => task.status === "completed"
+                          ).length /
+                            projectTasks.length) *
+                            40
+                        )}
+                        % from tasks)
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowImplementationModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Close
+                  </button>
+                  {projectTasks.length > 0 && (
+                    <button
+                      onClick={() => refreshTasks()}
+                      className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors"
+                    >
+                      Refresh Tasks
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

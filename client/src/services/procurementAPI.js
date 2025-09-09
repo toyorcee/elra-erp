@@ -55,6 +55,28 @@ export const getProcurementById = async (id) => {
   }
 };
 
+// Complete draft procurement order
+export const completeProcurementOrder = async (id, orderData) => {
+  try {
+    const response = await api.put(`/procurement/${id}/complete`, orderData);
+    return response.data;
+  } catch (error) {
+    console.error("Error completing procurement order:", error);
+    throw error;
+  }
+};
+
+// Resend procurement email
+export const resendProcurementEmail = async (id) => {
+  try {
+    const response = await api.post(`/procurement/${id}/resend-email`);
+    return response.data;
+  } catch (error) {
+    console.error("Error resending procurement email:", error);
+    throw error;
+  }
+};
+
 // Create new procurement order
 export const createProcurement = async (procurementData) => {
   try {

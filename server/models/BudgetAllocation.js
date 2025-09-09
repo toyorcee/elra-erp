@@ -8,9 +8,9 @@ const budgetAllocationSchema = new mongoose.Schema(
       type: String,
       unique: true,
       required: true,
-      default: function() {
+      default: function () {
         return `BA-${uuidv4().substring(0, 8).toUpperCase()}`;
-      }
+      },
     },
 
     // Entity reference (dynamic based on allocation type)
@@ -98,6 +98,30 @@ const budgetAllocationSchema = new mongoose.Schema(
       required: false,
       min: 0,
       default: 0,
+    },
+
+    // EXTRA WALLET FIELDS
+    baseAmount: {
+      type: Number,
+      required: false,
+      min: 0,
+      default: 0,
+      comment: "Base amount allocated for project items (exact cost)",
+    },
+    extraFundsAvailable: {
+      type: Number,
+      required: false,
+      min: 0,
+      default: 0,
+      comment:
+        "Total extra funds available in project budget for future requests",
+    },
+    extraFundsAllocated: {
+      type: Number,
+      required: false,
+      min: 0,
+      default: 0,
+      comment: "Extra funds allocated in this budget allocation",
     },
     previousBudget: {
       type: Number,
@@ -405,7 +429,14 @@ budgetAllocationSchema.statics.findByPayrollPeriod = function (month, year) {
 };
 
 budgetAllocationSchema.statics.getStats = async function () {
-  const stats = await this.aggregate([
+  console.log("📊 [STATS] Starting budget allocation stats calculation...");
+
+  const allocationStats = await this.aggregate([
+    {
+      $match: {
+        status: "allocated",
+      },
+    },
     {
       $group: {
         _id: "$status",
@@ -415,25 +446,104 @@ budgetAllocationSchema.statics.getStats = async function () {
     },
   ]);
 
-  const totalStats = await this.aggregate([
+  console.log(
+    "📊 [STATS] Budget allocation stats (approved only):",
+    allocationStats
+  );
+
+  // Get project stats - separate pending vs allocated projects
+  const Project = mongoose.model("Project");
+
+  // Projects that need allocation (approved but no budget allocation yet)
+  const pendingProjectsStats = await Project.aggregate([
+    {
+      $match: {
+        requiresBudgetAllocation: true,
+        status: "pending_budget_allocation",
+      },
+    },
     {
       $group: {
-        _id: null,
-        totalAllocations: { $sum: 1 },
-        totalAmount: { $sum: "$allocatedAmount" },
-        avgAmount: { $avg: "$allocatedAmount" },
+        _id: "pending_budget_allocation",
+        count: { $sum: 1 },
+        totalItemsValue: {
+          $sum: {
+            $sum: "$projectItems.totalPrice",
+          },
+        },
       },
     },
   ]);
 
-  return {
-    byStatus: stats,
-    totals: totalStats[0] || {
-      totalAllocations: 0,
-      totalAmount: 0,
-      avgAmount: 0,
+  // Projects that have been allocated (have approved budget allocations)
+  // We need to find projects that have BudgetAllocation records with status "allocated"
+  const allocatedProjectsStats = await Project.aggregate([
+    {
+      $match: {
+        requiresBudgetAllocation: true,
+        $or: [{ status: "approved" }, { status: "pending_procurement" }],
+      },
     },
+    {
+      $lookup: {
+        from: "budgetallocations",
+        localField: "_id",
+        foreignField: "project",
+        as: "budgetAllocations",
+      },
+    },
+    {
+      $match: {
+        "budgetAllocations.status": "allocated",
+      },
+    },
+    {
+      $group: {
+        _id: "allocated",
+        count: { $sum: 1 },
+        totalItemsValue: {
+          $sum: {
+            $sum: "$projectItems.totalPrice",
+          },
+        },
+      },
+    },
+  ]);
+
+  console.log("📊 [STATS] Pending projects stats:", pendingProjectsStats);
+  console.log("📊 [STATS] Allocated projects stats:", allocatedProjectsStats);
+
+  // Calculate stats
+  const pendingAllocations = 0; // Finance HOD auto-approves, so no pending allocations
+  const allocatedAllocations =
+    allocationStats.find((s) => s._id === "allocated")?.count || 0;
+  const totalAllocated =
+    allocationStats.find((s) => s._id === "allocated")?.totalAmount || 0;
+
+  const pendingProjects =
+    pendingProjectsStats.find((s) => s._id === "pending_budget_allocation")
+      ?.count || 0;
+  const allocatedProjects =
+    allocatedProjectsStats.find((s) => s._id === "allocated")?.count || 0;
+
+  // Total items cost for ALL projects that need allocation (pending + allocated)
+  const totalProjectItemsCost =
+    (pendingProjectsStats.find((s) => s._id === "pending_budget_allocation")
+      ?.totalItemsValue || 0) +
+    (allocatedProjectsStats.find((s) => s._id === "allocated")
+      ?.totalItemsValue || 0);
+
+  const finalStats = {
+    pendingAllocations,
+    allocatedAllocations,
+    totalAllocated,
+    pendingProjects,
+    allocatedProjects,
+    totalProjectItemsCost,
   };
+
+  console.log("📊 [STATS] Final stats result:", finalStats);
+  return finalStats;
 };
 
 const BudgetAllocation = mongoose.model(

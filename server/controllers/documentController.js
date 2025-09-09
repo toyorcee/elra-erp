@@ -417,6 +417,16 @@ export const uploadDocument = async (req, res) => {
         const notification = new NotificationService();
 
         // 1. Notify document creator (submitter)
+        console.log(
+          "📧 [DOCUMENT] Creating notification for document creator:",
+          {
+            recipient: currentUser._id,
+            type: "DOCUMENT_UPLOADED",
+            documentTitle: document.title,
+            projectId: document.project,
+          }
+        );
+
         await notification.createNotification({
           recipient: currentUser._id,
           type: "DOCUMENT_UPLOADED",
@@ -454,8 +464,27 @@ export const uploadDocument = async (req, res) => {
 
                 await project.save();
 
-                await project.updateProgress();
+                console.log(
+                  `🔄 [DOCUMENT] About to update progress for project ${project.code}`
+                );
+                console.log(
+                  `📊 [DOCUMENT] Current project progress before update: ${project.progress}%`
+                );
+                console.log(
+                  `📄 [DOCUMENT] Documents status: ${
+                    project.requiredDocuments.filter((doc) => doc.isSubmitted)
+                      .length
+                  }/${project.requiredDocuments.length} submitted`
+                );
 
+                await project.updateTwoPhaseProgress();
+
+                console.log(
+                  `✅ [DOCUMENT] Progress update completed for project ${project.code}`
+                );
+                console.log(
+                  `📊 [DOCUMENT] New project progress after update: ${project.progress}%`
+                );
                 console.log(
                   `✅ [documentController] Updated project ${project.code} - marked ${document.documentType} as submitted and updated progress`
                 );
@@ -554,6 +583,17 @@ export const uploadDocument = async (req, res) => {
                       `📧 [documentController] Notification type: ${notificationType}`
                     );
 
+                    console.log(
+                      "📧 [DOCUMENT] Creating notification for approver:",
+                      {
+                        recipient: approver._id,
+                        approverName: approver.name || approver.username,
+                        type: notificationType,
+                        projectName: project.name,
+                        documentTitle: document.title,
+                      }
+                    );
+
                     await notification.createNotification({
                       recipient: approver._id,
                       type: notificationType,
@@ -619,8 +659,8 @@ export const uploadDocument = async (req, res) => {
           }
         }
 
-        // Notify department members (if department is specified)
-        if (document.department) {
+        // Only notify department members for non-personal projects
+        if (document.department && document.projectScope !== "personal") {
           try {
             const departmentUsers = await User.find({
               department: document.department,
@@ -650,51 +690,6 @@ export const uploadDocument = async (req, res) => {
               deptError.message
             );
           }
-        }
-
-        // Notify admins and super admins (existing logic with updated service)
-        let adminsToNotify = [];
-        if (document.department) {
-          adminsToNotify = await User.find({
-            department: document.department,
-            "role.level": { $gte: 80 },
-            _id: { $ne: currentUser._id },
-          });
-        } else {
-          adminsToNotify = await User.find({
-            "role.level": { $gte: 80 },
-            _id: { $ne: currentUser._id },
-          });
-        }
-
-        if (adminsToNotify && adminsToNotify.length > 0) {
-          for (const admin of adminsToNotify) {
-            const departmentInfo = document.department
-              ? `in ${admin.department} department`
-              : "across all departments";
-            await notification.createNotification({
-              recipient: admin._id,
-              type: "DOCUMENT_SUBMITTED",
-              title: "New Document Uploaded",
-              message: `${
-                currentUser.name || currentUser.username
-              } has uploaded "${document.title}" ${departmentInfo}.`,
-              data: {
-                documentId: document._id,
-                actionUrl: `/documents/${document._id}`,
-                priority: document.priority.toLowerCase(),
-                senderId: currentUser._id,
-                department: document.department || "General",
-              },
-            });
-          }
-          console.log(
-            "✅ [documentController] Admin notifications sent successfully"
-          );
-        } else {
-          console.warn(
-            "[documentController] No admins to notify for this document upload."
-          );
         }
 
         // If document is confidential, notify super admins

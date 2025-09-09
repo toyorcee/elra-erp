@@ -1,6 +1,10 @@
 import Task from "../models/Task.js";
 import Project from "../models/Project.js";
 import User from "../models/User.js";
+import NotificationService from "../services/notificationService.js";
+
+// Create notification service instance
+const notificationService = new NotificationService();
 
 // ============================================================================
 // TASK CONTROLLERS
@@ -680,4 +684,219 @@ const checkTaskDeleteAccess = async (user, task) => {
   }
 
   return false;
+};
+
+// @desc    Get tasks by project ID (project creator only)
+// @route   GET /api/tasks/project/:projectId
+// @access  Private (Project creator only)
+export const getTasksByProject = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const currentUser = req.user;
+
+    // First, verify the project exists and get its details
+    const project = await Project.findById(projectId).populate(
+      "createdBy",
+      "firstName lastName email"
+    );
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    // Check if current user is the project creator
+    if (project.createdBy._id.toString() !== currentUser._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. You can only view tasks for your own projects.",
+      });
+    }
+
+    // Get tasks for this project
+    const tasks = await Task.find({
+      project: projectId,
+      isActive: true,
+    })
+      .populate("assignedTo", "firstName lastName email")
+      .populate("assignedBy", "firstName lastName email")
+      .sort({ createdAt: -1 });
+
+    console.log(
+      `🔍 [TASKS] Found ${tasks.length} tasks for project ${projectId} by user ${currentUser._id}`
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        tasks,
+        project: {
+          id: project._id,
+          name: project.name,
+          code: project.code,
+          createdBy: project.createdBy,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching project tasks:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching project tasks",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Update task status (task assignee or project creator only)
+// @route   PUT /api/tasks/:id/status
+// @access  Private (Task assignee or project creator only)
+export const updateTaskStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const currentUser = req.user;
+
+    // Validate status
+    if (!["pending", "in_progress", "completed"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid status. Must be 'pending', 'in_progress', or 'completed'",
+      });
+    }
+
+    // Find the task and populate project details
+    const task = await Task.findById(id).populate("project", "createdBy");
+
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        message: "Task not found",
+      });
+    }
+
+    // Check if current user is the task assignee or project creator
+    const isAssignee =
+      task.assignedTo.toString() === currentUser._id.toString();
+    const isProjectCreator =
+      task.project.createdBy.toString() === currentUser._id.toString();
+
+    if (!isAssignee && !isProjectCreator) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. You can only update tasks assigned to you or tasks from your projects.",
+      });
+    }
+
+    // Update task status
+    task.status = status;
+
+    // Set completion date if task is completed
+    if (status === "completed") {
+      task.completedDate = new Date();
+    } else if (status === "pending") {
+      task.completedDate = null;
+    }
+
+    await task.save();
+
+    // Update project progress if task is completed
+    if (status === "completed") {
+      await task.project.updateTwoPhaseProgress();
+    }
+
+    // Send notifications for task status updates
+    try {
+      const project = await Project.findById(task.project).populate(
+        "createdBy",
+        "firstName lastName email"
+      );
+      console.log(
+        `🔔 [NOTIFICATIONS] Sending task notification for project: ${project.name}, status: ${status}`
+      );
+
+      if (status === "in_progress") {
+        // Notify project creator that task has started
+        console.log(
+          `🔔 [NOTIFICATIONS] Creating task_started notification for user: ${project.createdBy._id}`
+        );
+        const notification = await notificationService.createNotification({
+          recipient: project.createdBy._id,
+          type: "task_started",
+          title: "Task Started",
+          message: `Task "${task.title}" has been started for project "${project.name}"`,
+          priority: "medium",
+          metadata: {
+            taskId: task._id,
+            projectId: project._id,
+            projectName: project.name,
+            taskTitle: task.title,
+            startedBy: currentUser._id,
+          },
+        });
+        console.log(
+          `✅ [NOTIFICATIONS] Task started notification created:`,
+          notification
+        );
+      } else if (status === "completed") {
+        // Notify project creator that task is completed
+        console.log(
+          `🔔 [NOTIFICATIONS] Creating task_completed notification for user: ${project.createdBy._id}`
+        );
+        const notification = await notificationService.createNotification({
+          recipient: project.createdBy._id,
+          type: "task_completed",
+          title: "Task Completed",
+          message: `Task "${task.title}" has been completed for project "${project.name}". Project progress updated!`,
+          priority: "high",
+          metadata: {
+            taskId: task._id,
+            projectId: project._id,
+            projectName: project.name,
+            taskTitle: task.title,
+            completedBy: currentUser._id,
+          },
+        });
+        console.log(
+          `✅ [NOTIFICATIONS] Task completed notification created:`,
+          notification
+        );
+      }
+    } catch (notificationError) {
+      console.error(
+        "❌ [NOTIFICATIONS] Error sending task notification:",
+        notificationError
+      );
+      // Don't fail the request if notification fails
+    }
+
+    console.log(
+      `✅ [TASKS] Task ${id} status updated to ${status} by user ${currentUser._id}`
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Task status updated to ${status}`,
+      data: {
+        task: {
+          id: task._id,
+          title: task.title,
+          status: task.status,
+          completedDate: task.completedDate,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error updating task status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error updating task status",
+      error: error.message,
+    });
+  }
 };

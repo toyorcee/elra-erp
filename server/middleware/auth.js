@@ -542,6 +542,47 @@ export const checkBudgetAllocationAccess = async (req, res, next) => {
   }
 };
 
+// Specific middleware for procurement management (Procurement HOD only)
+export const checkProcurementAccess = async (req, res, next) => {
+  try {
+    const user = req.user;
+
+    // Check minimum role level (HOD = 700, SUPER_ADMIN = 1000)
+    if (user.role.level < 700) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only Procurement HOD can manage procurement orders.",
+      });
+    }
+
+    // SUPER_ADMIN (level 1000) can access everything
+    if (user.role.level >= 1000) {
+      return next();
+    }
+
+    // HOD (level 700) can access only if they're in Procurement department
+    if (user.role.level >= 700) {
+      const userDepartment = user.department?.name || user.department;
+
+      if (userDepartment === "Procurement") {
+        return next();
+      }
+    }
+
+    // If we reach here, user doesn't have sufficient permissions
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Only Procurement HOD can manage procurement orders.",
+    });
+  } catch (error) {
+    console.error("Procurement access check error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during authorization check",
+    });
+  }
+};
+
 // Specific middleware for any other module
 export const checkModuleAccess = (moduleName) =>
   checkDepartmentAccess({

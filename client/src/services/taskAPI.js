@@ -102,10 +102,34 @@ export const addChecklistItem = async (taskId, itemData) => {
 // Complete checklist item
 export const completeChecklistItem = async (taskId, itemIndex) => {
   try {
-    const response = await api.put(`/tasks/${taskId}/checklist/${itemIndex}/complete`);
+    const response = await api.put(
+      `/tasks/${taskId}/checklist/${itemIndex}/complete`
+    );
     return response.data;
   } catch (error) {
     console.error("Error completing checklist item:", error);
+    throw error;
+  }
+};
+
+// Get tasks by project ID
+export const fetchProjectTasks = async (projectId) => {
+  try {
+    const response = await api.get(`/tasks/project/${projectId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching project tasks:", error);
+    throw error;
+  }
+};
+
+// Update task status
+export const updateTaskStatus = async (taskId, status) => {
+  try {
+    const response = await api.put(`/tasks/${taskId}/status`, { status });
+    return response.data;
+  } catch (error) {
+    console.error("Error updating task status:", error);
     throw error;
   }
 };

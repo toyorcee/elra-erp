@@ -12,6 +12,8 @@ import {
   addChecklistItem,
   completeChecklistItem,
   createPersonalProjectTasks,
+  getTasksByProject,
+  updateTaskStatus,
 } from "../controllers/taskController.js";
 import { protect, checkRole } from "../middleware/auth.js";
 
@@ -87,6 +89,9 @@ router.get("/stats", checkRole(600), getTaskStats);
 // Get overdue tasks - Manager+
 router.get("/overdue", checkRole(600), getOverdueTasks);
 
+// Get tasks by project ID - Project creator only
+router.get("/project/:projectId", getTasksByProject);
+
 // Get task by ID - Manager+
 router.get("/:id", checkRole(600), getTaskById);
 
@@ -95,6 +100,9 @@ router.post("/", checkRole(600), validateTask, createTask);
 
 // Update task - Manager+
 router.put("/:id", checkRole(600), validateTask, updateTask);
+
+// Update task status - Task assignee or project creator only
+router.put("/:id/status", updateTaskStatus);
 
 // Delete task - HOD+
 router.delete("/:id", checkRole(700), deleteTask);

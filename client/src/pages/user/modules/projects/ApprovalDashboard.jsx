@@ -21,6 +21,7 @@ import { toast } from "react-toastify";
 import { useAuth } from "../../../../context/AuthContext";
 import {
   fetchPendingProjectApprovals,
+  fetchCrossDepartmentalApprovalHistory,
   approveProject,
   rejectProject,
 } from "../../../../services/projectAPI.js";
@@ -31,8 +32,10 @@ import DataTable from "../../../../components/common/DataTable";
 const ApprovalDashboard = () => {
   const { user } = useAuth();
   const [projects, setProjects] = useState([]);
+  const [approvedProjects, setApprovedProjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState({});
+  const [activeTab, setActiveTab] = useState("pending");
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
@@ -50,11 +53,14 @@ const ApprovalDashboard = () => {
 
   // Document viewing states
   const [showDocumentsModal, setShowDocumentsModal] = useState(false);
+  const [showProjectDetailsModal, setShowProjectDetailsModal] = useState(false);
   const [projectDocuments, setProjectDocuments] = useState({});
   const [loadingDocuments, setLoadingDocuments] = useState({});
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   useEffect(() => {
     loadPendingProjectApprovals();
+    loadApprovedProjects();
   }, []);
 
   const loadPendingProjectApprovals = async () => {
@@ -64,16 +70,17 @@ const ApprovalDashboard = () => {
       if (response.success) {
         setProjects(response.data);
 
-        // Calculate stats
+        // Calculate stats for cross-departmental approvals
         const stats = {
           total: response.data.length,
           pending: response.data.filter(
             (p) =>
-              p.status === "pending_approval" ||
-              p.status === "pending_department_approval" ||
+              p.status === "pending_project_management_approval" ||
+              p.status === "pending_legal_compliance_approval" ||
               p.status === "pending_finance_approval" ||
               p.status === "pending_executive_approval" ||
-              p.status === "pending_legal_compliance_approval" ||
+              p.status === "pending_budget_allocation" ||
+              p.status === "pending_procurement" ||
               p.status === "resubmitted"
           ).length,
           approved: response.data.filter((p) => p.status === "approved").length,
@@ -91,10 +98,34 @@ const ApprovalDashboard = () => {
     }
   };
 
-  // Handle approval action with confirmation
+  const loadApprovedProjects = async () => {
+    try {
+      console.log("🔍 [FRONTEND] Loading approved projects...");
+      const response = await fetchCrossDepartmentalApprovalHistory();
+      console.log(
+        "🔍 [FRONTEND] Cross-departmental approval history response:",
+        response
+      );
+      if (response.success) {
+        setApprovedProjects(response.data);
+        console.log("🔍 [FRONTEND] Set approved projects:", response.data);
+      } else {
+        console.error("Failed to load approved projects:", response.message);
+      }
+    } catch (error) {
+      console.error("Error loading approved projects:", error);
+    }
+  };
+
+  const handleViewProject = (project) => {
+    setSelectedProject(project);
+    setShowProjectDetailsModal(true);
+  };
+
   const handleApprovalClick = (project) => {
     setSelectedProject(project);
-    setApprovalComments("");
+    const defaultComment = `Approved by ${user.firstName} ${user.lastName} (${user.department?.name} HOD)`;
+    setApprovalComments(defaultComment);
     setShowApprovalModal(true);
   };
 
@@ -159,6 +190,7 @@ const ApprovalDashboard = () => {
           } successfully`
         );
         loadPendingProjectApprovals();
+        loadApprovedProjects();
 
         // Close modals
         setShowApprovalModal(false);
@@ -245,10 +277,9 @@ const ApprovalDashboard = () => {
       legal_compliance: "Legal & Compliance Approval",
     };
 
-    return levelMap[currentStep.level] || currentStep.level;
+    return levelMap[currentStep.level] || currentStep.level.replace(/_/g, " ");
   };
 
-  // Get approval progress for project approval chain
   const getApprovalProgress = (project) => {
     if (!project.approvalChain || project.approvalChain.length === 0) {
       return { completed: 0, total: 0, percentage: 0 };
@@ -266,7 +297,6 @@ const ApprovalDashboard = () => {
     };
   };
 
-  // Get approval status color
   const getApprovalStatusColor = (project) => {
     const progress = getApprovalProgress(project);
 
@@ -349,13 +379,28 @@ const ApprovalDashboard = () => {
       renderer: (project) => (
         <div className="flex items-center space-x-3">
           <div className="flex-shrink-0">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <DocumentTextIcon className="h-6 w-6 text-white" />
+            <div
+              className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                activeTab === "approved"
+                  ? "bg-gradient-to-br from-green-500 to-green-600"
+                  : "bg-gradient-to-br from-blue-500 to-purple-600"
+              }`}
+            >
+              {activeTab === "approved" ? (
+                <CheckCircleIcon className="h-6 w-6 text-white" />
+              ) : (
+                <DocumentTextIcon className="h-6 w-6 text-white" />
+              )}
             </div>
           </div>
           <div className="flex-1 min-w-0">
             <div className="font-medium text-gray-900 break-words leading-tight">
               {project.name}
+              {activeTab === "approved" && (
+                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  ✓ Approved by You
+                </span>
+              )}
             </div>
             <div className="text-sm text-gray-500 break-words">
               {project.code} •{" "}
@@ -373,6 +418,26 @@ const ApprovalDashboard = () => {
       header: "Current Level",
       accessor: "currentLevel",
       renderer: (project) => {
+        // For approved projects in history tab, show approval information
+        if (activeTab === "approved" && project.approvalLevel) {
+          return (
+            <div className="space-y-2">
+              <div className="text-sm font-medium text-green-700">
+                ✅ Approved at {project.approvalLevel.replace(/_/g, " ")} level
+              </div>
+              <div className="text-xs text-gray-600">
+                Approved: {new Date(project.approvedAt).toLocaleDateString()}
+              </div>
+              {project.approvalComments && (
+                <div className="text-xs text-gray-500 italic">
+                  "{project.approvalComments}"
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        // For pending projects, show current approval level
         const currentLevel = getCurrentApprovalLevel(project);
         const progress = getApprovalProgress(project);
 
@@ -496,11 +561,11 @@ const ApprovalDashboard = () => {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Project Approval Dashboard
+          Cross-Departmental Project Approvals
         </h1>
         <p className="text-gray-600">
-          View project approval status, take action if you are the next
-          approver, and audit approved projects
+          Review and approve projects from other departments that require your
+          expertise
         </p>
       </div>
 
@@ -565,23 +630,65 @@ const ApprovalDashboard = () => {
         </div>
       </div>
 
+      {/* Tab Navigation */}
+      <div className="bg-white rounded-lg shadow mb-6">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">
+            <button
+              onClick={() => setActiveTab("pending")}
+              className={`${
+                activeTab === "pending"
+                  ? "border-[var(--elra-primary)] text-[var(--elra-primary)]"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm cursor-pointer transition-colors duration-200`}
+            >
+              Pending Approvals ({projects.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("approved")}
+              className={`${
+                activeTab === "approved"
+                  ? "border-[var(--elra-primary)] text-[var(--elra-primary)]"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm cursor-pointer transition-colors duration-200`}
+            >
+              My Approval History ({approvedProjects.length})
+            </button>
+          </nav>
+        </div>
+      </div>
+
       {/* Approvals Table */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-900">
-              Project Approval Requests & Audit Trail
+              {activeTab === "pending"
+                ? "Project Approval Requests & Audit Trail"
+                : "My Approval History"}
             </h2>
             <div className="flex items-center space-x-4">
               <div className="text-sm text-gray-500">
-                {projects.length} project{projects.length !== 1 ? "s" : ""}{" "}
+                {activeTab === "pending"
+                  ? projects.length
+                  : approvedProjects.length}{" "}
+                project
+                {(activeTab === "pending"
+                  ? projects.length
+                  : approvedProjects.length) !== 1
+                  ? "s"
+                  : ""}{" "}
                 found
               </div>
             </div>
           </div>
         </div>
 
-        {projects.length === 0 ? (
+        {(
+          activeTab === "pending"
+            ? projects.length === 0
+            : approvedProjects.length === 0
+        ) ? (
           <div className="text-center py-12">
             <div className="mb-6">
               <div className="relative">
@@ -589,26 +696,34 @@ const ApprovalDashboard = () => {
               </div>
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-3">
-              All Projects Approved! 🎉
+              {activeTab === "pending"
+                ? "All Projects Approved! 🎉"
+                : "No Approval History Yet"}
             </h3>
             <p className="text-gray-600 mb-6 max-w-md mx-auto leading-relaxed">
-              Great news! All project approval requests have been processed.
-              <br />
-              No pending approvals require your attention.
+              {activeTab === "pending"
+                ? "Great news! All project approval requests have been processed.\nNo pending approvals require your attention."
+                : "You haven't approved any cross-departmental projects yet.\nYour approval history will appear here once you start reviewing projects."}
             </p>
             <div className="flex items-center justify-center space-x-2 text-sm text-green-600 bg-green-50 rounded-full px-4 py-2 shadow-sm">
               <CheckCircleIcon className="h-5 w-5" />
-              <span className="font-medium">All projects are approved</span>
+              <span className="font-medium">
+                {activeTab === "pending"
+                  ? "All projects are approved"
+                  : "No approvals yet"}
+              </span>
             </div>
           </div>
         ) : (
           <DataTable
-            data={projects}
+            data={activeTab === "pending" ? projects : approvedProjects}
             columns={columns}
             loading={loading}
             searchable={true}
             sortable={true}
             pagination={true}
+            itemsPerPage={itemsPerPage}
+            onItemsPerPageChange={setItemsPerPage}
             actions={{
               showEdit: false,
               showDelete: false,
@@ -622,6 +737,32 @@ const ApprovalDashboard = () => {
 
                 const progress = getApprovalProgress(project);
                 const currentUser = user;
+
+                // For approved projects, show read-only actions
+                if (activeTab === "approved") {
+                  return (
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleViewProject(project)}
+                        className="inline-flex items-center px-3 py-2 border border-[var(--elra-primary)] text-xs font-medium rounded-md text-[var(--elra-primary)] bg-white hover:bg-[var(--elra-primary)] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--elra-primary)] cursor-pointer transition-all duration-200 shadow-sm"
+                        title="View Project Details"
+                      >
+                        <EyeIcon className="h-4 w-4 mr-1.5" />
+                        View
+                      </button>
+                      <button
+                        onClick={() => handleViewDocuments(project)}
+                        className="inline-flex items-center px-3 py-2 border border-blue-500 text-xs font-medium rounded-md text-blue-600 bg-white hover:bg-blue-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer transition-all duration-200 shadow-sm"
+                        title="View Documents"
+                      >
+                        <DocumentIcon className="h-4 w-4 mr-1.5" />
+                        Documents
+                      </button>
+                    </div>
+                  );
+                }
+
+                // For pending projects, show approval actions
 
                 const currentUserId = currentUser._id || currentUser.id;
                 const projectCreatorId =
@@ -670,6 +811,36 @@ const ApprovalDashboard = () => {
                       requiredDeptId: nextApprovalStep.department,
                       isNextApprover,
                     });
+                  } else if (nextApprovalStep.level === "project_management") {
+                    // Project Management HOD approves project_management level (cross-departmental)
+                    isNextApprover =
+                      currentUser.role.level >= 700 &&
+                      currentUser.department?.name === "Project Management";
+                    console.log(
+                      "🔍 [APPROVAL DEBUG] Project Management check:",
+                      {
+                        userRoleLevel: currentUser.role.level,
+                        requiredLevel: 700,
+                        userDept: currentUser.department?.name,
+                        requiredDept: "Project Management",
+                        isNextApprover,
+                      }
+                    );
+                  } else if (nextApprovalStep.level === "department") {
+                    // Legacy case - should not happen with new logic
+                    isNextApprover =
+                      currentUser.role.level >= 700 &&
+                      currentUser.department?.name === "Project Management";
+                    console.log(
+                      "🔍 [APPROVAL DEBUG] Department (Legacy) check:",
+                      {
+                        userRoleLevel: currentUser.role.level,
+                        requiredLevel: 700,
+                        userDept: currentUser.department?.name,
+                        requiredDept: "Project Management",
+                        isNextApprover,
+                      }
+                    );
                   } else if (nextApprovalStep.level === "finance") {
                     isNextApprover =
                       currentUser.role.level >= 700 &&
@@ -725,13 +896,9 @@ const ApprovalDashboard = () => {
                   isNextApprover
                 );
 
-                // Show actions only if:
-                // 1. Project is in any pending approval status
-                // 2. User is NOT the project creator (can't approve own project)
-                // 3. User IS the next approver in the chain
                 const isPendingApproval = [
                   "pending_approval",
-                  "pending_department_approval",
+                  "pending_project_management_approval",
                   "pending_finance_approval",
                   "pending_executive_approval",
                   "pending_legal_compliance_approval",
@@ -766,6 +933,18 @@ const ApprovalDashboard = () => {
 
                 return (
                   <div className="flex items-center space-x-2">
+                    {/* View Project Button - Always visible */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleViewProject(project);
+                      }}
+                      className="inline-flex items-center justify-center w-9 h-9 border border-[var(--elra-primary)] text-xs font-medium rounded-lg text-[var(--elra-primary)] bg-white hover:bg-[var(--elra-primary)] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--elra-primary)] transition-all duration-200 cursor-pointer shadow-sm"
+                      title="View Project Details"
+                    >
+                      <EyeIcon className="h-4 w-4" />
+                    </button>
+
                     {/* View Documents Button - Always visible */}
                     <button
                       onClick={(e) => {
@@ -773,11 +952,11 @@ const ApprovalDashboard = () => {
                         handleViewDocuments(project);
                       }}
                       disabled={loadingDocuments[project._id]}
-                      className="inline-flex items-center justify-center w-8 h-8 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+                      className="inline-flex items-center justify-center w-9 h-9 border border-blue-500 text-xs font-medium rounded-lg text-blue-600 bg-white hover:bg-blue-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-all duration-200 cursor-pointer shadow-sm"
                       title="View Project Documents"
                     >
                       {loadingDocuments[project._id] ? (
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                       ) : (
                         <DocumentIcon className="h-4 w-4" />
                       )}
@@ -792,11 +971,11 @@ const ApprovalDashboard = () => {
                             handleApprovalClick(project);
                           }}
                           disabled={actionLoading[project._id]}
-                          className="inline-flex items-center justify-center w-8 h-8 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 transition-colors"
+                          className="inline-flex items-center justify-center w-9 h-9 border border-green-500 text-xs font-medium rounded-lg text-green-600 bg-white hover:bg-green-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 transition-all duration-200 cursor-pointer shadow-sm"
                           title="Approve Project"
                         >
                           {actionLoading[project._id] ? (
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
                           ) : (
                             <CheckIcon className="h-4 w-4" />
                           )}
@@ -807,11 +986,11 @@ const ApprovalDashboard = () => {
                             handleRejectionClick(project);
                           }}
                           disabled={actionLoading[project._id]}
-                          className="inline-flex items-center justify-center w-8 h-8 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 transition-colors"
+                          className="inline-flex items-center justify-center w-9 h-9 border border-red-500 text-xs font-medium rounded-lg text-red-600 bg-white hover:bg-red-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 transition-all duration-200 cursor-pointer shadow-sm"
                           title="Reject Project"
                         >
                           {actionLoading[project._id] ? (
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
                           ) : (
                             <XMarkIcon className="h-4 w-4" />
                           )}
@@ -1327,6 +1506,445 @@ const ApprovalDashboard = () => {
                     )}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Project Details Modal */}
+        {showProjectDetailsModal && selectedProject && (
+          <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-2xl font-bold text-gray-900">
+                    Project Details - {selectedProject.name}
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowProjectDetailsModal(false);
+                      setSelectedProject(null);
+                    }}
+                    className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  >
+                    <XMarkIcon className="h-6 w-6" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Project Information */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                      Project Information
+                    </h4>
+                    <div className="space-y-3">
+                      <div>
+                        <span className="font-medium text-gray-700">
+                          Project Code:
+                        </span>
+                        <p className="text-gray-600">{selectedProject.code}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">
+                          Description:
+                        </span>
+                        <p className="text-gray-600">
+                          {selectedProject.description}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">
+                          Budget:
+                        </span>
+                        <p className="text-gray-600">
+                          {formatCurrency(selectedProject.budget)}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">
+                          Department:
+                        </span>
+                        <p className="text-gray-600">
+                          {selectedProject.department?.name}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">
+                          Created By:
+                        </span>
+                        <p className="text-gray-600">
+                          {selectedProject.createdBy?.firstName}{" "}
+                          {selectedProject.createdBy?.lastName}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">
+                          Project Manager:
+                        </span>
+                        <p className="text-gray-600">
+                          {selectedProject.projectManager?.firstName}{" "}
+                          {selectedProject.projectManager?.lastName}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Approval Information */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                      Approval Information
+                    </h4>
+                    <div className="space-y-3">
+                      <div>
+                        <span className="font-medium text-gray-700">
+                          Current Status:
+                        </span>
+                        <p className="text-gray-600 capitalize">
+                          {selectedProject.status?.replace(/_/g, " ")}
+                        </p>
+                      </div>
+
+                      {/* Show different info based on whether it's approved or pending */}
+                      {activeTab === "approved" ? (
+                        // For approved projects in history tab
+                        <>
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Approved At Level:
+                            </span>
+                            <p className="text-gray-600 capitalize">
+                              {selectedProject.approvalLevel?.replace(
+                                /_/g,
+                                " "
+                              ) || "N/A"}
+                            </p>
+                          </div>
+
+                          {/* Show current project status if it's in budget allocation */}
+                          {selectedProject.status ===
+                            "pending_budget_allocation" && (
+                            <div>
+                              <span className="font-medium text-gray-700">
+                                Current Status:
+                              </span>
+                              <p className="text-blue-600 font-medium">
+                                📋 Awaiting Budget Allocation
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Project is waiting for Finance HOD to create
+                                budget allocation
+                              </p>
+                            </div>
+                          )}
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Approved At:
+                            </span>
+                            <p className="text-gray-600">
+                              {selectedProject.approvedAt
+                                ? new Date(
+                                    selectedProject.approvedAt
+                                  ).toLocaleString()
+                                : "N/A"}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Approved By:
+                            </span>
+                            <p className="text-gray-600">
+                              {selectedProject.approver?.firstName}{" "}
+                              {selectedProject.approver?.lastName}
+                              {selectedProject.approver?.email && (
+                                <span className="text-sm text-gray-500 ml-2">
+                                  ({selectedProject.approver.email})
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Your Approval Comments:
+                            </span>
+                            <p className="text-gray-600">
+                              {selectedProject.approvalComments ||
+                                "No comments provided"}
+                            </p>
+                          </div>
+
+                          {/* Show approval progress for approved projects */}
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Approval Progress:
+                            </span>
+                            <div className="mt-2">
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div
+                                  className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                                  style={{
+                                    width: `${
+                                      getApprovalProgress(selectedProject)
+                                        .percentage
+                                    }%`,
+                                  }}
+                                ></div>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-1">
+                                {getApprovalProgress(selectedProject).completed}{" "}
+                                of {getApprovalProgress(selectedProject).total}{" "}
+                                levels completed
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Show complete approval chain for approved projects */}
+                          {selectedProject.approvalChain &&
+                            selectedProject.approvalChain.length > 0 && (
+                              <div>
+                                <span className="font-medium text-gray-700">
+                                  Complete Approval Chain:
+                                </span>
+                                <div className="mt-2 space-y-2">
+                                  {selectedProject.approvalChain.map(
+                                    (step, index) => (
+                                      <div
+                                        key={index}
+                                        className="flex items-center justify-between text-sm"
+                                      >
+                                        <span className="capitalize">
+                                          {step.level.replace(/_/g, " ")}{" "}
+                                          Approval
+                                        </span>
+                                        <span
+                                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                            step.status === "approved"
+                                              ? "bg-green-100 text-green-800"
+                                              : step.status === "pending"
+                                              ? step.level ===
+                                                  "budget_allocation" &&
+                                                selectedProject.status ===
+                                                  "pending_budget_allocation"
+                                                ? "bg-blue-100 text-blue-800"
+                                                : "bg-yellow-100 text-yellow-800"
+                                              : "bg-gray-100 text-gray-800"
+                                          }`}
+                                        >
+                                          {step.status === "approved"
+                                            ? "✓ Approved"
+                                            : step.status === "pending"
+                                            ? step.level ===
+                                                "budget_allocation" &&
+                                              selectedProject.status ===
+                                                "pending_budget_allocation"
+                                              ? "📋 Budget Allocation"
+                                              : "⏳ Pending"
+                                            : "⏸️ Waiting"}
+                                        </span>
+                                      </div>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                        </>
+                      ) : (
+                        // For pending projects
+                        <>
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Current Approval Level:
+                            </span>
+                            <p className="text-gray-600">
+                              {getCurrentApprovalLevel(selectedProject)}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Approval Progress:
+                            </span>
+                            <div className="mt-2">
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div
+                                  className="bg-[var(--elra-primary)] h-2 rounded-full transition-all duration-300"
+                                  style={{
+                                    width: `${
+                                      getApprovalProgress(selectedProject)
+                                        .percentage
+                                    }%`,
+                                  }}
+                                ></div>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-1">
+                                {getApprovalProgress(selectedProject).completed}{" "}
+                                of {getApprovalProgress(selectedProject).total}{" "}
+                                levels completed
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Show approval chain */}
+                          {selectedProject.approvalChain &&
+                            selectedProject.approvalChain.length > 0 && (
+                              <div>
+                                <span className="font-medium text-gray-700">
+                                  Approval Chain:
+                                </span>
+                                <div className="mt-2 space-y-2">
+                                  {selectedProject.approvalChain.map(
+                                    (step, index) => (
+                                      <div
+                                        key={index}
+                                        className="flex items-center justify-between text-sm"
+                                      >
+                                        <span className="capitalize">
+                                          {step.level.replace(/_/g, " ")}{" "}
+                                          Approval
+                                        </span>
+                                        <span
+                                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                            step.status === "approved"
+                                              ? "bg-green-100 text-green-800"
+                                              : step.status === "pending"
+                                              ? "bg-yellow-100 text-yellow-800"
+                                              : "bg-gray-100 text-gray-800"
+                                          }`}
+                                        >
+                                          {step.status === "approved"
+                                            ? "✓ Approved"
+                                            : step.status === "pending"
+                                            ? "⏳ Pending"
+                                            : "⏸️ Waiting"}
+                                        </span>
+                                      </div>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Project Items */}
+                {selectedProject.projectItems &&
+                  selectedProject.projectItems.length > 0 && (
+                    <div className="mt-6 bg-gray-50 rounded-lg p-4">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                        Project Items
+                      </h4>
+                      <div className="space-y-3">
+                        {selectedProject.projectItems.map((item, index) => (
+                          <div
+                            key={index}
+                            className="bg-white border border-gray-200 rounded-lg p-4"
+                          >
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <h5 className="font-medium text-gray-900 mb-1">
+                                  {item.name}
+                                </h5>
+                                {item.description && (
+                                  <p className="text-sm text-gray-600 mb-2">
+                                    {item.description}
+                                  </p>
+                                )}
+                                <div className="flex items-center space-x-4 text-sm text-gray-500">
+                                  <span>
+                                    Quantity:{" "}
+                                    <span className="font-medium text-gray-700">
+                                      {item.quantity}
+                                    </span>
+                                  </span>
+                                  <span>
+                                    Unit Price:{" "}
+                                    <span className="font-medium text-gray-700">
+                                      {formatCurrency(item.unitPrice)}
+                                    </span>
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-lg font-semibold text-gray-900">
+                                  {formatCurrency(item.totalPrice)}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  Total
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <div className="flex justify-between items-center">
+                            <span className="text-lg font-medium text-gray-900">
+                              Total Project Budget:
+                            </span>
+                            <span className="text-xl font-bold text-blue-600">
+                              {formatCurrency(selectedProject.budget)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                {/* Timeline Information */}
+                <div className="mt-6 bg-gray-50 rounded-lg p-4">
+                  <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                    Timeline
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <span className="font-medium text-gray-700">
+                        Start Date:
+                      </span>
+                      <p className="text-gray-600">
+                        {new Date(
+                          selectedProject.startDate
+                        ).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700">
+                        End Date:
+                      </span>
+                      <p className="text-gray-600">
+                        {new Date(selectedProject.endDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700">
+                        Duration:
+                      </span>
+                      <p className="text-gray-600">
+                        {selectedProject.duration} days
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700">
+                        Priority:
+                      </span>
+                      <p className="text-gray-600 capitalize">
+                        {selectedProject.priority}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="mt-6 flex justify-end space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowProjectDetailsModal(false);
+                      setSelectedProject(null);
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>

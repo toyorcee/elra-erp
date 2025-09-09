@@ -46,20 +46,20 @@ export const moduleSidebarConfig = {
           },
         ],
       },
-      {
-        title: "Team Management",
-        collapsible: true,
-        defaultExpanded: false,
-        items: [
-          {
-            label: "Team Management",
-            icon: "UsersIcon",
-            path: "/dashboard/modules/department-management/team-management",
-            required: { minLevel: 700 },
-            description: "Manage department staff and roles",
-          },
-        ],
-      },
+      // {
+      //   title: "Team Management",
+      //   collapsible: true,
+      //   defaultExpanded: false,
+      //   items: [
+      //     {
+      //       label: "Team Management",
+      //       icon: "UsersIcon",
+      //       path: "/dashboard/modules/department-management/team-management",
+      //       required: { minLevel: 700 },
+      //       description: "Manage department staff and roles",
+      //     },
+      //   ],
+      // },
       {
         title: "Department Analytics",
         collapsible: true,
@@ -422,28 +422,11 @@ export const moduleSidebarConfig = {
         defaultExpanded: false,
         items: [
           {
-            label: "My Projects",
-            icon: "FolderIcon",
-            path: "/dashboard/modules/projects/list",
-            required: { minLevel: 300 },
-            description: "View and manage all projects",
-          },
-          {
             label: "Approval Management",
             icon: "CheckIcon",
             path: "/dashboard/modules/projects/approvals",
             required: { minLevel: 700 },
             description: "Review and approve project requests",
-          },
-          {
-            label: "Budget Allocation",
-            icon: "CurrencyDollarIcon",
-            path: "/dashboard/modules/projects/budget-allocation",
-            required: {
-              minLevel: 700,
-              department: "Finance & Accounting",
-            },
-            description: "Manage project budget allocations and funding",
           },
         ],
       },

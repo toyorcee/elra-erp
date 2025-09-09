@@ -91,9 +91,16 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
 
     // Helper function to add new page if needed
     const addPageIfNeeded = (requiredSpace) => {
-      const currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY : 45;
+      // Get current Y position more accurately
+      let currentY = 45;
+      if (doc.lastAutoTable && doc.lastAutoTable.finalY) {
+        currentY = doc.lastAutoTable.finalY;
+      } else {
+        currentY = doc.internal.getCurrentPageInfo().pageNumber > 1 ? 20 : 45;
+      }
+
       const pageHeight = doc.internal.pageSize.height;
-      const margin = 20;
+      const margin = 30;
 
       if (currentY + requiredSpace > pageHeight - margin) {
         doc.addPage();
@@ -111,7 +118,7 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
         });
         doc.setGState(new doc.GState({ opacity: 1 }));
 
-        return 20; // Reset Y position to top of new page
+        return 20;
       }
       return currentY;
     };
@@ -780,5 +787,543 @@ export const getPDFMetadata = async (pdfBuffer) => {
   } catch (error) {
     console.error("PDF metadata error:", error);
     throw new Error("Failed to get PDF metadata");
+  }
+};
+
+/**
+ * Generate procurement order PDF for supplier
+ * @param {Object} procurementData - Procurement order data
+ * @param {Object} currentUser - Current user data
+ * @returns {Buffer}
+ */
+export const generateProcurementOrderPDF = async (
+  procurementData,
+  currentUser
+) => {
+  try {
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    // Helper function to add new page if needed
+    const addPageIfNeeded = (requiredSpace) => {
+      const currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY : 45;
+      const pageHeight = doc.internal.pageSize.height;
+      const margin = 20;
+
+      if (currentY + requiredSpace > pageHeight - margin) {
+        doc.addPage();
+
+        // Add watermark to new page
+        doc.setGState(new doc.GState({ opacity: 0.05 }));
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(100);
+        const pageWidth = doc.internal.pageSize.width;
+        const newPageHeight = doc.internal.pageSize.height;
+        doc.text("ELRA", pageWidth / 2, newPageHeight / 2, {
+          align: "center",
+          angle: 30,
+          renderingMode: "fill",
+        });
+        doc.setGState(new doc.GState({ opacity: 1 }));
+
+        return 20;
+      }
+      return currentY;
+    };
+
+    // Set watermark with reduced opacity
+    doc.setGState(new doc.GState({ opacity: 0.05 }));
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(100);
+
+    // Calculate the center of the page
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+
+    // Position watermark
+    doc.text("ELRA", pageWidth / 2, pageHeight / 2, {
+      align: "center",
+      angle: 30,
+      renderingMode: "fill",
+    });
+
+    // Reset opacity for rest of the content
+    doc.setGState(new doc.GState({ opacity: 1 }));
+
+    // Header with ELRA branding
+    const elraGreen = [13, 100, 73];
+    doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+    doc.setFontSize(32);
+    doc.setFont("helvetica", "bold");
+    doc.text("ELRA", 105, 25, { align: "center" });
+
+    // Reset to black for other text
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "normal");
+    doc.text("Purchase Order", 105, 35, { align: "center" });
+
+    // Add PO Number and date
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(`PO Number: ${procurementData.poNumber}`, 20, 50);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 57);
+
+    let yPosition = 70;
+
+    // Supplier Information Section
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Supplier Information", 20, yPosition);
+    yPosition += 10;
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Company: ${procurementData.supplier.name}`, 20, yPosition);
+    yPosition += 7;
+
+    if (procurementData.supplier.contactPerson) {
+      doc.text(
+        `Contact Person: ${procurementData.supplier.contactPerson}`,
+        20,
+        yPosition
+      );
+      yPosition += 7;
+    }
+
+    if (procurementData.supplier.email) {
+      doc.text(`Email: ${procurementData.supplier.email}`, 20, yPosition);
+      yPosition += 7;
+    }
+
+    if (procurementData.supplier.phone) {
+      doc.text(`Phone: ${procurementData.supplier.phone}`, 20, yPosition);
+      yPosition += 7;
+    }
+
+    yPosition += 10;
+
+    // Order Information Section
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Order Information", 20, yPosition);
+    yPosition += 10;
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Title: ${procurementData.title}`, 20, yPosition);
+    yPosition += 7;
+
+    doc.text(
+      `Priority: ${procurementData.priority.toUpperCase()}`,
+      20,
+      yPosition
+    );
+    yPosition += 7;
+
+    doc.text(
+      `Total Amount: NGN ${procurementData.totalAmount.toLocaleString()}`,
+      20,
+      yPosition
+    );
+    yPosition += 7;
+
+    doc.text(`Currency: ${procurementData.currency}`, 20, yPosition);
+    yPosition += 7;
+
+    if (procurementData.expectedDeliveryDate) {
+      doc.text(
+        `Expected Delivery: ${new Date(
+          procurementData.expectedDeliveryDate
+        ).toLocaleDateString()}`,
+        20,
+        yPosition
+      );
+      yPosition += 7;
+    }
+
+    yPosition += 10;
+
+    // Items Table
+    if (procurementData.items && procurementData.items.length > 0) {
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("Items Required", 20, yPosition);
+      yPosition += 10;
+
+      const headers = [
+        "S/N",
+        "Item Name",
+        "Description",
+        "Quantity",
+        "Unit Price",
+        "Total Price",
+      ];
+
+      const rows = procurementData.items.map((item, index) => [
+        index + 1,
+        item.name || "N/A",
+        item.description || "N/A",
+        item.quantity || 0,
+        `NGN ${(item.unitPrice || 0).toLocaleString()}`,
+        `NGN ${(item.totalPrice || 0).toLocaleString()}`,
+      ]);
+
+      autoTable(doc, {
+        head: [headers],
+        body: rows,
+        startY: yPosition,
+        theme: "grid",
+        headStyles: {
+          fillColor: [13, 100, 73],
+          fontSize: 10,
+          fontStyle: "bold",
+          textColor: [255, 255, 255],
+          cellPadding: 5,
+        },
+        styles: {
+          fontSize: 9,
+          cellPadding: 5,
+          lineWidth: 0.1,
+        },
+        columnStyles: {
+          0: { halign: "center", cellWidth: "auto", cellPadding: 5 }, // S/N
+          1: { fontStyle: "bold", cellWidth: "auto", cellPadding: 5 }, // Item Name
+          2: { cellWidth: "auto", cellPadding: 5 }, // Description
+          3: { halign: "center", cellWidth: "auto", cellPadding: 5 }, // Quantity
+          4: { halign: "right", cellWidth: "auto", cellPadding: 5 }, // Unit Price
+          5: { halign: "right", cellWidth: "auto", cellPadding: 5 }, // Total Price
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245],
+        },
+        margin: { left: 20, right: 20 },
+        tableWidth: "auto",
+        pageBreak: "auto",
+        showFoot: "lastPage",
+        didParseCell: function (data) {
+          if (data.column.index === 2) {
+            // Description column
+            const text = data.cell.text.join(" ");
+            const words = text.split(" ");
+            const maxWordsPerLine = 6;
+            const lines = [];
+
+            for (let i = 0; i < words.length; i += maxWordsPerLine) {
+              lines.push(words.slice(i, i + maxWordsPerLine).join(" "));
+            }
+
+            data.cell.text = lines;
+          }
+        },
+      });
+
+      yPosition = doc.lastAutoTable.finalY + 10;
+
+      // Order Summary
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("Order Summary", 20, yPosition);
+      yPosition += 8;
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        `Subtotal: NGN ${procurementData.subtotal.toLocaleString()}`,
+        20,
+        yPosition
+      );
+      yPosition += 7;
+
+      if (procurementData.tax > 0) {
+        doc.text(
+          `Tax: NGN ${procurementData.tax.toLocaleString()}`,
+          20,
+          yPosition
+        );
+        yPosition += 7;
+      }
+
+      if (procurementData.shipping > 0) {
+        doc.text(
+          `Shipping: NGN ${procurementData.shipping.toLocaleString()}`,
+          20,
+          yPosition
+        );
+        yPosition += 7;
+      }
+
+      doc.setFont("helvetica", "bold");
+      doc.text(
+        `Total Amount: NGN ${procurementData.totalAmount.toLocaleString()}`,
+        20,
+        yPosition
+      );
+      yPosition += 15;
+    }
+
+    // Contact Information Section - Check for page break
+    yPosition += 10;
+    yPosition = addPageIfNeeded(80);
+
+    // Ensure text color is black
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Contact Information & Next Steps", 20, yPosition);
+    yPosition += 10;
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      "For inquiries and order confirmation, please contact:",
+      20,
+      yPosition
+    );
+    yPosition += 7;
+
+    doc.text(
+      `Procurement HOD: ${currentUser.firstName} ${currentUser.lastName}`,
+      20,
+      yPosition
+    );
+    yPosition += 7;
+
+    doc.text(`Email: ${currentUser.email}`, 20, yPosition);
+    yPosition += 7;
+
+    doc.text("Phone: +234 800 ELRA (3572)", 20, yPosition);
+    yPosition += 7;
+
+    doc.text(
+      "Company: ELRA (Equipment Leasing Registration Authority)",
+      20,
+      yPosition
+    );
+    yPosition += 10;
+
+    // Delivery Address Section
+    if (
+      procurementData.deliveryAddress &&
+      procurementData.deliveryAddress.street
+    ) {
+      // Ensure text color is black
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("Delivery Address", 20, yPosition);
+      yPosition += 10;
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        `Street: ${procurementData.deliveryAddress.street}`,
+        20,
+        yPosition
+      );
+      yPosition += 7;
+
+      if (procurementData.deliveryAddress.city) {
+        doc.text(
+          `City: ${procurementData.deliveryAddress.city}`,
+          20,
+          yPosition
+        );
+        yPosition += 7;
+      }
+
+      if (procurementData.deliveryAddress.state) {
+        doc.text(
+          `State: ${procurementData.deliveryAddress.state}`,
+          20,
+          yPosition
+        );
+        yPosition += 7;
+      }
+
+      if (procurementData.deliveryAddress.postalCode) {
+        doc.text(
+          `Postal Code: ${procurementData.deliveryAddress.postalCode}`,
+          20,
+          yPosition
+        );
+        yPosition += 7;
+      }
+
+      if (procurementData.deliveryAddress.contactPerson) {
+        doc.text(
+          `Delivery Contact: ${procurementData.deliveryAddress.contactPerson}`,
+          20,
+          yPosition
+        );
+        yPosition += 7;
+      }
+
+      if (procurementData.deliveryAddress.phone) {
+        doc.text(
+          `Delivery Phone: ${procurementData.deliveryAddress.phone}`,
+          20,
+          yPosition
+        );
+        yPosition += 7;
+      }
+
+      yPosition += 10;
+    }
+
+    // Ensure text color is black for all remaining text
+    doc.setTextColor(0, 0, 0);
+    doc.text("Human Resources Department:", 20, yPosition);
+    yPosition += 10; // Increased spacing
+
+    doc.text("Email: hod.hr@elra.com", 20, yPosition);
+    yPosition += 8; // Increased spacing
+
+    doc.text("Name: Lisa Davis", 20, yPosition);
+    yPosition += 8; // Increased spacing
+
+    doc.text("Procurement Department:", 20, yPosition);
+    yPosition += 8; // Increased spacing
+
+    doc.text("Email: hod.proc@elra.com", 20, yPosition);
+    yPosition += 20; // Increased spacing
+
+    doc.text("Please respond within 48 hours with:", 20, yPosition);
+    yPosition += 10; // Increased spacing
+
+    doc.text("• Confirmation of order acceptance", 25, yPosition);
+    yPosition += 8; // Increased spacing
+
+    doc.text("• Expected delivery timeline", 25, yPosition);
+    yPosition += 8; // Increased spacing
+
+    doc.text("• Any questions or clarifications needed", 25, yPosition);
+    yPosition += 8; // Increased spacing
+
+    doc.text("• Invoice for payment processing", 25, yPosition);
+    yPosition += 8; // Increased spacing
+
+    doc.setFont("helvetica", "bold");
+    doc.text("• Signed copy of this purchase order", 25, yPosition);
+    yPosition += 12; // Increased spacing
+
+    doc.setFont("helvetica", "normal");
+    doc.text("To finalize this order, please contact:", 20, yPosition);
+    yPosition += 10; // Increased spacing
+
+    doc.text(
+      "• Human Resources Department for any personnel-related queries",
+      25,
+      yPosition
+    );
+    yPosition += 8;
+
+    doc.text(
+      "• Procurement Department for order modifications or clarifications",
+      25,
+      yPosition
+    );
+    yPosition += 8;
+
+    doc.text(
+      "• Both departments will work together to ensure smooth order processing",
+      25,
+      yPosition
+    );
+    yPosition += 30; // Increased spacing after bullet points
+
+    // Add some spacing after bullet points
+    yPosition += 20;
+
+    // Supplier Signature Section - Check for page break
+    yPosition = addPageIfNeeded(80);
+
+    // Ensure text color is black for supplier signature section
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("SUPPLIER SIGNATURE", 20, yPosition);
+    yPosition += 20;
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("Supplier Name: _________________________", 20, yPosition);
+    yPosition += 12;
+
+    doc.text("Authorized Signature: _________________________", 20, yPosition);
+    yPosition += 12;
+
+    doc.text("Date: _________________________", 20, yPosition);
+    yPosition += 12;
+    doc.text("Company Stamp/Seal:", 20, yPosition);
+    yPosition += 20;
+
+    // Signature box
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    doc.rect(20, yPosition, 80, 30);
+    doc.text("Please sign and stamp here", 25, yPosition + 20);
+    yPosition += 40;
+
+    // Final closing section - Check if we need a new page
+    yPosition = addPageIfNeeded(50); // Increased space for both sections
+
+    // Ensure text color is black
+    doc.setTextColor(0, 0, 0);
+
+    // Best regards section
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Best regards,`, 20, yPosition);
+    yPosition += 12;
+
+    doc.setFont("helvetica", "bold");
+    doc.text(`${currentUser.firstName} ${currentUser.lastName}`, 20, yPosition);
+    yPosition += 12;
+
+    doc.setFont("helvetica", "normal");
+    doc.text("Procurement HOD", 20, yPosition);
+    yPosition += 12;
+
+    doc.text("ELRA (Equipment Leasing Registration Authority)", 20, yPosition);
+    yPosition += 20;
+
+    // We look forward message
+    doc.setFont("helvetica", "italic");
+    doc.text(
+      "We look forward to a successful business relationship.",
+      20,
+      yPosition
+    );
+
+    // Add page numbers
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(0, 0, 0);
+      doc.text(
+        `Page ${i} of ${pageCount}`,
+        105,
+        doc.internal.pageSize.height - 10,
+        { align: "center" }
+      );
+    }
+
+    // Add metadata
+    doc.setProperties({
+      title: `Purchase Order ${procurementData.poNumber}`,
+      subject: "ELRA Procurement Order",
+      author: "ELRA System",
+      creator: "ELRA PDF Generator",
+    });
+
+    return Buffer.from(doc.output("arraybuffer"));
+  } catch (error) {
+    console.error("Procurement order PDF generation error:", error);
+    throw new Error("Failed to generate procurement order PDF");
   }
 };

@@ -30,22 +30,24 @@ import {
   rejectBudgetAllocation,
   getBudgetAllocationStats,
   getProjectsNeedingBudgetAllocation,
+  getBudgetAllocationHistory,
 } from "../../../../services/budgetAllocationAPI";
 import DataTable from "../../../../components/common/DataTable";
 
 const BudgetAllocation = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [budgetAllocations, setBudgetAllocations] = useState([]);
-  const [filteredAllocations, setFilteredAllocations] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedAllocation, setSelectedAllocation] = useState(null);
+  const [showProjectDetailsModal, setShowProjectDetailsModal] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [projects, setProjects] = useState([]);
   const [filteredProjects, setFilteredProjects] = useState([]);
   const [stats, setStats] = useState({});
   const [activeTab, setActiveTab] = useState("projects");
+  const [budgetHistory, setBudgetHistory] = useState([]);
 
   // Filters
   const [filters, setFilters] = useState({
@@ -64,32 +66,59 @@ const BudgetAllocation = () => {
   });
 
   useEffect(() => {
-    loadBudgetAllocations();
-    loadProjects();
+    const loadAllData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([loadStats(), loadProjects(), loadBudgetHistory()]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadAllData();
   }, []);
-
-  useEffect(() => {
-    filterAllocations();
-  }, [budgetAllocations, filters]);
 
   useEffect(() => {
     filterProjects();
   }, [projects, filters]);
 
-  const loadBudgetAllocations = async () => {
+  useEffect(() => {
+    if (activeTab === "history") {
+      loadBudgetHistory();
+    }
+  }, [activeTab]);
+
+  const loadStats = async () => {
     try {
-      setLoading(true);
-      const data = await getBudgetAllocations();
+      console.log("📊 [FRONTEND] Loading budget allocation stats...");
+      const data = await getBudgetAllocationStats();
+      console.log("📊 [FRONTEND] Stats response:", data);
       if (data.success) {
-        setBudgetAllocations(data.data.budgetAllocations);
+        console.log("📊 [FRONTEND] Stats breakdown:");
+        console.log(
+          "  - pendingAllocations:",
+          data.data.stats.pendingAllocations
+        );
+        console.log(
+          "  - allocatedAllocations:",
+          data.data.stats.allocatedAllocations
+        );
+        console.log("  - totalAllocated:", data.data.stats.totalAllocated);
+        console.log("  - pendingProjects:", data.data.stats.pendingProjects);
+        console.log(
+          "  - allocatedProjects:",
+          data.data.stats.allocatedProjects
+        );
+        console.log(
+          "  - totalProjectItemsCost:",
+          data.data.stats.totalProjectItemsCost
+        );
+        setStats(data.data.stats);
+        console.log("✅ [FRONTEND] Stats loaded successfully!");
       } else {
-        toast.error(data.message || "Failed to load budget allocations");
+        console.error("Failed to load stats:", data.message);
       }
     } catch (error) {
-      console.error("Error loading budget allocations:", error);
-      toast.error("Failed to load budget allocations");
-    } finally {
-      setLoading(false);
+      console.error("Error loading stats:", error);
     }
   };
 
@@ -110,35 +139,40 @@ const BudgetAllocation = () => {
     }
   };
 
+  const loadBudgetHistory = async () => {
+    try {
+      console.log("🔄 [FRONTEND] Loading budget history...");
+      const data = await getBudgetAllocationHistory({ limit: 1000 });
+      if (data.success) {
+        console.log(
+          "📊 [FRONTEND] Budget allocation history:",
+          data.data.allocations
+        );
+        console.log(
+          "📊 [FRONTEND] Budget allocation statuses:",
+          data.data.allocations.map((a) => ({
+            code: a.allocationCode,
+            status: a.status,
+          }))
+        );
+
+        console.log(
+          `✅ [FRONTEND] Loaded ${data.data.allocations.length} budget history records`
+        );
+        setBudgetHistory(data.data.allocations);
+      } else {
+        console.error(
+          "❌ [FRONTEND] Failed to load budget history:",
+          data.message
+        );
+      }
+    } catch (error) {
+      console.error("❌ [FRONTEND] Error loading budget history:", error);
+    }
+  };
+
   // Stats are calculated from projects and allocations data
   // No need for separate API call
-
-  const filterAllocations = () => {
-    let filtered = [...budgetAllocations];
-
-    if (filters.status) {
-      filtered = filtered.filter(
-        (allocation) => allocation.status === filters.status
-      );
-    }
-
-    if (filters.allocationType) {
-      filtered = filtered.filter(
-        (allocation) => allocation.allocationType === filters.allocationType
-      );
-    }
-
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      filtered = filtered.filter(
-        (allocation) =>
-          allocation.entityName?.toLowerCase().includes(searchTerm) ||
-          allocation.entityCode?.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    setFilteredAllocations(filtered);
-  };
 
   const filterProjects = () => {
     let filtered = [...projects];
@@ -179,24 +213,19 @@ const BudgetAllocation = () => {
       const baseAmount = selectedProject
         ? getBaseAmountForAllocation(selectedProject)
         : 0;
-      const extraAmount = Number(formData.allocatedAmount) || 0;
-      const totalAllocation = baseAmount + extraAmount;
 
       const allocationData = {
         ...formData,
-        allocatedAmount: totalAllocation,
+        allocatedAmount: 0, // No extra allocation allowed
       };
 
       console.log("🔄 [FRONTEND] Creating budget allocation...");
       console.log("📊 [FRONTEND] Form data:", formData);
       console.log("💰 [FRONTEND] Base amount:", baseAmount);
-      console.log("💰 [FRONTEND] Extra amount:", extraAmount);
-      console.log("💰 [FRONTEND] Total allocation:", totalAllocation);
       console.log("📤 [FRONTEND] Sending to backend:", allocationData);
 
       const data = await createBudgetAllocation(allocationData);
 
-      // Check if the response has an error
       if (data.error || !data.success) {
         console.error(
           "❌ [FRONTEND] Backend error:",
@@ -220,10 +249,13 @@ const BudgetAllocation = () => {
           currency: "NGN",
         });
         console.log("🔄 [FRONTEND] Refreshing data...");
-        await loadBudgetAllocations();
+        await loadStats();
         await loadProjects();
-        console.log("✅ [FRONTEND] Data refreshed successfully!");
-        setActiveTab("allocations"); // Switch to allocations tab after creation
+        setTimeout(async () => {
+          await loadBudgetHistory();
+          console.log("✅ [FRONTEND] Data refreshed successfully!");
+        }, 1000);
+        setActiveTab("history");
       } else {
         console.error(
           "❌ [FRONTEND] Failed to create budget allocation:",
@@ -250,6 +282,11 @@ const BudgetAllocation = () => {
     setShowCreateModal(true);
   };
 
+  const handleViewProjectDetails = (project) => {
+    setSelectedProject(project);
+    setShowProjectDetailsModal(true);
+  };
+
   const handleApproveAllocation = async (allocationId) => {
     try {
       const data = await approveBudgetAllocation(allocationId);
@@ -257,6 +294,7 @@ const BudgetAllocation = () => {
         toast.success("Budget allocation approved successfully!");
         loadBudgetAllocations();
         loadProjects();
+        loadBudgetHistory();
       } else {
         toast.error(data.message || "Failed to approve budget allocation");
       }
@@ -272,7 +310,8 @@ const BudgetAllocation = () => {
       if (data.success) {
         toast.success("Budget allocation rejected successfully!");
         loadBudgetAllocations();
-        loadProjects(); // Refresh projects to update status
+        loadProjects();
+        loadBudgetHistory();
       } else {
         toast.error(data.message || "Failed to reject budget allocation");
       }
@@ -335,13 +374,10 @@ const BudgetAllocation = () => {
   };
 
   const getBaseAmountForAllocation = (project) => {
-    const itemsTotal = calculateProjectItemsTotal(project);
-    const budget = project.budget || 0;
-
-    return itemsTotal < budget ? itemsTotal : budget;
+    // Base allocation is always the total project items cost (for procurement)
+    return calculateProjectItemsTotal(project);
   };
 
-  // Define columns for projects table
   const projectColumns = [
     {
       header: "Project",
@@ -388,23 +424,23 @@ const BudgetAllocation = () => {
       ),
     },
     {
-      header: "Remaining Budget",
-      accessor: "remainingBudget",
+      header: "Extra Funds Available",
+      accessor: "extraAllocatedFunds",
       renderer: (project) => {
         const itemsTotal = calculateProjectItemsTotal(project);
-        const remainingBudget = project.budget - itemsTotal;
+        const extraFunds = project.budget - itemsTotal;
 
         return (
           <div className="text-sm">
             <div
               className={`font-medium ${
-                remainingBudget > 0 ? "text-green-600" : "text-red-600"
+                extraFunds > 0 ? "text-blue-600" : "text-gray-600"
               }`}
             >
-              {formatCurrency(remainingBudget)}
+              {formatCurrency(extraFunds)}
             </div>
             <div className="text-xs text-gray-500">
-              {remainingBudget > 0 ? "Available for future use" : "Over budget"}
+              Available for allocation
             </div>
           </div>
         );
@@ -471,200 +507,88 @@ const BudgetAllocation = () => {
             </p>
           </div>
         </div>
-
-        {/* Filter Section */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-8">
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => setActiveTab("projects")}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  activeTab === "projects"
-                    ? "bg-[var(--elra-primary)] text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                Projects
-              </button>
-              <button
-                onClick={() => setActiveTab("allocations")}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  activeTab === "allocations"
-                    ? "bg-[var(--elra-primary)] text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                Budget Allocations
-              </button>
-            </div>
-
-            {/* Status Filter */}
-            <div className="flex flex-wrap gap-2">
-              <div className="relative">
-                <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search projects..."
-                  value={filters.search}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, search: e.target.value }))
-                  }
-                  className="pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent w-48"
-                />
-              </div>
-
-              <select
-                value={filters.status}
-                onChange={(e) =>
-                  setFilters((prev) => ({ ...prev, status: e.target.value }))
-                }
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-              >
-                <option value="">All Status</option>
-                <option value="pending_budget_allocation">
-                  Need Allocation
-                </option>
-                <option value="approved">Already Allocated</option>
-                <option value="pending">Pending Approval</option>
-              </select>
-
-              <select
-                value={filters.allocationType}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    allocationType: e.target.value,
-                  }))
-                }
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-              >
-                <option value="">All Types</option>
-                <option value="project_budget">Project Budget</option>
-                <option value="payroll_funding">Payroll Funding</option>
-                <option value="operational_funding">Operational Funding</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Filter Summary */}
-          {(filters.status || filters.allocationType || filters.search) && (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <div className="flex flex-wrap gap-2 items-center text-sm">
-                <span className="text-gray-600">Filters:</span>
-                {filters.status && (
-                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-md">
-                    Status:{" "}
-                    {filters.status === "pending_budget_allocation"
-                      ? "Need Allocation"
-                      : filters.status === "approved"
-                      ? "Already Allocated"
-                      : filters.status === "pending"
-                      ? "Pending Approval"
-                      : filters.status}
-                  </span>
-                )}
-                {filters.allocationType && (
-                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded-md">
-                    Type: {getAllocationTypeLabel(filters.allocationType)}
-                  </span>
-                )}
-                {filters.search && (
-                  <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-md">
-                    Search: "{filters.search}"
-                  </span>
-                )}
-                <button
-                  onClick={() =>
-                    setFilters({ status: "", allocationType: "", search: "" })
-                  }
-                  className="px-2 py-1 bg-gray-100 text-gray-600 rounded-md hover:bg-gray-200"
-                >
-                  Clear All
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-600 mb-2">
                   Need Allocation
                 </p>
-                <p className="text-2xl font-bold text-red-600">
-                  {
-                    projects.filter(
-                      (p) => p.status === "pending_budget_allocation"
-                    ).length
-                  }
+                <p className="text-xl sm:text-2xl font-bold text-red-600 break-words leading-tight">
+                  {stats.pendingProjects || 0}
                 </p>
               </div>
-              <div className="p-3 bg-red-100 rounded-lg">
-                <DocumentTextIcon className="w-6 h-6 text-red-600" />
+              <div className="flex-shrink-0 p-3 bg-red-100 rounded-lg">
+                <DocumentTextIcon className="w-4 h-4 text-red-600" />
               </div>
             </div>
           </div>
 
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-600 mb-2">
                   Already Allocated
                 </p>
-                <p className="text-2xl font-bold text-green-600">
-                  {projects.filter((p) => p.status === "approved").length}
+                <p className="text-xl sm:text-2xl font-bold text-green-600 break-words leading-tight">
+                  {stats.allocatedProjects || 0}
                 </p>
               </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <CheckIcon className="w-6 h-6 text-green-600" />
+              <div className="flex-shrink-0 p-3 bg-green-100 rounded-lg">
+                <CheckIcon className="w-4 h-4 text-green-600" />
               </div>
             </div>
           </div>
 
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-600 mb-2">
                   Pending Approval
                 </p>
-                <p className="text-2xl font-bold text-yellow-600">
-                  {
-                    budgetAllocations.filter((a) => a.status === "pending")
-                      .length
-                  }
+                <p className="text-xl sm:text-2xl font-bold text-yellow-600 break-words leading-tight">
+                  {stats.pendingAllocations || 0}
                 </p>
               </div>
-              <div className="p-3 bg-yellow-100 rounded-lg">
-                <ClockIcon className="w-6 h-6 text-yellow-600" />
+              <div className="flex-shrink-0 p-3 bg-yellow-100 rounded-lg">
+                <ClockIcon className="w-4 h-4 text-yellow-600" />
               </div>
             </div>
           </div>
 
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-600 mb-2">
                   Total Allocated
                 </p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(
-                    budgetAllocations.reduce(
-                      (sum, a) => sum + (a.newBudget || 0),
-                      0
-                    )
-                  )}
+                <p className="text-xl sm:text-2xl font-bold text-blue-600 break-words leading-tight">
+                  {formatCurrency(stats.totalAllocated || 0)}
                 </p>
               </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <CurrencyDollarIcon className="w-6 h-6 text-blue-600" />
+              <div className="flex-shrink-0 p-3 bg-blue-100 rounded-lg">
+                <CurrencyDollarIcon className="w-4 h-4 text-blue-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-600 mb-2">
+                  Total Items Cost
+                </p>
+                <p className="text-xl sm:text-2xl font-bold text-purple-600 break-words leading-tight">
+                  {formatCurrency(stats.totalProjectItemsCost || 0)}
+                </p>
+              </div>
+              <div className="flex-shrink-0 p-3 bg-purple-100 rounded-lg">
+                <ChartBarIcon className="w-4 h-4 text-purple-600" />
               </div>
             </div>
           </div>
         </div>
-
         {/* Filters */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -726,6 +650,33 @@ const BudgetAllocation = () => {
             </div>
           )}
         </div>
+        {/* Tab Navigation */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8 px-6">
+              <button
+                onClick={() => setActiveTab("projects")}
+                className={`py-3 px-3 border-b-2 font-medium text-sm cursor-pointer transition-colors rounded-t-md ${
+                  activeTab === "projects"
+                    ? "border-[var(--elra-primary)] text-[var(--elra-primary)] bg-[color:var(--elra-primary,#0f5132)]/10"
+                    : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300"
+                }`}
+              >
+                Projects Pending Allocation
+              </button>
+              <button
+                onClick={() => setActiveTab("history")}
+                className={`py-3 px-3 border-b-2 font-medium text-sm cursor-pointer transition-colors rounded-t-md ${
+                  activeTab === "history"
+                    ? "border-[var(--elra-primary)] text-[var(--elra-primary)] bg-[color:var(--elra-primary,#0f5132)]/10"
+                    : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300"
+                }`}
+              >
+                My Allocation History
+              </button>
+            </nav>
+          </div>
+        </div>
 
         {/* Content based on active tab */}
         {activeTab === "projects" ? (
@@ -759,40 +710,158 @@ const BudgetAllocation = () => {
             )}
 
             {/* Projects Table */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <DataTable
+                data={filteredProjects}
+                columns={projectColumns}
+                loading={loading}
+                actions={{
+                  showEdit: false,
+                  showDelete: false,
+                  showToggle: false,
+                  customActions: (project) => (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewProjectDetails(project);
+                        }}
+                        title="View Project Details"
+                        className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <EyeIcon className="w-5 h-5" />
+                      </button>
+                      {project.status === "pending_budget_allocation" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCreateAllocationForProject(project);
+                          }}
+                          title="Create Budget Allocation"
+                          className="bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white p-2 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <PlusIcon className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
+                  ),
+                }}
+                emptyState={{
+                  icon: (
+                    <DocumentTextIcon className="h-12 w-12 text-gray-400" />
+                  ),
+                  title: "No projects found",
+                  description:
+                    filters.status || filters.search
+                      ? "No projects match your current filters. Try adjusting your search criteria."
+                      : "No projects found that need budget allocation.",
+                }}
+              />
+            </div>
+          </>
+        ) : activeTab === "history" ? (
+          /* Budget History Table using DataTable component */
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <DataTable
-              data={filteredProjects}
-              columns={projectColumns}
+              data={budgetHistory}
+              columns={[
+                {
+                  header: "Project",
+                  accessor: "project",
+                  renderer: (allocation) => (
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {allocation.project?.name ||
+                          allocation.entityName ||
+                          "N/A"}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {allocation.project?.code ||
+                          allocation.entityCode ||
+                          "N/A"}
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  header: "Allocation Code",
+                  accessor: "allocationCode",
+                  renderer: (allocation) => (
+                    <span className="text-sm font-mono text-gray-900">
+                      {allocation.allocationCode}
+                    </span>
+                  ),
+                },
+                {
+                  header: "Amount Allocated",
+                  accessor: "allocatedAmount",
+                  renderer: (allocation) => (
+                    <div className="text-sm font-medium text-gray-900">
+                      {formatCurrency(
+                        allocation.allocatedAmount,
+                        allocation.currency
+                      )}
+                    </div>
+                  ),
+                },
+                {
+                  header: "Status",
+                  accessor: "status",
+                  renderer: (allocation) => (
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(allocation.status)}
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(
+                          allocation.status
+                        )}`}
+                      >
+                        {allocation.status.charAt(0).toUpperCase() +
+                          allocation.status.slice(1)}
+                      </span>
+                    </div>
+                  ),
+                },
+                {
+                  header: "Allocated Date",
+                  accessor: "createdAt",
+                  renderer: (allocation) => (
+                    <div className="text-sm text-gray-500">
+                      {new Date(allocation.createdAt).toLocaleDateString()}
+                    </div>
+                  ),
+                },
+              ]}
               loading={loading}
+              searchable={true}
+              sortable={true}
+              pagination={true}
               actions={{
                 showEdit: false,
                 showDelete: false,
                 showToggle: false,
-                customActions: (project) =>
-                  project.status === "pending_budget_allocation" ? (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCreateAllocationForProject(project);
-                      }}
-                      title="Create Budget Allocation"
-                      className="bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white p-2 rounded-lg transition-colors"
-                    >
-                      <PlusIcon className="w-5 h-5" />
-                    </button>
-                  ) : null,
+                customActions: (allocation) => (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedAllocation(allocation);
+                      setShowDetailsModal(true);
+                    }}
+                    title="View Allocation Details"
+                    className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <EyeIcon className="w-5 h-5" />
+                  </button>
+                ),
               }}
               emptyState={{
                 icon: <DocumentTextIcon className="h-12 w-12 text-gray-400" />,
-                title: "No projects found",
+                title: "No budget allocation history found",
                 description:
-                  filters.status || filters.search
-                    ? "No projects match your current filters. Try adjusting your search criteria."
-                    : "No projects found that need budget allocation.",
+                  "Your approved budget allocations will appear here.",
               }}
             />
-          </>
+          </div>
         ) : (
-          /* Allocations Table */
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             {loading ? (
               <div className="p-8 text-center">
@@ -831,7 +900,7 @@ const BudgetAllocation = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {filteredAllocations.map((allocation) => (
+                      {budgetHistory.map((allocation) => (
                         <tr key={allocation._id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div>
@@ -925,7 +994,7 @@ const BudgetAllocation = () => {
                   </table>
                 </div>
 
-                {filteredAllocations.length === 0 && (
+                {budgetHistory.length === 0 && (
                   <div className="text-center py-12">
                     <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
                     <h3 className="mt-2 text-sm font-medium text-gray-900">
@@ -945,7 +1014,7 @@ const BudgetAllocation = () => {
       {/* Create Allocation Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl p-8 w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl">
             <h2 className="text-xl font-bold text-gray-900 mb-4">
               Create Budget Allocation
             </h2>
@@ -1045,7 +1114,7 @@ const BudgetAllocation = () => {
                                 </div>
                                 <div className="flex justify-between border-t pt-2">
                                   <span className="text-green-700 font-medium">
-                                    Base Allocation:
+                                    Items Cost (Base Allocation):
                                   </span>
                                   <span className="text-green-700 font-bold">
                                     {formatCurrency(baseAmount)}
@@ -1053,6 +1122,54 @@ const BudgetAllocation = () => {
                                 </div>
                               </div>
                             </div>
+
+                            {/* Project Documents Section */}
+                            {selectedProject.requiredDocuments &&
+                              selectedProject.requiredDocuments.length > 0 && (
+                                <div className="mt-4 p-3 bg-white rounded border border-green-200">
+                                  <p className="text-sm font-medium text-green-800 mb-3">
+                                    📄 Required Documents
+                                  </p>
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    {selectedProject.requiredDocuments.map(
+                                      (doc, index) => (
+                                        <div key={index}>
+                                          <div className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                            <div className="flex items-center justify-center mb-2">
+                                              <DocumentTextIcon className="w-6 h-6 text-blue-600" />
+                                            </div>
+                                            <p className="text-xs font-medium text-gray-700 truncate text-center">
+                                              {doc.documentType
+                                                .replace(/_/g, " ")
+                                                .toUpperCase()}
+                                            </p>
+                                            <p className="text-xs text-gray-500 truncate mt-1 text-center">
+                                              {doc.fileName}
+                                            </p>
+                                            <div className="flex items-center justify-center mt-3">
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  if (doc.documentId) {
+                                                    window.open(
+                                                      `/api/documents/${doc.documentId}/view`,
+                                                      "_blank"
+                                                    );
+                                                  }
+                                                }}
+                                                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors cursor-pointer"
+                                                title="View Document"
+                                              >
+                                                View
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                           </div>
                         );
                       }
@@ -1060,32 +1177,22 @@ const BudgetAllocation = () => {
                     })()}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Extra Funding Amount (₦)
-                  </label>
-                  <input
-                    type="text"
-                    value={
-                      formData.allocatedAmount
-                        ? formatNumberWithCommas(formData.allocatedAmount)
-                        : ""
-                    }
-                    onChange={(e) => {
-                      const rawValue = parseFormattedNumber(e.target.value);
-                      setFormData((prev) => ({
-                        ...prev,
-                        allocatedAmount:
-                          rawValue > 0 ? rawValue.toString() : "",
-                      }));
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-                    placeholder="Enter extra funding amount in Naira (optional)"
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    This amount will be added to the base allocation (leave
-                    empty if no extra funding needed)
-                  </p>
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-start">
+                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mr-3 mt-0.5">
+                      <span className="text-blue-600 text-sm">💡</span>
+                    </div>
+                    <div>
+                      <p className="text-sm text-blue-800 font-medium mb-1">
+                        Simplified Allocation
+                      </p>
+                      <p className="text-sm text-blue-700">
+                        This will allocate the exact project items cost. Extra
+                        funds will be saved in the employee's wallet for future
+                        requests.
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 {formData.projectId &&
@@ -1096,8 +1203,6 @@ const BudgetAllocation = () => {
                     if (selectedProject) {
                       const baseAmount =
                         getBaseAmountForAllocation(selectedProject);
-                      const extraAmount = Number(formData.allocatedAmount) || 0;
-                      const totalAllocation = baseAmount + extraAmount;
                       return (
                         <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                           <p className="text-sm font-medium text-green-800 mb-3">
@@ -1106,28 +1211,18 @@ const BudgetAllocation = () => {
                           <div className="space-y-3 text-sm">
                             <div className="flex justify-between items-center p-2 bg-white rounded border">
                               <span className="text-gray-600">
-                                Base Allocation:
+                                Project Items Cost:
                               </span>
                               <span className="font-medium">
                                 {formatCurrency(baseAmount)}
                               </span>
                             </div>
-                            {extraAmount > 0 && (
-                              <div className="flex justify-between items-center p-2 bg-white rounded border">
-                                <span className="text-gray-600">
-                                  Extra Funding:
-                                </span>
-                                <span className="font-medium text-green-700">
-                                  {formatCurrency(extraAmount)}
-                                </span>
-                              </div>
-                            )}
                             <div className="flex justify-between items-center p-3 bg-green-100 rounded border-2 border-green-300">
                               <span className="text-green-800 font-semibold">
-                                Total Amount to Pay:
+                                Total Amount to Allocate:
                               </span>
                               <span className="text-green-800 font-bold text-lg">
-                                {formatCurrency(totalAllocation)}
+                                {formatCurrency(baseAmount)}
                               </span>
                             </div>
                           </div>
@@ -1138,9 +1233,28 @@ const BudgetAllocation = () => {
                   })()}
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Notes
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Notes
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const signatureTemplate = `Budget allocation approved for project items cost.
+
+Allocated by: ${user?.firstName} ${user?.lastName}
+Date & Time: ${new Date().toLocaleString()}
+Finance HOD`;
+                        setFormData((prev) => ({
+                          ...prev,
+                          notes: signatureTemplate,
+                        }));
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
+                    >
+                      Use Signature Template
+                    </button>
+                  </div>
                   <textarea
                     value={formData.notes}
                     onChange={(e) =>
@@ -1150,9 +1264,17 @@ const BudgetAllocation = () => {
                       }))
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-                    rows="3"
-                    placeholder="Add any additional notes..."
+                    rows="4"
+                    placeholder={`Budget allocation approved for project items cost.
+
+Allocated by: ${user?.firstName} ${user?.lastName}
+Date & Time: ${new Date().toLocaleString()}
+Finance HOD`}
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Click "Use Signature Template" to auto-fill your signature,
+                    or add your own notes
+                  </p>
                 </div>
               </div>
 
@@ -1187,8 +1309,8 @@ const BudgetAllocation = () => {
 
       {/* Details Modal */}
       {showDetailsModal && selectedAllocation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100">
             <h2 className="text-xl font-bold text-gray-900 mb-4">
               Budget Allocation Details
             </h2>
@@ -1280,7 +1402,7 @@ const BudgetAllocation = () => {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowDetailsModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
+                className="flex-1 px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg font-medium hover:bg-[var(--elra-primary-dark)] transition-colors cursor-pointer"
               >
                 Close
               </button>
@@ -1306,6 +1428,418 @@ const BudgetAllocation = () => {
                   </button>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Project Details Modal */}
+      {showProjectDetailsModal && selectedProject && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-8 w-full max-w-6xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-200">
+              <div>
+                <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                  Project Details
+                </h2>
+                <p className="text-gray-600">
+                  {selectedProject.name} - {selectedProject.code}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowProjectDetailsModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+              >
+                <XMarkIcon className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {/* Project Progress Tracking */}
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+                <div className="flex items-center mb-4">
+                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                    <span className="text-green-600 text-lg">📊</span>
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900">
+                    Approval Progress
+                  </h3>
+                </div>
+
+                {selectedProject.approvalChain &&
+                selectedProject.approvalChain.length > 0 ? (
+                  <div className="space-y-4">
+                    {/* Overall Progress */}
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium text-gray-700">
+                          Overall Approval Progress
+                        </span>
+                        <span className="text-sm font-bold text-green-600">
+                          {(() => {
+                            const completed =
+                              selectedProject.approvalChain.filter(
+                                (step) => step.status === "approved"
+                              ).length;
+                            const total = selectedProject.approvalChain.length;
+                            return `${completed}/${total} levels completed`;
+                          })()}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div
+                          className="bg-gradient-to-r from-green-500 to-emerald-500 h-3 rounded-full transition-all duration-500"
+                          style={{
+                            width: `${(() => {
+                              const completed =
+                                selectedProject.approvalChain.filter(
+                                  (step) => step.status === "approved"
+                                ).length;
+                              const total =
+                                selectedProject.approvalChain.length;
+                              return total > 0 ? (completed / total) * 100 : 0;
+                            })()}%`,
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* Approval Chain Status */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {selectedProject.approvalChain.map((step, index) => (
+                        <div
+                          key={index}
+                          className={`flex items-center justify-between p-3 rounded-lg border ${
+                            step.status === "approved"
+                              ? "bg-green-50 border-green-200"
+                              : step.status === "pending"
+                              ? "bg-yellow-50 border-yellow-200"
+                              : "bg-gray-50 border-gray-200"
+                          }`}
+                        >
+                          <span className="text-sm font-medium text-gray-700">
+                            {step.level
+                              .replace(/_/g, " ")
+                              .replace(/\b\w/g, (l) => l.toUpperCase())}
+                          </span>
+                          <div className="flex items-center">
+                            {step.status === "approved" ? (
+                              <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                            ) : step.status === "pending" ? (
+                              <ClockSolid className="w-5 h-5 text-yellow-500" />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-gray-300"></div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-gray-500">
+                      No approval chain data available
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Extra Wallet Information */}
+              {selectedProject.requiresBudgetAllocation && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                  <div className="flex items-center mb-4">
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                      <span className="text-blue-600 text-lg">💳</span>
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900">
+                      Extra Wallet Information
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white rounded-lg p-4 border border-blue-100">
+                      <div className="text-sm font-medium text-gray-600 mb-1">
+                        Project Budget
+                      </div>
+                      <div className="text-lg font-bold text-gray-900">
+                        {formatCurrency(selectedProject.budget)}
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg p-4 border border-blue-100">
+                      <div className="text-sm font-medium text-gray-600 mb-1">
+                        Items Cost
+                      </div>
+                      <div className="text-lg font-bold text-gray-900">
+                        {formatCurrency(
+                          selectedProject.projectItems?.reduce(
+                            (sum, item) => sum + (item.totalPrice || 0),
+                            0
+                          ) || 0
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg p-4 border border-blue-100">
+                      <div className="text-sm font-medium text-gray-600 mb-1">
+                        Extra Funds Available
+                      </div>
+                      <div className="text-lg font-bold text-blue-600">
+                        {formatCurrency(
+                          selectedProject.budget -
+                            (selectedProject.projectItems?.reduce(
+                              (sum, item) => sum + (item.totalPrice || 0),
+                              0
+                            ) || 0)
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-start">
+                      <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mr-3 mt-0.5">
+                        <span className="text-blue-600 text-sm">💡</span>
+                      </div>
+                      <div>
+                        <p className="text-sm text-blue-800 font-medium mb-1">
+                          Budget Allocation Tip
+                        </p>
+                        <p className="text-sm text-blue-700">
+                          After approving this budget allocation, procurement
+                          will be automatically triggered. The extra funds will
+                          be saved in the employee's wallet for future project
+                          requests.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Project Basic Information */}
+              <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-6 border border-gray-200">
+                <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                  <span className="text-2xl">📋</span>
+                  Project Information
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <span className="font-medium text-gray-700">
+                      Project Name:
+                    </span>
+                    <p className="text-gray-900">{selectedProject.name}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">
+                      Project Code:
+                    </span>
+                    <p className="text-gray-900 font-mono">
+                      {selectedProject.code}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">
+                      Department:
+                    </span>
+                    <p className="text-gray-900">
+                      {selectedProject.department?.name}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">
+                      Project Manager:
+                    </span>
+                    <p className="text-gray-900">
+                      {selectedProject.projectManager?.firstName}{" "}
+                      {selectedProject.projectManager?.lastName}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Budget:</span>
+                    <p className="text-gray-900 font-semibold">
+                      {formatCurrency(selectedProject.budget)}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Status:</span>
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        selectedProject.status === "pending_budget_allocation"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-green-100 text-green-800"
+                      }`}
+                    >
+                      {selectedProject.status === "pending_budget_allocation"
+                        ? "Need Allocation"
+                        : "Allocated"}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <span className="font-medium text-gray-700">
+                    Description:
+                  </span>
+                  <p className="text-gray-900 mt-1">
+                    {selectedProject.description}
+                  </p>
+                </div>
+              </div>
+
+              {/* Project Items */}
+              {selectedProject.projectItems &&
+                selectedProject.projectItems.length > 0 && (
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                      <span className="text-2xl">🛍️</span>
+                      Project Items
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-white">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Item Name
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Description
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Quantity
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Unit Price
+                            </th>
+                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Total Price
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {selectedProject.projectItems.map((item, index) => (
+                            <tr key={index}>
+                              <td className="px-4 py-2 text-sm font-medium text-gray-900">
+                                {item.name}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-500">
+                                {item.description}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-900">
+                                {item.quantity}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-900">
+                                {formatCurrency(item.unitPrice)}
+                              </td>
+                              <td className="px-4 py-2 text-sm font-semibold text-gray-900">
+                                {formatCurrency(item.totalPrice)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-4 p-3 bg-white rounded border">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-gray-700">
+                          Items Total:
+                        </span>
+                        <span className="font-bold text-lg text-blue-600">
+                          {formatCurrency(
+                            calculateProjectItemsTotal(selectedProject)
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              {/* Required Documents */}
+              {selectedProject.requiredDocuments &&
+                selectedProject.requiredDocuments.length > 0 && (
+                  <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6 border border-green-200">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                      <DocumentTextIcon className="w-6 h-6 text-green-600" />
+                      Required Documents
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {selectedProject.requiredDocuments.map((doc, index) => (
+                        <div
+                          key={index}
+                          className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex flex-col items-center text-center">
+                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-3">
+                              <DocumentTextIcon className="w-6 h-6 text-blue-600" />
+                            </div>
+                            <h4 className="font-semibold text-gray-900 text-sm mb-1 capitalize">
+                              {doc.documentType.replace(/_/g, " ")}
+                            </h4>
+                            <p className="text-xs text-gray-500 mb-3 truncate w-full">
+                              {doc.fileName}
+                            </p>
+                            <button
+                              onClick={() => {
+                                if (doc.documentId) {
+                                  window.open(
+                                    `/api/documents/${doc.documentId}/view`,
+                                    "_blank"
+                                  );
+                                }
+                              }}
+                              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer w-full"
+                            >
+                              View Document
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {/* Financial Summary */}
+              <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-6 border border-yellow-200">
+                <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                  <span className="text-2xl">💰</span>
+                  Financial Summary
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-2 bg-white rounded border">
+                    <span className="text-gray-600">Project Budget:</span>
+                    <span className="font-medium">
+                      {formatCurrency(selectedProject.budget)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 bg-white rounded border">
+                    <span className="text-gray-600">Items Total:</span>
+                    <span className="font-medium">
+                      {formatCurrency(
+                        calculateProjectItemsTotal(selectedProject)
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-yellow-100 rounded border-2 border-yellow-300">
+                    <span className="text-yellow-800 font-semibold">
+                      Extra Funds Available:
+                    </span>
+                    <span className="text-yellow-800 font-bold text-lg">
+                      {formatCurrency(
+                        selectedProject.budget -
+                          calculateProjectItemsTotal(selectedProject)
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setShowProjectDetailsModal(false)}
+                className="px-6 py-2 bg-[var(--elra-primary)] text-white rounded-lg font-medium hover:bg-[var(--elra-primary-dark)] transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

@@ -376,7 +376,7 @@ taskSchema.methods.completeChecklistItem = async function (
     this.checklist[itemIndex].completedBy = completedBy;
     this.checklist[itemIndex].completedAt = new Date();
 
-    await this.updateProgress();
+    await this.updateTwoPhaseProgress();
   }
 };
 

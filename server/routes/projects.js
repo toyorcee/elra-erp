@@ -19,6 +19,10 @@ import {
   triggerPostApprovalWorkflow,
   getProjectWorkflowStatus,
   getPendingApprovalProjects,
+  getDepartmentPendingApprovalProjects,
+  getProjectManagementPendingApprovalProjects,
+  getHODApprovalHistory,
+  getCrossDepartmentalApprovalHistory,
   getProjectAuditTrail,
   getMyProjects,
   getProjectAnalytics,
@@ -201,6 +205,30 @@ router.get("/my-projects", protect, getMyProjects);
 
 // Pending approval projects - HOD+ only
 router.get("/pending-approval", checkRole(700), getPendingApprovalProjects);
+
+// Department-specific pending approval projects - HOD+ only
+router.get(
+  "/department-pending-approval",
+  checkRole(700),
+  getDepartmentPendingApprovalProjects
+);
+
+// Project Management HOD pending approval projects - Project Management HOD only
+router.get(
+  "/project-management-pending-approval",
+  checkRole(700),
+  getProjectManagementPendingApprovalProjects
+);
+
+// HOD approval history - HOD+ only
+router.get("/approval-history", checkRole(700), getHODApprovalHistory);
+
+// Cross-departmental approval history - HOD+ only
+router.get(
+  "/cross-departmental-approval-history",
+  checkRole(700),
+  getCrossDepartmentalApprovalHistory
+);
 
 // Analytics route - HOD+ only
 router.get("/analytics", checkRole(700), getProjectAnalytics);

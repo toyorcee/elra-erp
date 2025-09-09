@@ -12,8 +12,10 @@ import {
   approve,
   receiveItems,
   addNote,
+  completeProcurementOrder,
+  resendProcurementEmail,
 } from "../controllers/procurementController.js";
-import { protect, checkRole } from "../middleware/auth.js";
+import { protect, checkRole, checkProcurementAccess } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -112,14 +114,20 @@ router.get("/overdue-deliveries", checkRole(600), getOverdueDeliveries);
 // Get procurement by ID - Manager+
 router.get("/:id", checkRole(600), getProcurementById);
 
-// Create new procurement - Manager+
-router.post("/", checkRole(600), validateProcurement, createProcurement);
+// Create new procurement - Procurement HOD+
+router.post("/", checkProcurementAccess, validateProcurement, createProcurement);
 
-// Update procurement - Manager+
-router.put("/:id", checkRole(600), validateProcurement, updateProcurement);
+// Update procurement - Procurement HOD+
+router.put("/:id", checkProcurementAccess, validateProcurement, updateProcurement);
 
-// Delete procurement - HOD+
-router.delete("/:id", checkRole(700), deleteProcurement);
+// Complete draft procurement order - Procurement HOD+
+router.put("/:id/complete", checkProcurementAccess, completeProcurementOrder);
+
+// Resend procurement email - Procurement HOD+
+router.post("/:id/resend-email", checkProcurementAccess, resendProcurementEmail);
+
+// Delete procurement - Procurement HOD+
+router.delete("/:id", checkProcurementAccess, deleteProcurement);
 
 // Approval routes - Manager+
 router.post("/:id/approve", checkRole(600), validateApproval, approve);

@@ -7,6 +7,7 @@ import {
   rejectBudgetAllocation,
   getBudgetAllocationStats,
   getProjectsNeedingBudgetAllocation,
+  getBudgetAllocationHistory,
 } from "../controllers/budgetAllocationController.js";
 import { protect, checkBudgetAllocationAccess } from "../middleware/auth.js";
 
@@ -21,6 +22,7 @@ router.use(checkBudgetAllocationAccess);
 // Budget allocation routes
 router.post("/", createBudgetAllocation);
 router.get("/", getBudgetAllocations);
+router.get("/history", getBudgetAllocationHistory);
 router.get("/stats", getBudgetAllocationStats);
 router.get("/projects-needing-allocation", getProjectsNeedingBudgetAllocation);
 router.get("/:id", getBudgetAllocationById);

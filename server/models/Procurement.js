@@ -41,7 +41,7 @@ const procurementSchema = new mongoose.Schema(
     },
     priority: {
       type: String,
-      enum: ["low", "medium", "high", "urgent"],
+      enum: ["low", "medium", "high", "urgent", "critical"],
       default: "medium",
       required: true,
     },
@@ -72,6 +72,16 @@ const procurementSchema = new mongoose.Schema(
         state: String,
         postalCode: String,
       },
+    },
+
+    // Delivery Information
+    deliveryAddress: {
+      street: String,
+      city: String,
+      state: String,
+      postalCode: String,
+      contactPerson: String,
+      phone: String,
     },
 
     // Purchase Order Items

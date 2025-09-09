@@ -40,6 +40,30 @@ export const getBudgetAllocations = async (filters = {}) => {
   }
 };
 
+// Get budget allocation history for current user
+export const getBudgetAllocationHistory = async (filters = {}) => {
+  try {
+    const params = new URLSearchParams();
+
+    // Add filters to query params
+    Object.keys(filters).forEach((key) => {
+      if (
+        filters[key] !== undefined &&
+        filters[key] !== null &&
+        filters[key] !== ""
+      ) {
+        params.append(key, filters[key]);
+      }
+    });
+
+    const response = await api.get(`/budget-allocations/history?${params}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching budget allocation history:", error);
+    throw error;
+  }
+};
+
 // Get budget allocation by ID
 export const getBudgetAllocationById = async (id) => {
   try {

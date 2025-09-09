@@ -40,6 +40,7 @@ import {
   DepartmentManagement as DeptManagement,
   LeaveManagement as DeptLeaveManagement,
   ProjectApprovals,
+  ApprovalHistory,
   TeamManagement,
   Analytics,
 } from "./pages/user/modules/department-management";
@@ -231,6 +232,10 @@ const AppRoutes = () => {
         <Route
           path="modules/department-management/project-approvals"
           element={<ProjectApprovals />}
+        />
+        <Route
+          path="modules/department-management/approval-history"
+          element={<ApprovalHistory />}
         />
         <Route
           path="modules/department-management/leave-management"

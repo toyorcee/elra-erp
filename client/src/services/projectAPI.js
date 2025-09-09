@@ -168,6 +168,61 @@ export const fetchPendingProjectApprovals = async () => {
   }
 };
 
+// Get department-specific projects pending approval (HOD+ only)
+export const fetchDepartmentPendingApprovalProjects = async () => {
+  try {
+    const response = await api.get("/projects/department-pending-approval");
+    return response.data;
+  } catch (error) {
+    console.error(
+      "Error fetching department pending approval projects:",
+      error
+    );
+    throw error;
+  }
+};
+
+// Get projects pending Project Management HOD approval (Project Management HOD only)
+export const fetchProjectManagementPendingApprovalProjects = async () => {
+  try {
+    const response = await api.get(
+      "/projects/project-management-pending-approval"
+    );
+    return response.data;
+  } catch (error) {
+    console.error(
+      "Error fetching project management pending approval projects:",
+      error
+    );
+    throw error;
+  }
+};
+
+// Get HOD approval history (HOD+ only)
+export const fetchHODApprovalHistory = async () => {
+  try {
+    const response = await api.get("/projects/approval-history");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching HOD approval history:", error);
+    throw error;
+  }
+};
+
+// Get cross-departmental approval history (for Project Management HOD)
+export const fetchCrossDepartmentalApprovalHistory = async () => {
+  try {
+    const response = await api.get(
+      "/projects/cross-departmental-approval-history"
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching cross-departmental approval history:", error);
+    throw error;
+  }
+};
+
 // Approve project
 export const approveProject = async (projectId, approvalData) => {
   try {

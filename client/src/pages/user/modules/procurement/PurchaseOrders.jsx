@@ -7,6 +7,7 @@ import {
   XMarkIcon,
   ClockIcon,
   CheckCircleIcon,
+  XCircleIcon,
   BanknotesIcon,
   ArrowPathIcon,
   UserIcon,
@@ -21,10 +22,11 @@ import {
   createProcurement,
   updateProcurement,
   deleteProcurement,
+  completeProcurementOrder,
+  resendProcurementEmail,
 } from "../../../../services/procurementAPI";
 import { toast } from "react-toastify";
 import DataTable from "../../../../components/common/DataTable";
-import ELRALogo from "../../../../components/ELRALogo";
 
 const PurchaseOrders = () => {
   const { user } = useAuth();
@@ -38,9 +40,38 @@ const PurchaseOrders = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [orderToComplete, setOrderToComplete] = useState(null);
+  const [showResendModal, setShowResendModal] = useState(false);
+  const [orderToResend, setOrderToResend] = useState(null);
+  const [isResending, setIsResending] = useState(false);
 
-  // Form data for new purchase order
+  const [completeFormData, setCompleteFormData] = useState({
+    supplier: {
+      name: "",
+      contactPerson: "",
+      email: "",
+      phone: "",
+      address: {
+        street: "",
+        city: "",
+        state: "",
+        postalCode: "",
+      },
+    },
+    deliveryAddress: {
+      street: "",
+      city: "",
+      state: "",
+      postalCode: "",
+      contactPerson: "",
+      phone: "",
+    },
+    expectedDeliveryDate: "",
+    notes: "",
+  });
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -74,7 +105,6 @@ const PurchaseOrders = () => {
     expectedDeliveryDate: "",
   });
 
-  // Access control - only Manager+ can access
   if (!user || user.role.level < 600) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -127,9 +157,9 @@ const PurchaseOrders = () => {
       color: "bg-gray-100 text-gray-800",
     },
     {
-      value: "normal",
-      label: "Normal",
-      color: "bg-blue-100 text-blue-800",
+      value: "medium",
+      label: "Medium",
+      color: "bg-yellow-100 text-yellow-800",
     },
     {
       value: "high",
@@ -140,6 +170,11 @@ const PurchaseOrders = () => {
       value: "urgent",
       label: "Urgent",
       color: "bg-red-100 text-red-800",
+    },
+    {
+      value: "critical",
+      label: "Critical",
+      color: "bg-red-200 text-red-900",
     },
   ];
 
@@ -193,6 +228,57 @@ const PurchaseOrders = () => {
   const handleViewDetails = (order) => {
     setSelectedOrder(order);
     setShowDetailModal(true);
+  };
+
+  const handleCompleteOrder = (order) => {
+    setCompleteFormData({
+      supplier: {
+        name: order.supplier?.name || "",
+        contactPerson: order.supplier?.contactPerson || "",
+        email: order.supplier?.email || "",
+        phone: order.supplier?.phone || "",
+        address: {
+          street: order.supplier?.address?.street || "",
+          city: order.supplier?.address?.city || "",
+          state: order.supplier?.address?.state || "",
+          postalCode: order.supplier?.address?.postalCode || "",
+        },
+      },
+      deliveryAddress: {
+        street: "",
+        city: "",
+        state: "",
+        postalCode: "",
+        contactPerson: "",
+        phone: "",
+      },
+      expectedDeliveryDate: order.expectedDeliveryDate || "",
+      notes: "",
+    });
+    setOrderToComplete(order);
+    setShowCompleteModal(true);
+  };
+
+  const handleResendEmail = (order) => {
+    setOrderToResend(order);
+    setShowResendModal(true);
+  };
+
+  const confirmResendEmail = async () => {
+    if (!orderToResend) return;
+
+    setIsResending(true);
+    try {
+      await resendProcurementEmail(orderToResend._id);
+      toast.success("Email resent successfully to supplier!");
+      setShowResendModal(false);
+      setOrderToResend(null);
+    } catch (error) {
+      console.error("Error resending email:", error);
+      toast.error(error.response?.data?.message || "Failed to resend email");
+    } finally {
+      setIsResending(false);
+    }
   };
 
   const formatDate = (dateString) => {
@@ -337,6 +423,42 @@ const PurchaseOrders = () => {
                 {order.supplier.email}
               </div>
             )}
+        </div>
+      ),
+    },
+    {
+      header: "Actions",
+      accessor: "actions",
+      renderer: (order) => (
+        <div className="flex items-center space-x-2">
+          {order.status === "draft" && (
+            <button
+              onClick={() => handleCompleteOrder(order)}
+              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-1"
+              title="Complete Order"
+            >
+              <CheckCircleIcon className="w-4 h-4" />
+              Complete
+            </button>
+          )}
+          <button
+            onClick={() => handleViewDetails(order)}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-1"
+            title="View Details"
+          >
+            <UserIcon className="w-4 h-4" />
+            View
+          </button>
+          {order.supplier?.email && order.status !== "draft" && (
+            <button
+              onClick={() => handleResendEmail(order)}
+              className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center gap-1"
+              title="Resend Email to Supplier"
+            >
+              <ArrowPathIcon className="w-4 h-4" />
+              Resend
+            </button>
+          )}
         </div>
       ),
     },
@@ -723,295 +845,218 @@ const PurchaseOrders = () => {
         />
       </div>
 
-      {/* Detail Modal */}
+      {/* Detail Modal - ELRA Branded */}
       {showDetailModal && selectedOrder && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity">
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
-            </div>
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen"></span>
-            &#8203;
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="w-full">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-lg font-medium text-gray-900">
-                        Purchase Order Details
-                      </h3>
-                      <button
-                        onClick={() => setShowDetailModal(false)}
-                        className="text-gray-400 hover:text-gray-500"
-                      >
-                        <span className="sr-only">Close</span>
-                        <XMarkIcon className="h-6 w-6" />
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                      <div>
-                        <h4 className="font-medium text-gray-900">
-                          General Information
-                        </h4>
-                        <div className="mt-2 space-y-2">
-                          <p>
-                            <span className="text-gray-600">PO Number:</span>{" "}
-                            {selectedOrder.poNumber}
-                          </p>
-                          <p>
-                            <span className="text-gray-600">Title:</span>{" "}
-                            {selectedOrder.title}
-                          </p>
-                          <p>
-                            <span className="text-gray-600">Status:</span>{" "}
-                            {getStatusBadge(selectedOrder.status)}
-                          </p>
-                          <p>
-                            <span className="text-gray-600">Priority:</span>{" "}
-                            {getPriorityBadge(selectedOrder.priority)}
-                          </p>
-                          <p>
-                            <span className="text-gray-600">Created By:</span>{" "}
-                            {selectedOrder.createdBy?.firstName}{" "}
-                            {selectedOrder.createdBy?.lastName}
-                          </p>
-                          <p>
-                            <span className="text-gray-600">Created At:</span>{" "}
-                            {formatDate(selectedOrder.createdAt)}
-                          </p>
-                          {selectedOrder.approvedBy && (
-                            <p>
-                              <span className="text-gray-600">
-                                Approved By:
-                              </span>{" "}
-                              {selectedOrder.approvedBy.firstName}{" "}
-                              {selectedOrder.approvedBy.lastName}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="font-medium text-gray-900">
-                          Project & Financial Details
-                        </h4>
-                        <div className="mt-2 space-y-2">
-                          <p>
-                            <span className="text-gray-600">Project:</span>{" "}
-                            {selectedOrder.relatedProject?.name}
-                          </p>
-                          <p>
-                            <span className="text-gray-600">Project Code:</span>{" "}
-                            {selectedOrder.relatedProject?.code}
-                          </p>
-                          <p>
-                            <span className="text-gray-600">Total Amount:</span>{" "}
-                            {formatCurrency(selectedOrder.totalAmount)}
-                          </p>
-                          <p>
-                            <span className="text-gray-600">Paid Amount:</span>{" "}
-                            {formatCurrency(selectedOrder.paidAmount)}
-                          </p>
-                          <p>
-                            <span className="text-gray-600">Outstanding:</span>{" "}
-                            {formatCurrency(selectedOrder.outstandingAmount)}
-                          </p>
-                          <p>
-                            <span className="text-gray-600">
-                              Payment Status:
-                            </span>{" "}
-                            {selectedOrder.paymentStatus}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mb-6">
-                      <h4 className="font-medium text-gray-900">
-                        Supplier Information
-                      </h4>
-                      <div className="mt-2 space-y-2">
-                        <p>
-                          <span className="text-gray-600">Name:</span>{" "}
-                          {selectedOrder.supplier?.name}
-                        </p>
-                        <p>
-                          <span className="text-gray-600">Contact Person:</span>{" "}
-                          {selectedOrder.supplier?.contactPerson}
-                        </p>
-                        <p>
-                          <span className="text-gray-600">Email:</span>{" "}
-                          {selectedOrder.supplier?.email}
-                        </p>
-                        <p>
-                          <span className="text-gray-600">Phone:</span>{" "}
-                          {selectedOrder.supplier?.phone}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-6">
-                      <h4 className="font-medium text-gray-900 mb-3">Items</h4>
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead>
-                            <tr>
-                              <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Item
-                              </th>
-                              <th className="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Description
-                              </th>
-                              <th className="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Quantity
-                              </th>
-                              <th className="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Received
-                              </th>
-                              <th className="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Unit Price
-                              </th>
-                              <th className="px-6 py-3 bg-gray-50 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Total
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {selectedOrder.items.map((item) => (
-                              <tr key={item._id}>
-                                <td className="px-6 py-4">
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {item.name}
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    Category: {item.category}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <div className="text-sm text-gray-500">
-                                    {item.description}
-                                  </div>
-                                  {item.specifications && (
-                                    <div className="text-xs text-gray-400 mt-1">
-                                      Specs:{" "}
-                                      {Object.entries(item.specifications)
-                                        .map(
-                                          ([key, value]) => `${key}: ${value}`
-                                        )
-                                        .join(", ")}
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="px-6 py-4 text-right text-sm text-gray-900">
-                                  {item.quantity}
-                                </td>
-                                <td className="px-6 py-4 text-right text-sm text-gray-900">
-                                  {item.receivedQuantity}
-                                </td>
-                                <td className="px-6 py-4 text-right text-sm text-gray-900">
-                                  {formatCurrency(item.unitPrice)}
-                                </td>
-                                <td className="px-6 py-4 text-right text-sm text-gray-900">
-                                  {formatCurrency(item.totalPrice)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr>
-                              <td
-                                colSpan="5"
-                                className="px-6 py-4 text-right font-medium text-gray-900"
-                              >
-                                Subtotal:
-                              </td>
-                              <td className="px-6 py-4 text-right font-medium text-gray-900">
-                                {formatCurrency(selectedOrder.subtotal)}
-                              </td>
-                            </tr>
-                            <tr>
-                              <td
-                                colSpan="5"
-                                className="px-6 py-4 text-right font-medium text-gray-900"
-                              >
-                                Tax:
-                              </td>
-                              <td className="px-6 py-4 text-right font-medium text-gray-900">
-                                {formatCurrency(selectedOrder.tax)}
-                              </td>
-                            </tr>
-                            <tr>
-                              <td
-                                colSpan="5"
-                                className="px-6 py-4 text-right font-medium text-gray-900"
-                              >
-                                Shipping:
-                              </td>
-                              <td className="px-6 py-4 text-right font-medium text-gray-900">
-                                {formatCurrency(selectedOrder.shipping)}
-                              </td>
-                            </tr>
-                            <tr>
-                              <td
-                                colSpan="5"
-                                className="px-6 py-4 text-right font-medium text-gray-900"
-                              >
-                                Total:
-                              </td>
-                              <td className="px-6 py-4 text-right font-medium text-gray-900">
-                                {formatCurrency(selectedOrder.totalAmount)}
-                              </td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    </div>
-
-                    {selectedOrder.notes && selectedOrder.notes.length > 0 && (
-                      <div className="mt-6">
-                        <h4 className="font-medium text-gray-900 mb-3">
-                          Notes
-                        </h4>
-                        <div className="space-y-2">
-                          {selectedOrder.notes.map((note, index) => (
-                            <div key={index} className="bg-gray-50 p-3 rounded">
-                              <p className="text-sm text-gray-600">{note}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button
-                  type="button"
-                  onClick={() => setShowDetailModal(false)}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-[var(--elra-primary)] text-base font-medium text-white hover:bg-[var(--elra-primary-dark)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--elra-primary)] sm:ml-3 sm:w-auto sm:text-sm"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create Purchase Order Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-white bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[95vh] flex flex-col">
             {/* Header - ELRA Branded */}
             <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-t-2xl flex-shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                    <ELRALogo variant="dark" size="md" />
+                    <span className="text-2xl">🛒</span>
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-white">
+                    <h2 className="text-2xl font-bold">
+                      Purchase Order Details
+                    </h2>
+                    <p className="text-white text-opacity-90 mt-1 text-sm">
+                      {selectedOrder.poNumber} - {selectedOrder.title}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowDetailModal(false)}
+                  className="text-white hover:text-gray-200 transition-colors p-2 hover:bg-white hover:bg-opacity-10 rounded-full"
+                >
+                  <XMarkIcon className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-8 bg-white">
+              <div className="grid grid-cols-2 gap-6 mb-6">
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">
+                    General Information
+                  </h4>
+                  <div className="space-y-2">
+                    <p>
+                      <span className="text-gray-600">PO Number:</span>{" "}
+                      {selectedOrder.poNumber}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Status:</span>{" "}
+                      {getStatusBadge(selectedOrder.status)}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Priority:</span>{" "}
+                      {getPriorityBadge(selectedOrder.priority)}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Created By:</span>{" "}
+                      {selectedOrder.createdBy?.firstName}{" "}
+                      {selectedOrder.createdBy?.lastName}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Created Date:</span>{" "}
+                      {new Date(selectedOrder.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">
+                    Financial Information
+                  </h4>
+                  <div className="space-y-2">
+                    <p>
+                      <span className="text-gray-600">Total Amount:</span>{" "}
+                      {formatCurrency(selectedOrder.totalAmount)}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Paid Amount:</span>{" "}
+                      {formatCurrency(selectedOrder.paidAmount)}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Outstanding:</span>{" "}
+                      {formatCurrency(selectedOrder.outstandingAmount)}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Payment Status:</span>{" "}
+                      {selectedOrder.paymentStatus === "paid" ? (
+                        <span className="text-green-600 flex items-center">
+                          <CheckCircleIcon className="h-3 w-3 mr-1" />
+                          Paid
+                        </span>
+                      ) : (
+                        <span className="text-red-600 flex items-center">
+                          <XCircleIcon className="h-3 w-3 mr-1" />
+                          Unpaid
+                        </span>
+                      )}
+                    </p>
+                    <p>
+                      <span className="text-gray-600">Delivery Status:</span>{" "}
+                      {selectedOrder.deliveryStatus}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <h4 className="font-medium text-gray-900 mb-3">
+                  Supplier Information
+                </h4>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p>
+                    <span className="text-gray-600">Name:</span>{" "}
+                    {selectedOrder.supplier?.name}
+                  </p>
+                  <p>
+                    <span className="text-gray-600">Contact Person:</span>{" "}
+                    {selectedOrder.supplier?.contactPerson}
+                  </p>
+                  <p>
+                    <span className="text-gray-600">Email:</span>{" "}
+                    {selectedOrder.supplier?.email}
+                  </p>
+                  <p>
+                    <span className="text-gray-600">Phone:</span>{" "}
+                    {selectedOrder.supplier?.phone}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <h4 className="font-medium text-gray-900 mb-3">Items</h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Item
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Quantity
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Unit Price
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Total
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {selectedOrder.items?.map((item, index) => (
+                        <tr key={index}>
+                          <td className="px-6 py-4">
+                            <div className="max-w-xs">
+                              <div className="text-sm font-medium text-gray-900 break-words">
+                                {item.name}
+                              </div>
+                              <div className="text-sm text-gray-500 break-words">
+                                {item.description}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {item.quantity}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatCurrency(item.unitPrice)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatCurrency(item.totalPrice)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {selectedOrder.notes && selectedOrder.notes.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="font-medium text-gray-900 mb-3">Notes</h4>
+                  <div className="space-y-2">
+                    {selectedOrder.notes.map((note, index) => (
+                      <div key={index} className="bg-gray-50 p-3 rounded">
+                        <p className="text-sm text-gray-600">{note}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end p-6 bg-gray-50 rounded-b-2xl flex-shrink-0">
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="px-6 py-2 bg-[var(--elra-primary)] text-white rounded-lg font-medium hover:bg-[var(--elra-primary-dark)] transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Purchase Order Modal - ELRA Branded */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[95vh] flex flex-col">
+            {/* Header - ELRA Branded */}
+            <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-t-2xl flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <span className="text-2xl">📝</span>
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">
                       Create New Purchase Order
                     </h2>
                     <p className="text-white text-opacity-90 mt-1 text-sm">
@@ -1019,41 +1064,28 @@ const PurchaseOrders = () => {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => {
-                      setShowCreateModal(false);
-                      resetForm();
-                    }}
-                    className="bg-white text-[var(--elra-primary)] px-4 py-2 rounded-lg hover:bg-gray-50 transition-all duration-300 font-medium border border-white"
-                    disabled={loading}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowCreateModal(false);
-                      resetForm();
-                    }}
-                    className="text-white hover:text-gray-200 transition-colors p-1 rounded-full hover:bg-white hover:bg-opacity-20"
-                    disabled={loading}
-                  >
-                    <XMarkIcon className="h-6 w-6" />
-                  </button>
-                </div>
+                <button
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    resetForm();
+                  }}
+                  className="text-white hover:text-gray-200 transition-colors p-2 hover:bg-white hover:bg-opacity-10 rounded-full"
+                >
+                  <XMarkIcon className="w-6 h-6" />
+                </button>
               </div>
             </div>
 
-            {/* Content - Scrollable */}
-            <div className="p-8 bg-white overflow-y-auto flex-1">
-              <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-8 bg-white">
+              <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Basic Information */}
-                <div className="bg-gray-50 rounded-xl p-6">
+                <div className="bg-gray-50 rounded-lg p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <ShoppingBagIcon className="h-5 w-5 text-[var(--elra-primary)] mr-2" />
                     Purchase Order Details
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Title *
@@ -1085,6 +1117,7 @@ const PurchaseOrders = () => {
                         <option value="medium">Medium</option>
                         <option value="high">High</option>
                         <option value="urgent">Urgent</option>
+                        <option value="critical">Critical</option>
                       </select>
                     </div>
                     <div className="md:col-span-2">
@@ -1122,15 +1155,15 @@ const PurchaseOrders = () => {
                 </div>
 
                 {/* Supplier Information */}
-                <div className="bg-gray-50 rounded-xl p-6">
+                <div className="bg-gray-50 rounded-lg p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <UserIcon className="h-5 w-5 text-[var(--elra-primary)] mr-2" />
                     Supplier Information
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Supplier Name *
+                        Supplier Company Name*
                       </label>
                       <input
                         type="text"
@@ -1247,248 +1280,670 @@ const PurchaseOrders = () => {
                   </div>
                 </div>
 
-                {/* Items */}
-                <div className="bg-gray-50 rounded-xl p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                      <CurrencyDollarIcon className="h-5 w-5 text-[var(--elra-primary)] mr-2" />
-                      Purchase Items
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={addItem}
-                      className="inline-flex items-center px-3 py-2 border border-[var(--elra-primary)] text-sm font-medium rounded-lg text-[var(--elra-primary)] bg-white hover:bg-[var(--elra-primary)] hover:text-white transition-all duration-200"
-                    >
-                      <PlusIcon className="h-4 w-4 mr-2" />
-                      Add Item
-                    </button>
+                {/* Items section placeholder */}
+                <div className="bg-gray-50 rounded-lg p-6">
+                  <p className="text-center text-gray-500">
+                    Items section coming...
+                  </p>
+                </div>
+              </form>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end space-x-4 p-6 bg-gray-50 rounded-b-2xl flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreateModal(false);
+                  resetForm();
+                }}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-6 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors font-medium"
+              >
+                Create Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Complete Purchase Order Modal - ELRA Branded */}
+      {showCompleteModal && orderToComplete && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[95vh] flex flex-col">
+            {/* Header - ELRA Branded */}
+            <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-t-2xl flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <span className="text-2xl">✅</span>
                   </div>
-
-                  <div className="space-y-4">
-                    {formData.items.map((item, index) => (
-                      <div
-                        key={index}
-                        className="border border-gray-200 rounded-lg p-4 bg-white"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-medium text-gray-900">
-                            Item {index + 1}
-                          </h4>
-                          {formData.items.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => removeItem(index)}
-                              className="text-red-600 hover:text-red-800 p-1"
-                            >
-                              <TrashIcon className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Item Name *
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              value={item.name}
-                              onChange={(e) =>
-                                handleItemChange(index, "name", e.target.value)
-                              }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                              placeholder="Enter item name"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Category
-                            </label>
-                            <select
-                              value={item.category}
-                              onChange={(e) =>
-                                handleItemChange(
-                                  index,
-                                  "category",
-                                  e.target.value
-                                )
-                              }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                            >
-                              <option value="equipment">Equipment</option>
-                              <option value="electronics">Electronics</option>
-                              <option value="office_supplies">
-                                Office Supplies
-                              </option>
-                              <option value="furniture">Furniture</option>
-                              <option value="maintenance_parts">
-                                Maintenance Parts
-                              </option>
-                              <option value="other">Other</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Quantity *
-                            </label>
-                            <input
-                              type="number"
-                              required
-                              min="1"
-                              value={item.quantity}
-                              onChange={(e) =>
-                                handleItemChange(
-                                  index,
-                                  "quantity",
-                                  parseInt(e.target.value)
-                                )
-                              }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                              placeholder="Enter quantity"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Unit Price (₦) *
-                            </label>
-                            <input
-                              type="number"
-                              required
-                              min="0"
-                              step="0.01"
-                              value={item.unitPrice}
-                              onChange={(e) =>
-                                handleItemChange(
-                                  index,
-                                  "unitPrice",
-                                  parseFloat(e.target.value)
-                                )
-                              }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                              placeholder="Enter unit price"
-                            />
-                          </div>
-                          <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Description
-                            </label>
-                            <textarea
-                              rows={2}
-                              value={item.description}
-                              onChange={(e) =>
-                                handleItemChange(
-                                  index,
-                                  "description",
-                                  e.target.value
-                                )
-                              }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                              placeholder="Enter item description"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Brand
-                            </label>
-                            <input
-                              type="text"
-                              value={item.specifications.brand}
-                              onChange={(e) =>
-                                handleItemChange(
-                                  index,
-                                  "specifications.brand",
-                                  e.target.value
-                                )
-                              }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                              placeholder="Enter brand"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Model
-                            </label>
-                            <input
-                              type="text"
-                              value={item.specifications.model}
-                              onChange={(e) =>
-                                handleItemChange(
-                                  index,
-                                  "specifications.model",
-                                  e.target.value
-                                )
-                              }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                              placeholder="Enter model"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <div className="text-right">
-                            <span className="text-sm font-medium text-gray-900">
-                              Total: ₦
-                              {(
-                                item.quantity * item.unitPrice
-                              ).toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                  <div>
+                    <h2 className="text-2xl font-bold">
+                      Complete Purchase Order
+                    </h2>
+                    <p className="text-white text-opacity-90 mt-1 text-sm">
+                      {orderToComplete.poNumber} - Finalize supplier details
+                    </p>
                   </div>
+                </div>
+                <button
+                  onClick={() => setShowCompleteModal(false)}
+                  className="text-white hover:text-gray-200 transition-colors p-2 hover:bg-white hover:bg-opacity-10 rounded-full"
+                  disabled={loading}
+                >
+                  <XMarkIcon className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
 
-                  {/* Total Summary */}
-                  <div className="mt-6 p-4 bg-[var(--elra-primary)] bg-opacity-10 border border-[var(--elra-primary)] border-opacity-20 rounded-lg ">
-                    <div className="flex justify-between items-center text-white">
-                      <span className="text-lg font-semibold]">
-                        Total Order Value
-                      </span>
-                      <span className="text-2xl font-bold text-white">
-                        ₦{calculateTotal().toLocaleString()}
-                      </span>
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-8 bg-white">
+              {/* Order Summary */}
+              <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                  Order Summary
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">PO Number:</p>
+                    <p className="font-medium text-gray-900">
+                      {orderToComplete.poNumber}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Project:</p>
+                    <p className="font-medium text-gray-900">
+                      {orderToComplete.relatedProject?.name || "No Project"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Total Amount:</p>
+                    <p className="font-medium text-green-600">
+                      ₦{orderToComplete.totalAmount?.toLocaleString() || "0"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Items:</p>
+                    <p className="font-medium text-gray-900">
+                      {orderToComplete.items?.length || 0} items
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Items to be sent to supplier */}
+              <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                  Items to be sent to supplier
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Item
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Quantity
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Unit Price
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Total
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {orderToComplete.items?.map((item, index) => (
+                        <tr key={index}>
+                          <td className="px-6 py-4">
+                            <div className="max-w-xs">
+                              <div className="text-sm font-medium text-gray-900 break-words">
+                                {item.name}
+                              </div>
+                              <div className="text-sm text-gray-500 break-words">
+                                {item.description}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {item.quantity}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            ₦{item.unitPrice.toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            ₦{item.totalPrice.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setLoading(true);
+                  try {
+                    await completeProcurementOrder(
+                      orderToComplete._id,
+                      completeFormData
+                    );
+                    toast.success("Purchase order completed successfully!");
+                    setShowCompleteModal(false);
+                    loadPurchaseOrders();
+                  } catch (error) {
+                    toast.error("Error completing purchase order");
+                    console.error("Error:", error);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                className="space-y-6"
+              >
+                {/* Supplier Information */}
+                <div className="border-b border-gray-200 pb-6">
+                  <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                    Supplier Information
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Supplier Company Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={completeFormData.supplier.name}
+                        onChange={(e) =>
+                          setCompleteFormData({
+                            ...completeFormData,
+                            supplier: {
+                              ...completeFormData.supplier,
+                              name: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter supplier name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Contact Person
+                      </label>
+                      <input
+                        type="text"
+                        value={completeFormData.supplier.contactPerson}
+                        onChange={(e) =>
+                          setCompleteFormData({
+                            ...completeFormData,
+                            supplier: {
+                              ...completeFormData.supplier,
+                              contactPerson: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter contact person"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Email *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={completeFormData.supplier.email}
+                        onChange={(e) =>
+                          setCompleteFormData({
+                            ...completeFormData,
+                            supplier: {
+                              ...completeFormData.supplier,
+                              email: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter supplier email"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Phone
+                      </label>
+                      <input
+                        type="tel"
+                        value={completeFormData.supplier.phone}
+                        onChange={(e) =>
+                          setCompleteFormData({
+                            ...completeFormData,
+                            supplier: {
+                              ...completeFormData.supplier,
+                              phone: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter phone number"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Street Address
+                      </label>
+                      <input
+                        type="text"
+                        value={completeFormData.supplier.address.street}
+                        onChange={(e) =>
+                          setCompleteFormData({
+                            ...completeFormData,
+                            supplier: {
+                              ...completeFormData.supplier,
+                              address: {
+                                ...completeFormData.supplier.address,
+                                street: e.target.value,
+                              },
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter supplier street address"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        City
+                      </label>
+                      <input
+                        type="text"
+                        value={completeFormData.supplier.address.city}
+                        onChange={(e) =>
+                          setCompleteFormData({
+                            ...completeFormData,
+                            supplier: {
+                              ...completeFormData.supplier,
+                              address: {
+                                ...completeFormData.supplier.address,
+                                city: e.target.value,
+                              },
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter supplier city"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        State
+                      </label>
+                      <input
+                        type="text"
+                        value={completeFormData.supplier.address.state}
+                        onChange={(e) =>
+                          setCompleteFormData({
+                            ...completeFormData,
+                            supplier: {
+                              ...completeFormData.supplier,
+                              address: {
+                                ...completeFormData.supplier.address,
+                                state: e.target.value,
+                              },
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter supplier state"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Postal Code
+                      </label>
+                      <input
+                        type="text"
+                        value={completeFormData.supplier.address.postalCode}
+                        onChange={(e) =>
+                          setCompleteFormData({
+                            ...completeFormData,
+                            supplier: {
+                              ...completeFormData.supplier,
+                              address: {
+                                ...completeFormData.supplier.address,
+                                postalCode: e.target.value,
+                              },
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter postal code"
+                      />
                     </div>
                   </div>
                 </div>
 
-                {/* Submit Button */}
-                <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowCreateModal(false);
-                      resetForm();
-                    }}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all duration-200 font-medium text-sm"
-                    disabled={loading}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-sm group relative"
-                    title="Create New Purchase Order"
-                  >
-                    {loading ? (
-                      <>
-                        <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
-                        Creating...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircleIcon className="h-4 w-4 mr-2" />
-                        Submit
-                      </>
-                    )}
-                    {/* Hover tooltip */}
-                    <span className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-                      Create New Purchase Order
-                    </span>
-                  </button>
+                {/* Delivery Address Information */}
+                <div className="border-b border-gray-200 pb-6">
+                  <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                    Delivery Address Information
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Street Address *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={completeFormData.deliveryAddress.street}
+                        onChange={(e) =>
+                          setCompleteFormData({
+                            ...completeFormData,
+                            deliveryAddress: {
+                              ...completeFormData.deliveryAddress,
+                              street: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter delivery street address"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        City *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={completeFormData.deliveryAddress.city}
+                        onChange={(e) =>
+                          setCompleteFormData({
+                            ...completeFormData,
+                            deliveryAddress: {
+                              ...completeFormData.deliveryAddress,
+                              city: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter delivery city"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        State *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={completeFormData.deliveryAddress.state}
+                        onChange={(e) =>
+                          setCompleteFormData({
+                            ...completeFormData,
+                            deliveryAddress: {
+                              ...completeFormData.deliveryAddress,
+                              state: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter delivery state"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Postal Code
+                      </label>
+                      <input
+                        type="text"
+                        value={completeFormData.deliveryAddress.postalCode}
+                        onChange={(e) =>
+                          setCompleteFormData({
+                            ...completeFormData,
+                            deliveryAddress: {
+                              ...completeFormData.deliveryAddress,
+                              postalCode: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter postal code"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Contact Person *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={completeFormData.deliveryAddress.contactPerson}
+                        onChange={(e) =>
+                          setCompleteFormData({
+                            ...completeFormData,
+                            deliveryAddress: {
+                              ...completeFormData.deliveryAddress,
+                              contactPerson: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter delivery contact person"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Contact Phone *
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={completeFormData.deliveryAddress.phone}
+                        onChange={(e) =>
+                          setCompleteFormData({
+                            ...completeFormData,
+                            deliveryAddress: {
+                              ...completeFormData.deliveryAddress,
+                              phone: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter delivery contact phone"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Delivery Information */}
+                <div className="border-b border-gray-200 pb-6">
+                  <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                    Delivery Information
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Expected Delivery Date *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        min={new Date().toISOString().split("T")[0]}
+                        value={completeFormData.expectedDeliveryDate}
+                        onChange={(e) =>
+                          setCompleteFormData({
+                            ...completeFormData,
+                            expectedDeliveryDate: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Additional Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Additional Notes
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={completeFormData.notes}
+                    onChange={(e) =>
+                      setCompleteFormData({
+                        ...completeFormData,
+                        notes: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                    placeholder="Enter any additional notes or special instructions"
+                  />
                 </div>
               </form>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end space-x-4 p-6 bg-gray-50 rounded-b-2xl flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowCompleteModal(false)}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={loading}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  setLoading(true);
+                  try {
+                    await completeProcurementOrder(
+                      orderToComplete._id,
+                      completeFormData
+                    );
+                    toast.success("Purchase order completed successfully!");
+                    loadPurchaseOrders();
+                    // Keep modal open to show success state
+                  } catch (error) {
+                    toast.error("Error completing purchase order");
+                    console.error("Error:", error);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+                className="px-6 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              >
+                {loading ? (
+                  <>
+                    <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                    Completing...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircleIcon className="h-4 w-4 mr-2" />
+                    Complete Order
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Resend Email Confirmation Modal */}
+      {showResendModal && orderToResend && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white p-6 rounded-t-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center mr-4">
+                    <ArrowPathIcon className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">Resend Email</h2>
+                    <p className="text-white text-opacity-90 text-sm">
+                      Confirm resending to supplier
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowResendModal(false)}
+                  className="text-white hover:text-gray-200 transition-colors p-2 hover:bg-white hover:bg-opacity-10 rounded-full"
+                  disabled={isResending}
+                >
+                  <XMarkIcon className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="mb-4">
+                <p className="text-gray-700 mb-2">
+                  Are you sure you want to resend the purchase order email?
+                </p>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="text-sm text-gray-600">
+                    <div className="font-medium">
+                      Order: {orderToResend.poNumber}
+                    </div>
+                    <div className="mt-1">
+                      <span className="font-medium">Supplier:</span>{" "}
+                      {orderToResend.supplier?.name}
+                    </div>
+                    <div>
+                      <span className="font-medium">Email:</span>{" "}
+                      {orderToResend.supplier?.email}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end space-x-3 p-6 bg-gray-50 rounded-b-xl">
+              <button
+                type="button"
+                onClick={() => setShowResendModal(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                disabled={isResending}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmResendEmail}
+                disabled={isResending}
+                className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              >
+                {isResending ? (
+                  <>
+                    <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                    Resending...
+                  </>
+                ) : (
+                  <>
+                    <ArrowPathIcon className="h-4 w-4 mr-2" />
+                    Resend Email
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

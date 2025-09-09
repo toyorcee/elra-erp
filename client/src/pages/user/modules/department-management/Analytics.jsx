@@ -5,9 +5,8 @@ import {
   HiOutlineUsers,
   HiOutlineClipboardDocument,
   HiOutlineCalendar,
-  HiOutlineTrendingUp,
-  HiOutlineTrendingDown,
 } from "react-icons/hi2";
+import { HiTrendingUp, HiTrendingDown } from "react-icons/hi";
 
 const Analytics = () => {
   const { user } = useAuth();
@@ -75,7 +74,13 @@ const Analytics = () => {
     }
   };
 
-  const StatCard = ({ title, value, icon: Icon, trend, color = "bg-blue-500" }) => (
+  const StatCard = ({
+    title,
+    value,
+    icon: Icon,
+    trend,
+    color = "bg-blue-500",
+  }) => (
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex items-center justify-between">
         <div>
@@ -84,11 +89,15 @@ const Analytics = () => {
           {trend && (
             <div className="flex items-center mt-2">
               {trend > 0 ? (
-                <HiOutlineTrendingUp className="w-4 h-4 text-green-500 mr-1" />
+                <HiTrendingUp className="w-4 h-4 text-green-500 mr-1" />
               ) : (
-                <HiOutlineTrendingDown className="w-4 h-4 text-red-500 mr-1" />
+                <HiTrendingDown className="w-4 h-4 text-red-500 mr-1" />
               )}
-              <span className={`text-sm ${trend > 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <span
+                className={`text-sm ${
+                  trend > 0 ? "text-green-600" : "text-red-600"
+                }`}
+              >
                 {Math.abs(trend)}% from last month
               </span>
             </div>
@@ -157,7 +166,8 @@ const Analytics = () => {
             Department Analytics
           </h1>
           <p className="text-gray-600">
-            Comprehensive insights into {user.department?.name} department performance, team productivity, and project metrics.
+            Comprehensive insights into {user.department?.name} department
+            performance, team productivity, and project metrics.
           </p>
         </div>
 
@@ -201,16 +211,22 @@ const Analytics = () => {
               {analyticsData.projectStatus.map((item, index) => (
                 <div key={index} className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <div className={`w-3 h-3 rounded-full ${item.color} mr-3`}></div>
+                    <div
+                      className={`w-3 h-3 rounded-full ${item.color} mr-3`}
+                    ></div>
                     <span className="text-sm text-gray-700">{item.status}</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-sm font-medium text-gray-900">{item.count}</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {item.count}
+                    </span>
                     <div className="w-24 bg-gray-200 rounded-full h-2">
                       <div
                         className={`h-2 rounded-full ${item.color}`}
                         style={{
-                          width: `${(item.count / analyticsData.activeProjects) * 100}%`
+                          width: `${
+                            (item.count / analyticsData.activeProjects) * 100
+                          }%`,
                         }}
                       ></div>
                     </div>
@@ -226,16 +242,22 @@ const Analytics = () => {
               {analyticsData.leaveDistribution.map((item, index) => (
                 <div key={index} className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <div className={`w-3 h-3 rounded-full ${item.color} mr-3`}></div>
+                    <div
+                      className={`w-3 h-3 rounded-full ${item.color} mr-3`}
+                    ></div>
                     <span className="text-sm text-gray-700">{item.type}</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-sm font-medium text-gray-900">{item.count}</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {item.count}
+                    </span>
                     <div className="w-24 bg-gray-200 rounded-full h-2">
                       <div
                         className={`h-2 rounded-full ${item.color}`}
                         style={{
-                          width: `${(item.count / analyticsData.leaveRequests) * 100}%`
+                          width: `${
+                            (item.count / analyticsData.leaveRequests) * 100
+                          }%`,
                         }}
                       ></div>
                     </div>
@@ -257,17 +279,35 @@ const Analytics = () => {
                     <div
                       className="bg-blue-500 rounded-t-lg transition-all duration-500"
                       style={{
-                        height: `${(item.projects / Math.max(...analyticsData.monthlyTrends.map(t => t.projects))) * 100}%`
+                        height: `${
+                          (item.projects /
+                            Math.max(
+                              ...analyticsData.monthlyTrends.map(
+                                (t) => t.projects
+                              )
+                            )) *
+                          100
+                        }%`,
                       }}
                     ></div>
                     <div
                       className="bg-green-500 rounded-t-lg absolute bottom-0 w-full transition-all duration-500"
                       style={{
-                        height: `${(item.completion / Math.max(...analyticsData.monthlyTrends.map(t => t.completion))) * 100}%`
+                        height: `${
+                          (item.completion /
+                            Math.max(
+                              ...analyticsData.monthlyTrends.map(
+                                (t) => t.completion
+                              )
+                            )) *
+                          100
+                        }%`,
                       }}
                     ></div>
                   </div>
-                  <span className="text-xs text-gray-600 mt-2">{item.month}</span>
+                  <span className="text-xs text-gray-600 mt-2">
+                    {item.month}
+                  </span>
                 </div>
               ))}
             </div>
@@ -308,7 +348,12 @@ const Analytics = () => {
                     fill="transparent"
                     className="text-blue-500"
                     strokeDasharray={`${2 * Math.PI * 36}`}
-                    strokeDashoffset={`${2 * Math.PI * 36 * (1 - analyticsData.budgetUtilization / 100)}`}
+                    strokeDashoffset={`${
+                      2 *
+                      Math.PI *
+                      36 *
+                      (1 - analyticsData.budgetUtilization / 100)
+                    }`}
                     strokeLinecap="round"
                   />
                 </svg>
@@ -316,7 +361,9 @@ const Analytics = () => {
                   {analyticsData.budgetUtilization}%
                 </span>
               </div>
-              <p className="text-sm text-gray-600 mt-2">of allocated budget used</p>
+              <p className="text-sm text-gray-600 mt-2">
+                of allocated budget used
+              </p>
             </div>
           </ChartCard>
 
@@ -342,7 +389,12 @@ const Analytics = () => {
                     fill="transparent"
                     className="text-green-500"
                     strokeDasharray={`${2 * Math.PI * 36}`}
-                    strokeDashoffset={`${2 * Math.PI * 36 * (1 - analyticsData.teamProductivity / 100)}`}
+                    strokeDashoffset={`${
+                      2 *
+                      Math.PI *
+                      36 *
+                      (1 - analyticsData.teamProductivity / 100)
+                    }`}
                     strokeLinecap="round"
                   />
                 </svg>
@@ -350,7 +402,9 @@ const Analytics = () => {
                   {analyticsData.teamProductivity}%
                 </span>
               </div>
-              <p className="text-sm text-gray-600 mt-2">overall team efficiency</p>
+              <p className="text-sm text-gray-600 mt-2">
+                overall team efficiency
+              </p>
             </div>
           </ChartCard>
 
@@ -376,7 +430,12 @@ const Analytics = () => {
                     fill="transparent"
                     className="text-purple-500"
                     strokeDasharray={`${2 * Math.PI * 36}`}
-                    strokeDashoffset={`${2 * Math.PI * 36 * (1 - analyticsData.projectSuccessRate / 100)}`}
+                    strokeDashoffset={`${
+                      2 *
+                      Math.PI *
+                      36 *
+                      (1 - analyticsData.projectSuccessRate / 100)
+                    }`}
                     strokeLinecap="round"
                   />
                 </svg>
@@ -384,7 +443,9 @@ const Analytics = () => {
                   {analyticsData.projectSuccessRate}%
                 </span>
               </div>
-              <p className="text-sm text-gray-600 mt-2">projects completed successfully</p>
+              <p className="text-sm text-gray-600 mt-2">
+                projects completed successfully
+              </p>
             </div>
           </ChartCard>
         </div>
@@ -397,8 +458,13 @@ const Analytics = () => {
                 <div className="flex items-center">
                   <HiOutlineClipboardDocument className="w-5 h-5 text-blue-500 mr-3" />
                   <div>
-                    <p className="font-medium text-gray-900">Review Pending Projects</p>
-                    <p className="text-sm text-gray-600">{analyticsData.pendingApprovals} projects awaiting approval</p>
+                    <p className="font-medium text-gray-900">
+                      Review Pending Projects
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {analyticsData.pendingApprovals} projects awaiting
+                      approval
+                    </p>
                   </div>
                 </div>
               </button>
@@ -406,8 +472,12 @@ const Analytics = () => {
                 <div className="flex items-center">
                   <HiOutlineCalendar className="w-5 h-5 text-green-500 mr-3" />
                   <div>
-                    <p className="font-medium text-gray-900">Process Leave Requests</p>
-                    <p className="text-sm text-gray-600">{analyticsData.leaveRequests} requests pending</p>
+                    <p className="font-medium text-gray-900">
+                      Process Leave Requests
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {analyticsData.leaveRequests} requests pending
+                    </p>
                   </div>
                 </div>
               </button>
@@ -417,20 +487,32 @@ const Analytics = () => {
           <ChartCard title="Department Summary">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Total Team Members</span>
-                <span className="font-medium text-gray-900">{analyticsData.teamSize}</span>
+                <span className="text-sm text-gray-600">
+                  Total Team Members
+                </span>
+                <span className="font-medium text-gray-900">
+                  {analyticsData.teamSize}
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Active Projects</span>
-                <span className="font-medium text-gray-900">{analyticsData.activeProjects}</span>
+                <span className="font-medium text-gray-900">
+                  {analyticsData.activeProjects}
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Completed Projects</span>
-                <span className="font-medium text-gray-900">{analyticsData.completedProjects}</span>
+                <span className="text-sm text-gray-600">
+                  Completed Projects
+                </span>
+                <span className="font-medium text-gray-900">
+                  {analyticsData.completedProjects}
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Budget Used</span>
-                <span className="font-medium text-gray-900">{analyticsData.budgetUtilization}%</span>
+                <span className="font-medium text-gray-900">
+                  {analyticsData.budgetUtilization}%
+                </span>
               </div>
             </div>
           </ChartCard>

@@ -4,6 +4,113 @@ import Project from "../models/Project.js";
 import User from "../models/User.js";
 import Notification from "../models/Notification.js";
 
+const notifyEmployeeAboutWallet = async (project, wallet, extraFunds) => {
+  try {
+    console.log(
+      `📧 [WALLET NOTIFICATION] Notifying employee about wallet creation...`
+    );
+
+    const employee = await User.findById(project.createdBy);
+    if (!employee) {
+      console.log("⚠️ [WALLET NOTIFICATION] Employee not found");
+      return;
+    }
+
+    const notification = new Notification({
+      recipient: project.createdBy,
+      type: "WALLET_CREATED",
+      title: "Extra Funds Wallet Created",
+      message: `Your project "${
+        project.name
+      }" has been allocated ₦${extraFunds.toLocaleString()} in extra funds. These funds have been saved in your wallet for future project requests.`,
+      data: {
+        walletId: wallet._id,
+        projectId: project._id,
+        projectName: project.name,
+        projectCode: project.code,
+        extraFunds: extraFunds,
+        walletBalance: wallet.balance,
+        budgetAllocationId: wallet.metadata.createdFromBudgetAllocation,
+      },
+      priority: "medium",
+    });
+
+    await notification.save();
+    console.log(
+      `✅ [WALLET NOTIFICATION] Notification sent to employee: ${employee.email}`
+    );
+  } catch (error) {
+    console.error(
+      "❌ [WALLET NOTIFICATION] Error sending notification:",
+      error
+    );
+  }
+};
+
+// Helper function to notify employee about budget allocation
+const notifyEmployeeAboutBudgetAllocation = async (
+  project,
+  budgetAllocation,
+  extraFundsAvailable = 0
+) => {
+  try {
+    console.log(
+      `📧 [BUDGET NOTIFICATION] Notifying employee about budget allocation...`
+    );
+
+    // Get employee details
+    const employee = await User.findById(project.createdBy);
+    if (!employee) {
+      console.log("⚠️ [BUDGET NOTIFICATION] Employee not found");
+      return;
+    }
+
+    // Create smart message based on extra funds availability
+    let message = `Your project "${
+      project.name
+    }" has been allocated ₦${budgetAllocation.allocatedAmount.toLocaleString()}. The procurement process will now begin automatically.`;
+
+    if (extraFundsAvailable > 0) {
+      message += ` Additionally, ₦${extraFundsAvailable.toLocaleString()} in extra funds has been saved in your wallet for future project requests.`;
+    }
+
+    const notificationData = {
+      budgetAllocationId: budgetAllocation._id,
+      projectId: project._id,
+      projectName: project.name,
+      projectCode: project.code,
+      allocatedAmount: budgetAllocation.allocatedAmount,
+      projectStatus: project.status,
+    };
+
+    if (extraFundsAvailable > 0) {
+      notificationData.extraFundsAvailable = extraFundsAvailable;
+      notificationData.hasExtraFunds = true;
+    } else {
+      notificationData.hasExtraFunds = false;
+    }
+
+    const notification = new Notification({
+      recipient: project.createdBy,
+      type: "BUDGET_ALLOCATED",
+      title: "Project Budget Allocated",
+      message: message,
+      data: notificationData,
+      priority: "high",
+    });
+
+    await notification.save();
+    console.log(
+      `✅ [BUDGET NOTIFICATION] Notification sent to employee: ${employee.email}`
+    );
+  } catch (error) {
+    console.error(
+      "❌ [BUDGET NOTIFICATION] Error sending notification:",
+      error
+    );
+  }
+};
+
 /**
  *
  * Budget Allocation Controller
@@ -28,9 +135,8 @@ export const createBudgetAllocation = async (req, res) => {
       currency = "NGN",
     } = req.body;
 
-    const allocatedBy = req.user._id;
+    const allocatedBy = req.user;
 
-    // Validate allocation amount (allow 0 for no extra funding)
     if (
       allocatedAmount === undefined ||
       allocatedAmount === null ||
@@ -42,7 +148,6 @@ export const createBudgetAllocation = async (req, res) => {
       });
     }
 
-    // Validate required fields based on allocation type
     if (allocationType === "project_budget" && !projectId) {
       return res.status(400).json({
         success: false,
@@ -86,20 +191,21 @@ export const createBudgetAllocation = async (req, res) => {
       entityType = "project";
     }
 
-    // For project budget allocations, use project budget if no amount provided
     let finalAllocatedAmount = allocatedAmount || 0;
 
     if (allocationType === "project_budget" && project) {
-      // If no extra funding provided, use the project's budget as the allocation amount
       if (!allocatedAmount || allocatedAmount === 0) {
-        finalAllocatedAmount = project.budget;
+        finalAllocatedAmount = 0;
         console.log(
-          `💰 [BUDGET ALLOCATION] Using project budget as allocation amount: ₦${finalAllocatedAmount.toLocaleString()}`
+          `💰 [BUDGET ALLOCATION] No extra funding provided, will use project items cost as base allocation`
+        );
+      } else {
+        console.log(
+          `💰 [BUDGET ALLOCATION] Extra funding amount: ₦${finalAllocatedAmount.toLocaleString()}`
         );
       }
     }
 
-    // Calculate budget details
     const projectItemsTotal =
       project?.projectItems?.reduce(
         (sum, item) => sum + (item.totalPrice || 0),
@@ -107,19 +213,84 @@ export const createBudgetAllocation = async (req, res) => {
       ) || 0;
     const previousBudget = project ? project.budget : 0;
 
-    // If items total < budget: use items total as base
-    // If items total = budget: use budget as base (since they match)
-    const baseAmount =
-      projectItemsTotal < previousBudget ? projectItemsTotal : previousBudget;
-    const newBudget = baseAmount + finalAllocatedAmount;
+    const baseAmount = projectItemsTotal;
+    const extraFundsAvailable = previousBudget - projectItemsTotal;
+    const newBudget = baseAmount;
 
-    // Create budget allocation
+    console.log(`💰 [BUDGET ALLOCATION] Allocation breakdown:`);
+    console.log(
+      `   - Project Items Cost (Allocated): ₦${baseAmount.toLocaleString()}`
+    );
+    console.log(
+      `   - Extra Funds Available (Wallet): ₦${extraFundsAvailable.toLocaleString()}`
+    );
+    console.log(`   - Total Allocation: ₦${newBudget.toLocaleString()}`);
+
+    if (extraFundsAvailable > 0) {
+      console.log(
+        `💳 [EXTRA WALLET] ${extraFundsAvailable.toLocaleString()} available for wallet creation`
+      );
+
+      try {
+        const EmployeeWallet = await import("../models/EmployeeWallet.js");
+        const wallet = await EmployeeWallet.default.getOrCreateWallet(
+          project.createdBy,
+          project._id,
+          "project_extra_funds"
+        );
+
+        await wallet.addFunds(
+          extraFundsAvailable,
+          `Extra funds from project budget allocation - ${project.name}`,
+          budgetAllocation._id,
+          allocatedBy
+        );
+
+        wallet.metadata = {
+          projectName: project.name,
+          projectCode: project.code,
+          department: project.department?.name,
+          createdFromBudgetAllocation: budgetAllocation._id,
+          projectReference: {
+            _id: project._id,
+            name: project.name,
+            code: project.code,
+            budget: project.budget,
+            projectScope: project.projectScope,
+            requiresBudgetAllocation: project.requiresBudgetAllocation,
+            status: project.status,
+            startDate: project.startDate,
+            endDate: project.endDate,
+            department: project.department,
+            projectManager: project.projectManager,
+            createdBy: project.createdBy,
+          },
+        };
+        await wallet.save();
+
+        console.log(
+          `✅ [EXTRA WALLET] Wallet created/updated for employee ${
+            project.createdBy
+          } with ₦${extraFundsAvailable.toLocaleString()}`
+        );
+
+        // Wallet created - will be included in main notification
+      } catch (walletError) {
+        console.error("❌ [EXTRA WALLET] Error creating wallet:", walletError);
+      }
+    } else {
+      console.log(`💳 [EXTRA WALLET] No extra funds available (₦0)`);
+    }
+
     const budgetAllocation = new BudgetAllocation({
       project: projectId,
       projectCode: project?.code,
       projectName: project?.name,
       allocationType,
-      allocatedAmount: finalAllocatedAmount,
+      allocatedAmount: newBudget,
+      baseAmount: baseAmount,
+      extraFundsAvailable: extraFundsAvailable,
+      extraFundsAllocated: 0, // No extra allocation allowed
       previousBudget: baseAmount,
       newBudget,
       allocatedBy,
@@ -136,25 +307,96 @@ export const createBudgetAllocation = async (req, res) => {
     // Save the allocation
     await budgetAllocation.save();
 
+    // Always notify employee about budget allocation (with extra funds info if available)
+    await notifyEmployeeAboutBudgetAllocation(
+      project,
+      budgetAllocation,
+      extraFundsAvailable
+    );
+
     // Auto-approve the budget allocation for project_budget type
     if (allocationType === "project_budget" && project) {
       console.log("🚀 [BUDGET ALLOCATION] Auto-approving budget allocation...");
+      console.log(
+        "📊 [STATS TRANSFORM] Before allocation - Project status:",
+        project.status
+      );
+      console.log(
+        "📊 [STATS TRANSFORM] Before allocation - BudgetAllocation status:",
+        budgetAllocation.status
+      );
 
-      // Approve the allocation
       await budgetAllocation.approveAllocation(
         allocatedBy,
-        "Auto-approved by Finance HOD"
+        "Approved by Finance HOD"
+      );
+
+      console.log(
+        "📊 [STATS TRANSFORM] After allocation approval - BudgetAllocation status:",
+        budgetAllocation.status
       );
 
       // Update project budget and status
       project.budget = budgetAllocation.newBudget;
-      project.status = "approved";
+      console.log(
+        "📊 [STATS TRANSFORM] Updated project budget to:",
+        project.budget
+      );
+
+      const budgetAllocationStep = project.approvalChain.find(
+        (step) => step.level === "budget_allocation"
+      );
+      if (budgetAllocationStep) {
+        budgetAllocationStep.status = "approved";
+        budgetAllocationStep.approvedAt = new Date();
+        budgetAllocationStep.approver = allocatedBy._id;
+        budgetAllocationStep.comments =
+          "Budget allocated and approved by Finance & Accounting HOD";
+        console.log(
+          "✅ [BUDGET ALLOCATION] Updated approval chain - budget_allocation marked as approved"
+        );
+      }
+
       await project.save();
+      console.log(
+        "✅ [BUDGET ALLOCATION] Project saved with updated approval chain"
+      );
+
+      if (project.requiresBudgetAllocation === true) {
+        console.log(
+          "🛒 [BUDGET ALLOCATION] ${project.projectScope} project with budget allocation - triggering procurement workflow"
+        );
+        project.status = "pending_procurement";
+        await project.save();
+        console.log(
+          "📊 [STATS TRANSFORM] Project status set to pending_procurement"
+        );
+
+        try {
+          await project.triggerProcurementCreation(allocatedBy);
+          console.log(
+            "✅ [BUDGET ALLOCATION] Procurement triggered for ${project.projectScope} project"
+          );
+          console.log(
+            "📊 [STATS TRANSFORM] After procurement creation - Project status:",
+            project.status
+          );
+        } catch (procurementError) {
+          console.error(
+            "❌ [BUDGET ALLOCATION] Error triggering procurement:",
+            procurementError
+          );
+        }
+      } else {
+        project.status = "approved";
+        await project.save();
+        console.log(
+          "✅ [BUDGET ALLOCATION] Project status updated to approved"
+        );
+      }
 
       console.log("✅ [BUDGET ALLOCATION] Budget allocation auto-approved");
-      console.log("✅ [BUDGET ALLOCATION] Project status updated to approved");
 
-      // Send approval notifications (this will trigger procurement)
       await sendBudgetAllocationApprovalNotifications(
         budgetAllocation,
         "approved"
@@ -198,7 +440,7 @@ export const createBudgetAllocation = async (req, res) => {
           message: `A new budget allocation of ${
             budgetAllocation.formattedAmount
           } has been created for project: ${
-            project?.name || "Unknown Project"
+            budgetAllocation.projectName || "Unknown Project"
           }. Please review and approve.`,
           data: {
             budgetAllocationId: budgetAllocation._id,
@@ -234,6 +476,72 @@ export const createBudgetAllocation = async (req, res) => {
       success: false,
       error: error.message,
       message: "Failed to create budget allocation",
+    });
+  }
+};
+
+// ============================================================================
+// GET BUDGET ALLOCATION HISTORY
+// ============================================================================
+
+/**
+ * Get budget allocation history for the current user
+ * GET /api/budget-allocations/history
+ */
+export const getBudgetAllocationHistory = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const { page = 1, limit = 50, status } = req.query;
+
+    // Build query for allocations created by current user
+    const query = {
+      allocatedBy: currentUser._id,
+    };
+
+    // Filter by status if provided
+    if (status) {
+      query.status = status;
+    }
+
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Get budget allocations with pagination
+    const allocations = await BudgetAllocation.find(query)
+      .populate("project", "name code department")
+      .populate("allocatedBy", "firstName lastName email")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Get total count for pagination
+    const totalCount = await BudgetAllocation.countDocuments(query);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalCount / parseInt(limit));
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        allocations,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages,
+          totalCount,
+          hasNextPage,
+          hasPrevPage,
+          limit: parseInt(limit),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching budget allocation history:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch budget allocation history",
+      error: error.message,
     });
   }
 };
@@ -424,8 +732,24 @@ export const approveBudgetAllocation = async (req, res) => {
       const project = budgetAllocation.project;
       // Update project budget to the new total (items total + allocated amount)
       project.budget = budgetAllocation.newBudget;
-      project.status = "approved";
-      await project.save();
+
+      // For any project with budget allocation, trigger procurement workflow
+      if (project.requiresBudgetAllocation === true) {
+        console.log(
+          "🛒 [BUDGET ALLOCATION] ${project.projectScope} project with budget allocation - triggering procurement workflow"
+        );
+        project.status = "pending_procurement";
+        await project.save();
+
+        // Procurement creation is handled in the main allocation creation logic
+        console.log(
+          "ℹ️ [BUDGET ALLOCATION] Procurement creation handled in main allocation logic"
+        );
+      } else {
+        // For other project types, set to approved
+        project.status = "approved";
+        await project.save();
+      }
     }
 
     // Send notifications
@@ -534,8 +858,16 @@ export const rejectBudgetAllocation = async (req, res) => {
  */
 export const getBudgetAllocationStats = async (req, res) => {
   try {
+    console.log("📊 [CONTROLLER] Getting budget allocation stats...");
     const { allocationType, startDate, endDate } = req.query;
     const user = req.user;
+
+    console.log("📊 [CONTROLLER] User:", {
+      id: user._id,
+      name: `${user.firstName} ${user.lastName}`,
+      department: user.department,
+      roleLevel: user.role?.level,
+    });
 
     const query = {};
 
@@ -551,11 +883,15 @@ export const getBudgetAllocationStats = async (req, res) => {
     const isFinanceHOD =
       user.department === "Finance & Accounting" && user.role?.level >= 700;
 
+    console.log("📊 [CONTROLLER] Is Finance HOD:", isFinanceHOD);
+
     if (!isFinanceHOD && user.department) {
       query.department = user.department;
     }
 
     const stats = await BudgetAllocation.getStats();
+
+    console.log("📊 [CONTROLLER] Stats retrieved:", stats);
 
     res.status(200).json({
       success: true,
@@ -784,7 +1120,9 @@ const sendBudgetAllocationApprovalNotifications = async (
       title: `Budget Allocation ${
         actionText.charAt(0).toUpperCase() + actionText.slice(1)
       }`,
-      message: `Your budget allocation request of ${budgetAllocation.formattedAmount} has been ${actionText}.`,
+      message: `Budget allocation for project "${
+        budgetAllocation.projectName || "Unknown Project"
+      }" has been ${actionText} and can be used for the purchase order.`,
       data: {
         budgetAllocationId: budgetAllocation._id,
         allocationType: budgetAllocation.allocationType,
@@ -798,226 +1136,6 @@ const sendBudgetAllocationApprovalNotifications = async (
     console.log(
       `✅ [BUDGET ALLOCATION] ${action} notification sent to allocation creator`
     );
-
-    // If approved and it's a project allocation, trigger procurement
-    console.log(`🔍 [BUDGET ALLOCATION] Checking trigger conditions:`);
-    console.log(`🔍 [BUDGET ALLOCATION] action: "${action}"`);
-    console.log(
-      `🔍 [BUDGET ALLOCATION] allocationType: "${budgetAllocation.allocationType}"`
-    );
-    console.log(
-      `🔍 [BUDGET ALLOCATION] action === "approved": ${action === "approved"}`
-    );
-    console.log(
-      `🔍 [BUDGET ALLOCATION] allocationType === "project_budget": ${
-        budgetAllocation.allocationType === "project_budget"
-      }`
-    );
-    console.log(
-      `🔍 [BUDGET ALLOCATION] Both conditions met: ${
-        action === "approved" &&
-        budgetAllocation.allocationType === "project_budget"
-      }`
-    );
-
-    if (
-      action === "approved" &&
-      budgetAllocation.allocationType === "project_budget"
-    ) {
-      console.log(
-        "🛒 [BUDGET ALLOCATION] =========================================="
-      );
-      console.log("🛒 [BUDGET ALLOCATION] TRIGGERING PROCUREMENT CREATION");
-      console.log(
-        "🛒 [BUDGET ALLOCATION] =========================================="
-      );
-      console.log(
-        `🛒 [BUDGET ALLOCATION] Allocation Code: ${budgetAllocation.allocationCode}`
-      );
-      console.log(
-        `🛒 [BUDGET ALLOCATION] Allocation Amount: ₦${budgetAllocation.allocatedAmount?.toLocaleString()}`
-      );
-      console.log(
-        `🛒 [BUDGET ALLOCATION] Project ID: ${budgetAllocation.project}`
-      );
-
-      // Get the project and trigger procurement
-      const project = await Project.findById(budgetAllocation.project);
-      if (project) {
-        console.log(
-          `🛒 [BUDGET ALLOCATION] Found project: ${project.name} (${project.code})`
-        );
-        console.log(
-          `🛒 [BUDGET ALLOCATION] Project budget: ₦${project.budget?.toLocaleString()}`
-        );
-        console.log(`🛒 [BUDGET ALLOCATION] Project status: ${project.status}`);
-        console.log(
-          `🛒 [BUDGET ALLOCATION] Project items count: ${
-            project.projectItems?.length || 0
-          }`
-        );
-        console.log(
-          `🛒 [BUDGET ALLOCATION] Project items total: ₦${
-            project.projectItems
-              ?.reduce((sum, item) => sum + (item.totalPrice || 0), 0)
-              ?.toLocaleString() || 0
-          }`
-        );
-
-        // Get the approver user for the procurement trigger
-        const approver = await User.findById(budgetAllocation.approvedBy);
-        if (approver) {
-          console.log(
-            `🛒 [BUDGET ALLOCATION] Using approver: ${approver.firstName} ${approver.lastName} (${approver.email}) for procurement trigger`
-          );
-          console.log(
-            "🛒 [BUDGET ALLOCATION] Calling project.triggerProcurementCreation(approver)..."
-          );
-          try {
-            await project.triggerProcurementCreation(approver);
-            console.log(
-              "✅ [BUDGET ALLOCATION] project.triggerProcurementCreation() completed successfully"
-            );
-          } catch (procurementError) {
-            console.error(
-              "❌ [BUDGET ALLOCATION] Error in project.triggerProcurementCreation():",
-              procurementError
-            );
-            console.error(
-              "❌ [BUDGET ALLOCATION] Error stack:",
-              procurementError.stack
-            );
-          }
-        } else {
-          console.log(
-            "⚠️ [BUDGET ALLOCATION] No approver found, using project creator for procurement trigger"
-          );
-          const projectCreator = await User.findById(project.createdBy);
-          if (projectCreator) {
-            console.log(
-              `🛒 [BUDGET ALLOCATION] Using project creator: ${projectCreator.firstName} ${projectCreator.lastName} (${projectCreator.email}) for procurement trigger`
-            );
-            try {
-              await project.triggerProcurementCreation(projectCreator);
-              console.log(
-                "✅ [BUDGET ALLOCATION] project.triggerProcurementCreation() completed successfully with project creator"
-              );
-            } catch (procurementError) {
-              console.error(
-                "❌ [BUDGET ALLOCATION] Error in project.triggerProcurementCreation() with project creator:",
-                procurementError
-              );
-            }
-          }
-        }
-      } else {
-        console.error(
-          "❌ [BUDGET ALLOCATION] Project not found for procurement trigger"
-        );
-      }
-      console.log(
-        "🛒 [BUDGET ALLOCATION] =========================================="
-      );
-      console.log("🛒 [BUDGET ALLOCATION] PROCUREMENT TRIGGER COMPLETED");
-      console.log(
-        "🛒 [BUDGET ALLOCATION] =========================================="
-      );
-
-      // Send direct notification to Procurement HOD
-      console.log(
-        "📧 [BUDGET ALLOCATION] Sending direct notification to Procurement HOD..."
-      );
-      try {
-        // Find Procurement department
-        const procurementDept = await mongoose.model("Department").findOne({
-          name: "Procurement",
-        });
-
-        if (procurementDept) {
-          console.log(
-            `📧 [BUDGET ALLOCATION] Found Procurement department: ${procurementDept.name}`
-          );
-
-          // Get HOD role ID first
-          const hodRole = await mongoose.model("Role").findOne({ name: "HOD" });
-          if (!hodRole) {
-            console.log("❌ [BUDGET ALLOCATION] HOD role not found in system");
-          } else {
-            // Find Procurement HOD by role name first
-            let procurementHOD = await mongoose
-              .model("User")
-              .findOne({
-                department: procurementDept._id,
-                role: hodRole._id,
-                isActive: true,
-              })
-              .populate("role");
-
-            // Fallback to role level if no HOD found by name
-            if (!procurementHOD) {
-              console.log(
-                "🔄 [BUDGET ALLOCATION] No Procurement HOD found by name, trying role level fallback..."
-              );
-              procurementHOD = await mongoose
-                .model("User")
-                .findOne({
-                  department: procurementDept._id,
-                  "role.level": { $gte: 700 },
-                  isActive: true,
-                })
-                .populate("role");
-            }
-
-            if (procurementHOD) {
-              console.log(
-                `📧 [BUDGET ALLOCATION] Found Procurement HOD: ${procurementHOD.firstName} ${procurementHOD.lastName} (${procurementHOD.email})`
-              );
-
-              const procurementNotification = new Notification({
-                recipient: procurementHOD._id,
-                type: "PROCUREMENT_INITIATION_REQUIRED",
-                title: "Procurement Initiation Required",
-                message: `Project "${project?.name || "Unknown Project"}" (${
-                  project?.code || "Unknown Code"
-                }) has been approved for budget allocation of ${
-                  budgetAllocation.formattedAmount
-                }. Please review and initiate procurement processes for this project.`,
-                priority: "high",
-                data: {
-                  projectId: project?._id,
-                  projectName: project?.name,
-                  projectCode: project?.code,
-                  budget: project?.budget,
-                  category: project?.category,
-                  actionUrl: "/dashboard/modules/procurement",
-                  triggeredBy: budgetAllocation.approvedBy,
-                  budgetAllocationId: budgetAllocation._id,
-                  allocatedAmount: budgetAllocation.allocatedAmount,
-                },
-              });
-
-              await procurementNotification.save();
-              console.log(
-                `✅ [BUDGET ALLOCATION] Direct notification sent to Procurement HOD: ${procurementHOD.firstName} ${procurementHOD.lastName} (${procurementHOD.email})`
-              );
-            } else {
-              console.log(
-                "⚠️ [BUDGET ALLOCATION] No Procurement HOD found to notify"
-              );
-            }
-          }
-        } else {
-          console.log(
-            "⚠️ [BUDGET ALLOCATION] Procurement department not found"
-          );
-        }
-      } catch (notifError) {
-        console.error(
-          "❌ [BUDGET ALLOCATION] Error sending Procurement HOD notification:",
-          notifError
-        );
-      }
-    }
   } catch (error) {
     console.error(
       "Send Budget Allocation Approval Notifications Error:",

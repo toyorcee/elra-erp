@@ -26,6 +26,12 @@ const formatCurrency = (amount, currency = "NGN") => {
   }).format(amount);
 };
 
+// Helper function to format approval level text
+const formatApprovalLevel = (level) => {
+  if (!level) return level;
+  return level.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+};
+
 // Helper function to get next project code with department-based numbering
 const generateNextProjectCode = async (departmentId) => {
   try {
@@ -175,13 +181,10 @@ export const getAllProjects = async (req, res) => {
 
       if (currentUser.role.level >= 700) {
         // HOD (700+) - see personal and departmental projects from their department
-        const isHRDepartment =
-          currentUser.department?.name === "Human Resources" ||
-          currentUser.department?.name === "HR" ||
-          currentUser.department?.name === "Human Resource Management";
+        const isProjectManagementDepartment =
+          currentUser.department?.name === "Project Management";
 
-        if (isHRDepartment) {
-          // HR HOD can see personal, departmental, and external projects
+        if (isProjectManagementDepartment) {
           query.$or = [
             { projectScope: "personal", createdBy: currentUser._id },
             {
@@ -194,7 +197,7 @@ export const getAllProjects = async (req, res) => {
             },
           ];
           console.log(
-            `🔍 [PROJECTS] HR HOD - showing personal, departmental, and external projects from department: ${currentUser.department.name}`
+            `🔍 [PROJECTS] Project Management HOD - showing personal, departmental, and external projects from department: ${currentUser.department.name}`
           );
         } else {
           // ALL HODs can see personal and departmental projects from their department
@@ -544,18 +547,16 @@ export const createProject = async (req, res) => {
     console.log(`   Requested Project Scope: ${projectScope}`);
 
     // Validate project scope based on user role
-    const isHRDepartment =
-      currentUser.department?.name === "Human Resources" ||
-      currentUser.department?.name === "HR" ||
-      currentUser.department?.name === "Human Resource Management";
+    const isProjectManagementDepartment =
+      currentUser.department?.name === "Project Management";
 
     let allowedScopes = [];
 
     if (currentUser.role.level >= 1000) {
       // SUPER_ADMIN can create all types
       allowedScopes = ["personal", "departmental", "external"];
-    } else if (currentUser.role.level >= 700 && isHRDepartment) {
-      // HR HOD can create personal, departmental, and external projects
+    } else if (currentUser.role.level >= 700 && isProjectManagementDepartment) {
+      // Project Management HOD can create personal, departmental, and external projects
       allowedScopes = ["personal", "departmental", "external"];
     } else if (currentUser.role.level >= 700) {
       // ALL HODs can create personal and departmental projects
@@ -654,7 +655,6 @@ export const createProject = async (req, res) => {
       // For budgets >₦1M, also check budget allocation for personal/departmental projects
       if (req.body.projectScope !== "external") {
         if (req.body.requiresBudgetAllocation === false) {
-          // No budget allocation needed - but personal projects still need approval workflow
           if (req.body.projectScope === "personal") {
             projectStatus = "pending_approval";
             console.log(
@@ -747,30 +747,26 @@ export const createProject = async (req, res) => {
         }
       }
 
-      // Special case for external projects - HR HOD can assign HR department managers
+      // Special case for external projects - Project Management HOD can assign Project Management department managers
       if (projectScope === "external") {
-        const isHRDepartment =
-          currentUser.department?.name === "Human Resources" ||
-          currentUser.department?.name === "HR" ||
-          currentUser.department?.name === "Human Resource Management";
+        const isProjectManagementDepartment =
+          currentUser.department?.name === "Project Management";
 
-        const isUserFromHRDepartment =
-          assignedManager.department?.name === "Human Resources" ||
-          assignedManager.department?.name === "HR" ||
-          assignedManager.department?.name === "Human Resource Management";
+        const isUserFromProjectManagementDepartment =
+          assignedManager.department?.name === "Project Management";
 
-        // HR HOD can assign themselves or HR department users at levels 700, 600, 300
-        if (isHRDepartment && currentUser.role.level === 700) {
-          if (!isUserFromHRDepartment) {
+        // Project Management HOD can assign themselves or Project Management department users at levels 700, 600, 300
+        if (isProjectManagementDepartment && currentUser.role.level === 700) {
+          if (!isUserFromProjectManagementDepartment) {
             return res.status(403).json({
               success: false,
               message: "Access denied",
               errors: [
-                "For external projects, you can only assign project managers from the HR department",
+                "For external projects, you can only assign project managers from the Project Management department",
               ],
               fieldErrors: {
                 projectManager:
-                  "You can only assign HR department managers for external projects",
+                  "You can only assign Project Management department managers for external projects",
               },
             });
           }
@@ -1047,13 +1043,12 @@ export const createProject = async (req, res) => {
               }
             } else if (project.projectScope === "external") {
               // External projects: Auto-approve if creator is from approval department
-              const isHRDepartment =
-                currentUser.department?.name === "Human Resources" ||
-                currentUser.department?.name === "HR" ||
-                currentUser.department?.name === "Human Resource Management";
+              const isProjectManagementDepartment =
+                currentUser.department?.name === "Project Management";
 
               if (step.level === "hod") {
-                shouldAutoApprove = isCreatorHOD && isHRDepartment;
+                shouldAutoApprove =
+                  isCreatorHOD && isProjectManagementDepartment;
               } else if (
                 step.level === "legal_compliance" &&
                 creatorDepartment === "Legal & Compliance"
@@ -1099,6 +1094,12 @@ export const createProject = async (req, res) => {
 
           if (nextPendingStep) {
             switch (nextPendingStep.level) {
+              case "project_management":
+                project.status = "pending_project_management_approval";
+                console.log(
+                  "🔍 [DEBUG] Setting status to pending_project_management_approval"
+                );
+                break;
               case "legal_compliance":
                 project.status = "pending_legal_compliance_approval";
                 console.log(
@@ -1115,6 +1116,12 @@ export const createProject = async (req, res) => {
                 project.status = "pending_finance_approval";
                 console.log(
                   "🔍 [DEBUG] Setting status to pending_finance_approval"
+                );
+                break;
+              case "budget_allocation":
+                project.status = "pending_budget_allocation";
+                console.log(
+                  "🔍 [DEBUG] Setting status to pending_budget_allocation"
                 );
                 break;
               default:
@@ -1262,13 +1269,35 @@ export const createProject = async (req, res) => {
                 console.log(`🔍 [DEBUG] Approver ID: ${approver._id}`);
                 console.log(`🔍 [DEBUG] Project ID: ${project._id}`);
 
-                // Send notification to approver
+                // Send notification to approver with special handling for Project Management HOD
                 try {
+                  // Special notification for Project Management HOD when PM staff create projects
+                  const isProjectManagementHOD =
+                    approver.department?.name === "Project Management";
+                  const isCreatorFromPM =
+                    currentUser.department?.name === "Project Management";
+                  const isCreatorPMStaff =
+                    isCreatorFromPM && currentUser.role.level < 700;
+
+                  let notificationTitle = "Project Approval Required";
+                  let notificationMessage = `A new ${project.projectScope} project "${project.name}" requires your approval.`;
+                  let notificationType = "PROJECT_READY_FOR_APPROVAL";
+
+                  if (isProjectManagementHOD && isCreatorPMStaff) {
+                    notificationTitle =
+                      "Project Management Staff Project - Approval Required";
+                    notificationMessage = `A ${project.projectScope} project "${project.name}" created by Project Management staff (${currentUser.firstName} ${currentUser.lastName}) requires your approval. This project has been routed directly to you, skipping the department HOD approval step.`;
+                    notificationType = "PROJECT_MANAGEMENT_STAFF_APPROVAL";
+                    console.log(
+                      `📧 [NOTIFICATION] Special PM HOD notification for PM staff project: ${project.name}`
+                    );
+                  }
+
                   await sendProjectNotification(req, {
                     recipient: approver._id,
-                    type: "PROJECT_READY_FOR_APPROVAL",
-                    title: "Project Approval Required",
-                    message: `A new ${project.projectScope} project "${project.name}" requires your approval.`,
+                    type: notificationType,
+                    title: notificationTitle,
+                    message: notificationMessage,
                     data: {
                       projectId: project._id,
                       projectName: project.name,
@@ -1277,6 +1306,10 @@ export const createProject = async (req, res) => {
                       projectScope: project.projectScope,
                       budget: project.budget,
                       category: project.category,
+                      creatorName: `${currentUser.firstName} ${currentUser.lastName}`,
+                      creatorDepartment: currentUser.department?.name,
+                      isSpecialPMCase:
+                        isProjectManagementHOD && isCreatorPMStaff,
                       actionUrl: `/dashboard/modules/projects/${project._id}`,
                     },
                   });
@@ -1971,14 +2004,12 @@ const checkProjectAccess = async (user, project) => {
 const checkProjectEditAccess = async (user, project) => {
   if (user.role.level >= 1000) return true;
 
-  // For external projects, only HR HOD can edit
+  // For external projects, only Project Management HOD can edit
   if (project.projectScope === "external") {
-    const isHRDepartment =
-      user.department?.name === "Human Resources" ||
-      user.department?.name === "HR" ||
-      user.department?.name === "Human Resource Management";
+    const isProjectManagementDepartment =
+      user.department?.name === "Project Management";
 
-    return user.role.level >= 700 && isHRDepartment;
+    return user.role.level >= 700 && isProjectManagementDepartment;
   }
 
   // HOD can edit projects they manage or in their department
@@ -2264,16 +2295,14 @@ export const addTeamMember = async (req, res) => {
 
     // Additional validation for external projects
     if (project.projectScope === "external") {
-      const isHRDepartment =
-        currentUser.department?.name === "Human Resources" ||
-        currentUser.department?.name === "HR" ||
-        currentUser.department?.name === "Human Resource Management";
+      const isProjectManagementDepartment =
+        currentUser.department?.name === "Project Management";
 
-      if (!isHRDepartment || currentUser.role.level < 700) {
+      if (!isProjectManagementDepartment || currentUser.role.level < 700) {
         return res.status(403).json({
           success: false,
           message:
-            "Access denied. Only HR HOD can manage external project teams.",
+            "Access denied. Only Project Management HOD can manage external project teams.",
         });
       }
     }
@@ -2624,6 +2653,78 @@ export const approveProject = async (req, res) => {
     // Approve the project
     await project.approveProject(currentUser._id, level, comments);
 
+    // Log progress after approval
+    console.log(
+      `📊 [PROGRESS] Project ${project.name} progress after ${level} approval: ${project.progress}%`
+    );
+
+    // Send notification to the approver confirming their approval
+    try {
+      const nextPendingStep = project.approvalChain.find(
+        (step) => step.status === "pending"
+      );
+
+      let approverMessage = `You have successfully approved project "${
+        project.name
+      }" at ${formatApprovalLevel(level)} level.`;
+
+      if (nextPendingStep) {
+        if (
+          nextPendingStep.level === "budget_allocation" &&
+          currentUser.department?.name === "Finance & Accounting"
+        ) {
+          approverMessage += ` You can now proceed to allocate budget for this project.`;
+        } else {
+          // Normal case: different approver for next step
+          let nextStage = "";
+          switch (nextPendingStep.level) {
+            case "project_management":
+              nextStage = "Project Management HOD";
+              break;
+            case "legal_compliance":
+              nextStage = "Legal & Compliance HOD";
+              break;
+            case "finance":
+              nextStage = "Finance HOD";
+              break;
+            case "executive":
+              nextStage = "Executive HOD";
+              break;
+            case "budget_allocation":
+              nextStage = "Finance HOD for budget allocation";
+              break;
+            default:
+              nextStage = "next approver";
+          }
+          approverMessage += ` The project has been forwarded to ${nextStage} for the next approval stage.`;
+        }
+      } else {
+        approverMessage += ` The project has been fully approved and is ready for implementation.`;
+      }
+
+      await sendProjectNotification(req, {
+        recipient: currentUser._id,
+        type: "project_approval_confirmed",
+        title: "Project Approval Confirmed",
+        message: approverMessage,
+        data: {
+          projectId: project._id,
+          projectName: project.name,
+          approvalLevel: level,
+          nextStage: nextPendingStep ? nextPendingStep.level : "completed",
+        },
+      });
+
+      console.log(
+        `📧 [APPROVER NOTIFICATION] Sent approval confirmation to ${currentUser.firstName} ${currentUser.lastName}`
+      );
+    } catch (error) {
+      console.error(
+        "❌ [APPROVER NOTIFICATION] Error sending approval confirmation:",
+        error
+      );
+    }
+
     // Audit logging for project approval
     try {
       await ProjectAuditService.logProjectApproved(
@@ -2673,13 +2774,23 @@ export const approveProject = async (req, res) => {
     }
 
     // Send notification to project creator
-    let creatorMessage = `Your project "${project.name}" has been approved at ${level} level by ${currentUser.firstName} ${currentUser.lastName} (${currentUser.department?.name}).`;
+    let creatorMessage = `Your project "${
+      project.name
+    }" has been approved at ${formatApprovalLevel(level)} level by ${
+      currentUser.firstName
+    } ${currentUser.lastName} (${currentUser.department?.name}).`;
 
     // Add next department information if there's a next step
-    if (project.status !== "approved" && nextDepartmentName) {
+    if (
+      project.status !== "approved" &&
+      project.status !== "pending_budget_allocation" &&
+      nextDepartmentName
+    ) {
       creatorMessage += ` Awaiting approval from ${nextDepartmentName}.`;
     } else if (project.status === "approved") {
       creatorMessage += ` Project fully approved and ready for implementation.`;
+    } else if (project.status === "pending_budget_allocation") {
+      creatorMessage += ` Project approved! Finance department will now allocate budget and initiate procurement.`;
     }
 
     await sendProjectNotification(req, {
@@ -2701,157 +2812,297 @@ export const approveProject = async (req, res) => {
 
     // Send notification to next approver if there is one
     if (project.status !== "approved") {
-      if (nextPendingStep) {
+      // Special case: Send budget allocation notification when status is pending_budget_allocation
+      if (project.status === "pending_budget_allocation") {
         try {
           console.log(
-            `🔍 [NEXT APPROVER] Looking for approver for level: ${nextPendingStep.level}`
+            `🔍 [BUDGET ALLOCATION] Looking for Finance HOD for budget allocation`
           );
 
-          let nextApproverQuery = {};
+          const financeDept = await mongoose
+            .model("Department")
+            .findOne({ name: "Finance & Accounting" });
 
-          if (nextPendingStep.level === "legal_compliance") {
-            const legalDept = await mongoose
-              .model("Department")
-              .findOne({ name: "Legal & Compliance" });
+          const hodRole = await mongoose.model("Role").findOne({ name: "HOD" });
 
-            const hodRole = await mongoose
-              .model("Role")
-              .findOne({ name: "HOD" });
+          if (financeDept && hodRole) {
+            const financeHOD = await User.findOne({
+              role: hodRole._id,
+              department: financeDept._id,
+              isActive: true,
+            }).populate("department");
 
-            if (legalDept && hodRole) {
-              nextApproverQuery = {
-                role: hodRole._id,
-                department: legalDept._id,
-                isActive: true,
-              };
-            }
-          } else if (nextPendingStep.level === "executive") {
-            const execDept = await mongoose
-              .model("Department")
-              .findOne({ name: "Executive Office" });
+            if (financeHOD) {
+              const budgetAllocationMessage = `You have a pending budget allocation for project: ${
+                project.name
+              } (${formatCurrency(project.budget)})`;
 
-            const hodRole = await mongoose
-              .model("Role")
-              .findOne({ name: "HOD" });
-
-            if (execDept && hodRole) {
-              nextApproverQuery = {
-                role: hodRole._id,
-                department: execDept._id,
-                isActive: true,
-              };
-            }
-          } else if (nextPendingStep.level === "finance") {
-            const financeDept = await mongoose
-              .model("Department")
-              .findOne({ name: "Finance & Accounting" });
-
-            const hodRole = await mongoose
-              .model("Role")
-              .findOne({ name: "HOD" });
-
-            if (financeDept && hodRole) {
-              nextApproverQuery = {
-                role: hodRole._id,
-                department: financeDept._id,
-                isActive: true,
-              };
-            }
-          } else if (nextPendingStep.level === "department") {
-            // For department level, find HOD of the project's department
-            const hodRole = await mongoose
-              .model("Role")
-              .findOne({ name: "HOD" });
-
-            if (project.department && hodRole) {
-              nextApproverQuery = {
-                role: hodRole._id,
-                department: project.department._id,
-                isActive: true,
-              };
-            }
-          } else if (nextPendingStep.level === "hod") {
-            // For HOD level, find HOD of the project's department
-            const hodRole = await mongoose
-              .model("Role")
-              .findOne({ name: "HOD" });
-
-            if (project.department && hodRole) {
-              nextApproverQuery = {
-                role: hodRole._id,
-                department: project.department._id,
-                isActive: true,
-              };
-            }
-          }
-
-          if (Object.keys(nextApproverQuery).length > 0) {
-            console.log(
-              `🔍 [NEXT APPROVER] Query:`,
-              JSON.stringify(nextApproverQuery, null, 2)
-            );
-
-            const nextApprover = await User.findOne(nextApproverQuery).populate(
-              "department"
-            );
-
-            console.log(
-              `🔍 [NEXT APPROVER] Found approver:`,
-              nextApprover
-                ? `${nextApprover.firstName} ${nextApprover.lastName} (${nextApprover.department?.name})`
-                : "None"
-            );
-
-            // Skip notification if next approver is the project creator (to avoid duplicate notifications)
-            if (
-              nextApprover &&
-              nextApprover._id.toString() !== project.createdBy.toString()
-            ) {
               const notificationData = {
-                recipient: nextApprover._id,
+                recipient: financeHOD._id,
                 type: "PROJECT_READY_FOR_APPROVAL",
-                title: "Project Approval Required",
-                message: `You have a pending ${
-                  nextPendingStep.level
-                } approval for project: ${project.name} (${formatCurrency(
-                  project.budget
-                )})`,
+                title: "Budget Allocation Required",
+                message: budgetAllocationMessage,
                 priority: "high",
                 data: {
                   projectId: project._id,
                   projectName: project.name,
-                  approvalLevel: nextPendingStep.level,
+                  approvalLevel: "budget_allocation",
                   amount: project.budget,
                   creatorDepartment: project.department?.name,
                   creatorName: `${project.createdBy?.firstName} ${project.createdBy?.lastName}`,
-                  actionUrl: "/dashboard/modules/projects",
+                  actionUrl: "/dashboard/modules/finance",
                 },
               };
 
               console.log(
-                `📧 [NEXT APPROVER NOTIFICATION] Creating notification:`,
+                `📧 [BUDGET ALLOCATION NOTIFICATION] Creating notification:`,
                 JSON.stringify(notificationData, null, 2)
               );
 
               await notificationService.createNotification(notificationData);
 
               console.log(
-                `📧 [NEXT APPROVER NOTIFICATION] Sent to ${nextApprover.firstName} ${nextApprover.lastName} (${nextApprover.department?.name}) for ${nextPendingStep.level} approval`
+                `📧 [BUDGET ALLOCATION NOTIFICATION] Sent to ${financeHOD.firstName} ${financeHOD.lastName} (${financeHOD.department?.name}) for budget allocation`
               );
-            } else if (
-              nextApprover &&
-              nextApprover._id.toString() === project.createdBy.toString()
-            ) {
+            } else {
               console.log(
-                `📧 [NEXT APPROVER NOTIFICATION] Skipped notification to project creator (${nextApprover.firstName} ${nextApprover.lastName})`
+                `❌ [BUDGET ALLOCATION] No Finance HOD found for budget allocation`
               );
             }
           }
-        } catch (notifError) {
+        } catch (error) {
           console.error(
-            "❌ [NEXT APPROVER NOTIFICATION] Error sending notification:",
-            notifError
+            "❌ [BUDGET ALLOCATION NOTIFICATION] Error sending budget allocation notification:",
+            error
           );
+        }
+      } else {
+        if (nextPendingStep) {
+          try {
+            console.log(
+              `🔍 [NEXT APPROVER] Looking for approver for level: ${nextPendingStep.level}`
+            );
+
+            let nextApproverQuery = {};
+
+            if (nextPendingStep.level === "legal_compliance") {
+              const legalDept = await mongoose
+                .model("Department")
+                .findOne({ name: "Legal & Compliance" });
+
+              const hodRole = await mongoose
+                .model("Role")
+                .findOne({ name: "HOD" });
+
+              if (legalDept && hodRole) {
+                nextApproverQuery = {
+                  role: hodRole._id,
+                  department: legalDept._id,
+                  isActive: true,
+                };
+              }
+            } else if (nextPendingStep.level === "executive") {
+              const execDept = await mongoose
+                .model("Department")
+                .findOne({ name: "Executive Office" });
+
+              const hodRole = await mongoose
+                .model("Role")
+                .findOne({ name: "HOD" });
+
+              if (execDept && hodRole) {
+                nextApproverQuery = {
+                  role: hodRole._id,
+                  department: execDept._id,
+                  isActive: true,
+                };
+              }
+            } else if (nextPendingStep.level === "finance") {
+              const financeDept = await mongoose
+                .model("Department")
+                .findOne({ name: "Finance & Accounting" });
+
+              const hodRole = await mongoose
+                .model("Role")
+                .findOne({ name: "HOD" });
+
+              if (financeDept && hodRole) {
+                nextApproverQuery = {
+                  role: hodRole._id,
+                  department: financeDept._id,
+                  isActive: true,
+                };
+              }
+            } else if (nextPendingStep.level === "project_management") {
+              const hodRole = await mongoose
+                .model("Role")
+                .findOne({ name: "HOD" });
+
+              const projectManagementDept = await mongoose
+                .model("Department")
+                .findOne({ name: "Project Management" });
+
+              if (projectManagementDept && hodRole) {
+                nextApproverQuery = {
+                  role: hodRole._id,
+                  department: projectManagementDept._id,
+                  isActive: true,
+                };
+              }
+            } else if (nextPendingStep.level === "department") {
+              // Legacy case - should not happen with new logic
+              const hodRole = await mongoose
+                .model("Role")
+                .findOne({ name: "HOD" });
+
+              const projectManagementDept = await mongoose
+                .model("Department")
+                .findOne({ name: "Project Management" });
+
+              if (projectManagementDept && hodRole) {
+                nextApproverQuery = {
+                  role: hodRole._id,
+                  department: projectManagementDept._id,
+                  isActive: true,
+                };
+              }
+            } else if (nextPendingStep.level === "hod") {
+              const hodRole = await mongoose
+                .model("Role")
+                .findOne({ name: "HOD" });
+
+              if (project.department && hodRole) {
+                nextApproverQuery = {
+                  role: hodRole._id,
+                  department: project.department._id,
+                  isActive: true,
+                };
+              }
+            }
+
+            if (Object.keys(nextApproverQuery).length > 0) {
+              console.log(
+                `🔍 [NEXT APPROVER] Query:`,
+                JSON.stringify(nextApproverQuery, null, 2)
+              );
+
+              const nextApprover = await User.findOne(
+                nextApproverQuery
+              ).populate("department");
+
+              console.log(
+                `🔍 [NEXT APPROVER] Found approver:`,
+                nextApprover
+                  ? `${nextApprover.firstName} ${nextApprover.lastName} (${nextApprover.department?.name})`
+                  : "None"
+              );
+
+              // Skip notification if next approver is the project creator (to avoid duplicate notifications)
+              if (
+                nextApprover &&
+                nextApprover._id.toString() !== project.createdBy.toString()
+              ) {
+                // Create more descriptive approval messages based on level
+                let approvalMessage = "";
+                let actionUrl = "/dashboard/modules/projects";
+
+                switch (nextPendingStep.level) {
+                  case "hod":
+                    approvalMessage = `You have a pending HOD approval for project: ${
+                      project.name
+                    } (${formatCurrency(project.budget)})`;
+                    actionUrl = "/dashboard/modules/department-management";
+                    break;
+                  case "project_management":
+                    // This is always Project Management HOD for cross-departmental approval
+                    approvalMessage = `You have a pending cross-departmental approval for project: ${
+                      project.name
+                    } (${formatCurrency(project.budget)}) - Created by ${
+                      project.department?.name
+                    } staff`;
+                    actionUrl = "/dashboard/modules/projects";
+                    break;
+                  case "department":
+                    // Legacy case - should not happen with new logic
+                    approvalMessage = `You have a pending department approval for project: ${
+                      project.name
+                    } (${formatCurrency(project.budget)})`;
+                    actionUrl = "/dashboard/modules/department-management";
+                    break;
+                  case "legal_compliance":
+                    approvalMessage = `You have a pending legal compliance approval for project: ${
+                      project.name
+                    } (${formatCurrency(project.budget)})`;
+                    actionUrl = "/dashboard/modules/legal";
+                    break;
+                  case "finance":
+                    approvalMessage = `You have a pending finance approval for project: ${
+                      project.name
+                    } (${formatCurrency(project.budget)})`;
+                    actionUrl = "/dashboard/modules/finance";
+                    break;
+                  case "executive":
+                    approvalMessage = `You have a pending executive approval for project: ${
+                      project.name
+                    } (${formatCurrency(project.budget)})`;
+                    actionUrl = "/dashboard/modules/executive";
+                    break;
+                  case "budget_allocation":
+                    approvalMessage = `You have a pending budget allocation for project: ${
+                      project.name
+                    } (${formatCurrency(project.budget)})`;
+                    actionUrl = "/dashboard/modules/finance";
+                    break;
+                  default:
+                    approvalMessage = `You have a pending ${formatApprovalLevel(
+                      nextPendingStep.level
+                    )} approval for project: ${project.name} (${formatCurrency(
+                      project.budget
+                    )})`;
+                }
+
+                const notificationData = {
+                  recipient: nextApprover._id,
+                  type: "PROJECT_READY_FOR_APPROVAL",
+                  title: "Project Approval Required",
+                  message: approvalMessage,
+                  priority: "high",
+                  data: {
+                    projectId: project._id,
+                    projectName: project.name,
+                    approvalLevel: nextPendingStep.level,
+                    amount: project.budget,
+                    creatorDepartment: project.department?.name,
+                    creatorName: `${project.createdBy?.firstName} ${project.createdBy?.lastName}`,
+                    actionUrl: actionUrl,
+                  },
+                };
+
+                console.log(
+                  `📧 [NEXT APPROVER NOTIFICATION] Creating notification:`,
+                  JSON.stringify(notificationData, null, 2)
+                );
+
+                await notificationService.createNotification(notificationData);
+
+                console.log(
+                  `📧 [NEXT APPROVER NOTIFICATION] Sent to ${nextApprover.firstName} ${nextApprover.lastName} (${nextApprover.department?.name}) for ${nextPendingStep.level} approval`
+                );
+              } else if (
+                nextApprover &&
+                nextApprover._id.toString() === project.createdBy.toString()
+              ) {
+                console.log(
+                  `📧 [NEXT APPROVER NOTIFICATION] Skipped notification to project creator (${nextApprover.firstName} ${nextApprover.lastName})`
+                );
+              }
+            }
+          } catch (notifError) {
+            console.error(
+              "❌ [NEXT APPROVER NOTIFICATION] Error sending notification:",
+              notifError
+            );
+          }
         }
       }
     } else {
@@ -3333,39 +3584,44 @@ export const getProjectWorkflowStatus = async (req, res) => {
   }
 };
 
-// @desc    Get projects pending approval
+// @desc    Get projects pending cross-departmental approval (for Project Management module)
 // @route   GET /api/projects/pending-approval
-// @access  Private (Approvers)
+// @access  Private (Cross-departmental Approvers)
 export const getPendingApprovalProjects = async (req, res) => {
   try {
     const currentUser = req.user;
 
-    let query = {
-      status: {
-        $in: [
-          "pending_approval",
-          "pending_department_approval",
-          "pending_finance_approval",
-          "pending_executive_approval",
-          "pending_legal_compliance_approval",
-          "resubmitted", // Include resubmitted projects as they need approval
-          "approved",
-          "implementation",
-        ],
-      },
-      isActive: true,
-    };
-
-    if (currentUser.role.level >= 1000) {
-      // Super Admin - showing all pending approvals
-    } else if (currentUser.role.level >= 700) {
-      // HOD - showing all pending approvals
-    } else {
+    // Check access level
+    if (currentUser.role.level < 700) {
       return res.status(403).json({
         success: false,
         message:
           "Access denied. HOD level (700) or higher required for approval access.",
       });
+    }
+
+    // Define cross-departmental approval statuses (exclude department-specific approvals)
+    // Note: pending_budget_allocation is handled in Finance module, not cross-departmental approvals
+    let query = {
+      status: {
+        $in: [
+          "pending_project_management_approval",
+          "pending_legal_compliance_approval",
+          "pending_finance_approval",
+          "pending_executive_approval",
+          "pending_procurement",
+          "resubmitted",
+        ],
+      },
+      isActive: true,
+    };
+
+    // For Super Admins, show all cross-departmental approvals
+    if (currentUser.role.level >= 1000) {
+      // Super Admin - showing all cross-departmental pending approvals
+    } else {
+      // For HODs, exclude projects from their own department (those go to Department Management module)
+      query.department = { $ne: currentUser.department._id };
     }
 
     const projects = await Project.find(query)
@@ -3375,10 +3631,77 @@ export const getPendingApprovalProjects = async (req, res) => {
       .populate("approvalChain.approver", "firstName lastName email")
       .sort({ createdAt: -1 });
 
+    // Filter projects where current user is the next approver (for cross-departmental approvals)
+    const filteredProjects = projects.filter((project) => {
+      if (!project.approvalChain || project.approvalChain.length === 0) {
+        return false;
+      }
+
+      // Find the next pending approval step
+      const nextPendingStep = project.approvalChain.find(
+        (step) => step.status === "pending"
+      );
+
+      if (!nextPendingStep) {
+        return false;
+      }
+
+      // For Super Admins, show all cross-departmental approvals
+      if (currentUser.role.level >= 1000) {
+        return true;
+      }
+
+      // For HODs, check if they are responsible for the next approval step
+      const userDepartment = currentUser.department?.name;
+
+      // Project Management HOD approves project_management level (Project Management approval)
+      if (
+        nextPendingStep.level === "project_management" &&
+        userDepartment === "Project Management"
+      ) {
+        return true;
+      }
+
+      // Legacy case - Project Management HOD approves department level (should not happen with new logic)
+      if (
+        nextPendingStep.level === "department" &&
+        userDepartment === "Project Management"
+      ) {
+        return true;
+      }
+
+      // Legal & Compliance HOD approves legal_compliance level
+      if (
+        nextPendingStep.level === "legal_compliance" &&
+        userDepartment === "Legal & Compliance"
+      ) {
+        return true;
+      }
+
+      // Finance & Accounting HOD approves finance level only
+      // Note: budget_allocation is handled in Finance module, not cross-departmental approvals
+      if (
+        nextPendingStep.level === "finance" &&
+        userDepartment === "Finance & Accounting"
+      ) {
+        return true;
+      }
+
+      // Executive Office HOD approves executive level
+      if (
+        nextPendingStep.level === "executive" &&
+        userDepartment === "Executive Office"
+      ) {
+        return true;
+      }
+
+      return false;
+    });
+
     // Get document counts for each project
     const Document = await import("../models/Document.js");
     const projectsWithDocumentCounts = await Promise.all(
-      projects.map(async (project) => {
+      filteredProjects.map(async (project) => {
         const projectDoc = project.toObject();
 
         // Count actual uploaded documents for this project
@@ -3453,15 +3776,486 @@ export const getPendingApprovalProjects = async (req, res) => {
       })
     );
 
+    console.log(
+      `✅ [CROSS-DEPARTMENTAL APPROVALS] Found ${
+        projectsWithDocumentCounts.length
+      } projects pending cross-departmental approval for ${
+        currentUser.department?.name || "Super Admin"
+      }`
+    );
+
     res.status(200).json({
       success: true,
       data: projectsWithDocumentCounts,
+      count: projectsWithDocumentCounts.length,
     });
   } catch (error) {
     console.error("Error getting pending approval projects:", error);
     res.status(500).json({
       success: false,
       message: "Failed to get pending approval projects",
+    });
+  }
+};
+
+// @desc    Get department-specific projects pending HOD approval
+// @route   GET /api/projects/department-pending-approval
+// @access  Private (HODs only)
+export const getDepartmentPendingApprovalProjects = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    // Check if user is HOD level
+    if (currentUser.role.level < 700) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. HOD level (700) or higher required.",
+      });
+    }
+
+    // Get projects from the HOD's department that are pending their approval
+    const query = {
+      department: currentUser.department._id,
+      status: {
+        $in: ["pending_approval", "pending_department_approval", "resubmitted"],
+      },
+      isActive: true,
+    };
+
+    // Find projects where the current user is the next approver in the approval chain
+    const projects = await Project.find(query)
+      .populate("createdBy", "firstName lastName email employeeId")
+      .populate("projectManager", "firstName lastName email")
+      .populate("department", "name code")
+      .populate("approvalChain.approver", "firstName lastName email")
+      .sort({ createdAt: -1 });
+
+    // Filter projects where current user is the next pending approver
+    const filteredProjects = projects.filter((project) => {
+      if (!project.approvalChain || project.approvalChain.length === 0) {
+        return false;
+      }
+
+      // Find the next pending approval step
+      const nextPendingStep = project.approvalChain.find(
+        (step) => step.status === "pending"
+      );
+
+      if (!nextPendingStep) {
+        return false;
+      }
+
+      // For HOD level approval, check if the current user is the HOD of the project's department
+      if (nextPendingStep.level === "hod") {
+        return (
+          project.department._id.toString() ===
+          currentUser.department._id.toString()
+        );
+      }
+
+      // For other approval levels, check if the current user is the specific approver
+      if (nextPendingStep.approver) {
+        return (
+          nextPendingStep.approver.toString() === currentUser._id.toString()
+        );
+      }
+
+      return false;
+    });
+
+    // Get document counts for each project
+    const Document = await import("../models/Document.js");
+    const projectsWithDocumentCounts = await Promise.all(
+      filteredProjects.map(async (projectDoc) => {
+        const uploadedDocuments = await Document.default.find({
+          project: projectDoc._id,
+          isActive: true,
+        });
+
+        // Update the requiredDocuments array with submission status
+        projectDoc.requiredDocuments = projectDoc.requiredDocuments.map(
+          (reqDoc) => {
+            const uploadedDoc = uploadedDocuments.find(
+              (uploaded) => uploaded.documentType === reqDoc.documentType
+            );
+
+            return {
+              ...reqDoc,
+              isSubmitted: !!uploadedDoc,
+              uploadedDocumentId: uploadedDoc?._id,
+              uploadedAt: uploadedDoc?.createdAt,
+            };
+          }
+        );
+
+        // Add approval status indicator for frontend
+        projectDoc.approvalStatus = projectDoc.status;
+        projectDoc.isPendingApproval = [
+          "pending_approval",
+          "pending_department_approval",
+          "resubmitted",
+        ].includes(projectDoc.status);
+
+        return projectDoc;
+      })
+    );
+
+    console.log(
+      `✅ [DEPARTMENT APPROVALS] Found ${projectsWithDocumentCounts.length} projects pending HOD approval for department: ${currentUser.department.name}`
+    );
+
+    res.status(200).json({
+      success: true,
+      data: projectsWithDocumentCounts,
+      count: projectsWithDocumentCounts.length,
+    });
+  } catch (error) {
+    console.error(
+      "❌ [DEPARTMENT APPROVALS] Error fetching department pending approvals:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch department pending approval projects",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get projects pending Project Management HOD approval
+// @route   GET /api/projects/project-management-pending-approval
+// @access  Private (Project Management HOD only)
+export const getProjectManagementPendingApprovalProjects = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    // Check if user is HOD level
+    if (currentUser.role.level < 700) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. HOD level (700) or higher required.",
+      });
+    }
+
+    // Check if user is Project Management HOD
+    if (currentUser.department?.name !== "Project Management") {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Only Project Management HOD can access this endpoint.",
+      });
+    }
+
+    // Get projects from ALL departments that are pending Project Management approval
+    const query = {
+      status: "pending_project_management_approval",
+      isActive: true,
+    };
+
+    // Find projects where the current user is the next approver in the approval chain
+    const projects = await Project.find(query)
+      .populate("createdBy", "firstName lastName email employeeId")
+      .populate("projectManager", "firstName lastName email")
+      .populate("department", "name code")
+      .populate("approvalChain.approver", "firstName lastName email")
+      .sort({ createdAt: -1 });
+
+    // Filter projects where current user is the next pending approver
+    const filteredProjects = projects.filter((project) => {
+      const nextPendingStep = project.approvalChain.find(
+        (step) => step.status === "pending"
+      );
+
+      // Check if the next pending step is "department" level and the current user is the approver
+      return (
+        nextPendingStep &&
+        nextPendingStep.level === "department" &&
+        nextPendingStep.department &&
+        nextPendingStep.department.toString() ===
+          currentUser.department._id.toString()
+      );
+    });
+
+    const Document = await import("../models/Document.js");
+    const projectsWithDocumentCounts = await Promise.all(
+      filteredProjects.map(async (projectDoc) => {
+        const uploadedDocuments = await Document.default.find({
+          project: projectDoc._id,
+          isActive: true,
+        });
+
+        // Update the requiredDocuments array with submission status
+        projectDoc.requiredDocuments = projectDoc.requiredDocuments.map(
+          (reqDoc) => {
+            const uploadedDoc = uploadedDocuments.find(
+              (uploaded) => uploaded.documentType === reqDoc.documentType
+            );
+
+            return {
+              ...reqDoc,
+              isSubmitted: !!uploadedDoc,
+              uploadedDocumentId: uploadedDoc?._id,
+              uploadedAt: uploadedDoc?.createdAt,
+            };
+          }
+        );
+
+        projectDoc.approvalStatus = projectDoc.status;
+        projectDoc.isPendingApproval = [
+          "pending_project_management_approval",
+        ].includes(projectDoc.status);
+
+        return projectDoc;
+      })
+    );
+
+    console.log(
+      `✅ [PROJECT MANAGEMENT APPROVALS] Found ${projectsWithDocumentCounts.length} projects pending Project Management HOD approval`
+    );
+
+    res.status(200).json({
+      success: true,
+      data: projectsWithDocumentCounts,
+      count: projectsWithDocumentCounts.length,
+    });
+  } catch (error) {
+    console.error(
+      "❌ [PROJECT MANAGEMENT APPROVALS] Error fetching project management pending approvals:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch project management pending approval projects",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get cross-departmental approval history (for Project Management HOD)
+// @route   GET /api/projects/cross-departmental-approval-history
+// @access  Private (Cross-departmental Approvers)
+export const getCrossDepartmentalApprovalHistory = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    // Check if user is HOD level
+    if (currentUser.role.level < 700) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. HOD level (700) or higher required.",
+      });
+    }
+
+    // Find projects where the current user has approved at cross-departmental levels
+    // Include both fully approved projects and projects currently in budget allocation
+    const projects = await Project.find({
+      $or: [
+        {
+          "approvalChain.status": "approved",
+          "approvalChain.approver": currentUser._id,
+          isActive: true,
+        },
+        {
+          "approvalChain.status": "approved",
+          "approvalChain.approver": currentUser._id,
+          status: "pending_budget_allocation",
+          isActive: true,
+        },
+      ],
+    })
+      .populate("createdBy", "firstName lastName email employeeId")
+      .populate("projectManager", "firstName lastName email")
+      .populate("department", "name code")
+      .populate("approvalChain.approver", "firstName lastName email")
+      .sort({ updatedAt: -1 });
+
+    const approvalHistory = [];
+
+    for (const project of projects) {
+      const userApprovalStep = project.approvalChain.find(
+        (step) =>
+          step.status === "approved" &&
+          step.approver &&
+          step.approver._id.toString() === currentUser._id.toString()
+      );
+
+      if (userApprovalStep) {
+        // Get document counts from requiredDocuments array
+        const totalDocuments = project.requiredDocuments?.length || 0;
+        const submittedDocuments =
+          project.requiredDocuments?.filter((doc) => doc.isSubmitted).length ||
+          0;
+
+        approvalHistory.push({
+          _id: project._id,
+          name: project.name,
+          code: project.code,
+          description: project.description,
+          budget: project.budget,
+          startDate: project.startDate,
+          endDate: project.endDate,
+          priority: project.priority,
+          status: project.status,
+          projectScope: project.projectScope,
+          requiresBudgetAllocation: project.requiresBudgetAllocation,
+          createdBy: project.createdBy,
+          projectManager: project.projectManager,
+          department: project.department,
+          approvalLevel: userApprovalStep.level,
+          approvalComments: userApprovalStep.comments,
+          approvedAt: userApprovalStep.approvedAt,
+          approver: userApprovalStep.approver,
+          requiredDocuments: project.requiredDocuments,
+          projectItems: project.projectItems,
+          approvalChain: project.approvalChain,
+          documentStats: {
+            submitted: submittedDocuments,
+            total: totalDocuments,
+            percentage:
+              totalDocuments > 0
+                ? Math.round((submittedDocuments / totalDocuments) * 100)
+                : 0,
+          },
+          createdAt: project.createdAt,
+          updatedAt: project.updatedAt,
+        });
+      }
+    }
+
+    console.log(
+      `✅ [CROSS-DEPARTMENTAL APPROVAL HISTORY] Found ${approvalHistory.length} projects approved by ${currentUser.department?.name} HOD`
+    );
+    console.log("🔍 [CROSS-DEPARTMENTAL APPROVAL HISTORY] Current User:", {
+      id: currentUser._id,
+      name: `${currentUser.firstName} ${currentUser.lastName}`,
+      department: currentUser.department?.name,
+      roleLevel: currentUser.role?.level,
+    });
+    console.log(
+      "🔍 [CROSS-DEPARTMENTAL APPROVAL HISTORY] Approval History:",
+      approvalHistory.map((p) => ({
+        id: p._id,
+        name: p.name,
+        approvalLevel: p.approvalLevel,
+        approvedAt: p.approvedAt,
+      }))
+    );
+
+    res.status(200).json({
+      success: true,
+      data: approvalHistory,
+      count: approvalHistory.length,
+    });
+  } catch (error) {
+    console.error(
+      "❌ [CROSS-DEPARTMENTAL APPROVAL HISTORY] Error fetching cross-departmental approval history:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch cross-departmental approval history",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get HOD approval history
+// @route   GET /api/projects/approval-history
+// @access  Private (HODs only)
+export const getHODApprovalHistory = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    // Check if user is HOD level
+    if (currentUser.role.level < 700) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. HOD level (700) or higher required.",
+      });
+    }
+
+    // Find projects from the HOD's own department where they have approved
+    const projects = await Project.find({
+      department: currentUser.department._id, // Only projects from HOD's own department
+      "approvalChain.status": "approved",
+      "approvalChain.approver": currentUser._id,
+      isActive: true,
+    })
+      .populate("createdBy", "firstName lastName email employeeId")
+      .populate("projectManager", "firstName lastName email")
+      .populate("department", "name code")
+      .populate("approvalChain.approver", "firstName lastName email")
+      .sort({ updatedAt: -1 });
+
+    const approvalHistory = [];
+
+    for (const project of projects) {
+      const userApprovalStep = project.approvalChain.find(
+        (step) =>
+          step.status === "approved" &&
+          step.approver &&
+          step.approver._id.toString() === currentUser._id.toString()
+      );
+
+      if (userApprovalStep) {
+        // Get document counts from requiredDocuments array
+        const totalDocuments = project.requiredDocuments?.length || 0;
+        const submittedDocuments =
+          project.requiredDocuments?.filter((doc) => doc.isSubmitted).length ||
+          0;
+
+        approvalHistory.push({
+          _id: project._id,
+          name: project.name,
+          code: project.code,
+          description: project.description,
+          budget: project.budget,
+          startDate: project.startDate,
+          endDate: project.endDate,
+          priority: project.priority,
+          status: project.status,
+          projectScope: project.projectScope,
+          requiresBudgetAllocation: project.requiresBudgetAllocation,
+          createdBy: project.createdBy,
+          projectManager: project.projectManager,
+          department: project.department,
+          approvalLevel: userApprovalStep.level,
+          approvedAt: userApprovalStep.approvedAt,
+          approvalComments: userApprovalStep.comments,
+          projectItems: project.projectItems,
+          requiredDocuments: project.requiredDocuments,
+          documentStats: {
+            submitted: submittedDocuments,
+            total: totalDocuments,
+            percentage:
+              totalDocuments > 0
+                ? Math.round((submittedDocuments / totalDocuments) * 100)
+                : 0,
+          },
+          createdAt: project.createdAt,
+          updatedAt: project.updatedAt,
+        });
+      }
+    }
+
+    console.log(
+      `✅ [DEPARTMENT APPROVAL HISTORY] Found ${approvalHistory.length} department projects approved by ${currentUser.firstName} ${currentUser.lastName} (${currentUser.department?.name})`
+    );
+
+    res.status(200).json({
+      success: true,
+      data: approvalHistory,
+      count: approvalHistory.length,
+    });
+  } catch (error) {
+    console.error(
+      "❌ [APPROVAL HISTORY] Error fetching HOD approval history:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch approval history",
+      error: error.message,
     });
   }
 };
@@ -3548,13 +4342,11 @@ export const getMyProjects = async (req, res) => {
 
       if (currentUser.role.level >= 700) {
         // HOD (700+) - see personal and departmental projects from their department
-        const isHRDepartment =
-          currentUser.department?.name === "Human Resources" ||
-          currentUser.department?.name === "HR" ||
-          currentUser.department?.name === "Human Resource Management";
+        const isProjectManagementDepartment =
+          currentUser.department?.name === "Project Management";
 
-        if (isHRDepartment) {
-          // HR HOD can see personal, departmental, and external projects
+        if (isProjectManagementDepartment) {
+          // Project Management HOD can see personal, departmental, and external projects
           query.$or = [
             { projectScope: "personal", createdBy: currentUser._id },
             {
@@ -3645,7 +4437,6 @@ export const getProjectAnalytics = async (req, res) => {
     // Apply role-based filtering
     if (currentUser.role.level < 1000) {
       if (currentUser.role.level >= 700) {
-        // HOD - projects in their department or where they're manager
         query.$or = [
           { projectManager: currentUser._id },
           { "teamMembers.user": currentUser._id },

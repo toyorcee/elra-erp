@@ -153,7 +153,7 @@ export const authAPI = {
 
   forgotPassword: async (data) => {
     try {
-      const response = await api.post("/auth/forgotpassword", data);
+      const response = await api.post("/auth/forgot-password", data);
       return response.data;
     } catch (error) {
       console.error("[authAPI.forgotPassword] Error:", error);

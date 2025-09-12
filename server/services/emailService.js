@@ -244,7 +244,8 @@ const createEmailTemplate = (
             <div class="header">
                 <div class="logo-container">
                     <div class="logo-text">ELRA</div>
-                    <div class="logo-subtitle">You Lease, We Regulate...</div>
+                    <div class="logo-subtitle">You Lease, We Regulate</div>
+                    <div class="logo-subtitle" style="font-size: 16px; font-weight: 600; margin-top: 8px;">${title}</div>
                 </div>
             </div>
             
@@ -1067,6 +1068,141 @@ export const sendUserPaymentFailureEmail = async (
   } catch (error) {
     console.error(
       `❌ Error sending user payment failure email to ${userEmail}:`,
+      error.message
+    );
+    return { success: false, error: error.message };
+  }
+};
+
+// Send inventory completion notification email
+export const sendInventoryCompletionEmail = async (
+  email,
+  userName,
+  inventoryData,
+  projectData,
+  pdfBuffer,
+  isEdit = false
+) => {
+  try {
+    const transporter = createTransporter();
+    const dashboardUrl = `${process.env.CLIENT_URL}/dashboard/modules/inventory`;
+
+    const actionText = isEdit ? null : "View Completed Inventory";
+    const title = isEdit
+      ? "Inventory Item Updated"
+      : "Inventory Item Completed";
+    const statusText = isEdit ? "updated" : "completed";
+    const buttonText = isEdit
+      ? ""
+      : "<p>Click the button below to view the inventory item in the ELRA dashboard.</p>";
+
+    const htmlContent = createEmailTemplate(
+      title,
+      `
+        <p>Hello <strong>${userName}</strong>,</p>
+        <p>📦 An inventory item has been ${statusText} in the ELRA system.</p>
+        
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #0d6449; margin-bottom: 15px;">📋 Inventory Details</h3>
+          <p><strong>Item Name:</strong> ${inventoryData.name}</p>
+          <p><strong>Item Code:</strong> ${inventoryData.code}</p>
+          <p><strong>Description:</strong> ${inventoryData.description}</p>
+          <p><strong>Type:</strong> ${inventoryData.type}</p>
+          <p><strong>Category:</strong> ${
+            inventoryData.category?.replace(/[-_]/g, " ") || "N/A"
+          }</p>
+          <p><strong>Status:</strong> ${inventoryData.status}</p>
+          ${
+            inventoryData.specifications?.brand
+              ? `<p><strong>Brand:</strong> ${inventoryData.specifications.brand}</p>`
+              : ""
+          }
+          ${
+            inventoryData.specifications?.model
+              ? `<p><strong>Model:</strong> ${inventoryData.specifications.model}</p>`
+              : ""
+          }
+        </div>
+
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #0d6449; margin-bottom: 15px;">🏗️ Project Information</h3>
+          <p><strong>Project Name:</strong> ${projectData.name}</p>
+          <p><strong>Project Code:</strong> ${projectData.code}</p>
+          <p><strong>Category:</strong> ${
+            projectData.category?.replace(/[-_]/g, " ") || "N/A"
+          }</p>
+          <p><strong>Budget:</strong> ₦${
+            projectData.budget?.toLocaleString() || "N/A"
+          }</p>
+        </div>
+
+        ${
+          inventoryData.maintenance
+            ? `
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #0d6449; margin-bottom: 15px;">🔧 Maintenance Schedule</h3>
+          ${
+            inventoryData.maintenance.lastServiceDate
+              ? `<p><strong>Last Service:</strong> ${new Date(
+                  inventoryData.maintenance.lastServiceDate
+                ).toLocaleDateString()}</p>`
+              : ""
+          }
+          ${
+            inventoryData.maintenance.nextServiceDate
+              ? `<p><strong>Next Service:</strong> ${new Date(
+                  inventoryData.maintenance.nextServiceDate
+                ).toLocaleDateString()}</p>`
+              : ""
+          }
+          ${
+            inventoryData.maintenance.maintenanceInterval
+              ? `<p><strong>Interval:</strong> ${inventoryData.maintenance.maintenanceInterval} days</p>`
+              : ""
+          }
+        </div>
+        `
+            : ""
+        }
+
+        <p>📎 A detailed completion certificate has been attached to this email for your records.</p>
+        ${buttonText}
+      `,
+      actionText,
+      dashboardUrl,
+      isEdit
+        ? "Inventory item updated"
+        : "Inventory item completed successfully"
+    );
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM,
+      to: email,
+      subject: `${title} - ${inventoryData.name} (${inventoryData.code})`,
+      html: htmlContent,
+      attachments: pdfBuffer
+        ? [
+            {
+              filename: isEdit
+                ? `Inventory_Completion_${inventoryData.code}_${
+                    new Date().toISOString().split("T")[0]
+                  }_Updated.pdf`
+                : `Inventory_Completion_${inventoryData.code}_${
+                    new Date().toISOString().split("T")[0]
+                  }.pdf`,
+              content: pdfBuffer,
+              contentType: "application/pdf",
+            },
+          ]
+        : [],
+    };
+
+    const result = await transporter.sendMail(mailOptions);
+    console.log(`✅ Inventory completion email sent to: ${email}`);
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    console.error(
+      `❌ Error sending inventory completion email to ${email}:`,
       error.message
     );
     return { success: false, error: error.message };

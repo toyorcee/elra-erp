@@ -802,6 +802,81 @@ export const moduleSidebarConfig = {
       },
     ],
   },
+
+  // ===== INVENTORY MODULE =====
+  inventory: {
+    label: "Inventory Management",
+    icon: "CubeIcon",
+    path: "/dashboard/modules/inventory",
+    color: "text-[var(--elra-primary)]",
+    bgColor: "bg-[var(--elra-secondary-3)]",
+    borderColor: "border-[var(--elra-primary)]",
+    sections: [
+      {
+        title: "Inventory Management",
+        collapsible: true,
+        defaultExpanded: true,
+        items: [
+          {
+            label: "Inventory List",
+            icon: "CubeIcon",
+            path: "/dashboard/modules/inventory/list",
+            required: {
+              minLevel: 700,
+              department: "Operations",
+            },
+            description: "View and manage all inventory items",
+            hidden: (user) => {
+              // Only Super Admin and Operations HOD can access
+              const userDepartment = user?.department?.name;
+              const isSuperAdmin = user?.role?.level === 1000;
+              const isOperationsHOD =
+                user?.role?.level === 700 && userDepartment === "Operations";
+
+              return !(isSuperAdmin || isOperationsHOD);
+            },
+          },
+          {
+            label: "Inventory Tracking",
+            icon: "WrenchScrewdriverIcon",
+            path: "/dashboard/modules/inventory/tracking",
+            required: {
+              minLevel: 700,
+              department: "Operations",
+            },
+            description: "Track maintenance schedules and available items",
+            hidden: (user) => {
+              const userDepartment = user?.department?.name;
+              const isSuperAdmin = user?.role?.level === 1000;
+              const isOperationsHOD =
+                user?.role?.level === 700 && userDepartment === "Operations";
+
+              return !(isSuperAdmin || isOperationsHOD);
+            },
+          },
+          {
+            label: "Inventory Reports",
+            icon: "ChartBarIcon",
+            path: "/dashboard/modules/inventory/reports",
+            required: {
+              minLevel: 700,
+              department: "Operations",
+            },
+            description: "Generate inventory reports and analytics",
+            hidden: (user) => {
+              // Only Super Admin and Operations HOD can access
+              const userDepartment = user?.department?.name;
+              const isSuperAdmin = user?.role?.level === 1000;
+              const isOperationsHOD =
+                user?.role?.level === 700 && userDepartment === "Operations";
+
+              return !(isSuperAdmin || isOperationsHOD);
+            },
+          },
+        ],
+      },
+    ],
+  },
 };
 
 // Helper function to get module sidebar configuration

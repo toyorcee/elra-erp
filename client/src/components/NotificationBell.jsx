@@ -201,6 +201,10 @@ const NotificationBell = ({ className = "" }) => {
         return "📋";
       case "POLICY_UPDATED":
         return "📝";
+      case "INVENTORY_COMPLETION":
+        return "📦";
+      case "PROJECT_READY_IMPLEMENTATION":
+        return "🚀";
       default:
         return "📢";
     }

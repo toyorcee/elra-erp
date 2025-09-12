@@ -183,6 +183,8 @@ export const getAllProjects = async (req, res) => {
         // HOD (700+) - see personal and departmental projects from their department
         const isProjectManagementDepartment =
           currentUser.department?.name === "Project Management";
+        const isProcurementDepartment =
+          currentUser.department?.name === "Procurement";
 
         if (isProjectManagementDepartment) {
           query.$or = [
@@ -199,8 +201,13 @@ export const getAllProjects = async (req, res) => {
           console.log(
             `🔍 [PROJECTS] Project Management HOD - showing personal, departmental, and external projects from department: ${currentUser.department.name}`
           );
+        } else if (isProcurementDepartment) {
+          // Procurement HOD can see ALL projects for creating POs
+          console.log(
+            `🔍 [PROJECTS] Procurement HOD - showing ALL projects for procurement purposes`
+          );
         } else {
-          // ALL HODs can see personal and departmental projects from their department
+          // ALL other HODs can see personal and departmental projects from their department
           query.$or = [
             { projectScope: "personal", createdBy: currentUser._id },
             {

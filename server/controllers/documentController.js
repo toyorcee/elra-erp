@@ -17,6 +17,150 @@ import {
 } from "../utils/documentUtils.js";
 import { hasPermission } from "../utils/permissionUtils.js";
 
+// Upload multiple documents for inventory completion
+export const uploadInventoryDocuments = async (req, res) => {
+  console.log(
+    "🚀 [documentController] Starting multiple document upload for inventory completion"
+  );
+  console.log("👤 [documentController] User:", {
+    id: req.user._id,
+    username: req.user.username,
+    role: req.user.role?.name,
+    permissions: req.user.role?.permissions,
+  });
+
+  try {
+    const currentUser = req.user;
+
+    // Check if user has permission to upload documents
+    if (!hasPermission(currentUser, "document.upload")) {
+      console.log(
+        "❌ [documentController] Permission denied for document upload"
+      );
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to upload documents",
+      });
+    }
+
+    console.log("✅ [documentController] User has upload permission");
+
+    // Use multer upload middleware for multiple files
+    uploadMultipleDocuments(req, res, async (err) => {
+      if (err) {
+        return res.status(400).json({
+          success: false,
+          message: err.message,
+        });
+      }
+
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No files uploaded",
+        });
+      }
+
+      const { inventoryId, inventoryName } = req.body;
+
+      if (!inventoryId) {
+        return res.status(400).json({
+          success: false,
+          message: "Inventory ID is required",
+        });
+      }
+
+      const uploadedDocuments = [];
+      const errors = [];
+
+      // Process each uploaded file
+      for (let i = 0; i < req.files.length; i++) {
+        const file = req.files[i];
+        const documentType = req.body[`documentType_${i}`] || "other";
+        const title = req.body[`title_${i}`] || file.originalname;
+
+        try {
+          console.log(
+            `📄 [documentController] Processing inventory document ${i + 1}: ${
+              file.originalname
+            }`
+          );
+
+          const reference = await generateDocRef("ELRA", currentUser._id);
+
+          const docData = {
+            title: title || `${documentType} - ${inventoryName}`,
+            description: `Inventory document for ${inventoryName}`,
+            fileName: file.filename,
+            originalFileName: file.originalname,
+            fileUrl: file.path.replace(/\\/g, "/"),
+            fileSize: file.size,
+            mimeType: file.mimetype,
+            documentType: documentType,
+            category: "administrative",
+            status: "approved",
+            department: currentUser.department,
+            createdBy: currentUser._id,
+            reference,
+            metadata: {
+              originalName: file.originalname,
+              filename: file.filename,
+              mimetype: file.mimetype,
+              size: file.size,
+              uploadedBy: currentUser._id,
+              category: "inventory",
+              uploadDate: new Date(),
+              documentType: getDocumentType(file.originalname),
+              inventoryId,
+              inventoryName,
+            },
+          };
+
+          const document = new Document(docData);
+          await document.save();
+
+          uploadedDocuments.push(document._id);
+
+          console.log(
+            `✅ [documentController] Inventory document saved: ${document._id}`
+          );
+        } catch (docError) {
+          console.error(
+            `❌ [documentController] Error saving inventory document ${i + 1}:`,
+            docError
+          );
+          errors.push({
+            file: file.originalname,
+            error: docError.message,
+          });
+        }
+      }
+
+      res.status(200).json({
+        success: true,
+        message: `Successfully uploaded ${uploadedDocuments.length} documents for inventory`,
+        data: {
+          inventoryId,
+          inventoryName,
+          uploadedDocuments: uploadedDocuments.length,
+          documentIds: uploadedDocuments,
+          errors: errors.length > 0 ? errors : undefined,
+        },
+      });
+    });
+  } catch (error) {
+    console.error(
+      "❌ [documentController] Upload inventory documents error:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Error uploading inventory documents",
+      error: error.message,
+    });
+  }
+};
+
 // Upload multiple documents for project creation
 export const uploadProjectDocuments = async (req, res) => {
   console.log(

@@ -14,6 +14,20 @@ export const uploadDocument = async (formData) => {
   }
 };
 
+// Upload documents for inventory completion (same as project module)
+export const uploadInventoryDocuments = async (formData) => {
+  try {
+    const response = await api.post("/documents/upload-inventory", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
 // Get user's documents
 export const getUserDocuments = async (filters = {}) => {
   try {

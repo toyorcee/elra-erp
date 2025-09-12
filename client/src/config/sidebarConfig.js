@@ -143,7 +143,7 @@ export const sidebarConfig = [
     required: { minLevel: 600 },
     section: "erp",
     badge: "Inv",
-    departments: ["Operations", "Production", "Manufacturing"], // Operations department only
+    departments: ["Operations"], 
   },
 
   // ===== SYSTEM MANAGEMENT =====

@@ -12,7 +12,7 @@ const inventorySchema = new mongoose.Schema(
     },
     description: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
       maxlength: 1000,
     },
@@ -47,9 +47,30 @@ const inventorySchema = new mongoose.Schema(
     // Item Status
     status: {
       type: String,
-      enum: ["available", "leased", "maintenance", "retired", "lost"],
+      enum: [
+        "available",
+        "unavailable",
+        "leased",
+        "maintenance",
+        "retired",
+        "lost",
+      ],
       default: "available",
       required: true,
+    },
+
+    // Completion Status (for Operations HOD workflow)
+    completionStatus: {
+      type: String,
+      enum: ["pending", "completed"],
+      default: "pending",
+    },
+    completedAt: {
+      type: Date,
+    },
+    completedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
     },
 
     // Item Specifications
@@ -65,14 +86,17 @@ const inventorySchema = new mongoose.Schema(
       year: {
         type: Number,
         min: 1900,
-        max: new Date().getFullYear() + 10,
+        max: new Date().getFullYear() + 45,
       },
       serialNumber: {
         type: String,
         trim: true,
-        uppercase: true,
       },
-      capacity: {
+      licenseType: {
+        type: String,
+        enum: ["Annual", "Monthly", "Perpetual", "One-time", "Trial"],
+      },
+      numberOfUsers: {
         type: String,
         trim: true,
       },
@@ -98,35 +122,32 @@ const inventorySchema = new mongoose.Schema(
 
     // Location Information
     location: {
-      warehouse: {
-        type: String,
-        trim: true,
-      },
-      shelf: {
-        type: String,
-        trim: true,
-      },
-      area: {
-        type: String,
-        trim: true,
-      },
-      address: {
-        street: String,
-        city: String,
-        state: String,
-        postalCode: String,
-      },
+      type: String,
+      trim: true,
+    },
+
+    // Delivery Information
+    deliveryCondition: {
+      type: String,
+      enum: ["excellent", "good", "fair", "poor", "damaged"],
+    },
+    receivedBy: {
+      type: String,
+      trim: true,
+    },
+    receivedDate: {
+      type: Date,
     },
 
     // Financial Information (in Naira)
     purchasePrice: {
       type: Number,
-      required: true,
+      required: false,
       min: 0,
     },
     currentValue: {
       type: Number,
-      required: true,
+      required: false,
       min: 0,
     },
     leaseRate: {
@@ -153,18 +174,22 @@ const inventorySchema = new mongoose.Schema(
         type: Date,
       },
       serviceInterval: {
-        type: Number, // in days
+        type: Number,
         min: 0,
+      },
+      maintenanceNotes: {
+        type: String,
+        trim: true,
       },
       maintenanceHistory: [
         {
           date: {
             type: Date,
-            required: true,
+            required: false,
           },
           description: {
             type: String,
-            required: true,
+            required: false,
             trim: true,
           },
           cost: {
@@ -202,59 +227,34 @@ const inventorySchema = new mongoose.Schema(
       },
     },
 
-    // Documents and Images
+    // Documents and Images - Store references to Document collection
     documents: [
       {
-        name: {
-          type: String,
-          required: true,
-          trim: true,
-        },
-        type: {
-          type: String,
-          enum: ["manual", "warranty", "invoice", "certificate", "other"],
-          required: true,
-        },
-        filename: {
-          type: String,
-          required: true,
-        },
-        path: {
-          type: String,
-          required: true,
-        },
-        uploadedBy: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-          required: true,
-        },
-        uploadedAt: {
-          type: Date,
-          default: Date.now,
-        },
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Document",
       },
     ],
 
     // Notes and Comments
     notes: [
       {
-        content: {
+        text: {
           type: String,
           required: true,
           trim: true,
         },
-        author: {
+        type: {
+          type: String,
+          default: "completion",
+        },
+        addedBy: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "User",
           required: true,
         },
-        createdAt: {
+        addedAt: {
           type: Date,
           default: Date.now,
-        },
-        isPrivate: {
-          type: Boolean,
-          default: false,
         },
       },
     ],
@@ -275,11 +275,6 @@ const inventorySchema = new mongoose.Schema(
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-    },
-
-    // Receipt Information
-    receivedDate: {
-      type: Date,
     },
 
     // Expiry Information (for consumables)

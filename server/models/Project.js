@@ -2142,7 +2142,7 @@ projectSchema.methods.createInventoryFromProcurement = async function (
         currentValue: procurementItem.totalPrice,
         location: "TBD",
         project: this._id,
-        procurementOrder: procurementOrder._id,
+        procurementId: procurementOrder._id,
         createdBy: triggeredByUser._id,
         quantity: procurementItem.quantity,
         unitPrice: procurementItem.unitPrice,
@@ -2288,8 +2288,9 @@ projectSchema.methods.notifyOperationsHODForInventory = async function (
       department: operationsDept._id,
       role: hodRole._id,
       isActive: true,
-    }).populate("role").populate("department");
-
+    })
+      .populate("role")
+      .populate("department");
 
     if (operationsHOD) {
       console.log(
@@ -2300,7 +2301,13 @@ projectSchema.methods.notifyOperationsHODForInventory = async function (
         recipient: operationsHOD._id,
         type: "INVENTORY_SETUP_REQUIRED",
         title: "Inventory Setup Required",
-        message: `Goods have been delivered for project "${this.name}" (${this.code}). Procurement order ${procurementOrder.poNumber} is ready for inventory setup.`,
+        message: `${
+          this.name
+            ? `Goods have been delivered for project "${this.name}" (${this.code}).`
+            : "Goods have been delivered."
+        } Procurement order ${
+          procurementOrder.poNumber
+        } is ready for inventory setup.`,
         priority: "high",
         data: {
           projectId: this._id,
@@ -2330,81 +2337,81 @@ projectSchema.methods.notifyOperationsHODForInventory = async function (
   }
 };
 
-projectSchema.methods.notifyProcurementHODOfDeliveryCompletion = async function (
-  procurementOrder,
-  deliveredBy
-) {
-  try {
-    console.log(
-      "📧 [NOTIFICATION] Notifying Procurement HOD of delivery completion..."
-    );
-
-    const NotificationService = await import(
-      "../services/notificationService.js"
-    );
-    const notification = new NotificationService.default();
-
-    // Find Procurement HOD
-    const Department = mongoose.model("Department");
-    const User = mongoose.model("User");
-
-    const procurementDept = await Department.findOne({ name: "Procurement" });
-    if (!procurementDept) {
-      console.log("⚠️ [NOTIFICATION] Procurement department not found");
-      return;
-    }
-
-    // Get HOD role ID first (same approach as other HOD queries)
-    const hodRole = await mongoose.model("Role").findOne({ name: "HOD" });
-    if (!hodRole) {
-      console.log("❌ [NOTIFICATION] HOD role not found in system");
-      return;
-    }
-
-    const procurementHOD = await User.findOne({
-      department: procurementDept._id,
-      role: hodRole._id,
-      isActive: true,
-    }).populate("role").populate("department");
-
-    if (procurementHOD) {
+projectSchema.methods.notifyProcurementHODOfDeliveryCompletion =
+  async function (procurementOrder, deliveredBy) {
+    try {
       console.log(
-        `📧 [NOTIFICATION] Found Procurement HOD: ${procurementHOD.firstName} ${procurementHOD.lastName} (${procurementHOD.email})`
+        "📧 [NOTIFICATION] Notifying Procurement HOD of delivery completion..."
       );
 
-      await notification.createNotification({
-        recipient: procurementHOD._id,
-        type: "PROCUREMENT_DELIVERY_COMPLETED",
-        title: "Procurement Delivery Completed",
-        message: `Procurement order ${procurementOrder.poNumber} has been successfully delivered and inventory has been created. Operations HOD has been notified for inventory setup.`,
-        priority: "medium",
-        data: {
-          projectId: this._id,
-          projectName: this.name,
-          projectCode: this.code,
-          procurementOrderId: procurementOrder._id,
-          procurementOrderNumber: procurementOrder.poNumber,
-          budget: this.budget,
-          category: this.category,
-          actionUrl: "/dashboard/modules/procurement",
-          deliveredBy: deliveredBy ? deliveredBy._id : null,
-          workflowPhase: "delivery_completed",
-        },
-      });
-
-      console.log(
-        `✅ [NOTIFICATION] Procurement HOD notified of delivery completion: ${procurementHOD.firstName} ${procurementHOD.lastName}`
+      const NotificationService = await import(
+        "../services/notificationService.js"
       );
-    } else {
-      console.log("⚠️ [NOTIFICATION] No Procurement HOD found to notify");
+      const notification = new NotificationService.default();
+
+      // Find Procurement HOD
+      const Department = mongoose.model("Department");
+      const User = mongoose.model("User");
+
+      const procurementDept = await Department.findOne({ name: "Procurement" });
+      if (!procurementDept) {
+        console.log("⚠️ [NOTIFICATION] Procurement department not found");
+        return;
+      }
+
+      // Get HOD role ID first (same approach as other HOD queries)
+      const hodRole = await mongoose.model("Role").findOne({ name: "HOD" });
+      if (!hodRole) {
+        console.log("❌ [NOTIFICATION] HOD role not found in system");
+        return;
+      }
+
+      const procurementHOD = await User.findOne({
+        department: procurementDept._id,
+        role: hodRole._id,
+        isActive: true,
+      })
+        .populate("role")
+        .populate("department");
+
+      if (procurementHOD) {
+        console.log(
+          `📧 [NOTIFICATION] Found Procurement HOD: ${procurementHOD.firstName} ${procurementHOD.lastName} (${procurementHOD.email})`
+        );
+
+        await notification.createNotification({
+          recipient: procurementHOD._id,
+          type: "PROCUREMENT_DELIVERY_COMPLETED",
+          title: "Procurement Delivery Completed",
+          message: `Procurement order ${procurementOrder.poNumber} has been successfully delivered and inventory has been created. Operations HOD has been notified for inventory setup.`,
+          priority: "medium",
+          data: {
+            projectId: this._id,
+            projectName: this.name,
+            projectCode: this.code,
+            procurementOrderId: procurementOrder._id,
+            procurementOrderNumber: procurementOrder.poNumber,
+            budget: this.budget,
+            category: this.category,
+            actionUrl: "/dashboard/modules/procurement",
+            deliveredBy: deliveredBy ? deliveredBy._id : null,
+            workflowPhase: "delivery_completed",
+          },
+        });
+
+        console.log(
+          `✅ [NOTIFICATION] Procurement HOD notified of delivery completion: ${procurementHOD.firstName} ${procurementHOD.lastName}`
+        );
+      } else {
+        console.log("⚠️ [NOTIFICATION] No Procurement HOD found to notify");
+      }
+    } catch (error) {
+      console.error(
+        "❌ [NOTIFICATION] Error notifying Procurement HOD of delivery completion:",
+        error
+      );
     }
-  } catch (error) {
-    console.error(
-      "❌ [NOTIFICATION] Error notifying Procurement HOD of delivery completion:",
-      error
-    );
-  }
-};
+  };
 
 // Instance method to notify Finance HOD for budget review (not allocation)
 projectSchema.methods.notifyFinanceHODForBudgetReview = async function (

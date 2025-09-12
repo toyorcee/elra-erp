@@ -551,7 +551,8 @@ export const checkProcurementAccess = async (req, res, next) => {
     if (user.role.level < 700) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. Only Procurement HOD can manage procurement orders.",
+        message:
+          "Access denied. Only Procurement HOD can manage procurement orders.",
       });
     }
 
@@ -572,7 +573,8 @@ export const checkProcurementAccess = async (req, res, next) => {
     // If we reach here, user doesn't have sufficient permissions
     return res.status(403).json({
       success: false,
-      message: "Access denied. Only Procurement HOD can manage procurement orders.",
+      message:
+        "Access denied. Only Procurement HOD can manage procurement orders.",
     });
   } catch (error) {
     console.error("Procurement access check error:", error);

@@ -20,6 +20,7 @@ import {
   assignProjectLocations,
   completeProjectInventory,
   getEquipmentCategories,
+  resendInventoryNotifications,
 } from "../controllers/inventoryController.js";
 import { protect, checkRole } from "../middleware/auth.js";
 
@@ -181,5 +182,14 @@ router.post(
   checkRole(700),
   completeProjectInventory
 );
+
+// Resend inventory completion notifications - HOD+
+router.post(
+  "/:id/resend-notifications",
+  checkRole(700),
+  resendInventoryNotifications
+);
+
+// Note: Document uploads are now handled via the centralized /api/documents/upload endpoint
 
 export default router;

@@ -796,6 +796,534 @@ export const getPDFMetadata = async (pdfBuffer) => {
  * @param {Object} currentUser - Current user data
  * @returns {Buffer}
  */
+/**
+ * Generate inventory completion PDF
+ * @param {Object} inventoryData - Inventory item data
+ * @param {Object} projectData - Project data
+ * @param {Object} procurementData - Procurement data
+ * @param {Object} currentUser - Current user data
+ * @returns {Buffer}
+ */
+export const generateInventoryCompletionPDF = async (
+  inventoryData,
+  projectData,
+  procurementData,
+  currentUser
+) => {
+  try {
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    // Helper function to add new page if needed
+    const addPageIfNeeded = (requiredSpace) => {
+      const currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY : 45;
+      const pageHeight = doc.internal.pageSize.height;
+      const margin = 20;
+
+      if (currentY + requiredSpace > pageHeight - margin) {
+        doc.addPage();
+
+        // Add watermark to new page
+        doc.setGState(new doc.GState({ opacity: 0.05 }));
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(100);
+        const pageWidth = doc.internal.pageSize.width;
+        const newPageHeight = doc.internal.pageSize.height;
+        doc.text("ELRA", pageWidth / 2, newPageHeight / 2, {
+          align: "center",
+          angle: 30,
+          renderingMode: "fill",
+        });
+        doc.setGState(new doc.GState({ opacity: 1 }));
+
+        return 20;
+      }
+      return currentY;
+    };
+
+    // Set watermark with reduced opacity
+    doc.setGState(new doc.GState({ opacity: 0.05 }));
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(100);
+
+    // Calculate the center of the page
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+
+    // Position watermark
+    doc.text("ELRA", pageWidth / 2, pageHeight / 2, {
+      align: "center",
+      angle: 30,
+      renderingMode: "fill",
+    });
+
+    // Reset opacity for rest of the content
+    doc.setGState(new doc.GState({ opacity: 1 }));
+
+    // Header with ELRA branding (centered like procurement PDF)
+    const elraGreen = [13, 100, 73];
+    doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+    doc.setFontSize(32);
+    doc.setFont("helvetica", "bold");
+    doc.text("ELRA", 105, 30, { align: "center" });
+
+    // Reset to black for other text
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "normal");
+    doc.text("Inventory Completion Certificate", 105, 42, { align: "center" });
+
+    // Add completion details
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Item Code: ${inventoryData.code}`, 20, 50);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 57);
+
+    // Document details
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
+
+    let yPosition = 60;
+
+    // Project Information
+    doc.setFont("helvetica", "bold");
+    doc.text("PROJECT INFORMATION", 20, yPosition);
+    yPosition += 8;
+
+    doc.setFont("helvetica", "normal");
+    doc.text(`Project Name: ${projectData.name}`, 20, yPosition);
+    yPosition += 6;
+    doc.text(`Project Code: ${projectData.code}`, 20, yPosition);
+    yPosition += 6;
+    doc.text(`Category: ${projectData.category}`, 20, yPosition);
+    yPosition += 6;
+    doc.text(
+      `Budget: NGN ${projectData.budget?.toLocaleString() || "N/A"}`,
+      20,
+      yPosition
+    );
+    yPosition += 10;
+
+    // Procurement Information
+    doc.setFont("helvetica", "bold");
+    doc.text("PROCUREMENT INFORMATION", 20, yPosition);
+    yPosition += 8;
+
+    doc.setFont("helvetica", "normal");
+    doc.text(`Purchase Order: ${procurementData.poNumber}`, 20, yPosition);
+    yPosition += 6;
+    doc.text(
+      `Supplier: ${procurementData.supplier?.name || "N/A"}`,
+      20,
+      yPosition
+    );
+    yPosition += 6;
+    doc.text(
+      `Total Amount: NGN ${
+        procurementData.totalAmount?.toLocaleString() || "N/A"
+      }`,
+      20,
+      yPosition
+    );
+    yPosition += 6;
+    doc.text(
+      `Delivery Address: ${procurementData.deliveryAddress?.street || "N/A"}, ${
+        procurementData.deliveryAddress?.city || "N/A"
+      }, ${procurementData.deliveryAddress?.state || "N/A"}`,
+      20,
+      yPosition
+    );
+    yPosition += 10;
+
+    // Inventory Item Details
+    doc.setFont("helvetica", "bold");
+    doc.text("INVENTORY ITEM DETAILS", 20, yPosition);
+    yPosition += 8;
+
+    doc.setFont("helvetica", "normal");
+    doc.text(`Item Name: ${inventoryData.name}`, 20, yPosition);
+    yPosition += 6;
+    doc.text(`Item Code: ${inventoryData.code}`, 20, yPosition);
+    yPosition += 6;
+    doc.text(`Description: ${inventoryData.description}`, 20, yPosition);
+    yPosition += 6;
+    doc.text(`Type: ${inventoryData.type}`, 20, yPosition);
+    yPosition += 6;
+    doc.text(`Category: ${inventoryData.category}`, 20, yPosition);
+    yPosition += 6;
+    doc.text(`Status: ${inventoryData.status}`, 20, yPosition);
+    yPosition += 6;
+    if (inventoryData.location) {
+      doc.text(`Location: ${inventoryData.location}`, 20, yPosition);
+      yPosition += 6;
+    }
+    doc.text(
+      `Purchase Price: NGN ${
+        inventoryData.purchasePrice?.toLocaleString() || "N/A"
+      }`,
+      20,
+      yPosition
+    );
+    yPosition += 6;
+    doc.text(
+      `Current Value: NGN ${
+        inventoryData.currentValue?.toLocaleString() || "N/A"
+      }`,
+      20,
+      yPosition
+    );
+    yPosition += 10;
+
+    // Specifications Table
+    if (inventoryData.specifications) {
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("SPECIFICATIONS", 20, yPosition);
+      yPosition += 10;
+
+      const specData = [];
+
+      if (inventoryData.specifications.brand) {
+        specData.push(["Brand", inventoryData.specifications.brand]);
+      }
+      if (inventoryData.specifications.model) {
+        specData.push(["Model", inventoryData.specifications.model]);
+      }
+      if (inventoryData.specifications.year) {
+        specData.push(["Year", inventoryData.specifications.year]);
+      }
+      if (inventoryData.specifications.serialNumber) {
+        specData.push([
+          "Serial Number",
+          inventoryData.specifications.serialNumber,
+        ]);
+      }
+      if (inventoryData.specifications.licenseType) {
+        specData.push([
+          "License Type",
+          inventoryData.specifications.licenseType,
+        ]);
+      }
+      if (inventoryData.specifications.numberOfUsers) {
+        specData.push([
+          "Number of Users",
+          inventoryData.specifications.numberOfUsers,
+        ]);
+      }
+
+      // Dimensions
+      if (inventoryData.specifications.dimensions) {
+        const dims = inventoryData.specifications.dimensions;
+        if (dims.length || dims.width || dims.height) {
+          specData.push([
+            "Dimensions",
+            `${dims.length || "N/A"} × ${dims.width || "N/A"} × ${
+              dims.height || "N/A"
+            } ${dims.unit || "m"}`,
+          ]);
+        }
+      }
+
+      // Weight
+      if (inventoryData.specifications.weight) {
+        const weight = inventoryData.specifications.weight;
+        if (weight.value) {
+          specData.push([
+            "Weight",
+            `${weight.value.toLocaleString()} ${weight.unit || "kg"}`,
+          ]);
+        }
+      }
+
+      if (specData.length > 0) {
+        autoTable(doc, {
+          head: [["Specification", "Value"]],
+          body: specData,
+          startY: yPosition,
+          theme: "grid",
+          headStyles: {
+            fillColor: [13, 100, 73],
+            fontSize: 10,
+            fontStyle: "bold",
+            textColor: [255, 255, 255],
+            cellPadding: 5,
+          },
+          styles: {
+            fontSize: 9,
+            cellPadding: 5,
+            lineWidth: 0.1,
+          },
+          columnStyles: {
+            0: { fontStyle: "bold", cellWidth: 60 },
+            1: { cellWidth: "auto" },
+          },
+          alternateRowStyles: {
+            fillColor: [245, 245, 245],
+          },
+          margin: { left: 20, right: 20 },
+          tableWidth: "auto",
+          pageBreak: "auto",
+        });
+
+        yPosition = doc.lastAutoTable.finalY + 10;
+      }
+    }
+
+    // Delivery Information Table
+    if (
+      inventoryData.receivedBy ||
+      inventoryData.receivedDate ||
+      inventoryData.deliveryCondition
+    ) {
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("DELIVERY INFORMATION", 20, yPosition);
+      yPosition += 10;
+
+      const deliveryData = [];
+
+      if (inventoryData.receivedBy) {
+        deliveryData.push(["Received By", inventoryData.receivedBy]);
+      }
+      if (inventoryData.receivedDate) {
+        deliveryData.push([
+          "Received Date",
+          new Date(inventoryData.receivedDate).toLocaleDateString(),
+        ]);
+      }
+      if (inventoryData.deliveryCondition) {
+        deliveryData.push([
+          "Delivery Condition",
+          inventoryData.deliveryCondition,
+        ]);
+      }
+
+      if (deliveryData.length > 0) {
+        autoTable(doc, {
+          head: [["Field", "Value"]],
+          body: deliveryData,
+          startY: yPosition,
+          theme: "grid",
+          headStyles: {
+            fillColor: [13, 100, 73],
+            fontSize: 10,
+            fontStyle: "bold",
+            textColor: [255, 255, 255],
+            cellPadding: 5,
+          },
+          styles: {
+            fontSize: 9,
+            cellPadding: 5,
+            lineWidth: 0.1,
+          },
+          columnStyles: {
+            0: { fontStyle: "bold", cellWidth: 60 },
+            1: { cellWidth: "auto" },
+          },
+          alternateRowStyles: {
+            fillColor: [245, 245, 245],
+          },
+          margin: { left: 20, right: 20 },
+          tableWidth: "auto",
+          pageBreak: "auto",
+        });
+
+        yPosition = doc.lastAutoTable.finalY + 10;
+      }
+    }
+
+    // Maintenance Information Table
+    if (inventoryData.maintenance) {
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("MAINTENANCE SCHEDULE", 20, yPosition);
+      yPosition += 10;
+
+      const maintenanceData = [];
+
+      if (inventoryData.maintenance.lastServiceDate) {
+        maintenanceData.push([
+          "Last Service Date",
+          new Date(
+            inventoryData.maintenance.lastServiceDate
+          ).toLocaleDateString(),
+        ]);
+      }
+      if (inventoryData.maintenance.nextServiceDate) {
+        maintenanceData.push([
+          "Next Service Date",
+          new Date(
+            inventoryData.maintenance.nextServiceDate
+          ).toLocaleDateString(),
+        ]);
+      }
+      if (inventoryData.maintenance.serviceInterval) {
+        maintenanceData.push([
+          "Service Interval",
+          `${inventoryData.maintenance.serviceInterval} days`,
+        ]);
+      }
+      if (inventoryData.maintenance.maintenanceNotes) {
+        maintenanceData.push([
+          "Maintenance Notes",
+          inventoryData.maintenance.maintenanceNotes,
+        ]);
+      }
+
+      if (maintenanceData.length > 0) {
+        autoTable(doc, {
+          head: [["Field", "Value"]],
+          body: maintenanceData,
+          startY: yPosition,
+          theme: "grid",
+          headStyles: {
+            fillColor: [13, 100, 73],
+            fontSize: 10,
+            fontStyle: "bold",
+            textColor: [255, 255, 255],
+            cellPadding: 5,
+          },
+          styles: {
+            fontSize: 9,
+            cellPadding: 5,
+            lineWidth: 0.1,
+          },
+          columnStyles: {
+            0: { fontStyle: "bold", cellWidth: 60 },
+            1: { cellWidth: "auto" },
+          },
+          alternateRowStyles: {
+            fillColor: [245, 245, 245],
+          },
+          margin: { left: 20, right: 20 },
+          tableWidth: "auto",
+          pageBreak: "auto",
+        });
+
+        yPosition = doc.lastAutoTable.finalY + 10;
+      }
+    }
+
+    // Completion Information Table
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("COMPLETION INFORMATION", 20, yPosition);
+    yPosition += 10;
+
+    const completionData = [
+      ["Completed By", `${currentUser.firstName} ${currentUser.lastName}`],
+      ["Completion Date", new Date().toLocaleDateString()],
+      ["Completion Time", new Date().toLocaleTimeString()],
+    ];
+
+    autoTable(doc, {
+      head: [["Field", "Value"]],
+      body: completionData,
+      startY: yPosition,
+      theme: "grid",
+      headStyles: {
+        fillColor: [13, 100, 73],
+        fontSize: 10,
+        fontStyle: "bold",
+        textColor: [255, 255, 255],
+        cellPadding: 5,
+      },
+      styles: {
+        fontSize: 9,
+        cellPadding: 5,
+        lineWidth: 0.1,
+      },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 60 },
+        1: { cellWidth: "auto" },
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245],
+      },
+      margin: { left: 20, right: 20 },
+      tableWidth: "auto",
+      pageBreak: "auto",
+    });
+
+    yPosition = doc.lastAutoTable.finalY + 10;
+
+    // Notes Table
+    if (inventoryData.notes && inventoryData.notes.length > 0) {
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("NOTES", 20, yPosition);
+      yPosition += 10;
+
+      const notesData = inventoryData.notes.map((note, index) => [
+        `Note ${index + 1}`,
+        note.text || "No content",
+      ]);
+
+      autoTable(doc, {
+        head: [["Note", "Content"]],
+        body: notesData,
+        startY: yPosition,
+        theme: "grid",
+        headStyles: {
+          fillColor: [13, 100, 73],
+          fontSize: 10,
+          fontStyle: "bold",
+          textColor: [255, 255, 255],
+          cellPadding: 5,
+        },
+        styles: {
+          fontSize: 9,
+          cellPadding: 5,
+          lineWidth: 0.1,
+        },
+        columnStyles: {
+          0: { fontStyle: "bold", cellWidth: 30 },
+          1: { cellWidth: "auto" },
+        },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245],
+        },
+        margin: { left: 20, right: 20 },
+        tableWidth: "auto",
+        pageBreak: "auto",
+      });
+
+      yPosition = doc.lastAutoTable.finalY + 10;
+    }
+
+    // Add page numbers
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(0, 0, 0);
+      doc.text(
+        `Page ${i} of ${pageCount}`,
+        105,
+        doc.internal.pageSize.height - 10,
+        { align: "center" }
+      );
+    }
+
+    // Add metadata
+    doc.setProperties({
+      title: `Inventory Completion Certificate - ${inventoryData.code}`,
+      subject: "ELRA Inventory Completion",
+      author: "ELRA System",
+      creator: "ELRA PDF Generator",
+    });
+
+    return Buffer.from(doc.output("arraybuffer"));
+  } catch (error) {
+    console.error("Inventory completion PDF generation error:", error);
+    throw new Error("Failed to generate inventory completion PDF");
+  }
+};
+
 export const generateProcurementOrderPDF = async (
   procurementData,
   currentUser
@@ -860,11 +1388,16 @@ export const generateProcurementOrderPDF = async (
     doc.setFont("helvetica", "bold");
     doc.text("ELRA", 105, 25, { align: "center" });
 
+    // Add "We Regulate" tagline
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "normal");
+    doc.text("You Lease, We Regulate", 105, 35, { align: "center" });
+
     // Reset to black for other text
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(16);
     doc.setFont("helvetica", "normal");
-    doc.text("Purchase Order", 105, 35, { align: "center" });
+    doc.text("Purchase Order", 105, 45, { align: "center" });
 
     // Add PO Number and date
     doc.setFontSize(12);

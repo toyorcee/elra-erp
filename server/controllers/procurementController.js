@@ -5,6 +5,7 @@ import { sendEmail } from "../services/emailService.js";
 import { generateProcurementOrderPDF } from "../utils/pdfUtils.js";
 import nodemailer from "nodemailer";
 import mongoose from "mongoose";
+import NotificationService from "../services/notificationService.js";
 
 // ============================================================================
 // EMAIL FUNCTIONS
@@ -33,21 +34,7 @@ const sendProcurementEmailToSupplier = async (procurement, currentUser) => {
     // Continue without PDF if generation fails
   }
 
-  // Generate items list for email
-  const itemsList = items
-    .map(
-      (item, index) => `
-    <tr style="border-bottom: 1px solid #e5e7eb;">
-      <td style="padding: 12px; text-align: left;">${index + 1}</td>
-      <td style="padding: 12px; text-align: left;">${item.name}</td>
-      <td style="padding: 12px; text-align: left;">${item.description}</td>
-      <td style="padding: 12px; text-align: center;">${item.quantity}</td>
-      <td style="padding: 12px; text-align: right;">₦${item.unitPrice.toLocaleString()}</td>
-      <td style="padding: 12px; text-align: right;">₦${item.totalPrice.toLocaleString()}</td>
-    </tr>
-  `
-    )
-    .join("");
+  // Items details are in the PDF attachment, not in email body
 
   const emailSubject = `Purchase Order ${poNumber} - ${title}`;
 
@@ -59,23 +46,28 @@ const sendProcurementEmailToSupplier = async (procurement, currentUser) => {
       <title>Purchase Order ${poNumber}</title>
       <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .header { background: linear-gradient(135deg, #0D6449 0%, #059669 100%); color: white; padding: 20px; text-align: center; }
+        .header { background: linear-gradient(135deg, #0D6449 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+        .header h1 { margin: 0 0 5px 0; font-size: 32px; font-weight: bold; }
+        .tagline { margin: 0 0 15px 0; }
+        .tagline p { margin: 0; font-size: 16px; opacity: 0.9; font-weight: 300; letter-spacing: 1px; }
+        .header h2 { margin: 0; font-size: 20px; opacity: 0.9; }
         .content { padding: 20px; }
         .order-details { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; }
-        .items-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        .items-table th { background: #0D6449; color: white; padding: 12px; text-align: left; }
-        .items-table td { padding: 12px; border-bottom: 1px solid #e5e7eb; }
         .total-section { background: #e8f4fd; padding: 15px; border-radius: 8px; margin: 20px 0; }
         .contact-info { background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 20px 0; }
         .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #666; }
         .priority-high { color: #dc2626; font-weight: bold; }
         .priority-urgent { color: #ea580c; font-weight: bold; }
         .priority-critical { color: #991b1b; font-weight: bold; }
+        
       </style>
     </head>
     <body>
       <div class="header">
-        <h1>ELRA Procurement System</h1>
+        <h1>ELRA</h1>
+        <div class="tagline">
+          <p>You Lease, We Regulate</p>
+        </div>
         <h2>Purchase Order ${poNumber}</h2>
       </div>
       
@@ -93,22 +85,9 @@ const sendProcurementEmailToSupplier = async (procurement, currentUser) => {
           <p><strong>Currency:</strong> NGN (Nigerian Naira)</p>
         </div>
         
-        <h3>Items Required</h3>
-        <table class="items-table">
-          <thead>
-            <tr>
-              <th>S/N</th>
-              <th>Item Name</th>
-              <th>Description</th>
-              <th>Quantity</th>
-              <th>Unit Price</th>
-              <th>Total Price</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsList}
-          </tbody>
-        </table>
+        <p><strong>Items:</strong> ${
+          items.length
+        } item(s) - See attached PDF for detailed item specifications.</p>
         
         <div class="total-section">
           <h3>Order Summary</h3>
@@ -338,22 +317,76 @@ export const createProcurement = async (req, res) => {
   try {
     const currentUser = req.user;
 
-    // Access control handled by middleware
+    const count = await Procurement.countDocuments();
+    const poNumber = `PO${String(count + 1).padStart(4, "0")}`;
 
     const procurementData = {
       ...req.body,
       createdBy: currentUser._id,
+      poNumber: poNumber,
+      status: "pending",
     };
+
+    console.log("🔢 [PO-NUMBER] Generated PO number:", poNumber);
 
     const procurement = new Procurement(procurementData);
     await procurement.save();
 
-    // Populate the created procurement
     await procurement.populate("createdBy", "firstName lastName email");
+
+    // Notifications to stakeholders removed as requested
+
+    console.log(
+      `\n📧 [PROCUREMENT] Preparing to send email and PDF to supplier...`
+    );
+    console.log(`   - PO Number: ${procurement.poNumber}`);
+    console.log(`   - Supplier: ${procurement.supplier.name}`);
+    console.log(`   - Email: ${procurement.supplier.email}`);
+
+    try {
+      const emailResult = await sendProcurementEmailToSupplier(
+        procurement,
+        currentUser
+      );
+      console.log(`✅ [PROCUREMENT] Email sent successfully to supplier`);
+      console.log(
+        `   - PDF Attachment: Purchase_Order_${procurement.poNumber}.pdf`
+      );
+
+      // Notify Procurement HOD that email was sent successfully
+      try {
+        const notificationService = new NotificationService();
+        await notificationService.createNotification({
+          recipient: currentUser._id,
+          type: "procurement_email_sent",
+          title: "Purchase Order Email Sent Successfully",
+          message: `Purchase Order ${procurement.poNumber} has been sent to ${procurement.supplier.name}. Wait for supplier response, then mark as issued.`,
+          priority: "medium",
+          data: {
+            procurementId: procurement._id,
+            poNumber: procurement.poNumber,
+            supplier: procurement.supplier.name,
+            supplierEmail: procurement.supplier.email,
+          },
+        });
+        console.log(
+          `✅ [NOTIFICATIONS] Procurement HOD notified of successful email send`
+        );
+      } catch (notificationError) {
+        console.error(
+          "❌ [NOTIFICATIONS] Error notifying Procurement HOD:",
+          notificationError
+        );
+      }
+    } catch (emailError) {
+      console.error(`❌ [PROCUREMENT] Email/PDF sending failed:`, emailError);
+      console.error(`   - Error details: ${emailError.message}`);
+      console.error(`   - Supplier email: ${procurement.supplier.email}`);
+    }
 
     res.status(201).json({
       success: true,
-      message: "Procurement created successfully",
+      message: "Procurement created successfully and email sent to supplier",
       data: procurement,
     });
   } catch (error) {
@@ -1268,6 +1301,28 @@ export const markAsDelivered = async (req, res) => {
       } catch (inventoryError) {
         console.error(
           "❌ [INVENTORY] Error triggering inventory creation:",
+          inventoryError
+        );
+      }
+    } else {
+      // Handle standalone procurement - trigger inventory creation
+      try {
+        console.log(
+          `📦 [INVENTORY] Triggering standalone inventory creation for PO: ${procurement.poNumber}`
+        );
+
+        // Import inventory controller dynamically to avoid circular dependency
+        const { createInventoryFromProcurement } = await import(
+          "./inventoryController.js"
+        );
+        await createInventoryFromProcurement(procurement, currentUser);
+
+        console.log(
+          `✅ [INVENTORY] Standalone inventory creation completed for PO: ${procurement.poNumber}`
+        );
+      } catch (inventoryError) {
+        console.error(
+          "❌ [INVENTORY] Error creating standalone inventory:",
           inventoryError
         );
       }

@@ -79,6 +79,12 @@ import Profile from "./pages/user/Profile";
 import PurchaseOrders from "./pages/user/modules/procurement/PurchaseOrders";
 import ProcurementTracking from "./pages/user/modules/procurement/ProcurementTracking";
 
+// Inventory Module imports
+import InventoryManagement from "./pages/user/modules/inventory/InventoryManagement";
+import InventoryList from "./pages/user/modules/inventory/InventoryList";
+import InventoryTracking from "./pages/user/modules/inventory/InventoryTracking";
+import InventoryReports from "./pages/user/modules/inventory/InventoryReports";
+
 const AppRoutes = () => {
   return (
     <Routes>
@@ -303,6 +309,18 @@ const AppRoutes = () => {
         <Route
           path="modules/legal/compliance-history"
           element={<ComplianceHistory />}
+        />
+
+        {/* Inventory Module Routes */}
+        <Route path="modules/inventory" element={<InventoryManagement />} />
+        <Route path="modules/inventory/list" element={<InventoryList />} />
+        <Route
+          path="modules/inventory/tracking"
+          element={<InventoryTracking />}
+        />
+        <Route
+          path="modules/inventory/reports"
+          element={<InventoryReports />}
         />
       </Route>
 

@@ -17,7 +17,10 @@ import {
   TrashIcon,
   DocumentCheckIcon,
   PencilIcon,
+  ChevronDownIcon,
+  TruckIcon,
 } from "@heroicons/react/24/outline";
+import { Listbox, Transition } from "@headlessui/react";
 import { useAuth } from "../../../../context/AuthContext";
 import {
   fetchPurchaseOrders,
@@ -30,8 +33,18 @@ import {
   markProcurementAsPaid,
   markProcurementAsDelivered,
 } from "../../../../services/procurementAPI";
+import { fetchProjects } from "../../../../services/projectAPI";
 import { toast } from "react-toastify";
 import DataTable from "../../../../components/common/DataTable";
+import {
+  UNIFIED_CATEGORIES,
+  CATEGORY_DISPLAY_NAMES,
+  CATEGORY_GROUPS,
+} from "../../../../constants/unifiedCategories";
+import {
+  formatNumberWithCommas,
+  parseFormattedNumber,
+} from "../../../../utils/formatters";
 
 const PurchaseOrders = () => {
   const { user } = useAuth();
@@ -40,6 +53,7 @@ const PurchaseOrders = () => {
   const [filters, setFilters] = useState({
     status: "all",
     priority: "all",
+    type: "all",
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -77,6 +91,10 @@ const PurchaseOrders = () => {
     delivered: 0,
     total: 0,
   });
+  const [projects, setProjects] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [isProjectTied, setIsProjectTied] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
 
   const [completeFormData, setCompleteFormData] = useState({
     supplier: {
@@ -119,17 +137,25 @@ const PurchaseOrders = () => {
         postalCode: "",
       },
     },
+    deliveryAddress: {
+      street: "",
+      city: "",
+      state: "",
+      postalCode: "",
+      contactPerson: "",
+      phone: "",
+    },
     items: [
       {
         name: "",
         description: "",
         quantity: 1,
         unitPrice: 0,
-        category: "equipment",
+        category: "office_equipment",
         specifications: {
           brand: "",
           model: "",
-          year: "",
+          year: new Date().getFullYear().toString(),
         },
       },
     ],
@@ -216,6 +242,7 @@ const PurchaseOrders = () => {
 
   useEffect(() => {
     loadPurchaseOrders();
+    loadProjects();
   }, []);
 
   const calculateStats = (orders) => {
@@ -246,6 +273,34 @@ const PurchaseOrders = () => {
       toast.error("Error loading purchase orders");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadProjects = async () => {
+    setLoadingProjects(true);
+    try {
+      console.log("🔄 [PROCUREMENT] Loading projects for dropdown...");
+      const response = await fetchProjects();
+      if (response.success) {
+        setProjects(response.data);
+        console.log(
+          "✅ [PROCUREMENT] Loaded projects for dropdown:",
+          response.data.length
+        );
+        console.log(
+          "📋 [PROCUREMENT] Projects:",
+          response.data.map((p) => ({ id: p._id, name: p.name, code: p.code }))
+        );
+      } else {
+        console.error(
+          "❌ [PROCUREMENT] Failed to load projects:",
+          response.message
+        );
+      }
+    } catch (error) {
+      console.error("❌ [PROCUREMENT] Error loading projects:", error);
+    } finally {
+      setLoadingProjects(false);
     }
   };
 
@@ -764,13 +819,21 @@ const PurchaseOrders = () => {
     },
   ];
 
-  // Filter purchase orders based on status and priority
+  // Filter purchase orders based on status, priority, and type
   const filteredPurchaseOrders = purchaseOrders.filter((order) => {
     if (filters.status !== "all" && order.status !== filters.status) {
       return false;
     }
     if (filters.priority !== "all" && order.priority !== filters.priority) {
       return false;
+    }
+    if (filters.type !== "all") {
+      if (filters.type === "standalone" && order.relatedProject) {
+        return false;
+      }
+      if (filters.type === "project-tied" && !order.relatedProject) {
+        return false;
+      }
     }
     return true;
   });
@@ -797,17 +860,29 @@ const PurchaseOrders = () => {
   const handleSupplierChange = (field, value) => {
     if (field.includes(".")) {
       const [parent, child] = field.split(".");
-      setFormData((prev) => ({
-        ...prev,
-        supplier: {
-          ...prev.supplier,
-          [parent]: {
-            ...prev.supplier[parent],
+
+      if (parent === "deliveryAddress") {
+        setFormData((prev) => ({
+          ...prev,
+          deliveryAddress: {
+            ...prev.deliveryAddress,
             [child]: value,
           },
-        },
-      }));
+        }));
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          supplier: {
+            ...prev.supplier,
+            [parent]: {
+              ...prev.supplier[parent],
+              [child]: value,
+            },
+          },
+        }));
+      }
     } else {
+      // Handle top-level fields (shouldn't happen for supplier/deliveryAddress)
       setFormData((prev) => ({
         ...prev,
         supplier: {
@@ -820,7 +895,12 @@ const PurchaseOrders = () => {
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
-    if (field.includes(".")) {
+
+    // Handle formatted number fields
+    if (field === "quantity" || field === "unitPrice") {
+      const numericValue = parseFormattedNumber(value);
+      newItems[index][field] = numericValue;
+    } else if (field.includes(".")) {
       const [parent, child] = field.split(".");
       newItems[index] = {
         ...newItems[index],
@@ -855,11 +935,11 @@ const PurchaseOrders = () => {
           description: "",
           quantity: 1,
           unitPrice: 0,
-          category: "equipment",
+          category: "office_equipment",
           specifications: {
             brand: "",
             model: "",
-            year: "",
+            year: new Date().getFullYear().toString(),
           },
         },
       ],
@@ -887,20 +967,45 @@ const PurchaseOrders = () => {
     setLoading(true);
 
     try {
+      const itemsWithTotalPrice = formData.items.map((item) => ({
+        ...item,
+        totalPrice: item.quantity * item.unitPrice,
+      }));
+
       const procurementData = {
         ...formData,
+        items: itemsWithTotalPrice,
         subtotal: calculateTotal(),
         totalAmount: calculateTotal(),
         orderDate: new Date().toISOString(),
+        requestedBy: user.id,
+        relatedProject:
+          isProjectTied && selectedProject ? selectedProject._id : null,
       };
+
+      console.log("📋 [FRONTEND] Creating procurement with data:", {
+        title: procurementData.title,
+        totalAmount: procurementData.totalAmount,
+        itemsCount: procurementData.items.length,
+        relatedProject: procurementData.relatedProject,
+        isStandalone: !procurementData.relatedProject,
+        selectedProject: selectedProject
+          ? selectedProject.name
+          : "None (Standalone)",
+      });
 
       const response = await createProcurement(procurementData);
 
       if (response.success) {
-        toast.success("Purchase order created successfully!");
-        setShowCreateModal(false);
-        resetForm();
+        toast.success(
+          "Purchase order created successfully and email sent to supplier!"
+        );
         loadPurchaseOrders();
+        // Clear form and close modal
+        resetForm();
+        setShowCreateModal(false);
+        setIsProjectTied(false);
+        setSelectedProject(null);
       } else {
         toast.error(response.message || "Failed to create purchase order");
       }
@@ -929,13 +1034,21 @@ const PurchaseOrders = () => {
           postalCode: "",
         },
       },
+      deliveryAddress: {
+        street: "",
+        city: "",
+        state: "",
+        postalCode: "",
+        contactPerson: "",
+        phone: "",
+      },
       items: [
         {
           name: "",
           description: "",
           quantity: 1,
           unitPrice: 0,
-          category: "equipment",
+          category: "office_equipment", // Use valid category
           specifications: {
             brand: "",
             model: "",
@@ -945,6 +1058,8 @@ const PurchaseOrders = () => {
       ],
       expectedDeliveryDate: "",
     });
+    setIsProjectTied(false);
+    setSelectedProject(null);
   };
 
   const handleDeleteOrder = async (orderId) => {
@@ -1077,6 +1192,15 @@ const PurchaseOrders = () => {
                   {priority.label}
                 </option>
               ))}
+            </select>
+            <select
+              value={filters.type}
+              onChange={(e) => setFilters({ ...filters, type: e.target.value })}
+              className="rounded-md border-gray-300 shadow-sm focus:border-[var(--elra-primary)] focus:ring focus:ring-[var(--elra-primary)] focus:ring-opacity-50"
+            >
+              <option value="all">All Types</option>
+              <option value="standalone">Standalone</option>
+              <option value="project-tied">Project-Tied</option>
             </select>
           </div>
           <div className="flex items-center space-x-3">
@@ -1683,6 +1807,7 @@ const PurchaseOrders = () => {
                       </label>
                       <input
                         type="date"
+                        min={new Date().toISOString().split("T")[0]}
                         value={formData.expectedDeliveryDate}
                         onChange={(e) =>
                           handleInputChange(
@@ -1822,11 +1947,500 @@ const PurchaseOrders = () => {
                   </div>
                 </div>
 
-                {/* Items section placeholder */}
+                {/* Delivery Address Section */}
                 <div className="bg-gray-50 rounded-lg p-6">
-                  <p className="text-center text-gray-500">
-                    Items section coming...
-                  </p>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <TruckIcon className="h-5 w-5 text-[var(--elra-primary)] mr-2" />
+                    Delivery Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Contact Person
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.deliveryAddress.contactPerson}
+                        onChange={(e) =>
+                          handleSupplierChange(
+                            "deliveryAddress.contactPerson",
+                            e.target.value
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter delivery contact person"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Phone
+                      </label>
+                      <input
+                        type="tel"
+                        value={formData.deliveryAddress.phone}
+                        onChange={(e) =>
+                          handleSupplierChange(
+                            "deliveryAddress.phone",
+                            e.target.value
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter delivery phone"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Street Address
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.deliveryAddress.street}
+                        onChange={(e) =>
+                          handleSupplierChange(
+                            "deliveryAddress.street",
+                            e.target.value
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter delivery street address"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        City
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.deliveryAddress.city}
+                        onChange={(e) =>
+                          handleSupplierChange(
+                            "deliveryAddress.city",
+                            e.target.value
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter delivery city"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        State
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.deliveryAddress.state}
+                        onChange={(e) =>
+                          handleSupplierChange(
+                            "deliveryAddress.state",
+                            e.target.value
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter delivery state"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Postal Code
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.deliveryAddress.postalCode}
+                        onChange={(e) =>
+                          handleSupplierChange(
+                            "deliveryAddress.postalCode",
+                            e.target.value
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter delivery postal code"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Items Section */}
+                <div className="bg-gray-50 rounded-lg p-6 border-0">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <ShoppingBagIcon className="h-5 w-5 text-[var(--elra-primary)] mr-2" />
+                    Purchase Order Items
+                  </h3>
+
+                  {/* Project Type Selection */}
+                  <div className="mb-6">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <input
+                        type="checkbox"
+                        id="isProjectTied"
+                        checked={isProjectTied}
+                        onChange={(e) => {
+                          setIsProjectTied(e.target.checked);
+                          if (!e.target.checked) {
+                            setSelectedProject(null);
+                          }
+                        }}
+                        className="h-4 w-4 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] border-gray-300 rounded"
+                      />
+                      <label
+                        htmlFor="isProjectTied"
+                        className="text-sm font-medium text-gray-700"
+                      >
+                        Tie this purchase order to a project
+                      </label>
+                    </div>
+
+                    {/* Project Selection Dropdown - Only show when checkbox is checked */}
+                    <Transition
+                      show={isProjectTied}
+                      enter="transition ease-out duration-200"
+                      enterFrom="opacity-0 transform scale-95"
+                      enterTo="opacity-100 transform scale-100"
+                      leave="transition ease-in duration-150"
+                      leaveFrom="opacity-100 transform scale-100"
+                      leaveTo="opacity-0 transform scale-95"
+                    >
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Select Project
+                        </label>
+                        <Listbox
+                          value={selectedProject}
+                          onChange={setSelectedProject}
+                        >
+                          <div className="relative">
+                            <Listbox.Button className="relative w-full cursor-default rounded-lg bg-white py-3 pl-3 pr-10 text-left shadow-sm focus:outline-none focus-visible:border-[var(--elra-primary)] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--elra-primary)] sm:text-sm border border-gray-300">
+                              <span className="block truncate">
+                                {loadingProjects ? (
+                                  <span className="text-gray-500">
+                                    Loading projects...
+                                  </span>
+                                ) : selectedProject ? (
+                                  `${selectedProject.name} (${selectedProject.code})`
+                                ) : (
+                                  <span className="text-gray-500">
+                                    Choose a project...
+                                  </span>
+                                )}
+                              </span>
+                              <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                                <ChevronDownIcon
+                                  className="h-5 w-5 text-gray-400"
+                                  aria-hidden="true"
+                                />
+                              </span>
+                            </Listbox.Button>
+                            <Transition
+                              as={React.Fragment}
+                              leave="transition ease-in duration-100"
+                              leaveFrom="opacity-100"
+                              leaveTo="opacity-0"
+                            >
+                              <Listbox.Options className="absolute mt-1 max-h-80 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-gray-200 focus:outline-none sm:text-sm z-10">
+                                {projects.map((project) => (
+                                  <Listbox.Option
+                                    key={project._id}
+                                    className={({ active }) =>
+                                      `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                                        active
+                                          ? "bg-[var(--elra-primary)] text-white"
+                                          : "text-gray-900"
+                                      }`
+                                    }
+                                    value={project}
+                                  >
+                                    {({ selected, active }) => (
+                                      <>
+                                        <span
+                                          className={`block truncate ${
+                                            selected
+                                              ? "font-medium"
+                                              : "font-normal"
+                                          }`}
+                                        >
+                                          {project.name} ({project.code})
+                                        </span>
+                                        {selected ? (
+                                          <span
+                                            className={`absolute inset-y-0 left-0 flex items-center pl-3 ${
+                                              active
+                                                ? "text-white"
+                                                : "text-[var(--elra-primary)]"
+                                            }`}
+                                          >
+                                            <CheckCircleIcon
+                                              className="h-5 w-5"
+                                              aria-hidden="true"
+                                            />
+                                          </span>
+                                        ) : null}
+                                      </>
+                                    )}
+                                  </Listbox.Option>
+                                ))}
+                              </Listbox.Options>
+                            </Transition>
+                          </div>
+                        </Listbox>
+                        <p className="text-xs text-gray-500">
+                          {loadingProjects ? (
+                            <span className="text-gray-500">
+                              Loading projects...
+                            </span>
+                          ) : selectedProject ? (
+                            <span className="text-blue-600">
+                              ✓ This PO will be tied to: {selectedProject.name}
+                            </span>
+                          ) : (
+                            <span className="text-orange-600">
+                              ⚠ Please select a project
+                            </span>
+                          )}
+                          {!loadingProjects && projects.length > 0 && (
+                            <span className="text-gray-400 ml-2">
+                              ({projects.length} projects available)
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </Transition>
+
+                    {/* Standalone indicator */}
+                    {!isProjectTied && (
+                      <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <BuildingOfficeIcon className="h-5 w-5 text-orange-400" />
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-orange-800">
+                              Standalone Purchase
+                            </p>
+                            <p className="text-sm text-orange-700">
+                              This purchase order will not be tied to any
+                              project
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Items List */}
+                  <div className="space-y-4">
+                    {formData.items.map((item, index) => (
+                      <div
+                        key={index}
+                        className="bg-white p-4 rounded-lg border border-gray-200"
+                      >
+                        <div className="flex justify-between items-start mb-4">
+                          <h4 className="font-medium text-gray-900">
+                            Item {index + 1}
+                          </h4>
+                          {formData.items.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeItem(index)}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Item Name *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={item.name}
+                              onChange={(e) =>
+                                handleItemChange(index, "name", e.target.value)
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                              placeholder="Enter item name"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Category *
+                            </label>
+                            <select
+                              required
+                              value={item.category}
+                              onChange={(e) =>
+                                handleItemChange(
+                                  index,
+                                  "category",
+                                  e.target.value
+                                )
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                            >
+                              {CATEGORY_GROUPS.map((group) => (
+                                <optgroup key={group.label} label={group.label}>
+                                  {group.categories.map((category) => (
+                                    <option key={category} value={category}>
+                                      {CATEGORY_DISPLAY_NAMES[category]}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Quantity *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={formatNumberWithCommas(item.quantity)}
+                              onChange={(e) =>
+                                handleItemChange(
+                                  index,
+                                  "quantity",
+                                  e.target.value
+                                )
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                              placeholder="Enter quantity"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Unit Price (₦) *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={formatNumberWithCommas(item.unitPrice)}
+                              onChange={(e) =>
+                                handleItemChange(
+                                  index,
+                                  "unitPrice",
+                                  e.target.value
+                                )
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                              placeholder="Enter unit price"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Description
+                            </label>
+                            <textarea
+                              value={item.description}
+                              onChange={(e) =>
+                                handleItemChange(
+                                  index,
+                                  "description",
+                                  e.target.value
+                                )
+                              }
+                              rows={2}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                              placeholder="Enter item description"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Brand
+                            </label>
+                            <input
+                              type="text"
+                              value={item.specifications.brand}
+                              onChange={(e) =>
+                                handleItemChange(
+                                  index,
+                                  "specifications.brand",
+                                  e.target.value
+                                )
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                              placeholder="Enter brand"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Model
+                            </label>
+                            <input
+                              type="text"
+                              value={item.specifications.model}
+                              onChange={(e) =>
+                                handleItemChange(
+                                  index,
+                                  "specifications.model",
+                                  e.target.value
+                                )
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                              placeholder="Enter model"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Year/Period
+                            </label>
+                            <input
+                              type="text"
+                              value={item.specifications.year}
+                              onChange={(e) =>
+                                handleItemChange(
+                                  index,
+                                  "specifications.year",
+                                  e.target.value
+                                )
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                              placeholder="e.g., 2024, 2024-2025, Q1 2024, etc."
+                            />
+                          </div>
+                        </div>
+
+                        {item.totalPrice > 0 && (
+                          <div className="mt-3 pt-3 border-t border-gray-200">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">
+                                Total Price:
+                              </span>
+                              <span className="font-medium text-green-600">
+                                ₦{item.totalPrice.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Add Item Button */}
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    className="mt-4 w-full flex items-center justify-center px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-[var(--elra-primary)] hover:text-[var(--elra-primary)] transition-colors"
+                  >
+                    <PlusIcon className="h-4 w-4 mr-2" />
+                    Add Another Item
+                  </button>
+
+                  {/* Total Calculation */}
+                  {calculateTotal() > 0 && (
+                    <div className="mt-6 pt-4 border-t border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-lg font-medium text-gray-900">
+                          Total Amount:
+                        </span>
+                        <span className="text-2xl font-bold text-green-600">
+                          ₦{calculateTotal().toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </form>
             </div>
@@ -1845,9 +2459,21 @@ const PurchaseOrders = () => {
               </button>
               <button
                 type="button"
-                className="px-6 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors font-medium"
+                disabled={loading}
+                onClick={handleSubmit}
+                className="px-6 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center cursor-pointer"
               >
-                Create Order
+                {loading ? (
+                  <>
+                    <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <PlusIcon className="h-4 w-4 mr-2" />
+                    Create Order
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -2416,7 +3042,7 @@ const PurchaseOrders = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                    <ArrowPathIcon className="w-8 h-8 text-white" />
+                    <ArrowPathIcon className="w-8 h-8 text-orange-600" />
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold">Resend Email</h2>
@@ -2500,7 +3126,7 @@ const PurchaseOrders = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                    <DocumentCheckIcon className="w-8 h-8" />
+                    <DocumentCheckIcon className="w-8 h-8 text-blue-600" />
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold">Mark as Issued</h2>
@@ -2625,7 +3251,7 @@ const PurchaseOrders = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                    <DocumentCheckIcon className="w-8 h-8" />
+                    <DocumentCheckIcon className="w-8 h-8 text-blue-600" />
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold">
@@ -3273,7 +3899,7 @@ const PurchaseOrders = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                    <PencilIcon className="w-8 h-8" />
+                    <PencilIcon className="w-8 h-8 text-purple-600" />
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold">
@@ -3533,6 +4159,7 @@ const PurchaseOrders = () => {
                         <input
                           type="date"
                           name="expectedDeliveryDate"
+                          min={new Date().toISOString().split("T")[0]}
                           defaultValue={
                             orderToEdit.expectedDeliveryDate
                               ? new Date(orderToEdit.expectedDeliveryDate)

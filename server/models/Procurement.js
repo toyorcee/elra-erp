@@ -112,7 +112,7 @@ const procurementSchema = new mongoose.Schema(
         specifications: {
           brand: String,
           model: String,
-          year: Number,
+          year: String,
           serialNumber: String,
         },
         receivedQuantity: {
@@ -344,7 +344,7 @@ procurementSchema.virtual("deliveryStatus").get(function () {
 
 // Virtual for items received percentage
 procurementSchema.virtual("receivedPercentage").get(function () {
-  if (this.items.length === 0) return 0;
+  if (!this.items || this.items.length === 0) return 0;
 
   const totalOrdered = this.items.reduce((sum, item) => sum + item.quantity, 0);
   const totalReceived = this.items.reduce(
@@ -507,6 +507,15 @@ procurementSchema.methods.addNote = async function (
   await this.save();
 };
 
+// Virtual field for procurement type
+procurementSchema.virtual("procurementType").get(function () {
+  return this.relatedProject ? "project-tied" : "standalone";
+});
+
+// Ensure virtual fields are included in JSON output
+procurementSchema.set("toJSON", { virtuals: true });
+procurementSchema.set("toObject", { virtuals: true });
+
 // Instance method to get procurement summary
 procurementSchema.methods.getSummary = function () {
   return {
@@ -525,6 +534,7 @@ procurementSchema.methods.getSummary = function () {
     orderDate: this.orderDate,
     expectedDeliveryDate: this.expectedDeliveryDate,
     actualDeliveryDate: this.actualDeliveryDate,
+    procurementType: this.procurementType,
   };
 };
 

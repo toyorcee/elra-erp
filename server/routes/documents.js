@@ -2,6 +2,7 @@ import express from "express";
 import {
   uploadDocument,
   uploadProjectDocuments,
+  uploadInventoryDocuments,
   replaceProjectDocument,
   getAllDocuments,
   getMyDocuments,
@@ -36,6 +37,7 @@ router.get("/stats", getDocumentStats);
 router.post("/ocr", processOCR);
 router.post("/upload", uploadDocument);
 router.post("/upload-project-documents", uploadProjectDocuments);
+router.post("/upload-inventory", uploadInventoryDocuments);
 router.post("/replace-project-document", replaceProjectDocument);
 router.get("/", getAllDocuments);
 router.get("/my-documents", getMyDocuments);

@@ -25,8 +25,8 @@ const createEmailTemplate = (
     <html>
     <head>
       <meta charset="utf-8">
-      <title>${title}</title>
-      <style>
+        <title>${title}</title>
+        <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
         .header { background: linear-gradient(135deg, #0D6449 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
         .header h1 { margin: 0 0 5px 0; font-size: 32px; font-weight: bold; }
@@ -43,74 +43,74 @@ const createEmailTemplate = (
         .priority-critical { color: #991b1b; font-weight: bold; }
         .action-button {
           display: inline-block;
-          background: #0d6449;
+                background: #0d6449;
           color: white !important;
           text-decoration: none;
           padding: 16px 32px;
           border-radius: 8px;
           font-weight: 600;
           font-size: 16px;
-          text-align: center;
+                text-align: center;
           margin: 24px 0;
           border: none;
           cursor: pointer;
         }
-        .info-box {
-          background: #ffffff;
-          border: 2px solid #0d6449;
-          border-radius: 8px;
-          padding: 24px;
-          margin: 24px 0;
-        }
-        .info-title {
-          font-weight: 600;
-          color: #0d6449;
-          font-size: 18px;
-          margin-bottom: 16px;
-        }
-        .info-item {
-          margin-bottom: 8px;
-          font-size: 15px;
-          color: #000000;
-        }
-        .info-item strong {
-          color: #0d6449;
-          font-weight: 600;
-          min-width: 100px;
-        }
-      </style>
+            .info-box {
+                background: #ffffff;
+                border: 2px solid #0d6449;
+                border-radius: 8px;
+                padding: 24px;
+                margin: 24px 0;
+            }
+            .info-title {
+                font-weight: 600;
+                color: #0d6449;
+                font-size: 18px;
+                margin-bottom: 16px;
+            }
+            .info-item {
+                margin-bottom: 8px;
+                font-size: 15px;
+                color: #000000;
+            }
+            .info-item strong {
+                color: #0d6449;
+                font-weight: 600;
+                min-width: 100px;
+            }
+        </style>
     </head>
     <body>
-      <div class="header">
+            <div class="header">
         <h1>ELRA</h1>
         <div class="tagline">
           <p>You Lease, We Regulate</p>
-        </div>
+                </div>
         <h2>${title}</h2>
-      </div>
-      
-      <div class="content">
-        <div class="message">
-          ${content}
-        </div>
-        
-        ${
-          actionText && actionUrl
-            ? `
-        <div style="text-align: center;">
-          <a href="${actionUrl}" class="action-button">
-            ${actionText}
-          </a>
-        </div>
-        `
-            : ""
-        }
-        
-        <div class="footer">
+            </div>
+            
+            <div class="content">
+                <div class="message">
+                    ${content}
+                </div>
+                
+                ${
+                  actionText && actionUrl
+                    ? `
+                <div style="text-align: center;">
+                    <a href="${actionUrl}" class="action-button">
+                        ${actionText}
+                    </a>
+                </div>
+                `
+                    : ""
+                }
+            
+            <div class="footer">
           <p><strong>${footerText}</strong></p>
           <p>© ${currentYear} ELRA. All rights reserved.</p>
+            </div>
         </div>
-      </div>
     </body>
     </html>
   `;
@@ -120,6 +120,7 @@ const createEmailTemplate = (
 export const sendPasswordResetEmail = async (email, resetToken, userName) => {
   try {
     const transporter = createTransporter();
+
     const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
 
     const htmlContent = createEmailTemplate(

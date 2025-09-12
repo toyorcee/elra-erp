@@ -381,7 +381,7 @@ export const sendInvitationEmail = async (
         
         <p><strong>How to Join:</strong></p>
         <ol style="margin: 20px 0; padding-left: 24px; line-height: 1.8;">
-          <li style="margin: 12px 0;">Click the "Join ELRA" button below</li>
+          <li style="margin: 12px 0;">Click the "Join ELRA" button below or use your invitation code on the website</li>
           <li style="margin: 12px 0;">Complete your account setup with your details</li>
           <li style="margin: 12px 0;">Start accessing your documents and workflows</li>
         </ol>

@@ -474,7 +474,7 @@ const ForgotPassword = () => {
                 {
                   icon: <HiShieldCheck className="w-6 h-6" />,
                   title: "Secure Reset",
-                  description: "Bank-level encryption for your reset link",
+                  description: "Solid encryption for your reset link",
                   color:
                     "from-[var(--elra-primary)]/20 to-[var(--elra-primary)]/30",
                   iconColor: "text-[var(--elra-primary)]",

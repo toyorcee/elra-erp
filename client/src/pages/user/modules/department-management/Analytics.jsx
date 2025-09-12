@@ -1,16 +1,22 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../../../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 import {
   HiOutlineChartBar,
   HiOutlineUsers,
   HiOutlineClipboardDocument,
   HiOutlineCalendar,
+  HiOutlineDocumentCheck,
+  HiOutlineUser,
 } from "react-icons/hi2";
 import { HiTrendingUp, HiTrendingDown } from "react-icons/hi";
 
 const Analytics = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedPeriod, setSelectedPeriod] = useState("current");
   const [analyticsData, setAnalyticsData] = useState({
     teamSize: 0,
     activeProjects: 0,
@@ -23,6 +29,22 @@ const Analytics = () => {
     monthlyTrends: [],
     projectStatus: [],
     leaveDistribution: [],
+    payrollAnalytics: {
+      totalPayrollCost: 0,
+      employeeCount: 0,
+      averageSalary: 0,
+      payrollRuns: 0,
+      frequencyBreakdown: {
+        monthly: 0,
+        quarterly: 0,
+        yearly: 0,
+        one_time: 0,
+      },
+    },
+    budgetAllocationBreakdown: {
+      withAllocation: 0,
+      withoutAllocation: 0,
+    },
   });
 
   useEffect(() => {
@@ -31,44 +53,75 @@ const Analytics = () => {
     }
   }, [user]);
 
-  const fetchAnalyticsData = async () => {
+  const fetchAnalyticsData = async (period = selectedPeriod) => {
     try {
       setLoading(true);
-      // TODO: Implement API call to fetch department analytics
-      // For now, using mock data
-      const mockData = {
-        teamSize: 12,
-        activeProjects: 8,
-        completedProjects: 15,
-        pendingApprovals: 3,
-        leaveRequests: 5,
-        budgetUtilization: 78.5,
-        projectSuccessRate: 92.3,
-        teamProductivity: 85.7,
-        monthlyTrends: [
-          { month: "Jan", projects: 3, completion: 2 },
-          { month: "Feb", projects: 4, completion: 3 },
-          { month: "Mar", projects: 5, completion: 4 },
-          { month: "Apr", projects: 6, completion: 5 },
-          { month: "May", projects: 7, completion: 6 },
-          { month: "Jun", projects: 8, completion: 7 },
-        ],
-        projectStatus: [
-          { status: "Planning", count: 2, color: "bg-blue-500" },
-          { status: "In Progress", count: 4, color: "bg-yellow-500" },
-          { status: "Review", count: 1, color: "bg-purple-500" },
-          { status: "Completed", count: 15, color: "bg-green-500" },
-        ],
-        leaveDistribution: [
-          { type: "Annual Leave", count: 8, color: "bg-green-500" },
-          { type: "Sick Leave", count: 3, color: "bg-red-500" },
-          { type: "Personal Leave", count: 2, color: "bg-blue-500" },
-          { type: "Training", count: 1, color: "bg-purple-500" },
-        ],
-      };
-      setAnalyticsData(mockData);
+      console.log("📊 [Analytics] Fetching real analytics data...");
+
+      if (!user?.department?._id) {
+        console.error("❌ [Analytics] No department found for user");
+        return;
+      }
+
+      const response = await fetch(
+        `/api/analytics/department/${user.department._id}?period=${period}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          credentials: "include",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log(
+          "✅ [Analytics] Successfully fetched analytics data:",
+          result.data
+        );
+        setAnalyticsData(result.data);
+      } else {
+        throw new Error(result.message || "Failed to fetch analytics data");
+      }
     } catch (error) {
       console.error("❌ [Analytics] Error fetching analytics:", error);
+      setError(error.message || "Failed to fetch analytics data");
+      setAnalyticsData({
+        teamSize: 0,
+        activeProjects: 0,
+        completedProjects: 0,
+        pendingApprovals: 0,
+        leaveRequests: 0,
+        budgetUtilization: 0,
+        projectSuccessRate: 0,
+        teamProductivity: 0,
+        monthlyTrends: [],
+        projectStatus: [],
+        leaveDistribution: [],
+        payrollAnalytics: {
+          totalPayrollCost: 0,
+          employeeCount: 0,
+          averageSalary: 0,
+          payrollRuns: 0,
+          frequencyBreakdown: {
+            monthly: 0,
+            quarterly: 0,
+            yearly: 0,
+            one_time: 0,
+          },
+        },
+        budgetAllocationBreakdown: {
+          withAllocation: 0,
+          withoutAllocation: 0,
+        },
+      });
     } finally {
       setLoading(false);
     }
@@ -86,7 +139,7 @@ const Analytics = () => {
         <div>
           <p className="text-sm font-medium text-gray-600">{title}</p>
           <p className="text-2xl font-bold text-gray-900">{value}</p>
-          {trend && (
+          {trend !== undefined && trend !== null && (
             <div className="flex items-center mt-2">
               {trend > 0 ? (
                 <HiTrendingUp className="w-4 h-4 text-green-500 mr-1" />
@@ -98,7 +151,7 @@ const Analytics = () => {
                   trend > 0 ? "text-green-600" : "text-red-600"
                 }`}
               >
-                {Math.abs(trend)}% from last month
+                {Math.abs(trend).toFixed(1)}% from previous period
               </span>
             </div>
           )}
@@ -157,6 +210,37 @@ const Analytics = () => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+            <h1 className="text-xl font-semibold text-red-800 mb-2">
+              Analytics Error
+            </h1>
+            <p className="text-red-600 mb-4">
+              Failed to load analytics data: {error}
+            </p>
+            <button
+              onClick={() => {
+                setError(null);
+                fetchAnalyticsData();
+              }}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const handlePeriodChange = (newPeriod) => {
+    setSelectedPeriod(newPeriod);
+    fetchAnalyticsData(newPeriod);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
@@ -178,28 +262,28 @@ const Analytics = () => {
             value={analyticsData.teamSize}
             icon={HiOutlineUsers}
             color="bg-blue-500"
-            trend={5.2}
+            trend={analyticsData.trends?.teamSize}
           />
           <StatCard
             title="Active Projects"
             value={analyticsData.activeProjects}
             icon={HiOutlineClipboardDocument}
             color="bg-green-500"
-            trend={12.5}
+            trend={analyticsData.trends?.activeProjects}
           />
           <StatCard
             title="Pending Approvals"
             value={analyticsData.pendingApprovals}
             icon={HiOutlineCalendar}
             color="bg-yellow-500"
-            trend={-8.3}
+            trend={analyticsData.trends?.pendingApprovals}
           />
           <StatCard
             title="Success Rate"
             value={`${analyticsData.projectSuccessRate}%`}
             icon={HiOutlineChartBar}
             color="bg-purple-500"
-            trend={2.1}
+            trend={analyticsData.trends?.completedProjects}
           />
         </div>
 
@@ -217,16 +301,23 @@ const Analytics = () => {
                     <span className="text-sm text-gray-700">{item.status}</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-sm font-medium text-gray-900">
+                    <span className="text-sm font-medium text-gray-900 min-w-[20px]">
                       {item.count}
                     </span>
-                    <div className="w-24 bg-gray-200 rounded-full h-2">
+                    <div className="w-20 bg-gray-200 rounded-full h-2 overflow-hidden">
                       <div
-                        className={`h-2 rounded-full ${item.color}`}
+                        className={`h-2 rounded-full ${item.color} transition-all duration-300`}
                         style={{
-                          width: `${
-                            (item.count / analyticsData.activeProjects) * 100
-                          }%`,
+                          width: `${Math.min(
+                            (item.count /
+                              Math.max(
+                                ...analyticsData.projectStatus.map(
+                                  (s) => s.count
+                                )
+                              )) *
+                              100,
+                            100
+                          )}%`,
                         }}
                       ></div>
                     </div>
@@ -248,16 +339,23 @@ const Analytics = () => {
                     <span className="text-sm text-gray-700">{item.type}</span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-sm font-medium text-gray-900">
+                    <span className="text-sm font-medium text-gray-900 min-w-[20px]">
                       {item.count}
                     </span>
-                    <div className="w-24 bg-gray-200 rounded-full h-2">
+                    <div className="w-20 bg-gray-200 rounded-full h-2 overflow-hidden">
                       <div
-                        className={`h-2 rounded-full ${item.color}`}
+                        className={`h-2 rounded-full ${item.color} transition-all duration-300`}
                         style={{
-                          width: `${
-                            (item.count / analyticsData.leaveRequests) * 100
-                          }%`,
+                          width: `${Math.min(
+                            (item.count /
+                              Math.max(
+                                ...analyticsData.leaveDistribution.map(
+                                  (l) => l.count
+                                )
+                              )) *
+                              100,
+                            100
+                          )}%`,
                         }}
                       ></div>
                     </div>
@@ -270,8 +368,148 @@ const Analytics = () => {
 
         {/* Charts Row 2 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Budget Allocation Breakdown */}
+          <ChartCard title="Budget Allocation Breakdown">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-green-500 mr-3"></div>
+                  <span className="text-sm text-gray-700">
+                    With Budget Allocation
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-900 min-w-[20px]">
+                    {analyticsData.budgetAllocationBreakdown?.withAllocation ||
+                      0}
+                  </span>
+                  <div className="w-20 bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-2 rounded-full bg-green-500 transition-all duration-300"
+                      style={{
+                        width: `${Math.min(
+                          ((analyticsData.budgetAllocationBreakdown
+                            ?.withAllocation || 0) /
+                            Math.max(
+                              analyticsData.budgetAllocationBreakdown
+                                ?.withAllocation || 0,
+                              analyticsData.budgetAllocationBreakdown
+                                ?.withoutAllocation || 0,
+                              1
+                            )) *
+                            100,
+                          100
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-blue-500 mr-3"></div>
+                  <span className="text-sm text-gray-700">
+                    Without Budget Allocation
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-900 min-w-[20px]">
+                    {analyticsData.budgetAllocationBreakdown
+                      ?.withoutAllocation || 0}
+                  </span>
+                  <div className="w-20 bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-2 rounded-full bg-blue-500 transition-all duration-300"
+                      style={{
+                        width: `${Math.min(
+                          ((analyticsData.budgetAllocationBreakdown
+                            ?.withoutAllocation || 0) /
+                            Math.max(
+                              analyticsData.budgetAllocationBreakdown
+                                ?.withAllocation || 0,
+                              analyticsData.budgetAllocationBreakdown
+                                ?.withoutAllocation || 0,
+                              1
+                            )) *
+                            100,
+                          100
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ChartCard>
+
+          {/* Payroll Frequency Breakdown */}
+          <ChartCard title="Payroll Frequency Breakdown">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-purple-500 mr-3"></div>
+                  <span className="text-sm text-gray-700">Monthly</span>
+                </div>
+                <span className="text-sm font-medium text-gray-900">
+                  {analyticsData.payrollAnalytics?.frequencyBreakdown
+                    ?.monthly || 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-orange-500 mr-3"></div>
+                  <span className="text-sm text-gray-700">Quarterly</span>
+                </div>
+                <span className="text-sm font-medium text-gray-900">
+                  {analyticsData.payrollAnalytics?.frequencyBreakdown
+                    ?.quarterly || 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-red-500 mr-3"></div>
+                  <span className="text-sm text-gray-700">Yearly</span>
+                </div>
+                <span className="text-sm font-medium text-gray-900">
+                  {analyticsData.payrollAnalytics?.frequencyBreakdown?.yearly ||
+                    0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-gray-500 mr-3"></div>
+                  <span className="text-sm text-gray-700">One Time</span>
+                </div>
+                <span className="text-sm font-medium text-gray-900">
+                  {analyticsData.payrollAnalytics?.frequencyBreakdown
+                    ?.one_time || 0}
+                </span>
+              </div>
+            </div>
+          </ChartCard>
+        </div>
+
+        {/* Charts Row 3 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Monthly Trends */}
           <ChartCard title="Monthly Project Trends" className="lg:col-span-2">
+            {/* Time Period Selector */}
+            <div className="flex justify-end items-center space-x-3 mb-4">
+              <label className="text-sm font-medium text-gray-700">
+                Time Period:
+              </label>
+              <select
+                value={selectedPeriod}
+                onChange={(e) => handlePeriodChange(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+              >
+                <option value="current">Current Year</option>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="yearly">Yearly</option>
+                <option value="one_time">One Time</option>
+              </select>
+            </div>
             <div className="h-64 flex items-end justify-between space-x-2">
               {analyticsData.monthlyTrends.map((item, index) => (
                 <div key={index} className="flex-1 flex flex-col items-center">
@@ -308,6 +546,9 @@ const Analytics = () => {
                   <span className="text-xs text-gray-600 mt-2">
                     {item.month}
                   </span>
+                  {item.year && (
+                    <span className="text-xs text-gray-400">{item.year}</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -325,43 +566,43 @@ const Analytics = () => {
         </div>
 
         {/* Performance Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <ChartCard title="Budget Utilization">
             <div className="text-center">
-              <div className="relative inline-flex items-center justify-center w-24 h-24">
-                <svg className="w-24 h-24 transform -rotate-90">
+              <div className="relative inline-flex items-center justify-center w-20 h-20">
+                <svg className="w-20 h-20 transform -rotate-90">
                   <circle
-                    cx="48"
-                    cy="48"
-                    r="36"
+                    cx="40"
+                    cy="40"
+                    r="30"
                     stroke="currentColor"
-                    strokeWidth="8"
+                    strokeWidth="6"
                     fill="transparent"
                     className="text-gray-200"
                   />
                   <circle
-                    cx="48"
-                    cy="48"
-                    r="36"
+                    cx="40"
+                    cy="40"
+                    r="30"
                     stroke="currentColor"
-                    strokeWidth="8"
+                    strokeWidth="6"
                     fill="transparent"
                     className="text-blue-500"
-                    strokeDasharray={`${2 * Math.PI * 36}`}
+                    strokeDasharray={`${2 * Math.PI * 30}`}
                     strokeDashoffset={`${
                       2 *
                       Math.PI *
-                      36 *
+                      30 *
                       (1 - analyticsData.budgetUtilization / 100)
                     }`}
                     strokeLinecap="round"
                   />
                 </svg>
-                <span className="absolute text-lg font-bold text-gray-900">
+                <span className="absolute text-sm font-bold text-gray-900">
                   {analyticsData.budgetUtilization}%
                 </span>
               </div>
-              <p className="text-sm text-gray-600 mt-2">
+              <p className="text-xs text-gray-600 mt-1">
                 of allocated budget used
               </p>
             </div>
@@ -369,40 +610,40 @@ const Analytics = () => {
 
           <ChartCard title="Team Productivity">
             <div className="text-center">
-              <div className="relative inline-flex items-center justify-center w-24 h-24">
-                <svg className="w-24 h-24 transform -rotate-90">
+              <div className="relative inline-flex items-center justify-center w-20 h-20">
+                <svg className="w-20 h-20 transform -rotate-90">
                   <circle
-                    cx="48"
-                    cy="48"
-                    r="36"
+                    cx="40"
+                    cy="40"
+                    r="30"
                     stroke="currentColor"
-                    strokeWidth="8"
+                    strokeWidth="6"
                     fill="transparent"
                     className="text-gray-200"
                   />
                   <circle
-                    cx="48"
-                    cy="48"
-                    r="36"
+                    cx="40"
+                    cy="40"
+                    r="30"
                     stroke="currentColor"
-                    strokeWidth="8"
+                    strokeWidth="6"
                     fill="transparent"
                     className="text-green-500"
-                    strokeDasharray={`${2 * Math.PI * 36}`}
+                    strokeDasharray={`${2 * Math.PI * 30}`}
                     strokeDashoffset={`${
                       2 *
                       Math.PI *
-                      36 *
+                      30 *
                       (1 - analyticsData.teamProductivity / 100)
                     }`}
                     strokeLinecap="round"
                   />
                 </svg>
-                <span className="absolute text-lg font-bold text-gray-900">
+                <span className="absolute text-sm font-bold text-gray-900">
                   {analyticsData.teamProductivity}%
                 </span>
               </div>
-              <p className="text-sm text-gray-600 mt-2">
+              <p className="text-xs text-gray-600 mt-1">
                 overall team efficiency
               </p>
             </div>
@@ -410,42 +651,58 @@ const Analytics = () => {
 
           <ChartCard title="Project Success Rate">
             <div className="text-center">
-              <div className="relative inline-flex items-center justify-center w-24 h-24">
-                <svg className="w-24 h-24 transform -rotate-90">
+              <div className="relative inline-flex items-center justify-center w-20 h-20">
+                <svg className="w-20 h-20 transform -rotate-90">
                   <circle
-                    cx="48"
-                    cy="48"
-                    r="36"
+                    cx="40"
+                    cy="40"
+                    r="30"
                     stroke="currentColor"
-                    strokeWidth="8"
+                    strokeWidth="6"
                     fill="transparent"
                     className="text-gray-200"
                   />
                   <circle
-                    cx="48"
-                    cy="48"
-                    r="36"
+                    cx="40"
+                    cy="40"
+                    r="30"
                     stroke="currentColor"
-                    strokeWidth="8"
+                    strokeWidth="6"
                     fill="transparent"
                     className="text-purple-500"
-                    strokeDasharray={`${2 * Math.PI * 36}`}
+                    strokeDasharray={`${2 * Math.PI * 30}`}
                     strokeDashoffset={`${
                       2 *
                       Math.PI *
-                      36 *
+                      30 *
                       (1 - analyticsData.projectSuccessRate / 100)
                     }`}
                     strokeLinecap="round"
                   />
                 </svg>
-                <span className="absolute text-lg font-bold text-gray-900">
+                <span className="absolute text-sm font-bold text-gray-900">
                   {analyticsData.projectSuccessRate}%
                 </span>
               </div>
-              <p className="text-sm text-gray-600 mt-2">
+              <p className="text-xs text-gray-600 mt-1">
                 projects completed successfully
               </p>
+            </div>
+          </ChartCard>
+
+          <ChartCard title="Payroll Analytics">
+            <div className="text-center">
+              <div className="space-y-2">
+                <div className="text-lg font-bold text-gray-900">
+                  ₦
+                  {analyticsData.payrollAnalytics?.totalPayrollCost?.toLocaleString() ||
+                    0}
+                </div>
+                <div className="text-xs text-gray-600">Total Payroll Cost</div>
+                <div className="text-xs text-gray-500">
+                  {analyticsData.payrollAnalytics?.payrollRuns || 0} runs
+                </div>
+              </div>
             </div>
           </ChartCard>
         </div>
@@ -454,7 +711,14 @@ const Analytics = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
           <ChartCard title="Quick Actions">
             <div className="space-y-3">
-              <button className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+              <button
+                onClick={() =>
+                  navigate(
+                    "/dashboard/modules/department-management/project-approvals"
+                  )
+                }
+                className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+              >
                 <div className="flex items-center">
                   <HiOutlineClipboardDocument className="w-5 h-5 text-blue-500 mr-3" />
                   <div>
@@ -468,7 +732,14 @@ const Analytics = () => {
                   </div>
                 </div>
               </button>
-              <button className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-green-300 hover:bg-green-50 transition-colors">
+              <button
+                onClick={() =>
+                  navigate(
+                    "/dashboard/modules/department-management/leave-management"
+                  )
+                }
+                className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-green-300 hover:bg-green-50 transition-colors"
+              >
                 <div className="flex items-center">
                   <HiOutlineCalendar className="w-5 h-5 text-green-500 mr-3" />
                   <div>
@@ -477,6 +748,26 @@ const Analytics = () => {
                     </p>
                     <p className="text-sm text-gray-600">
                       {analyticsData.leaveRequests} requests pending
+                    </p>
+                  </div>
+                </div>
+              </button>
+              <button
+                onClick={() =>
+                  navigate(
+                    "/dashboard/modules/department-management/approval-history"
+                  )
+                }
+                className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-colors"
+              >
+                <div className="flex items-center">
+                  <HiOutlineDocumentCheck className="w-5 h-5 text-purple-500 mr-3" />
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      View Approval History
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Review past approval decisions
                     </p>
                   </div>
                 </div>
@@ -512,6 +803,14 @@ const Analytics = () => {
                 <span className="text-sm text-gray-600">Budget Used</span>
                 <span className="font-medium text-gray-900">
                   {analyticsData.budgetUtilization}%
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Total Payroll</span>
+                <span className="font-medium text-gray-900">
+                  ₦
+                  {analyticsData.payrollAnalytics?.totalPayrollCost?.toLocaleString() ||
+                    0}
                 </span>
               </div>
             </div>

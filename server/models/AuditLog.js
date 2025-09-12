@@ -61,6 +61,7 @@ const auditLogSchema = new mongoose.Schema(
         "INVITATION_CANCELLED",
         "BULK_INVITATION_CREATED",
         "CSV_INVITATION_CREATED",
+        "SINGLE_INVITATION_CREATED",
         "DOCUMENT_UPLOADED",
 
         // System actions

@@ -870,16 +870,16 @@ const PurchaseOrders = () => {
           },
         }));
       } else {
-        setFormData((prev) => ({
-          ...prev,
-          supplier: {
-            ...prev.supplier,
-            [parent]: {
-              ...prev.supplier[parent],
-              [child]: value,
-            },
+      setFormData((prev) => ({
+        ...prev,
+        supplier: {
+          ...prev.supplier,
+          [parent]: {
+            ...prev.supplier[parent],
+            [child]: value,
           },
-        }));
+        },
+      }));
       }
     } else {
       // Handle top-level fields (shouldn't happen for supplier/deliveryAddress)
@@ -2471,7 +2471,7 @@ const PurchaseOrders = () => {
                 ) : (
                   <>
                     <PlusIcon className="h-4 w-4 mr-2" />
-                    Create Order
+                Create Order
                   </>
                 )}
               </button>

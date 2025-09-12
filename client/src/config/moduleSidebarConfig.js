@@ -12,6 +12,20 @@ export const moduleSidebarConfig = {
     borderColor: "border-[var(--elra-primary)]",
     sections: [
       {
+        title: "Department Analytics",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Analytics",
+            icon: "ChartPieIcon",
+            path: "/dashboard/modules/department-management/analytics",
+            required: { minLevel: 700 },
+            description: "Department overview and key metrics",
+          },
+        ],
+      },
+      {
         title: "Project Approvals",
         collapsible: true,
         defaultExpanded: true,
@@ -43,34 +57,6 @@ export const moduleSidebarConfig = {
             path: "/dashboard/modules/department-management/leave-management",
             required: { minLevel: 700 },
             description: "Review and approve employee leave requests",
-          },
-        ],
-      },
-      // {
-      //   title: "Team Management",
-      //   collapsible: true,
-      //   defaultExpanded: false,
-      //   items: [
-      //     {
-      //       label: "Team Management",
-      //       icon: "UsersIcon",
-      //       path: "/dashboard/modules/department-management/team-management",
-      //       required: { minLevel: 700 },
-      //       description: "Manage department staff and roles",
-      //     },
-      //   ],
-      // },
-      {
-        title: "Department Analytics",
-        collapsible: true,
-        defaultExpanded: false,
-        items: [
-          {
-            label: "Analytics",
-            icon: "ChartPieIcon",
-            path: "/dashboard/modules/department-management/analytics",
-            required: { minLevel: 700 },
-            description: "Department overview and key metrics",
           },
         ],
       },

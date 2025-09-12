@@ -32,8 +32,14 @@ const NotificationModal = ({
         return "⚠️";
       case "TASK_ASSIGNED":
         return "📋";
+      case "TASK_STARTED":
+        return "🚀";
       case "TASK_COMPLETED":
         return "✅";
+      case "TASK_UPDATED":
+        return "📝";
+      case "TASK_OVERDUE":
+        return "⏰";
       case "DEADLINE_APPROACHING":
         return "⏰";
       case "DOCUMENT_SHARED":

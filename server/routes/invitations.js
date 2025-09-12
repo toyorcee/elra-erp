@@ -65,7 +65,7 @@ const createInvitationValidation = [
 router.post(
   "/",
   checkRole(700),
-  checkDepartmentAccess,
+  checkDepartmentAccess(),
   createInvitationValidation,
   createInvitation
 );
@@ -73,7 +73,7 @@ router.post(
 router.post(
   "/create-single",
   checkRole(700),
-  checkDepartmentAccess,
+  checkDepartmentAccess(),
   createInvitationValidation,
   createSingleInvitation
 );
@@ -101,13 +101,13 @@ router.post("/:invitationId/retry-email", checkRole(700), retrySingleEmail);
 router.post(
   "/bulk-create",
   checkRole(700),
-  checkDepartmentAccess,
+  checkDepartmentAccess(),
   createBulkInvitations
 );
 router.post(
   "/bulk-csv",
   checkRole(700),
-  checkDepartmentAccess,
+  checkDepartmentAccess(),
   createBulkInvitationsFromCSV
 );
 router.get("/pending-approval", checkRole(700), getPendingApprovalInvitations);

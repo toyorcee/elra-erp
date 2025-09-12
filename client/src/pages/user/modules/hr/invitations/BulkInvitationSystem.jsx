@@ -714,17 +714,35 @@ const BulkInvitationSystem = () => {
 
       console.log("✅ [FRONTEND] Invitation process completed successfully");
 
-      toast.success(
-        <div className="flex items-center space-x-3">
-          <div>
-            <div className="font-medium">Invitations Sent Successfully!</div>
-            <div className="text-sm text-gray-600">
-              {response.data?.statistics?.successfulInvitations || 0}{" "}
-              invitations sent
+      // Show appropriate toast message based on single vs batch
+      const isSingle = response.data?.statistics?.isSingleInvitation;
+      const successfulCount =
+        response.data?.statistics?.successfulInvitations || 0;
+
+      if (isSingle) {
+        toast.success(
+          <div className="flex items-center space-x-3">
+            <div>
+              <div className="font-medium">Invitation Sent Successfully!</div>
+              <div className="text-sm text-gray-600">
+                1 invitation sent to {response.data?.invitation?.email}
+              </div>
             </div>
           </div>
-        </div>
-      );
+        );
+      } else {
+        toast.success(
+          <div className="flex items-center space-x-3">
+            <div>
+              <div className="font-medium">Invitations Sent Successfully!</div>
+              <div className="text-sm text-gray-600">
+                {successfulCount} invitation{successfulCount !== 1 ? "s" : ""}{" "}
+                sent
+              </div>
+            </div>
+          </div>
+        );
+      }
 
       setFormData({
         emails: "",

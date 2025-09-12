@@ -64,17 +64,7 @@ const SALARY_GRADES = [
 // @route   POST /api/invitations
 // @access  Private
 export const createInvitation = asyncHandler(async (req, res) => {
-  console.log("🚀 [INVITATION] Starting single invitation creation...");
-  console.log("📋 [INVITATION] Request body:", req.body);
-
   const currentUser = req.user;
-  console.log("👤 [INVITATION] Current user:", {
-    id: currentUser._id,
-    email: currentUser.email,
-    roleLevel: currentUser.role?.level,
-    roleName: currentUser.role?.name,
-    company: currentUser.company,
-  });
 
   const {
     email,
@@ -87,56 +77,14 @@ export const createInvitation = asyncHandler(async (req, res) => {
     isPendingUser = false,
     userId = null,
   } = req.body;
-
-  console.log("📝 [INVITATION] Parsed invitation data:", {
-    email,
-    firstName,
-    lastName,
-    position,
-    departmentId,
-    roleId,
-    notes,
-    isPendingUser,
-    userId,
-  });
-
-  // Check permissions - Super Admin or users with canManageUsers permission
-  const canInviteUsers =
-    currentUser.role.level >= 100 ||
-    currentUser.role.permissions?.includes("user.manage");
-
-  console.log("🔐 [INVITATION] Permission check:", {
-    userRoleLevel: currentUser.role.level,
-    hasUserManagePermission:
-      currentUser.role.permissions?.includes("user.manage"),
-    canInviteUsers,
-  });
-
-  if (!canInviteUsers) {
-    console.log("❌ [INVITATION] Permission denied - user cannot invite");
-    return res.status(403).json({
-      success: false,
-      message: "Access denied. User management privileges required.",
-    });
-  }
-
   // Validate required fields
   if (!email || !firstName || !lastName || !departmentId || !roleId) {
-    console.log("❌ [INVITATION] Missing required fields:", {
-      hasEmail: !!email,
-      hasFirstName: !!firstName,
-      hasLastName: !!lastName,
-      hasDepartmentId: !!departmentId,
-      hasRoleId: !!roleId,
-    });
     return res.status(400).json({
       success: false,
       message:
         "Email, first name, last name, department, and role are required",
     });
   }
-
-  console.log("✅ [INVITATION] All required fields present");
 
   if (isPendingUser && userId) {
     console.log("🔄 [INVITATION] Processing pending user invitation...");
@@ -335,6 +283,12 @@ export const createInvitation = asyncHandler(async (req, res) => {
         expiresAt: invitation.expiresAt,
       },
       emailSent: emailResult.success,
+      statistics: {
+        totalInvitations: 1,
+        successfulInvitations: emailResult.success ? 1 : 0,
+        failedInvitations: emailResult.success ? 0 : 1,
+        isSingleInvitation: true,
+      },
     },
   });
 });
@@ -851,6 +805,32 @@ export const createSingleInvitation = asyncHandler(async (req, res) => {
         }
       );
 
+      // Send in-app notification to the creator
+      try {
+        const notificationService = new NotificationService();
+        await notificationService.createNotification({
+          recipient: currentUser._id,
+          type: "INVITATION_CREATED",
+          title: "Invitation Created Successfully",
+          message: `Invitation sent to ${email} for ${role.name} role in ${department.name}`,
+          priority: "medium",
+          data: {
+            invitationId: invitation._id,
+            recipientEmail: email,
+            role: role.name,
+            department: department.name,
+          },
+        });
+        console.log(
+          "✅ [SINGLE_INVITATION] In-app notification sent to creator"
+        );
+      } catch (notificationError) {
+        console.error(
+          "❌ [SINGLE_INVITATION] Failed to send in-app notification:",
+          notificationError
+        );
+      }
+
       return res.status(201).json({
         success: true,
         message: "Invitation created and sent successfully",
@@ -863,6 +843,12 @@ export const createSingleInvitation = asyncHandler(async (req, res) => {
             code: invitation.code,
             status: invitation.status,
             emailSent: invitation.emailSent,
+          },
+          statistics: {
+            totalInvitations: 1,
+            successfulInvitations: 1,
+            failedInvitations: 0,
+            isSingleInvitation: true,
           },
         },
       });
@@ -1177,6 +1163,7 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
         failedInvitations: errors.length,
         emailsSent: successfulEmails,
         emailsFailed: failedEmails,
+        isSingleInvitation: false,
       },
       invitations: invitations.map((inv) => ({
         id: inv._id,
@@ -1761,6 +1748,7 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
         pendingApproval: pendingApproval,
         autoApproved: autoApproved,
         errors: errors.length,
+        isSingleInvitation: false,
       },
       invitations: invitations.map((inv) => ({
         id: inv._id,
@@ -1948,33 +1936,20 @@ export const approveBulkInvitations = asyncHandler(async (req, res) => {
 
 // @desc    Get next batch number
 // @route   GET /api/invitations/next-batch-number
-// @access  Private (Super Admin)
+// @access  Private (HOD level or higher)
 export const getNextBatchNumber = asyncHandler(async (req, res) => {
-  console.log("🚀 [NEXT_BATCH] Getting next batch number...");
-
   const currentUser = req.user;
-  console.log("👤 [NEXT_BATCH] Current user:", {
-    id: currentUser._id,
-    email: currentUser.email,
-    roleLevel: currentUser.role?.level,
-    roleName: currentUser.role?.name,
-  });
 
-  // Check if user is super admin
-  if (currentUser.role.level < 1000) {
-    console.log("❌ [NEXT_BATCH] Permission denied - not super admin");
+  // Check if user has permission (HOD level or higher)
+  if (currentUser.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Super admin privileges required.",
+      message: "Access denied. HOD level or higher required.",
     });
   }
 
   try {
     const nextBatchNumber = await Invitation.generateSequentialBatchNumber();
-    console.log(
-      "✅ [NEXT_BATCH] Generated next batch number:",
-      nextBatchNumber
-    );
 
     res.status(200).json({
       success: true,
@@ -1983,7 +1958,7 @@ export const getNextBatchNumber = asyncHandler(async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ [NEXT_BATCH] Error generating batch number:", error);
+    console.error("Error generating batch number:", error);
     res.status(500).json({
       success: false,
       message: "Failed to generate next batch number",

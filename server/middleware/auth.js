@@ -430,7 +430,6 @@ export const checkDepartmentAccess = (options = {}) => {
         return next();
       }
 
-      // If we reach here, user doesn't have sufficient permissions
       return res.status(403).json({
         success: false,
         message: errorMessage,

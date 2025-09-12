@@ -807,7 +807,10 @@ export const updateTaskStatus = async (req, res) => {
 
     // Update project progress if task is completed
     if (status === "completed") {
-      await task.project.updateTwoPhaseProgress();
+      const project = await Project.findById(task.project);
+      if (project) {
+        await project.updateTwoPhaseProgress();
+      }
     }
 
     // Send notifications for task status updates
@@ -823,11 +826,11 @@ export const updateTaskStatus = async (req, res) => {
       if (status === "in_progress") {
         // Notify project creator that task has started
         console.log(
-          `🔔 [NOTIFICATIONS] Creating task_started notification for user: ${project.createdBy._id}`
+          `🔔 [NOTIFICATIONS] Creating TASK_STARTED notification for user: ${project.createdBy._id}`
         );
         const notification = await notificationService.createNotification({
           recipient: project.createdBy._id,
-          type: "task_started",
+          type: "TASK_STARTED",
           title: "Task Started",
           message: `Task "${task.title}" has been started for project "${project.name}"`,
           priority: "medium",
@@ -846,11 +849,11 @@ export const updateTaskStatus = async (req, res) => {
       } else if (status === "completed") {
         // Notify project creator that task is completed
         console.log(
-          `🔔 [NOTIFICATIONS] Creating task_completed notification for user: ${project.createdBy._id}`
+          `🔔 [NOTIFICATIONS] Creating TASK_COMPLETED notification for user: ${project.createdBy._id}`
         );
         const notification = await notificationService.createNotification({
           recipient: project.createdBy._id,
-          type: "task_completed",
+          type: "TASK_COMPLETED",
           title: "Task Completed",
           message: `Task "${task.title}" has been completed for project "${project.name}". Project progress updated!`,
           priority: "high",

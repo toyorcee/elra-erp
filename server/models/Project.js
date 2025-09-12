@@ -802,39 +802,29 @@ projectSchema.pre("save", async function (next) {
       )}`;
     }
 
-    // Set budget threshold based on budget amount and department
+    // Set budget threshold based on budget amount and budget allocation requirement
     if (this.budget && !this.budgetThreshold) {
-      // Get department name for smart threshold determination
-      let departmentName = "Unknown";
-      try {
-        const dept = await mongoose
-          .model("Department")
-          .findById(this.department);
-        departmentName = dept ? dept.name : "Unknown";
-      } catch (error) {
-        console.error("Error getting department for budget threshold:", error);
-      }
-
-      if (this.budget <= 1000000) {
-        // 1M NGN
-        this.budgetThreshold = "hod_auto_approve";
-      } else if (this.budget <= 5000000) {
-        // 5M NGN - For Finance department, skip finance approval
-        if (departmentName === "Finance & Accounting") {
-          this.budgetThreshold = "executive_approval";
+      if (this.requiresBudgetAllocation === true) {
+        // Personal Projects with Budget Allocation = TRUE
+        if (this.budget <= 1000000) {
+          // ≤ ₦1M: HOD → Project Management HOD → Legal → Finance → Budget Allocation
+          this.budgetThreshold = "legal_finance_approval";
+        } else if (this.budget <= 5000000) {
+          // ₦1M - ₦5M: HOD → Project Management → Legal → Finance → Budget Allocation
+          this.budgetThreshold = "legal_finance_approval";
         } else {
-          this.budgetThreshold = "department_approval";
-        }
-      } else if (this.budget <= 25000000) {
-        // 25M NGN - For Finance department, skip finance approval
-        if (departmentName === "Finance & Accounting") {
+          // ≥ ₦5M: HOD → Project Management → Legal → Finance → Executive → Budget Allocation
           this.budgetThreshold = "executive_approval";
-        } else {
-          this.budgetThreshold = "finance_approval";
         }
       } else {
-        // Above 25M NGN
-        this.budgetThreshold = "executive_approval";
+        // Self-funded Projects (Budget Allocation = FALSE)
+        if (this.budget < 5000000) {
+          // < ₦5M: HOD → Project Management HOD (stops here)
+          this.budgetThreshold = "project_management_approval";
+        } else {
+          // ≥ ₦5M: HOD → Project Management → Legal → Executive
+          this.budgetThreshold = "legal_executive_approval";
+        }
       }
     }
 
@@ -1265,32 +1255,6 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
               "Project ready for implementation";
           }
         }
-
-        console.log(
-          `📧 [WORKFLOW] Notifying Executive about project implementation...`
-        );
-        await notification.createNotification({
-          recipient: triggeredByUser,
-          type: "PROJECT_IMPLEMENTATION_READY",
-          title: "Project Implementation Ready",
-          message: notificationMessage,
-          priority: "medium",
-          data: {
-            projectId: this._id,
-            projectName: this.name,
-            projectCode: this.code,
-            budget: this.budget,
-            category: this.category,
-            projectScope: this.projectScope,
-            actionUrl: "/dashboard/modules/projects",
-            implementationPhase: "ready",
-            triggeredBy: triggeredByUser,
-            notificationsSent: notificationsSent,
-          },
-        });
-        console.log(
-          `✅ [WORKFLOW] Executive notified about notifications sent to both parties`
-        );
       } catch (notifError) {
         console.error(
           "❌ [WORKFLOW] Error notifying Executive about notifications:",
@@ -3765,18 +3729,20 @@ projectSchema.methods.updateProgress = async function () {
 
   console.log(
     `📊 [PROGRESS] Project ${this.code} (${
-      isPersonalProject ? "Personal" : "Legacy"
+      isPersonalProject ? "Personal" : "External"
     }) progress updated to ${this.progress}%`
   );
 
   // Log approval chain status for debugging
   console.log(
     `🔍 [PROGRESS] Approval chain status:`,
-    this.approvalChain.map((step) => ({
-      level: step.level,
-      status: step.status,
-      required: step.required,
-    }))
+    this.approvalChain
+      ? this.approvalChain.map((step) => ({
+          level: step.level,
+          status: step.status,
+          required: step.required,
+        }))
+      : "No approval chain found"
   );
 
   return this.progress;
@@ -3873,19 +3839,36 @@ projectSchema.methods.updateTwoPhaseProgress = async function () {
   let overallProgress = 0;
 
   if (isPersonalProject) {
-    // PERSONAL PROJECTS: Two-phase system
-    if (this.approvalProgress < 100) {
-      // Still in approval phase - overall progress = approval progress
-      overallProgress = this.approvalProgress;
-    } else {
-      // Approval complete - overall progress = 100% approval + implementation progress
-      // This gives us: 100% (approval) + 0-100% (implementation) = 100-200%
-      // We need to normalize this to 0-100% scale
-      overallProgress = 100 + this.implementationProgress * 0.5; // Scale implementation to 50% of total
-      overallProgress = Math.min(overallProgress, 100); // Cap at 100%
+    // PERSONAL PROJECTS: 20% setup + 60% approval + 20% implementation
+    let setupProgress = 0;
+    let approvalProgress = 0;
+    let submittedDocs = 0;
+    let approvedSteps = 0;
+
+    // 1. Setup Progress (20% weight) - Document submission
+    if (this.requiredDocuments && this.requiredDocuments.length > 0) {
+      submittedDocs = this.requiredDocuments.filter(
+        (doc) => doc.isSubmitted
+      ).length;
+      setupProgress = (submittedDocs / this.requiredDocuments.length) * 20;
     }
+
+    // 2. Approval Progress (60% weight) - All approvals completed
+    if (this.approvalChain && this.approvalChain.length > 0) {
+      approvedSteps = this.approvalChain.filter(
+        (step) => step.status === "approved"
+      ).length;
+      approvalProgress = (approvedSteps / this.approvalChain.length) * 60;
+    }
+
+    // 3. Implementation Progress (20% weight) - Task completion
+    const implementationProgressWeight =
+      (this.implementationProgress / 100) * 20;
+
+    overallProgress =
+      setupProgress + approvalProgress + implementationProgressWeight;
   } else {
-    // LEGACY PROJECTS: Keep existing logic for now
+    // EXTERNAL PROJECTS: Keep existing logic for now
     let totalSteps = 0;
 
     // 1. Document Submission Progress (25% weight)
@@ -3959,7 +3942,7 @@ projectSchema.methods.updateTwoPhaseProgress = async function () {
   // Log detailed progress information
   console.log(
     `📊 [TWO-PHASE PROGRESS] Project ${this.code} (${
-      isPersonalProject ? "Personal" : "Legacy"
+      isPersonalProject ? "Personal" : "External"
     }) progress updated:`
   );
   console.log(
@@ -3979,14 +3962,34 @@ projectSchema.methods.updateTwoPhaseProgress = async function () {
   );
   console.log(`  - Overall Progress: ${this.progress}%`);
 
+  if (isPersonalProject) {
+    console.log(`📊 [PERSONAL PROJECT] Progress breakdown:`);
+    console.log(
+      `  - Setup Progress: ${setupProgress}% (${submittedDocs}/${
+        this.requiredDocuments?.length || 0
+      } docs)`
+    );
+    console.log(
+      `  - Approval Progress: ${approvalProgress}% (${approvedSteps}/${
+        this.approvalChain?.length || 0
+      } approvals)`
+    );
+    console.log(
+      `  - Implementation Progress: ${implementationProgressWeight}% (${this.implementationProgress}% of tasks)`
+    );
+    console.log(`  - Total: ${overallProgress}%`);
+  }
+
   // Log approval chain status for debugging
   console.log(
     `🔍 [TWO-PHASE PROGRESS] Approval chain status:`,
-    this.approvalChain.map((step) => ({
-      level: step.level,
-      status: step.status,
-      required: step.required,
-    }))
+    this.approvalChain
+      ? this.approvalChain.map((step) => ({
+          level: step.level,
+          status: step.status,
+          required: step.required,
+        }))
+      : "No approval chain found"
   );
 
   return {

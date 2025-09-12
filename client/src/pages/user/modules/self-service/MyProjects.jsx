@@ -18,6 +18,8 @@ import {
   FolderIcon,
   XMarkIcon,
   ArrowUpTrayIcon,
+  ArrowLeftIcon,
+  ArrowPathIcon,
   CalendarIcon,
   UserIcon,
 } from "@heroicons/react/24/outline";
@@ -389,33 +391,27 @@ const MyProjects = () => {
     const numBudget = parseFloat(budget.replace(/,/g, "")) || 0;
 
     if (!requiresBudgetAllocation || requiresBudgetAllocation === "false") {
-      // Self-funded projects
-      if (numBudget <= 1000000) {
+      // Self-funded projects (Budget Allocation = FALSE)
+      if (numBudget < 5000000) {
         return {
-          text: "HOD → Project Management",
+          text: "HOD → Project Management HOD (stops here)",
           color: "text-green-600",
           description:
-            "Project starts after HOD and Project Management approvals",
+            "Self-funded project starts after HOD and Project Management HOD approvals",
         };
-      } else if (numBudget <= 5000000) {
-        return {
-          text: "HOD → Project Management",
-          color: "text-green-600",
-          description:
-            "Project starts after HOD and Project Management approvals",
-        };
-      } else if (numBudget > 5000000) {
+      } else {
         return {
           text: "HOD → Project Management → Legal → Executive",
           color: "text-orange-600",
-          description: "Large self-funded project requires Legal and Executive",
+          description:
+            "Large self-funded project requires Legal and Executive approval",
         };
       }
     } else {
-      // Budget allocation required
+      // Budget allocation required (Budget Allocation = TRUE)
       if (numBudget <= 1000000) {
         return {
-          text: "HOD → Project Management → Legal → Finance → Budget Allocation",
+          text: "HOD → Project Management HOD → Legal → Finance → Budget Allocation",
           color: "text-blue-600",
           description: "Legal review required before Finance allocation",
         };
@@ -428,16 +424,14 @@ const MyProjects = () => {
       } else {
         return {
           text: "HOD → Project Management → Legal → Finance → Executive → Budget Allocation",
-          color: "text-orange-600",
-          description: "Executive approval required before allocation",
+          color: "text-red-600",
+          description:
+            "Executive approval required for large budget allocation",
         };
       }
     }
-
-    return { text: "HOD → Project Management", color: "text-green-600" };
   };
 
-  // Form validation
   const isFormValid = () => {
     const basicFieldsValid =
       formData.name &&
@@ -484,15 +478,6 @@ const MyProjects = () => {
     }
 
     return basicFieldsValid;
-  };
-
-  const isBudgetExceeded = () => {
-    if (formData.requiresBudgetAllocation === "true") {
-      return (
-        getTotalItemsCost() > parseFloat(formData.budget.replace(/,/g, "") || 0)
-      );
-    }
-    return false;
   };
 
   const getCurrentApprovalText = () => {
@@ -2067,10 +2052,10 @@ const MyProjects = () => {
                             parseFloat(
                               formData.budget.replace(/,/g, "") || 0
                             ) ? (
-                              <span className="text-red-600 font-medium">
-                                ⚠️ Items cost exceeds project budget - Cannot
-                                create project. Please adjust your budget or
-                                reduce item costs.
+                              <span className="text-amber-600 font-medium">
+                                ⚠️ Items cost exceeds project budget - You can
+                                still create the project. Finance will handle
+                                the additional funding if needed.
                               </span>
                             ) : (
                               <span className="text-green-600 font-medium">
@@ -2146,13 +2131,11 @@ const MyProjects = () => {
                       type="submit"
                       form="create-project-form"
                       className={`px-6 py-3 rounded-lg transition-all duration-200 flex items-center space-x-2 ${
-                        isFormValid() && !isBudgetExceeded() && !submitting
+                        isFormValid() && !submitting
                           ? "bg-[var(--elra-primary)] text-white hover:bg-[var(--elra-primary-dark)]"
                           : "bg-gray-300 text-gray-500 cursor-not-allowed"
                       }`}
-                      disabled={
-                        submitting || !isFormValid() || isBudgetExceeded()
-                      }
+                      disabled={submitting || !isFormValid()}
                     >
                       {submitting ? (
                         <>
@@ -2560,15 +2543,10 @@ const MyProjects = () => {
                       setShowDocumentModal(false);
                       setShowDocumentsModal(true);
                     }}
-                    className="bg-white text-[var(--elra-primary)] px-4 py-2 rounded-lg hover:bg-gray-50 transition-all duration-300 font-medium border border-white"
+                    className="text-white hover:text-[var(--elra-primary)] transition-colors p-2 rounded-full hover:bg-white hover:bg-opacity-20 cursor-pointer"
+                    title="Back to Documents"
                   >
-                    Back to Documents
-                  </button>
-                  <button
-                    onClick={closeDocumentModal}
-                    className="bg-white text-[var(--elra-primary)] px-4 py-2 rounded-lg hover:bg-gray-50 transition-all duration-300 font-medium border border-white"
-                  >
-                    Cancel
+                    <ArrowLeftIcon className="w-6 h-6" />
                   </button>
                   <button
                     onClick={closeDocumentModal}
@@ -2762,11 +2740,14 @@ const MyProjects = () => {
                       {selectedFile && !isUploadingDocument && (
                         <button
                           onClick={handleDocumentUpload}
-                          className="bg-[var(--elra-primary)] text-white px-6 py-3 rounded-xl hover:shadow-lg transform hover:scale-105 transition-all duration-300 font-semibold cursor-pointer"
+                          className="bg-[var(--elra-primary)] text-white p-4 rounded-full hover:shadow-lg hover:bg-[var(--elra-primary-dark)] transform hover:scale-105 transition-all duration-300 cursor-pointer"
+                          title={
+                            isReplacingDocument
+                              ? "Replace Document"
+                              : "Upload Document"
+                          }
                         >
-                          {isReplacingDocument
-                            ? "Replace Document"
-                            : "Upload Document"}
+                          <ArrowUpTrayIcon className="w-6 h-6" />
                         </button>
                       )}
                     </div>
@@ -2958,10 +2939,10 @@ const MyProjects = () => {
                                           );
                                         }
                                       }}
-                                      className="px-4 py-2 rounded-lg transition-colors font-medium flex items-center space-x-2 bg-green-600 text-white hover:bg-green-700"
+                                      className="p-2 rounded-full transition-colors bg-green-600 text-white hover:bg-[var(--elra-primary)] cursor-pointer"
+                                      title="View Document"
                                     >
-                                      <EyeIcon className="w-4 h-4" />
-                                      <span>View Document</span>
+                                      <EyeIcon className="w-5 h-5" />
                                     </button>
 
                                     {/* Hide replace button after first approval */}
@@ -2981,11 +2962,10 @@ const MyProjects = () => {
                                             selectedProjectForDocuments
                                           )
                                         }
-                                        className="px-4 py-2 rounded-lg transition-colors font-medium flex items-center space-x-2 bg-blue-600 text-white hover:bg-blue-700"
+                                        className="p-2 rounded-full transition-colors bg-blue-600 text-white hover:bg-[var(--elra-primary)] cursor-pointer"
                                         title="Replace document"
                                       >
-                                        <ArrowUpTrayIcon className="w-4 h-4" />
-                                        <span>Replace</span>
+                                        <ArrowPathIcon className="w-5 h-5" />
                                       </button>
                                     )}
                                   </div>
@@ -3008,10 +2988,10 @@ const MyProjects = () => {
                                       setIsReplacingDocument(false);
                                       setShowDocumentModal(true);
                                     }}
-                                    className="px-4 py-2 rounded-lg transition-colors font-medium flex items-center space-x-2 bg-[var(--elra-primary)] text-white hover:bg-[var(--elra-primary-dark)]"
+                                    className="p-2 rounded-full transition-colors bg-[var(--elra-primary)] text-white hover:bg-[var(--elra-primary-dark)] cursor-pointer"
+                                    title="Upload Document"
                                   >
-                                    <ArrowUpTrayIcon className="w-4 h-4" />
-                                    <span>Upload Document</span>
+                                    <ArrowUpTrayIcon className="w-5 h-5" />
                                   </button>
                                 )}
                               </div>

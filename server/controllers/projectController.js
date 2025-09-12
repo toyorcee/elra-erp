@@ -1461,7 +1461,7 @@ export const createProject = async (req, res) => {
           recipient: currentUser._id,
           type: "PROJECT_READY_FOR_APPROVAL",
           title: "Project Created Successfully",
-          message: `Your project "${project.name}" (${project.code}) has been created successfully and is now pending approval.`,
+          message: `Your project "${project.name}" (${project.code}) has been created successfully and is now pending approval. Please upload the required documents for approval.`,
           data: {
             projectId: project._id,
             projectName: project.name,

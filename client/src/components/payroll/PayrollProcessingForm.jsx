@@ -14,6 +14,8 @@ import {
   HiCurrencyDollar,
   HiMinusCircle,
   HiPlus,
+  HiChevronLeft,
+  HiChevronRight,
 } from "react-icons/hi";
 import { toast } from "react-toastify";
 import { userModulesAPI } from "../../services/userModules.js";
@@ -65,6 +67,9 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
   const [employeesPerPage] = useState(10);
   const [selectedPayrollDetail, setSelectedPayrollDetail] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [payrollBatchResult, setPayrollBatchResult] = useState(null);
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [previewErrors, setPreviewErrors] = useState([]);
 
   const months = [
     { value: 1, label: "January" },
@@ -364,8 +369,19 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
       };
       setPreviewData(previewDataForProcessing);
 
+      // Extract errors from the result if any
+      const errors = result.data?.errors || [];
+      setPreviewErrors(errors);
+
       setProcessingStatus("previewed");
-      toast.success("Payroll preview generated successfully!");
+
+      if (errors.length > 0) {
+        toast.warning(
+          `Payroll preview generated with ${errors.length} employee(s) having issues`
+        );
+      } else {
+        toast.success("Payroll preview generated successfully!");
+      }
     } catch (error) {
       setProcessingStatus("error");
       toast.error(error.message || "Error generating preview");
@@ -408,7 +424,22 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
 
       setProcessingStatus("completed");
 
-      toast.success("🎉 Payroll processed successfully!");
+      // Store the batch result for the modal
+      setPayrollBatchResult(result.data);
+
+      // Show success message based on the result
+      if (result.data?.processingSummary) {
+        const summary = result.data.processingSummary;
+        if (summary.duplicates > 0 || summary.failed > 0) {
+          toast.success(
+            `✅ Payroll processed: ${summary.successful} successful, ${summary.duplicates} duplicates skipped, ${summary.failed} failed`
+          );
+        } else {
+          toast.success("🎉 Payroll processed successfully for all employees!");
+        }
+      } else {
+        toast.success("🎉 Payroll processed successfully!");
+      }
 
       setTimeout(() => {
         console.log("🎉 [SUCCESS] Setting showSuccessOverlay to true");
@@ -418,7 +449,7 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
       setTimeout(() => {
         console.log("🎉 [SUCCESS] Auto-hiding success overlay");
         setShowSuccessOverlay(false);
-      }, 3100);
+      }, 5000);
 
       if (onSuccess) {
         onSuccess(result.data);
@@ -579,10 +610,6 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
     setCurrentPage(page);
   };
 
-  const handleShowMore = () => {
-    setCurrentPage(currentPage + 1);
-  };
-
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("en-NG", {
       style: "currency",
@@ -700,7 +727,7 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
 
   return (
     <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[95vw] max-h-[95vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center space-x-3">
@@ -1051,28 +1078,49 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                         ))}
                       </div>
 
-                      {/* Show More Button */}
-                      {employees.length > employeesPerPage &&
-                        currentPage * employeesPerPage < employees.length && (
-                          <div className="text-center">
-                            <button
-                              onClick={handleShowMore}
-                              className="px-4 py-2 text-sm font-medium text-[var(--elra-primary)] bg-white border border-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary)] hover:text-white transition-colors"
-                            >
-                              Show More (
-                              {employees.length -
-                                currentPage * employeesPerPage}{" "}
-                              remaining)
-                            </button>
-                          </div>
-                        )}
-
-                      {/* Pagination Info */}
+                      {/* Pagination Controls */}
                       {Math.ceil(employees.length / employeesPerPage) > 1 && (
-                        <div className="text-center text-xs text-gray-500">
-                          Page {currentPage} of{" "}
-                          {Math.ceil(employees.length / employeesPerPage)} •{" "}
-                          {employees.length} total employees
+                        <div className="flex items-center justify-between mt-4">
+                          {/* Previous Button */}
+                          <button
+                            onClick={() =>
+                              setCurrentPage(Math.max(1, currentPage - 1))
+                            }
+                            disabled={currentPage === 1}
+                            className="px-4 py-2 text-sm font-medium text-[var(--elra-primary)] bg-white border border-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary)] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors flex items-center"
+                          >
+                            <HiChevronLeft className="w-4 h-4 mr-1" />
+                            Previous
+                          </button>
+
+                          {/* Page Info */}
+                          <div className="text-sm text-gray-500">
+                            Page {currentPage} of{" "}
+                            {Math.ceil(employees.length / employeesPerPage)} •{" "}
+                            {employees.length} total employees
+                          </div>
+
+                          {/* Next Button */}
+                          <button
+                            onClick={() =>
+                              setCurrentPage(
+                                Math.min(
+                                  Math.ceil(
+                                    employees.length / employeesPerPage
+                                  ),
+                                  currentPage + 1
+                                )
+                              )
+                            }
+                            disabled={
+                              currentPage >=
+                              Math.ceil(employees.length / employeesPerPage)
+                            }
+                            className="px-4 py-2 text-sm font-medium text-[var(--elra-primary)] bg-white border border-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary)] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+                          >
+                            Next
+                            <HiChevronRight className="w-4 h-4 ml-1" />
+                          </button>
                         </div>
                       )}
                     </>
@@ -1465,28 +1513,40 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                         })}
                       </div>
 
-                      {/* Show More Button */}
-                      {getFilteredEmployees().length > employeesPerPage &&
-                        currentPage * employeesPerPage <
-                          getFilteredEmployees().length && (
-                          <div className="text-center">
-                            <button
-                              onClick={handleShowMore}
-                              className="px-4 py-2 text-sm font-medium text-[var(--elra-primary)] bg-white border border-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary)] hover:text-white transition-colors"
-                            >
-                              Show More (
-                              {getFilteredEmployees().length -
-                                currentPage * employeesPerPage}{" "}
-                              remaining)
-                            </button>
-                          </div>
-                        )}
-
-                      {/* Pagination Info */}
+                      {/* Pagination Controls */}
                       {totalPages > 1 && (
-                        <div className="text-center text-xs text-gray-500">
-                          Page {currentPage} of {totalPages} •{" "}
-                          {getFilteredEmployees().length} total employees
+                        <div className="flex items-center justify-between mt-4">
+                          {/* Previous Button */}
+                          <button
+                            onClick={() =>
+                              setCurrentPage(Math.max(1, currentPage - 1))
+                            }
+                            disabled={currentPage === 1}
+                            className="px-4 py-2 text-sm font-medium text-[var(--elra-primary)] bg-white border border-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary)] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors flex items-center"
+                          >
+                            <HiChevronLeft className="w-4 h-4 mr-1" />
+                            Previous
+                          </button>
+
+                          {/* Page Info */}
+                          <div className="text-sm text-gray-500">
+                            Page {currentPage} of {totalPages} •{" "}
+                            {getFilteredEmployees().length} total employees
+                          </div>
+
+                          {/* Next Button */}
+                          <button
+                            onClick={() =>
+                              setCurrentPage(
+                                Math.min(totalPages, currentPage + 1)
+                              )
+                            }
+                            disabled={currentPage >= totalPages}
+                            className="px-4 py-2 text-sm font-medium text-[var(--elra-primary)] bg-white border border-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary)] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+                          >
+                            Next
+                            <HiChevronRight className="w-4 h-4 ml-1" />
+                          </button>
                         </div>
                       )}
                     </div>
@@ -1539,6 +1599,15 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                       <span className="text-green-600 font-medium">
                         Payroll completed successfully
                       </span>
+                      {payrollBatchResult && (
+                        <button
+                          onClick={() => setShowBatchModal(true)}
+                          className="ml-4 px-3 py-1 text-sm bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors flex items-center gap-1"
+                        >
+                          <HiDocumentText className="w-4 h-4" />
+                          View Details
+                        </button>
+                      )}
                     </>
                   )}
                   {processingStatus === "error" && (
@@ -1548,6 +1617,84 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                         Error processing payroll
                       </span>
                     </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Preview Summary - Show when previewed */}
+            {processingStatus === "previewed" && previewData && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Payroll Preview
+                </h3>
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="flex items-center">
+                      <HiUserGroup className="w-8 h-8 text-blue-500" />
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-blue-600">
+                          Employees to Process
+                        </p>
+                        <p className="text-2xl font-bold text-blue-900">
+                          {previewData.payrolls?.length || 0}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <div className="flex items-center">
+                      <HiCurrencyDollar className="w-8 h-8 text-green-500" />
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-green-600">
+                          Total Gross Pay
+                        </p>
+                        <p className="text-2xl font-bold text-green-900">
+                          {formatCurrency(previewData.totalGrossPay || 0)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <div className="flex items-center">
+                      <HiMinusCircle className="w-8 h-8 text-red-500" />
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-red-600">
+                          Total Deductions
+                        </p>
+                        <p className="text-2xl font-bold text-red-900">
+                          {formatCurrency(previewData.totalDeductions || 0)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <div className="flex items-center">
+                      <HiCheckCircle className="w-8 h-8 text-purple-500" />
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-purple-600">
+                          Total Net Pay
+                        </p>
+                        <p className="text-2xl font-bold text-purple-900">
+                          {formatCurrency(previewData.totalNetPay || 0)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  {previewErrors.length > 0 && (
+                    <div className="bg-yellow-50 p-4 rounded-lg">
+                      <div className="flex items-center">
+                        <HiExclamation className="w-8 h-8 text-yellow-500" />
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-yellow-600">
+                            Employees with Issues
+                          </p>
+                          <p className="text-2xl font-bold text-yellow-900">
+                            {previewErrors.length}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1644,7 +1791,7 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
               </div>
             )}
 
-            {/* Payroll Breakdown Table - Only show after successful payroll */}
+            {/* Payroll Breakdown Table - Show preview or results */}
             {processingStatus === "processing" ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <div className="w-16 h-16 border-4 border-[var(--elra-primary)] border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -1657,14 +1804,30 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                 </p>
               </div>
             ) : (
-              payrollData &&
-              payrollData.length > 0 && (
+              ((processingStatus === "previewed" && previewData?.payrolls) ||
+                (payrollData && payrollData.length > 0)) && (
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Payroll Breakdown
-                  </h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {processingStatus === "previewed"
+                        ? "Preview Breakdown"
+                        : "Payroll Breakdown"}
+                    </h3>
+                    {previewErrors.length > 0 && (
+                      <div className="flex items-center gap-2 text-sm text-yellow-600 bg-yellow-50 px-3 py-1 rounded-full">
+                        <HiExclamation className="w-4 h-4" />
+                        <span>
+                          {previewErrors.length} employee(s) with issues
+                        </span>
+                      </div>
+                    )}
+                  </div>
                   <DataTable
-                    data={payrollData || []}
+                    data={
+                      processingStatus === "previewed"
+                        ? previewData?.payrolls || []
+                        : payrollData || []
+                    }
                     columns={tableColumns}
                     loading={loading}
                     className="bg-white"
@@ -1722,6 +1885,50 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                     }}
                   />
 
+                  {/* Error Details Section */}
+                  {previewErrors.length > 0 && (
+                    <div className="mt-6">
+                      <h4 className="text-md font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <HiExclamation className="w-5 h-5 text-yellow-600" />
+                        Employees with Issues
+                      </h4>
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div className="space-y-3">
+                          {previewErrors.map((error, index) => (
+                            <div
+                              key={index}
+                              className="flex items-start gap-3 p-3 bg-white rounded-lg border border-yellow-200"
+                            >
+                              <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                                {error.employee?.name?.charAt(0) || "?"}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-medium text-gray-900">
+                                    {error.employee?.name || "Unknown Employee"}
+                                  </span>
+                                  <span className="text-sm text-gray-500">
+                                    ({error.employee?.employeeId || "No ID"})
+                                  </span>
+                                </div>
+                                <p className="text-sm text-red-600">
+                                  {error.error || "Unknown error occurred"}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 p-3 bg-yellow-100 rounded-lg">
+                          <p className="text-sm text-yellow-800">
+                            <strong>Note:</strong> These employees will be
+                            skipped during payroll processing. You can still
+                            process payroll for the remaining employees.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Close Summary Button */}
                   <div className="mt-6 text-center">
                     <button
@@ -1736,6 +1943,7 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                           totalPAYE: 0,
                         });
                         setProcessingStatus("idle");
+                        setPreviewErrors([]);
                       }}
                       className="px-6 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center mx-auto"
                     >
@@ -2310,7 +2518,7 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
       {/* Success Overlay */}
       {console.log("🎉 [RENDER] showSuccessOverlay:", showSuccessOverlay)}
       {showSuccessOverlay && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-2xl p-8 shadow-2xl max-w-md w-full mx-4">
             <div className="text-center">
               {/* Success Icon - Simplified */}
@@ -2363,13 +2571,269 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                 </div>
               </div>
 
-              {/* Close Button */}
+              {/* Action Buttons */}
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => {
+                    setShowSuccessOverlay(false);
+                    setShowBatchModal(true);
+                  }}
+                  className="bg-[var(--elra-primary)] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[var(--elra-primary)]/90 transition-colors flex items-center gap-2"
+                >
+                  <HiDocumentText className="w-4 h-4" />
+                  View Details
+                </button>
+                <button
+                  onClick={() => setShowSuccessOverlay(false)}
+                  className="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 transition-colors"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payroll Batch Details Modal */}
+      {showBatchModal && payrollBatchResult && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-[70] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-[95vw] w-full max-h-[95vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-[var(--elra-primary)] rounded-lg flex items-center justify-center">
+                  <HiDocumentText className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">
+                    Payroll Batch Details
+                  </h2>
+                  <p className="text-gray-600">
+                    {payrollBatchResult.scope?.type === "company"
+                      ? "Company-wide"
+                      : payrollBatchResult.scope?.type === "department"
+                      ? "Department"
+                      : "Individual"}{" "}
+                    Payroll -
+                    {months.find((m) => m.value === formData.month)?.label}{" "}
+                    {formData.year}
+                  </p>
+                </div>
+              </div>
               <button
-                onClick={() => setShowSuccessOverlay(false)}
-                className="bg-green-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors"
+                onClick={() => setShowBatchModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                Continue
+                <HiX className="w-6 h-6 text-gray-500" />
               </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              {/* Summary Cards */}
+              {payrollBatchResult.processingSummary && (
+                <div className="p-6 border-b border-gray-200">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-green-50 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <HiCheckCircle className="w-5 h-5 text-green-600" />
+                        <span className="text-sm font-medium text-green-800">
+                          Successful
+                        </span>
+                      </div>
+                      <div className="text-2xl font-bold text-green-600">
+                        {payrollBatchResult.processingSummary.successful}
+                      </div>
+                    </div>
+
+                    {payrollBatchResult.processingSummary.duplicates > 0 && (
+                      <div className="bg-yellow-50 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <HiExclamation className="w-5 h-5 text-yellow-600" />
+                          <span className="text-sm font-medium text-yellow-800">
+                            Duplicates
+                          </span>
+                        </div>
+                        <div className="text-2xl font-bold text-yellow-600">
+                          {payrollBatchResult.processingSummary.duplicates}
+                        </div>
+                      </div>
+                    )}
+
+                    {payrollBatchResult.processingSummary.failed > 0 && (
+                      <div className="bg-red-50 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <HiMinusCircle className="w-5 h-5 text-red-600" />
+                          <span className="text-sm font-medium text-red-800">
+                            Failed
+                          </span>
+                        </div>
+                        <div className="text-2xl font-bold text-red-600">
+                          {payrollBatchResult.processingSummary.failed}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="bg-blue-50 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <HiUserGroup className="w-5 h-5 text-blue-600" />
+                        <span className="text-sm font-medium text-blue-800">
+                          Total
+                        </span>
+                      </div>
+                      <div className="text-2xl font-bold text-blue-600">
+                        {payrollBatchResult.processingSummary.totalEmployees}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Employee Details Table */}
+              <div className="flex-1 overflow-hidden p-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                  Employee Details
+                </h3>
+                <div className="h-full overflow-auto border border-gray-200 rounded-lg">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Employee
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Employee ID
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Department
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Gross Pay
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Net Pay
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Error Details
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {/* Successful Employees */}
+                      {payrollBatchResult.payrolls?.map((payroll, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="w-8 h-8 bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white text-sm font-medium">
+                                {payroll.employee.name.charAt(0)}
+                              </div>
+                              <div className="ml-3">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {payroll.employee.name}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {payroll.employee.employeeId}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {payroll.employee.department}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              <HiCheckCircle className="w-3 h-3 mr-1" />
+                              Success
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatCurrency(payroll.summary.grossPay)}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatCurrency(payroll.summary.netPay)}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                            -
+                          </td>
+                        </tr>
+                      ))}
+
+                      {/* Error Employees */}
+                      {payrollBatchResult.processingSummary?.errors?.map(
+                        (error, index) => (
+                          <tr
+                            key={`error-${index}`}
+                            className="hover:bg-gray-50"
+                          >
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                                  {error.employee.charAt(0)}
+                                </div>
+                                <div className="ml-3">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {error.employee}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {error.employeeId || "N/A"}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                              -
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                  error.step === "duplicate_check"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
+                              >
+                                {error.step === "duplicate_check" ? (
+                                  <>
+                                    <HiExclamation className="w-3 h-3 mr-1" />
+                                    Duplicate
+                                  </>
+                                ) : (
+                                  <>
+                                    <HiMinusCircle className="w-3 h-3 mr-1" />
+                                    Failed
+                                  </>
+                                )}
+                              </span>
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                              -
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                              -
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-red-600">
+                              {error.error}
+                            </td>
+                          </tr>
+                        )
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-6 border-t border-gray-200 flex justify-end">
+                <button
+                  onClick={() => setShowBatchModal(false)}
+                  className="bg-[var(--elra-primary)] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[var(--elra-primary)]/90 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

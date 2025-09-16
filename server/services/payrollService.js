@@ -618,7 +618,7 @@ class PayrollService {
         );
         if (!isAvailable) {
           console.log(
-            `🔍 [DEDUCTION] ${deduction.name}: Skipped - not available for payroll`
+            `🔍 [DEDUCTION] ${deduction.name}: Skipped - not available for payroll (frequency: ${deduction.frequency}, used: ${deduction.isUsed})`
           );
           continue;
         }
@@ -638,7 +638,6 @@ class PayrollService {
             `🔍 [DEDUCTION] ${deduction.name}: Department scope - ELIGIBLE: ${isEligible}`
           );
         } else if (deduction.scope === "individual") {
-          // Individual scope: check if employee is specifically assigned
           isEligible = deduction.employees?.some(
             (emp) => emp._id.toString() === employeeId.toString()
           );
@@ -650,18 +649,14 @@ class PayrollService {
         if (isEligible) {
           let amount = 0;
 
-          // FIXED: Handle PAYE correctly - it should be calculated using tax brackets
           if (deduction.category === "paye") {
-            // PAYE is calculated separately using tax brackets in calculatePAYETax
-            // Don't set amount to 0 here - let the tax calculation handle it
-            amount = 0; // This will be overridden by calculatePAYETax
+            amount = 0;
           } else if (deduction.calculationType === "fixed") {
             amount = deduction.amount;
           } else if (deduction.calculationType === "percentage") {
             amount = (effectiveBaseSalary * deduction.amount) / 100;
           } else if (deduction.calculationType === "tax_brackets") {
-            // Tax brackets are handled in calculatePAYETax
-            amount = 0; // This will be overridden by calculatePAYETax
+            amount = 0;
           }
 
           totalDeductions += amount;
@@ -960,7 +955,7 @@ class PayrollService {
 
       switch (scope) {
         case "company":
-          employees = await User.find({ isActive: true });
+          employees = await User.find({ isActive: true, status: "ACTIVE" });
           break;
 
         case "department":
@@ -974,6 +969,7 @@ class PayrollService {
           employees = await User.find({
             department: { $in: departmentIds },
             isActive: true,
+            status: "ACTIVE",
           });
           break;
 
@@ -989,6 +985,7 @@ class PayrollService {
           employees = await User.find({
             _id: { $in: scopeId },
             isActive: true,
+            status: "ACTIVE",
           });
           break;
 
@@ -997,6 +994,25 @@ class PayrollService {
             "Invalid scope. Must be company, department, or individual"
           );
       }
+
+      // Filter employees who have completed onboarding
+      const EmployeeLifecycle = (await import("../models/EmployeeLifecycle.js"))
+        .default;
+      const eligibleEmployees = [];
+
+      for (const employee of employees) {
+        const onboardingLifecycle = await EmployeeLifecycle.findOne({
+          employee: employee._id,
+          type: "Onboarding",
+          status: "Completed",
+        });
+
+        if (onboardingLifecycle) {
+          eligibleEmployees.push(employee);
+        }
+      }
+
+      employees = eligibleEmployees;
 
       console.log(
         `👥 [PAYROLL] Found ${employees.length} employees for processing`
@@ -1072,107 +1088,472 @@ class PayrollService {
   }
 
   /**
+   * Calculate final payroll for offboarding employee
+   * @param {string} employeeId - Employee ID
+   * @param {number} month - Final payroll month
+   * @param {number} year - Final payroll year
+   * @param {Object} options - Additional options
+   * @returns {Object} Final payroll calculation
+   */
+  async calculateFinalPayroll(employeeId, month, year, options = {}) {
+    try {
+      console.log(
+        `🚀 [FINAL PAYROLL] Starting final payroll calculation for employee: ${employeeId}`
+      );
+
+      // Import leave balance service
+      const LeaveBalanceService = (await import("./leaveBalanceService.js"))
+        .default;
+
+      // 1. Get employee details
+      const employee = await User.findById(employeeId)
+        .populate("role", "name level description")
+        .populate("department", "name description");
+
+      if (!employee) {
+        throw new Error("Employee not found");
+      }
+
+      // 2. Calculate regular payroll for the final month (pro-rated if needed)
+      const regularPayroll = await this.calculateEmployeePayroll(
+        employeeId,
+        month,
+        year,
+        "monthly",
+        false
+      );
+
+      // 3. Calculate gratuity (years of service × monthly salary)
+      const gratuityCalculation = this.calculateGratuity(
+        employee,
+        regularPayroll.baseSalary.effectiveBaseSalary,
+        "monthly"
+      );
+
+      // 4. Calculate leave payout
+      // Calculate daily rate based on the period salary and frequency
+      let dailyRate;
+      switch (
+        "monthly" // Final payroll is always monthly
+      ) {
+        case "monthly":
+          dailyRate = regularPayroll.baseSalary.effectiveBaseSalary / 30; // 30 days per month
+          break;
+        case "quarterly":
+          dailyRate = regularPayroll.baseSalary.effectiveBaseSalary / 90; // 90 days per quarter
+          break;
+        case "yearly":
+          dailyRate = regularPayroll.baseSalary.effectiveBaseSalary / 365; // 365 days per year
+          break;
+        default:
+          dailyRate = regularPayroll.baseSalary.effectiveBaseSalary / 30; // Default to monthly
+      }
+      const leavePayout = await LeaveBalanceService.calculateLeavePayout(
+        employeeId,
+        dailyRate
+      );
+
+      // 5. Calculate final deductions (outstanding loans, etc.)
+      const finalDeductions = await this.calculateFinalDeductions(
+        employeeId,
+        regularPayroll.baseSalary.effectiveBaseSalary
+      );
+
+      // 6. Calculate tax on gratuity and leave payout
+      const finalTaxCalculation = await this.calculateFinalTax(
+        gratuityCalculation.amount,
+        leavePayout.leavePayout,
+        regularPayroll.taxCalculation.payeAmount
+      );
+
+      // 7. Calculate final amounts
+      const finalGrossPay =
+        regularPayroll.grossPay +
+        gratuityCalculation.amount +
+        leavePayout.leavePayout;
+      const finalTotalDeductions =
+        regularPayroll.totalDeductions +
+        finalDeductions.total +
+        finalTaxCalculation.additionalTax;
+      const finalNetPay = finalGrossPay - finalTotalDeductions;
+
+      const finalPayrollData = {
+        employee: {
+          id: employee._id,
+          name: `${employee.firstName} ${employee.lastName}`,
+          employeeId: employee.employeeId,
+          email: employee.email,
+          department: employee.department?.name,
+          role: employee.role?.name,
+          yearsOfService: employee.yearsOfService,
+        },
+        period: {
+          month,
+          year,
+          monthName: new Date(year, month - 1).toLocaleString("default", {
+            month: "long",
+          }),
+          frequency: "final",
+        },
+        regularPayroll: {
+          baseSalary: regularPayroll.baseSalary,
+          allowances: regularPayroll.allowances,
+          bonuses: regularPayroll.bonuses,
+          deductions: regularPayroll.deductions,
+          grossPay: regularPayroll.grossPay,
+          netPay: regularPayroll.netPay,
+          taxCalculation: regularPayroll.taxCalculation,
+        },
+        finalPayments: {
+          gratuity: gratuityCalculation,
+          leavePayout: leavePayout,
+        },
+        finalDeductions: finalDeductions,
+        finalTaxCalculation: finalTaxCalculation,
+        summary: {
+          regularGrossPay: regularPayroll.grossPay,
+          gratuityAmount: gratuityCalculation.amount,
+          leavePayoutAmount: leavePayout.leavePayout,
+          finalGrossPay: finalGrossPay,
+          regularDeductions: regularPayroll.totalDeductions,
+          finalDeductions: finalDeductions.total,
+          additionalTax: finalTaxCalculation.additionalTax,
+          finalTotalDeductions: finalTotalDeductions,
+          finalNetPay: finalNetPay,
+        },
+        isFinalPayroll: true,
+        calculatedAt: new Date(),
+      };
+
+      console.log(
+        `✅ [FINAL PAYROLL] Final payroll calculated for ${
+          employee.email
+        }: ₦${finalNetPay.toLocaleString()}`
+      );
+      return finalPayrollData;
+    } catch (error) {
+      console.error(
+        "❌ [FINAL PAYROLL] Error calculating final payroll:",
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate gratuity based on years of service
+   * @param {Object} employee - Employee object
+   * @param {number} periodSalary - Salary for the payroll period (monthly/quarterly/yearly)
+   * @param {string} frequency - Payroll frequency (monthly, quarterly, yearly, one_time)
+   * @returns {Object} Gratuity calculation
+   */
+  calculateGratuity(employee, periodSalary, frequency = "monthly") {
+    const yearsOfService = employee.yearsOfService || 0;
+
+    // Convert period salary to annual salary for gratuity calculation
+    let annualSalary = periodSalary;
+    switch (frequency) {
+      case "monthly":
+        annualSalary = periodSalary * 12;
+        break;
+      case "quarterly":
+        annualSalary = periodSalary * 4;
+        break;
+      case "yearly":
+        annualSalary = periodSalary;
+        break;
+      case "one_time":
+        // For one-time payrolls, assume it's monthly equivalent
+        annualSalary = periodSalary * 12;
+        break;
+      default:
+        annualSalary = periodSalary * 12; // Default to monthly
+    }
+
+    // Standard gratuity: 1 month salary per year of service
+    // Minimum 1 year service required for gratuity
+    const monthlySalary = annualSalary / 12;
+    const gratuityAmount =
+      yearsOfService >= 1 ? yearsOfService * monthlySalary : 0;
+
+    return {
+      yearsOfService,
+      periodSalary,
+      annualSalary,
+      monthlySalary,
+      gratuityAmount,
+      frequency,
+      breakdown: {
+        type: "Gratuity",
+        years: yearsOfService,
+        periodRate: periodSalary,
+        annualRate: annualSalary,
+        monthlyRate: monthlySalary,
+        amount: gratuityAmount,
+        frequency: frequency,
+      },
+    };
+  }
+
+  /**
+   * Calculate final deductions (outstanding loans, etc.)
+   * @param {string} employeeId - Employee ID
+   * @param {number} baseSalary - Base salary for calculations
+   * @returns {Object} Final deductions
+   */
+  async calculateFinalDeductions(employeeId, baseSalary) {
+    try {
+      // Get all active deductions for the employee
+      const deductions = await Deduction.find({
+        $or: [{ employee: employeeId }, { employees: employeeId }],
+        isActive: true,
+        type: "voluntary", // Only voluntary deductions (loans, etc.)
+      });
+
+      const finalDeductions = {
+        items: [],
+        total: 0,
+      };
+
+      deductions.forEach((deduction) => {
+        let amount = 0;
+
+        if (deduction.calculationType === "fixed") {
+          amount = deduction.amount || 0;
+        } else if (deduction.calculationType === "percentage") {
+          amount = (baseSalary * (deduction.amount || 0)) / 100;
+        }
+
+        finalDeductions.items.push({
+          name: deduction.name,
+          category: deduction.category,
+          amount: amount,
+          type: deduction.calculationType,
+        });
+
+        finalDeductions.total += amount;
+      });
+
+      return finalDeductions;
+    } catch (error) {
+      console.error(
+        "❌ [FINAL PAYROLL] Error calculating final deductions:",
+        error
+      );
+      return { items: [], total: 0 };
+    }
+  }
+
+  /**
+   * Calculate additional tax on gratuity and leave payout
+   * @param {number} gratuityAmount - Gratuity amount
+   * @param {number} leavePayoutAmount - Leave payout amount
+   * @param {number} regularTax - Regular PAYE tax
+   * @returns {Object} Final tax calculation
+   */
+  async calculateFinalTax(gratuityAmount, leavePayoutAmount, regularTax) {
+    try {
+      // Gratuity and leave payout are typically taxable
+      const additionalTaxableIncome = gratuityAmount + leavePayoutAmount;
+
+      // Calculate additional tax on the extra income
+      const additionalTax = await this.calculatePAYETax(
+        additionalTaxableIncome,
+        0, // No additional allowances
+        0, // No additional bonuses
+        "monthly"
+      );
+
+      return {
+        additionalTaxableIncome,
+        additionalTax: additionalTax.payeAmount,
+        totalTax: regularTax + additionalTax.payeAmount,
+        breakdown: {
+          regularTax: regularTax,
+          additionalTax: additionalTax.payeAmount,
+          totalTax: regularTax + additionalTax.payeAmount,
+        },
+      };
+    } catch (error) {
+      console.error("❌ [FINAL PAYROLL] Error calculating final tax:", error);
+      return {
+        additionalTaxableIncome: 0,
+        additionalTax: 0,
+        totalTax: regularTax,
+        breakdown: {
+          regularTax: regularTax,
+          additionalTax: 0,
+          totalTax: regularTax,
+        },
+      };
+    }
+  }
+
+  /**
    * Save calculated payroll data to database
    */
   async savePayroll(payrollData, userId = "system") {
     try {
       console.log(`💾 [PAYROLL] Saving calculated payroll data to database`);
+      console.log(
+        `📊 [PAYROLL] Processing ${payrollData.payrolls.length} employees for ${payrollData.scope.type} scope`
+      );
 
       // Import Payroll model
       const Payroll = (await import("../models/Payroll.js")).default;
 
+      // Track processing summary
+      const processingSummary = {
+        totalEmployees: payrollData.payrolls.length,
+        successful: 0,
+        failed: 0,
+        errors: [],
+        bonusesConsumed: 0,
+        allowancesConsumed: 0,
+        totalGrossPay: 0,
+        totalNetPay: 0,
+        totalDeductions: 0,
+        scope: payrollData.scope.type,
+        period: `${payrollData.period.month}/${payrollData.period.year}`,
+        frequency: payrollData.period.frequency,
+      };
+
+      // Mark items as used and track consumption
       for (const payroll of payrollData.payrolls) {
-        await this.markItemsAsUsed(
-          payroll.allowances?.items || [],
-          payroll.bonuses?.items || [],
-          payroll.deductions?.items || [],
-          {
-            userId,
-            employeeId: payroll.employee.id,
-            employeeName: payroll.employee.name,
-            month: payrollData.period.month,
-            year: payrollData.period.year,
-            scope: payrollData.scope.type,
-            frequency: payrollData.period.frequency,
-            processedBy: userId,
-          }
-        );
+        try {
+          await this.markItemsAsUsed(
+            payroll.allowances?.items || [],
+            payroll.bonuses?.items || [],
+            payroll.deductions?.items || [],
+            {
+              userId,
+              employeeId: payroll.employee.id,
+              employeeName: payroll.employee.name,
+              month: payrollData.period.month,
+              year: payrollData.period.year,
+              scope: payrollData.scope.type,
+              frequency: payrollData.period.frequency,
+              processedBy: userId,
+            }
+          );
+
+          // Track consumed items
+          processingSummary.bonusesConsumed += (
+            payroll.bonuses?.items || []
+          ).length;
+          processingSummary.allowancesConsumed += (
+            payroll.allowances?.items || []
+          ).length;
+          processingSummary.totalGrossPay += payroll.summary.grossPay || 0;
+          processingSummary.totalNetPay += payroll.summary.netPay || 0;
+          processingSummary.totalDeductions +=
+            payroll.summary.totalDeductions || 0;
+        } catch (error) {
+          console.error(
+            `❌ [PAYROLL] Error marking items as used for ${payroll.employee.name}:`,
+            error
+          );
+          processingSummary.errors.push({
+            employee: payroll.employee.name,
+            error: error.message,
+            step: "markItemsAsUsed",
+          });
+        }
       }
 
       // Create Payroll records for each employee
       const savedPayrolls = [];
       for (const payroll of payrollData.payrolls) {
-        // Get department ID for department scope
-        let departmentId = null;
-        if (payrollData.scope.type === "department") {
-          // For department scope, we need to get the department ID from the scope details
-          if (
-            payrollData.scope.details &&
-            payrollData.scope.details.departments &&
-            payrollData.scope.details.departments.length > 0
-          ) {
-            departmentId = payrollData.scope.details.departments[0].id;
+        try {
+          // Get department ID for department scope
+          let departmentId = null;
+          if (payrollData.scope.type === "department") {
+            // For department scope, we need to get the department ID from the scope details
+            if (
+              payrollData.scope.details &&
+              payrollData.scope.details.departments &&
+              payrollData.scope.details.departments.length > 0
+            ) {
+              departmentId = payrollData.scope.details.departments[0].id;
+            }
           }
+
+          const payrollRecord = new Payroll({
+            month: payrollData.period.month,
+            year: payrollData.period.year,
+            frequency: payrollData.period.frequency,
+            scope: payrollData.scope.type,
+            processingDate: new Date(),
+            employee: payroll.employee.id,
+            department: departmentId,
+
+            baseSalary: payroll.baseSalary.effectiveBaseSalary,
+            // Grade allowances
+            housingAllowance: payroll.baseSalary.gradeAllowances?.housing || 0,
+            transportAllowance:
+              payroll.baseSalary.gradeAllowances?.transport || 0,
+            mealAllowance: payroll.baseSalary.gradeAllowances?.meal || 0,
+            otherAllowance: payroll.baseSalary.gradeAllowances?.other || 0,
+            personalAllowances:
+              payroll.allowances?.items?.map((item) => ({
+                name: item.name,
+                amount: item.amount,
+                type: item.calculationType,
+              })) || [],
+            personalBonuses:
+              payroll.bonuses?.items?.map((item) => ({
+                name: item.name,
+                amount: item.amount,
+                type: item.calculationType,
+              })) || [],
+            deductions:
+              payroll.deductions?.items?.map((item) => ({
+                name: item.name,
+                amount: item.amount,
+                type: item.type,
+              })) || [],
+            grossSalary: payroll.summary.grossPay,
+            netSalary: payroll.summary.netPay,
+            totalDeductions: payroll.summary.totalDeductions,
+            paye: payroll.deductions?.paye || 0,
+            pension:
+              payroll.deductions?.items?.find((d) => d.category === "pension")
+                ?.amount || 0,
+            nhis:
+              payroll.deductions?.items?.find((d) => d.category === "nhis")
+                ?.amount || 0,
+            totalAllowances: payroll.allowances?.total || 0,
+            totalBonuses: payroll.bonuses?.total || 0,
+            taxableIncome: payroll.summary.taxableIncome || 0,
+            nonTaxableAllowances:
+              (payroll.baseSalary.gradeAllowances?.housing || 0) +
+              (payroll.baseSalary.gradeAllowances?.transport || 0) +
+              (payroll.baseSalary.gradeAllowances?.meal || 0) +
+              (payroll.baseSalary.gradeAllowances?.other || 0),
+            createdBy: userId,
+            processedBy: userId,
+          });
+
+          const savedPayroll = await payrollRecord.save();
+          savedPayrolls.push(savedPayroll);
+          processingSummary.successful++;
+
+          console.log(
+            `✅ [PAYROLL] Saved payroll for ${payroll.employee.name} (${payroll.employee.employeeId})`
+          );
+        } catch (error) {
+          console.error(
+            `❌ [PAYROLL] Error saving payroll for ${payroll.employee.name}:`,
+            error
+          );
+          processingSummary.failed++;
+          processingSummary.errors.push({
+            employee: payroll.employee.name,
+            employeeId: payroll.employee.employeeId,
+            error: error.message,
+            step: "savePayrollRecord",
+          });
         }
-
-        const payrollRecord = new Payroll({
-          month: payrollData.period.month,
-          year: payrollData.period.year,
-          frequency: payrollData.period.frequency,
-          scope: payrollData.scope.type,
-          processingDate: new Date(),
-          employee: payroll.employee.id,
-          department: departmentId,
-
-          baseSalary: payroll.baseSalary.effectiveBaseSalary,
-          // Grade allowances
-          housingAllowance: payroll.baseSalary.gradeAllowances?.housing || 0,
-          transportAllowance:
-            payroll.baseSalary.gradeAllowances?.transport || 0,
-          mealAllowance: payroll.baseSalary.gradeAllowances?.meal || 0,
-          otherAllowance: payroll.baseSalary.gradeAllowances?.other || 0,
-          personalAllowances:
-            payroll.allowances?.items?.map((item) => ({
-              name: item.name,
-              amount: item.amount,
-              type: item.calculationType,
-            })) || [],
-          personalBonuses:
-            payroll.bonuses?.items?.map((item) => ({
-              name: item.name,
-              amount: item.amount,
-              type: item.calculationType,
-            })) || [],
-          deductions:
-            payroll.deductions?.items?.map((item) => ({
-              name: item.name,
-              amount: item.amount,
-              type: item.type,
-            })) || [],
-          grossSalary: payroll.summary.grossPay,
-          netSalary: payroll.summary.netPay,
-          totalDeductions: payroll.summary.totalDeductions,
-          paye: payroll.deductions?.paye || 0,
-          pension:
-            payroll.deductions?.items?.find((d) => d.category === "pension")
-              ?.amount || 0,
-          nhis:
-            payroll.deductions?.items?.find((d) => d.category === "nhis")
-              ?.amount || 0,
-          totalAllowances: payroll.allowances?.total || 0,
-          totalBonuses: payroll.bonuses?.total || 0,
-          taxableIncome: payroll.summary.taxableIncome || 0,
-          nonTaxableAllowances:
-            (payroll.baseSalary.gradeAllowances?.housing || 0) +
-            (payroll.baseSalary.gradeAllowances?.transport || 0) +
-            (payroll.baseSalary.gradeAllowances?.meal || 0) +
-            (payroll.baseSalary.gradeAllowances?.other || 0),
-          createdBy: userId,
-          processedBy: userId,
-        });
-
-        const savedPayroll = await payrollRecord.save();
-        savedPayrolls.push(savedPayroll);
       }
 
       await AuditService.logPayrollProcessed(userId, {
@@ -1192,13 +1573,50 @@ class PayrollService {
         totalDeductions: payrollData.totalDeductions,
       });
 
+      // Log comprehensive processing summary
+      console.log(`📊 [PAYROLL] Processing Summary:`);
+      console.log(`   📈 Total Employees: ${processingSummary.totalEmployees}`);
+      console.log(`   ✅ Successful: ${processingSummary.successful}`);
+      console.log(`   ❌ Failed: ${processingSummary.failed}`);
+      console.log(
+        `   🎁 Bonuses Consumed: ${processingSummary.bonusesConsumed}`
+      );
+      console.log(
+        `   💰 Allowances Consumed: ${processingSummary.allowancesConsumed}`
+      );
+      console.log(
+        `   💵 Total Gross Pay: ₦${processingSummary.totalGrossPay.toLocaleString()}`
+      );
+      console.log(
+        `   💸 Total Net Pay: ₦${processingSummary.totalNetPay.toLocaleString()}`
+      );
+      console.log(
+        `   📉 Total Deductions: ₦${processingSummary.totalDeductions.toLocaleString()}`
+      );
+      console.log(`   🏢 Scope: ${processingSummary.scope}`);
+      console.log(
+        `   📅 Period: ${processingSummary.period} (${processingSummary.frequency})`
+      );
+
+      if (processingSummary.errors.length > 0) {
+        console.log(`⚠️ [PAYROLL] Errors encountered:`);
+        processingSummary.errors.forEach((error, index) => {
+          console.log(
+            `   ${index + 1}. ${error.employee} (${
+              error.employeeId || "N/A"
+            }): ${error.error} [${error.step}]`
+          );
+        });
+      }
+
       console.log(`✅ [PAYROLL] Payroll data saved successfully`);
 
-      // Return the saved payroll data with the actual database IDs
+      // Return the saved payroll data with comprehensive processing summary
       return {
         ...payrollData,
         savedPayrolls: savedPayrolls,
         payrollId: savedPayrolls[0]?._id,
+        processingSummary: processingSummary,
       };
     } catch (error) {
       console.error("Error saving payroll:", error);
@@ -1229,7 +1647,7 @@ class PayrollService {
         userId
       );
     } else {
-      // For processing, calculate then save
+      // For processing, calculate then save with duplicate handling
       const calculatedData = await this.calculatePayroll(
         month,
         year,
@@ -1238,7 +1656,236 @@ class PayrollService {
         scopeId,
         userId
       );
-      return await this.savePayroll(calculatedData, userId);
+      return await this.savePayrollWithDuplicateHandling(
+        calculatedData,
+        userId
+      );
+    }
+  }
+
+  /**
+   * Save payroll with duplicate handling - allows partial success
+   */
+  async savePayrollWithDuplicateHandling(payrollData, userId = "system") {
+    try {
+      console.log(`💾 [PAYROLL] Saving payroll with duplicate handling`);
+      console.log(
+        `📊 [PAYROLL] Processing ${payrollData.payrolls.length} employees for ${payrollData.scope.type} scope`
+      );
+
+      // Import Payroll model
+      const Payroll = (await import("../models/Payroll.js")).default;
+
+      // Check for existing payrolls for each employee
+      const duplicateCheck = await this.checkForDuplicatePayroll(
+        payrollData.period.month,
+        payrollData.period.year,
+        payrollData.period.frequency,
+        payrollData.scope.type,
+        payrollData.scope.details?.departments?.map((d) => d.id) ||
+          payrollData.scope.details?.employees?.map((e) => e.id),
+        userId
+      );
+
+      // Filter out employees with existing payrolls
+      const employeesToProcess = [];
+      const duplicateEmployees = [];
+
+      for (const payroll of payrollData.payrolls) {
+        const hasExistingPayroll = duplicateCheck.existingPayrolls.some(
+          (existing) => existing.employee._id.toString() === payroll.employee.id
+        );
+
+        if (hasExistingPayroll) {
+          duplicateEmployees.push({
+            employee: payroll.employee,
+            reason: "Duplicate payroll exists for this period",
+          });
+        } else {
+          employeesToProcess.push(payroll);
+        }
+      }
+
+      console.log(`🔍 [PAYROLL] Duplicate Check Results:`);
+      console.log(`   📊 Total Employees: ${payrollData.payrolls.length}`);
+      console.log(`   ✅ To Process: ${employeesToProcess.length}`);
+      console.log(`   ⚠️ Duplicates: ${duplicateEmployees.length}`);
+
+      if (duplicateEmployees.length > 0) {
+        console.log(`⚠️ [PAYROLL] Employees with existing payrolls:`);
+        duplicateEmployees.forEach((dup, index) => {
+          console.log(
+            `   ${index + 1}. ${dup.employee.name} (${
+              dup.employee.employeeId
+            }) - ${dup.reason}`
+          );
+        });
+      }
+
+      // If no employees to process, return early with summary
+      if (employeesToProcess.length === 0) {
+        return {
+          ...payrollData,
+          savedPayrolls: [],
+          payrollId: null,
+          processingSummary: {
+            totalEmployees: payrollData.payrolls.length,
+            successful: 0,
+            failed: 0,
+            duplicates: duplicateEmployees.length,
+            errors: duplicateEmployees.map((dup) => ({
+              employee: dup.employee.name,
+              employeeId: dup.employee.employeeId,
+              error: dup.reason,
+              step: "duplicate_check",
+            })),
+            bonusesConsumed: 0,
+            allowancesConsumed: 0,
+            totalGrossPay: 0,
+            totalNetPay: 0,
+            totalDeductions: 0,
+            scope: payrollData.scope.type,
+            period: `${payrollData.period.month}/${payrollData.period.year}`,
+            frequency: payrollData.period.frequency,
+          },
+        };
+      }
+
+      // Create new payroll data with only employees to process
+      const filteredPayrollData = {
+        ...payrollData,
+        payrolls: employeesToProcess,
+      };
+
+      // Process the filtered payroll
+      const result = await this.savePayroll(filteredPayrollData, userId);
+
+      // Add duplicate information to the result
+      result.processingSummary.duplicates = duplicateEmployees.length;
+      result.processingSummary.totalEmployees = payrollData.payrolls.length; // Original count
+
+      // Add duplicate errors to the errors array
+      if (duplicateEmployees.length > 0) {
+        result.processingSummary.errors = [
+          ...result.processingSummary.errors,
+          ...duplicateEmployees.map((dup) => ({
+            employee: dup.employee.name,
+            employeeId: dup.employee.employeeId,
+            error: dup.reason,
+            step: "duplicate_check",
+          })),
+        ];
+      }
+
+      return result;
+    } catch (error) {
+      console.error("Error saving payroll with duplicate handling:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check for duplicate payroll processing for the same period and scope
+   */
+  async checkForDuplicatePayroll(
+    month,
+    year,
+    frequency,
+    scope,
+    scopeId,
+    userId
+  ) {
+    try {
+      console.log(
+        `🔍 [PAYROLL] Checking for duplicate payroll: ${month}/${year} - ${frequency} - ${scope}`
+      );
+
+      const Payroll = (await import("../models/Payroll.js")).default;
+
+      // Build query based on scope
+      let query = {
+        month: parseInt(month),
+        year: parseInt(year),
+        frequency: frequency,
+        scope: scope,
+        createdBy: userId,
+      };
+
+      // Add scope-specific conditions
+      if (scope === "department" && scopeId) {
+        if (Array.isArray(scopeId)) {
+          query.department = { $in: scopeId };
+        } else {
+          query.department = scopeId;
+        }
+      } else if (scope === "individual" && scopeId) {
+        if (Array.isArray(scopeId)) {
+          query.employee = { $in: scopeId };
+        } else {
+          query.employee = scopeId;
+        }
+      }
+
+      const existingPayrolls = await Payroll.find(query)
+        .populate("employee", "firstName lastName employeeId")
+        .populate("department", "name")
+        .lean();
+
+      if (existingPayrolls.length > 0) {
+        const affectedEmployees = existingPayrolls.map((p) => ({
+          name: p.employee
+            ? `${p.employee.firstName} ${p.employee.lastName}`
+            : "Unknown",
+          employeeId: p.employee?.employeeId || "N/A",
+          department: p.department?.name || "N/A",
+        }));
+
+        let message = `Found ${existingPayrolls.length} existing payroll record(s) for ${scope} scope in ${month}/${year} (${frequency}). `;
+
+        if (scope === "company") {
+          message += `Company-wide payroll already processed.`;
+        } else if (scope === "department") {
+          const departments = [
+            ...new Set(
+              existingPayrolls.map((p) => p.department?.name).filter(Boolean)
+            ),
+          ];
+          message += `Department(s): ${departments.join(
+            ", "
+          )} already processed.`;
+        } else if (scope === "individual") {
+          const employeeNames = affectedEmployees.map(
+            (e) => `${e.name} (${e.employeeId})`
+          );
+          message += `Employee(s): ${employeeNames.join(
+            ", "
+          )} already processed.`;
+        }
+
+        return {
+          hasDuplicates: true,
+          message: message,
+          existingPayrolls: existingPayrolls,
+          affectedEmployees: affectedEmployees,
+          count: existingPayrolls.length,
+        };
+      }
+
+      return {
+        hasDuplicates: false,
+        message: "No duplicate payrolls found",
+        existingPayrolls: [],
+        affectedEmployees: [],
+        count: 0,
+      };
+    } catch (error) {
+      console.error(
+        "❌ [PAYROLL] Error checking for duplicate payroll:",
+        error
+      );
+      throw new Error(
+        `Failed to check for duplicate payroll: ${error.message}`
+      );
     }
   }
 

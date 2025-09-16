@@ -205,6 +205,8 @@ const NotificationBell = ({ className = "" }) => {
         return "📦";
       case "PROJECT_READY_IMPLEMENTATION":
         return "🚀";
+      case "FUND_ADDITION":
+        return "💰";
       default:
         return "📢";
     }

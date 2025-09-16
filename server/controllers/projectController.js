@@ -77,7 +77,21 @@ const generateNextProjectCode = async (departmentId) => {
 };
 
 // Helper function to determine budget threshold (department-aware)
-const getBudgetThreshold = (budget, departmentName) => {
+const getBudgetThreshold = (
+  budget,
+  departmentName,
+  requiresBudgetAllocation
+) => {
+  // For projects with budget allocation, use the new logic
+  if (requiresBudgetAllocation === true) {
+    if (budget < 5000000) {
+      return "legal_finance_approval";
+    } else {
+      return "executive_approval";
+    }
+  }
+
+  // For self-funded projects, use the old logic
   if (budget <= 1000000) return "hod_auto_approve";
 
   if (budget <= 5000000) {
@@ -85,7 +99,7 @@ const getBudgetThreshold = (budget, departmentName) => {
     if (departmentName === "Finance & Accounting") {
       return "executive_approval";
     }
-    return "department_approval";
+    return "project_management_approval";
   }
 
   if (budget <= 25000000) {
@@ -598,7 +612,8 @@ export const createProject = async (req, res) => {
     // Set budget threshold based on budget amount
     const budgetThreshold = getBudgetThreshold(
       req.body.budget,
-      currentUser.department?.name
+      currentUser.department?.name,
+      req.body.requiresBudgetAllocation
     );
 
     // Define 3 essential required documents for project approval

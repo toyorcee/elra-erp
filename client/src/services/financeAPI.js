@@ -189,3 +189,189 @@ export const addFinanceNote = async (id, noteData) => {
     throw error;
   }
 };
+
+// ===== ELRA WALLET API =====
+
+// Get ELRA wallet overview
+export const getELRAWallet = async () => {
+  try {
+    const response = await api.get("/elra-wallet");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching ELRA wallet:", error);
+    throw error;
+  }
+};
+
+// Add funds to ELRA wallet
+export const addFundsToWallet = async (fundsData) => {
+  try {
+    const response = await api.post("/elra-wallet/add-funds", fundsData);
+    return response.data;
+  } catch (error) {
+    console.error("Error adding funds to wallet:", error);
+    throw error;
+  }
+};
+
+// Set budget allocation in ELRA wallet
+export const setBudgetAllocation = async (budgetData) => {
+  try {
+    const response = await api.post("/elra-wallet/set-budget", budgetData);
+    return response.data;
+  } catch (error) {
+    console.error("Error setting budget allocation:", error);
+    throw error;
+  }
+};
+
+// Get wallet transaction history
+export const getWalletTransactions = async (params = {}) => {
+  try {
+    const response = await api.get("/elra-wallet/transactions", { params });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching wallet transactions:", error);
+    throw error;
+  }
+};
+
+// Export transaction history as PDF
+export const exportTransactionHistoryPDF = async (filters = {}) => {
+  try {
+    const response = await api.post(
+      "/elra-wallet/transactions/export/pdf",
+      filters,
+      {
+        responseType: "blob",
+      }
+    );
+
+    // Create blob and download
+    const blob = new Blob([response.data], { type: "application/pdf" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().split("T")[0];
+    link.download = `transaction_history_${timestamp}.pdf`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    return { success: true, message: "PDF exported successfully" };
+  } catch (error) {
+    console.error("Error exporting transaction history PDF:", error);
+    throw error;
+  }
+};
+
+// Export transaction history as Word/HTML
+export const exportTransactionHistoryWord = async (filters = {}) => {
+  try {
+    const response = await api.post(
+      "/elra-wallet/transactions/export/word",
+      filters,
+      {
+        responseType: "blob",
+      }
+    );
+
+    // Create blob and download
+    const blob = new Blob([response.data], { type: "text/html" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().split("T")[0];
+    link.download = `transaction_history_${timestamp}.html`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    return { success: true, message: "Word report exported successfully" };
+  } catch (error) {
+    console.error("Error exporting transaction history Word report:", error);
+    throw error;
+  }
+};
+
+// Get wallet allocations
+export const getWalletAllocations = async (params = {}) => {
+  try {
+    const response = await api.get("/elra-wallet/allocations", { params });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching wallet allocations:", error);
+    throw error;
+  }
+};
+
+// Get financial reports
+export const getFinancialReports = async (params = {}) => {
+  try {
+    const response = await api.get("/elra-wallet/reports", { params });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching financial reports:", error);
+    throw error;
+  }
+};
+
+// Update wallet settings
+export const updateWalletSettings = async (settingsData) => {
+  try {
+    const response = await api.put("/elra-wallet/settings", settingsData);
+    return response.data;
+  } catch (error) {
+    console.error("Error updating wallet settings:", error);
+    throw error;
+  }
+};
+
+// ===== PAYROLL APPROVALS API =====
+
+// Get pending payroll approvals
+export const getPendingPayrollApprovals = async () => {
+  try {
+    const response = await api.get("/payroll/approvals/pending");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching pending payroll approvals:", error);
+    throw error;
+  }
+};
+
+// Approve payroll
+export const approvePayroll = async (approvalId, approvalData = {}) => {
+  try {
+    const response = await api.post(
+      `/payroll/approvals/${approvalId}/approve`,
+      approvalData
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error approving payroll:", error);
+    throw error;
+  }
+};
+
+// Reject payroll
+export const rejectPayroll = async (approvalId, rejectionData = {}) => {
+  try {
+    const response = await api.post(
+      `/payroll/approvals/${approvalId}/reject`,
+      rejectionData
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error rejecting payroll:", error);
+    throw error;
+  }
+};

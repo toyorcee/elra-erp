@@ -543,477 +543,466 @@ const PaySlips = () => {
   const payslipSummary = getPayslipSummary(payslips);
 
   return (
-    <div className="space-y-6 p-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pay Slips</h1>
-          <p className="text-gray-600 mt-1">
-            View and manage employee pay slips from processed payrolls
-          </p>
-        </div>
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={fetchPayrolls}
-            disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-          >
-            <HiRefresh
-              className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`}
-            />
-            {loading ? "Loading..." : "Refresh"}
-          </button>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Header with ELRA Branding */}
+      <div className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between py-6">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl shadow-lg">
+                <HiDocumentDownload className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">
+                  Payslips Management
+                </h1>
+                <p className="text-gray-600 mt-1">
+                  View, download, and manage employee payslips across all
+                  departments
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={fetchPayrolls}
+                disabled={loading}
+                className="px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-lg hover:from-[var(--elra-primary-dark)] hover:to-[var(--elra-primary)] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-lg hover:shadow-xl"
+              >
+                <HiRefresh
+                  className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`}
+                />
+                {loading ? "Loading..." : "Refresh Data"}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Hierarchical Payroll Selection */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Payroll Selection
-          </h2>
-          <span className="text-sm text-gray-500">
-            {Array.isArray(payrolls)
-              ? `${payrolls.length} payrolls across ${sortedYears.length} years`
-              : "0 payrolls"}
-          </span>
-        </div>
-
-        {loading ? (
-          <div className="flex items-center justify-center py-6">
-            <HiRefresh className="w-6 h-6 animate-spin text-[var(--elra-primary)] mr-3" />
-            <span className="text-gray-600">Loading payrolls...</span>
-          </div>
-        ) : !Array.isArray(payrolls) || payrolls.length === 0 ? (
-          <div className="text-center py-8">
-            <HiDocumentDownload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              No payrolls processed yet
-            </h3>
-            <p className="text-gray-500">
-              Process a payroll to generate payslips here.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {sortedYears.map((year) => {
-              const yearPayrolls = groupedPayrolls[year];
-              const isExpanded = expandedYears.has(parseInt(year));
-              const totalEmployees = yearPayrolls.reduce(
-                (sum, payroll) => sum + payroll.payrolls.length,
-                0
-              );
-
-              return (
-                <div key={year} className="border border-gray-200 rounded-lg">
-                  {/* Year Header */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="space-y-8">
+          {/* Enhanced Search & Filter Section - Moved to Top */}
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <HiFilter className="w-6 h-6 text-white" />
+                  <h2 className="text-xl font-bold text-white">
+                    Search & Filter Payslips
+                  </h2>
+                </div>
+                <div className="flex items-center space-x-3">
                   <button
-                    onClick={() => toggleYearExpansion(parseInt(year))}
-                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors rounded-lg cursor-pointer"
+                    onClick={searchPayslips}
+                    disabled={loadingPayslips}
+                    className="px-6 py-2 text-sm font-medium text-[var(--elra-primary)] bg-white rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center shadow-md"
                   >
-                    <div className="flex items-center space-x-3">
-                      {isExpanded ? (
-                        <HiChevronDown className="w-5 h-5 text-gray-500" />
-                      ) : (
-                        <HiChevronRight className="w-5 h-5 text-gray-500" />
-                      )}
-                      <HiCalendar className="w-5 h-5 text-[var(--elra-primary)]" />
-                      <div className="text-left">
-                        <h3 className="font-semibold text-gray-900">{year}</h3>
-                        <p className="text-sm text-gray-500">
-                          {yearPayrolls.length} payroll
-                          {yearPayrolls.length !== 1 ? "s" : ""} •{" "}
-                          {totalEmployees} employee
-                          {totalEmployees !== 1 ? "s" : ""}
-                        </p>
-                      </div>
-                    </div>
+                    <HiSearch
+                      className={`w-4 h-4 mr-2 ${
+                        loadingPayslips ? "animate-spin" : ""
+                      }`}
+                    />
+                    {loadingPayslips ? "Searching..." : "Search"}
                   </button>
+                  <button
+                    onClick={() => {
+                      setFilters({
+                        month: "all",
+                        year: "all",
+                        scope: "all",
+                        status: "all",
+                        frequency: "all",
+                        department: "all",
+                        employeeId: "",
+                        employeeName: "",
+                      });
+                      setSearchTerm("");
+                      setSelectedPayroll(null);
+                      setPayslips([]);
+                    }}
+                    disabled={loadingPayslips}
+                    className="px-4 py-2 text-sm font-medium text-white bg-white/20 rounded-lg hover:bg-white/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              </div>
+            </div>
 
-                  {/* Months under this year */}
-                  {isExpanded && (
-                    <div className="px-4 pb-3 space-y-2">
-                      {yearPayrolls.map((payroll) => {
-                        const Icon = getScopeIcon(payroll.scope);
-                        const isSelected = selectedPayroll?._id === payroll._id;
+            <div className="p-6">
+              {/* Search Bar */}
+              <div className="mb-6">
+                <div className="relative">
+                  <HiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by employee name, ID, or department..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] text-gray-900 placeholder-gray-500"
+                  />
+                </div>
+              </div>
 
-                        return (
+              {/* Filter Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Month
+                  </label>
+                  <select
+                    value={filters.month}
+                    onChange={(e) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        month:
+                          e.target.value === "all"
+                            ? "all"
+                            : parseInt(e.target.value),
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] bg-white"
+                  >
+                    {months.map((month) => (
+                      <option key={month.value} value={month.value}>
+                        {month.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Year
+                  </label>
+                  <select
+                    value={filters.year}
+                    onChange={(e) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        year:
+                          e.target.value === "all"
+                            ? "all"
+                            : parseInt(e.target.value),
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] bg-white"
+                  >
+                    {years.map((year) => (
+                      <option key={year.value} value={year.value}>
+                        {year.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Frequency
+                  </label>
+                  <select
+                    value={filters.frequency}
+                    onChange={(e) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        frequency: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] bg-white"
+                  >
+                    {frequencies.map((frequency) => (
+                      <option key={frequency.value} value={frequency.value}>
+                        {frequency.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Scope
+                  </label>
+                  <select
+                    value={filters.scope}
+                    onChange={(e) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        scope: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] bg-white"
+                  >
+                    {scopes.map((scope) => (
+                      <option key={scope.value} value={scope.value}>
+                        {scope.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Department
+                  </label>
+                  <select
+                    value={filters.department}
+                    onChange={(e) =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        department: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] bg-white"
+                  >
+                    <option value="all">All Departments</option>
+                    {departments.map((dept) => (
+                      <option key={dept._id} value={dept._id}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Sort By
+                  </label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] bg-white"
+                  >
+                    {sortOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Payroll Selection Section */}
+          {Array.isArray(payrolls) && payrolls.length > 0 && (
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+              <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex items-center justify-center w-8 h-8 bg-[var(--elra-primary)] rounded-lg">
+                      <HiCalendar className="w-4 h-4 text-white" />
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900">
+                      Payroll Selection
+                    </h2>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <span className="text-sm font-medium text-gray-600 bg-white px-3 py-1 rounded-full border">
+                      {Array.isArray(payrolls)
+                        ? `${payrolls.length} payrolls across ${sortedYears.length} years`
+                        : "0 payrolls"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6">
+                {loading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="flex items-center space-x-3">
+                      <HiRefresh className="w-8 h-8 animate-spin text-[var(--elra-primary)]" />
+                      <span className="text-lg font-medium text-gray-600">
+                        Loading payrolls...
+                      </span>
+                    </div>
+                  </div>
+                ) : !Array.isArray(payrolls) || payrolls.length === 0 ? (
+                  <div className="text-center py-16">
+                    <div className="flex items-center justify-center w-20 h-20 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full mx-auto mb-6">
+                      <HiDocumentDownload className="w-10 h-10 text-gray-400" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                      No Payrolls Processed Yet
+                    </h3>
+                    <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                      Process a payroll to generate payslips and manage employee
+                      compensation records.
+                    </p>
+                    <div className="flex items-center justify-center space-x-4">
+                      <button
+                        onClick={fetchPayrolls}
+                        className="px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-lg hover:from-[var(--elra-primary-dark)] hover:to-[var(--elra-primary)] transition-all duration-200 flex items-center shadow-lg hover:shadow-xl"
+                      >
+                        <HiRefresh className="w-4 h-4 mr-2" />
+                        Refresh Data
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {sortedYears.map((year) => {
+                      const yearPayrolls = groupedPayrolls[year];
+                      const isExpanded = expandedYears.has(parseInt(year));
+                      const totalEmployees = yearPayrolls.reduce(
+                        (sum, payroll) => sum + payroll.payrolls.length,
+                        0
+                      );
+
+                      return (
+                        <div
+                          key={year}
+                          className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                        >
+                          {/* Year Header */}
                           <button
-                            key={payroll._id}
-                            onClick={() => setSelectedPayroll(payroll)}
-                            className={`w-full px-3 py-2 text-sm border rounded-md transition-all flex items-center justify-between cursor-pointer ${
-                              isSelected
-                                ? "border-[var(--elra-primary)] bg-[var(--elra-primary)] text-white"
-                                : "border-gray-200 hover:border-[var(--elra-primary)] hover:bg-gray-50"
-                            }`}
+                            onClick={() => toggleYearExpansion(parseInt(year))}
+                            className="w-full px-6 py-4 flex items-center justify-between hover:bg-gradient-to-r hover:from-gray-50 hover:to-gray-100 transition-all duration-200 cursor-pointer"
                           >
+                            <div className="flex items-center space-x-4">
+                              {isExpanded ? (
+                                <HiChevronDown className="w-5 h-5 text-[var(--elra-primary)]" />
+                              ) : (
+                                <HiChevronRight className="w-5 h-5 text-[var(--elra-primary)]" />
+                              )}
+                              <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-lg">
+                                <HiCalendar className="w-5 h-5 text-white" />
+                              </div>
+                              <div className="text-left">
+                                <h3 className="text-xl font-bold text-gray-900">
+                                  {year}
+                                </h3>
+                                <p className="text-sm text-gray-600">
+                                  {yearPayrolls.length} payroll
+                                  {yearPayrolls.length !== 1 ? "s" : ""} •{" "}
+                                  {totalEmployees} employee
+                                  {totalEmployees !== 1 ? "s" : ""}
+                                </p>
+                              </div>
+                            </div>
                             <div className="flex items-center space-x-2">
-                              <Icon
-                                className={`w-4 h-4 ${
-                                  isSelected
-                                    ? "text-white"
-                                    : "text-[var(--elra-primary)]"
-                                }`}
-                              />
-                              <span className="font-medium">
-                                {payroll.period.monthName}
-                              </span>
-                              <span
-                                className={`text-xs ${
-                                  isSelected ? "text-white/80" : "text-gray-500"
-                                }`}
-                              >
-                                {getScopeLabel(payroll.scope)}
+                              <span className="text-sm font-medium text-[var(--elra-primary)] bg-[var(--elra-primary)]/10 px-3 py-1 rounded-full">
+                                {yearPayrolls.length} batches
                               </span>
                             </div>
-                            <span
-                              className={`text-xs ${
-                                isSelected ? "text-white/80" : "text-gray-500"
-                              }`}
-                            >
-                              {payroll.payrolls.length} employee
-                              {payroll.payrolls.length !== 1 ? "s" : ""}
-                            </span>
                           </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
-      {/* Enhanced Filters & Search */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Search & Filter Payslips
-          </h2>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={searchPayslips}
-              disabled={loadingPayslips}
-              className="px-4 py-2 text-sm font-medium text-white bg-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-            >
-              <HiSearch
-                className={`w-4 h-4 mr-2 ${
-                  loadingPayslips ? "animate-spin" : ""
-                }`}
-              />
-              {loadingPayslips ? "Searching..." : "Search"}
-            </button>
-            <button
-              onClick={() => {
-                setFilters({
-                  month: "all",
-                  year: "all",
-                  scope: "all",
-                  status: "all",
-                  frequency: "all",
-                  department: "all",
-                  employeeId: "",
-                  employeeName: "",
-                });
-                setSearchTerm("");
-                setSelectedPayroll(null);
-                setPayslips([]);
-              }}
-              disabled={loadingPayslips}
-              className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Month
-            </label>
-            <select
-              value={filters.month}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  month:
-                    e.target.value === "all" ? "all" : parseInt(e.target.value),
-                }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-            >
-              {months.map((month) => (
-                <option key={month.value} value={month.value}>
-                  {month.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Year
-            </label>
-            <select
-              value={filters.year}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  year:
-                    e.target.value === "all" ? "all" : parseInt(e.target.value),
-                }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-            >
-              {years.map((year) => (
-                <option key={year.value} value={year.value}>
-                  {year.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Frequency
-            </label>
-            <select
-              value={filters.frequency}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  frequency: e.target.value,
-                }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-            >
-              {frequencies.map((frequency) => (
-                <option key={frequency.value} value={frequency.value}>
-                  {frequency.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Scope
-            </label>
-            <select
-              value={filters.scope}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  scope: e.target.value,
-                }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-            >
-              {scopes.map((scope) => (
-                <option key={scope.value} value={scope.value}>
-                  {scope.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Department
-            </label>
-            <select
-              value={filters.department}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  department: e.target.value,
-                }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-            >
-              <option value="all">All Departments</option>
-              {departments.map((dept) => (
-                <option key={dept._id} value={dept._id}>
-                  {dept.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Employee ID
-            </label>
-            <input
-              type="text"
-              placeholder="Enter employee ID..."
-              value={filters.employeeId}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  employeeId: e.target.value,
-                }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-            />
-          </div>
-        </div>
+                          {/* Months under this year */}
+                          {isExpanded && (
+                            <div className="px-6 pb-4 space-y-3 bg-gray-50/50">
+                              {yearPayrolls.map((payroll) => {
+                                const Icon = getScopeIcon(payroll.scope);
+                                const isSelected =
+                                  selectedPayroll?._id === payroll._id;
 
-        {/* Second row of filters */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Employee Name
-            </label>
-            <input
-              type="text"
-              placeholder="Search by name..."
-              value={filters.employeeName}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  employeeName: e.target.value,
-                }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Sort By
-            </label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-            >
-              {sortOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Order
-            </label>
-            <select
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-            >
-              <option value="desc">Descending</option>
-              <option value="asc">Ascending</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Search
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search employee..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-              />
-              <HiSearch className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between mt-4">
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => {
-                setFilters({
-                  month: "all",
-                  year: "all",
-                  scope: "all",
-                  status: "all",
-                  frequency: "all",
-                  department: "all",
-                  employeeId: "",
-                  employeeName: "",
-                });
-                setSearchTerm("");
-                setSortBy("createdAt");
-                setSortOrder("desc");
-              }}
-              disabled={loadingPayslips}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Clear Filters
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Summary Cards - Always Visible */}
-      <div className="flex justify-center">
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg w-full max-w-md border border-blue-200">
-          <div className="flex items-center justify-center">
-            <HiUserGroup className="w-12 h-12 text-blue-600" />
-            <div className="ml-4 text-center">
-              <p className="text-sm font-medium text-blue-700 mb-1">
-                Total Payslips
-              </p>
-              <p className="text-4xl font-bold text-blue-900">
-                {loadingPayslips ? (
-                  <HiRefresh className="w-10 h-10 animate-spin text-blue-600 mx-auto" />
-                ) : (
-                  payslips.length
+                                return (
+                                  <button
+                                    key={payroll._id}
+                                    onClick={() => setSelectedPayroll(payroll)}
+                                    className={`w-full px-4 py-3 text-sm border-2 rounded-lg transition-all duration-200 flex items-center justify-between cursor-pointer ${
+                                      isSelected
+                                        ? "border-[var(--elra-primary)] bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white shadow-lg"
+                                        : "border-gray-200 hover:border-[var(--elra-primary)] hover:bg-white hover:shadow-md"
+                                    }`}
+                                  >
+                                    <div className="flex items-center space-x-3">
+                                      <div
+                                        className={`flex items-center justify-center w-8 h-8 rounded-lg ${
+                                          isSelected
+                                            ? "bg-white/20"
+                                            : "bg-[var(--elra-primary)]/10"
+                                        }`}
+                                      >
+                                        <Icon
+                                          className={`w-4 h-4 ${
+                                            isSelected
+                                              ? "text-white"
+                                              : "text-[var(--elra-primary)]"
+                                          }`}
+                                        />
+                                      </div>
+                                      <div className="text-left">
+                                        <span className="font-semibold text-base">
+                                          {payroll.period.monthName}
+                                        </span>
+                                        <div className="flex items-center space-x-2 mt-1">
+                                          <span
+                                            className={`text-xs px-2 py-1 rounded-full ${
+                                              isSelected
+                                                ? "bg-white/20 text-white/90"
+                                                : "bg-[var(--elra-primary)]/10 text-[var(--elra-primary)]"
+                                            }`}
+                                          >
+                                            {getScopeLabel(payroll.scope)}
+                                          </span>
+                                          <span
+                                            className={`text-xs ${
+                                              isSelected
+                                                ? "text-white/80"
+                                                : "text-gray-500"
+                                            }`}
+                                          >
+                                            {payroll.period.frequency}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <span
+                                        className={`text-sm font-semibold ${
+                                          isSelected
+                                            ? "text-white"
+                                            : "text-gray-900"
+                                        }`}
+                                      >
+                                        {payroll.payrolls.length} employee
+                                        {payroll.payrolls.length !== 1
+                                          ? "s"
+                                          : ""}
+                                      </span>
+                                      <div
+                                        className={`text-xs mt-1 ${
+                                          isSelected
+                                            ? "text-white/80"
+                                            : "text-gray-500"
+                                        }`}
+                                      >
+                                        {new Date(
+                                          payroll.createdAt
+                                        ).toLocaleDateString()}
+                                      </div>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
-              </p>
-              <p className="text-xs text-blue-600 mt-1">
-                {selectedPayroll
-                  ? `${selectedPayroll.period.monthName} ${selectedPayroll.period.year}`
-                  : "All periods"}
-              </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* No Payslips State */}
+      {/* No Payslips State - Simple and Clean */}
       {payslips.length === 0 && !loadingPayslips && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-16">
           <div className="text-center">
-            <HiDocumentDownload className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              No payslips found
-            </h3>
-            <p className="text-gray-500 mb-6">
-              {selectedPayroll
-                ? `No payslips found for ${selectedPayroll.period.monthName} ${selectedPayroll.period.year}`
-                : "Try adjusting your search filters or select a different payroll period."}
-            </p>
-            <div className="flex justify-center space-x-3">
-              <button
-                onClick={() => {
-                  setFilters({
-                    month: "all",
-                    year: "all",
-                    scope: "all",
-                    status: "all",
-                    frequency: "all",
-                    department: "all",
-                    employeeId: "",
-                    employeeName: "",
-                  });
-                  setSearchTerm("");
-                  setSelectedPayroll(null);
-                }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Clear Filters
-              </button>
-              <button
-                onClick={searchPayslips}
-                className="px-4 py-2 text-sm font-medium text-white bg-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors"
-              >
-                Search All
-              </button>
+            <div className="flex items-center justify-center w-20 h-20 bg-gradient-to-r from-[var(--elra-primary)]/10 to-[var(--elra-primary-dark)]/10 rounded-full mx-auto mb-6">
+              <HiDocumentDownload className="w-10 h-10 text-[var(--elra-primary)]" />
             </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-3">
+              No Payslips Available
+            </h3>
+            <p className="text-gray-600 mb-6 max-w-md mx-auto">
+              {selectedPayroll
+                ? `No payslips were generated for ${selectedPayroll.period.monthName} ${selectedPayroll.period.year}.`
+                : "No payslips found. Try selecting a different payroll period or check if payroll processing is complete."}
+            </p>
+            <button
+              onClick={fetchPayrolls}
+              className="px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-lg hover:from-[var(--elra-primary-dark)] hover:to-[var(--elra-primary)] transition-all duration-200 flex items-center mx-auto shadow-lg hover:shadow-xl"
+            >
+              <HiRefresh className="w-4 h-4 mr-2" />
+              Refresh Data
+            </button>
           </div>
         </div>
       )}
@@ -1118,7 +1107,7 @@ const PaySlips = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-[var(--elra-primary)]/10 text-[var(--elra-primary)]">
                           {getPayslipStatus(payslip)}
                         </span>
                       </td>
@@ -1179,7 +1168,7 @@ const PaySlips = () => {
                               handleResendPaySlip(payslip.payrollId)
                             }
                             disabled={resendingPayslips || loadingPayslips}
-                            className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                            className="text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                             title="Resend Payslip"
                           >
                             <HiMail

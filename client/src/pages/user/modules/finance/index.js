@@ -1,15 +1,11 @@
-import FinanceManagement from "./FinanceManagement";
-import FinancialReports from "./FinancialReports";
-import ExpenseManagement from "./ExpenseManagement";
-import RevenueManagement from "./RevenueManagement";
-import FinancialTransactions from "./FinancialTransactions";
-import ProjectFinanceManagement from "./ProjectFinanceManagement";
+import ELRAWalletManagement from "./ELRAWalletManagement";
+import TransactionHistoryAndReports from "./TransactionHistoryAndReports";
+import BudgetAllocation from "./BudgetAllocation";
+import PayrollApprovals from "./PayrollApprovals";
 
 export {
-  FinanceManagement,
-  FinancialReports,
-  ExpenseManagement,
-  RevenueManagement,
-  FinancialTransactions,
-  ProjectFinanceManagement,
+  ELRAWalletManagement,
+  TransactionHistoryAndReports,
+  BudgetAllocation,
+  PayrollApprovals,
 };

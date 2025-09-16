@@ -156,7 +156,13 @@ const userSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["ACTIVE", "PENDING_REGISTRATION", "INACTIVE", "SUSPENDED"],
+      enum: [
+        "ACTIVE",
+        "PENDING_REGISTRATION",
+        "INACTIVE",
+        "SUSPENDED",
+        "PENDING_OFFBOARDING",
+      ],
       default: "ACTIVE",
     },
     lastLogin: {
@@ -308,6 +314,44 @@ const userSchema = new mongoose.Schema(
       min: 0,
       default: 0,
     },
+    // Leave balance tracking - dynamic based on leave types
+    leaveBalance: {
+      Annual: {
+        type: Number,
+        default: 21, // Standard 21 days annual leave
+        min: 0,
+      },
+      Sick: {
+        type: Number,
+        default: 12, // Standard 12 days sick leave
+        min: 0,
+      },
+      Personal: {
+        type: Number,
+        default: 5, // Standard 5 days personal leave
+        min: 0,
+      },
+      Maternity: {
+        type: Number,
+        default: 90, // Standard 90 days maternity leave
+        min: 0,
+      },
+      Paternity: {
+        type: Number,
+        default: 14, // Standard 14 days paternity leave
+        min: 0,
+      },
+      Study: {
+        type: Number,
+        default: 10, // Standard 10 days study leave
+        min: 0,
+      },
+      Bereavement: {
+        type: Number,
+        default: 5, // Standard 5 days bereavement leave
+        min: 0,
+      },
+    },
   },
   {
     timestamps: true,
@@ -318,8 +362,19 @@ userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
 
   try {
+    console.log("🔐 [USER MODEL] Password being hashed for user:", this.email);
+    console.log(
+      "🔐 [USER MODEL] Original password length:",
+      this.password?.length
+    );
+
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
+
+    console.log(
+      "🔐 [USER MODEL] Password hashed successfully, length:",
+      this.password?.length
+    );
 
     this.passwordChangedAt = Date.now() - 1000;
     next();

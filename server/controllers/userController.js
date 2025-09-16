@@ -73,32 +73,118 @@ export const getAllUsers = async (req, res) => {
       });
     }
 
-    query.email = { $not: /platformadmin/i };
-
     const users = await User.find(query)
       .populate("role", "name level description")
       .populate("department", "name description")
       .populate("supervisor", "name email")
       .select("-password");
 
-    const filteredUsers = users.filter((user) => {
-      // If user has no role (pending registration), include them
-      if (!user.role) return true;
-
-      // If user has a role, only include if it's not PLATFORM_ADMIN
-      return user.role.name !== "PLATFORM_ADMIN";
-    });
-
     res.json({
       success: true,
-      data: filteredUsers,
-      count: filteredUsers.length,
+      data: users,
+      count: users.length,
     });
   } catch (error) {
     console.error("Get all users error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch users",
+    });
+  }
+};
+
+// Get payroll-eligible employees (active + completed onboarding)
+export const getPayrollEligibleUsers = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    // Only allow HOD and Super Admin access
+    if (currentUser.role.level < 700) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Only HOD and Super Admin can view payroll-eligible users.",
+      });
+    }
+
+    let query = {
+      isActive: true,
+      status: "ACTIVE",
+    };
+
+    // For HODs (not Super Admin), limit to their department unless HR HOD
+    if (currentUser.role.level < 1000) {
+      if (!currentUser.department) {
+        return res.status(403).json({
+          success: false,
+          message: "You must be assigned to a department to view users",
+        });
+      }
+
+      // HR HOD can see ALL users across all departments
+      if (currentUser.department.name !== "Human Resources") {
+        query.department = currentUser.department._id;
+      }
+    }
+
+    console.log(
+      "🔍 [PAYROLL_ELIGIBLE] Fetching payroll-eligible users with query:",
+      query
+    );
+
+    // Get users with role and department populated
+    const users = await User.find(query)
+      .populate("role", "name level description")
+      .populate("department", "name description")
+      .select("-password");
+
+    // Import EmployeeLifecycle model
+    const EmployeeLifecycle = (await import("../models/EmployeeLifecycle.js"))
+      .default;
+
+    // Filter users who have completed onboarding
+    const payrollEligibleUsers = [];
+
+    for (const user of users) {
+      // Check if user has completed onboarding
+      const onboardingLifecycle = await EmployeeLifecycle.findOne({
+        employee: user._id,
+        type: "Onboarding",
+        status: "Completed",
+      });
+
+      if (onboardingLifecycle) {
+        payrollEligibleUsers.push({
+          ...user.toObject(),
+          onboardingStatus: "Completed",
+          onboardingCompletedAt: onboardingLifecycle.actualCompletionDate,
+        });
+        console.log(
+          `✅ [PAYROLL_ELIGIBLE] User ${user.email} is eligible for payroll`
+        );
+      } else {
+        console.log(
+          `❌ [PAYROLL_ELIGIBLE] User ${user.email} not eligible (onboarding not completed)`
+        );
+      }
+    }
+
+    console.log(
+      `📊 [PAYROLL_ELIGIBLE] Found ${payrollEligibleUsers.length} payroll-eligible users out of ${users.length} active users`
+    );
+
+    res.json({
+      success: true,
+      data: payrollEligibleUsers,
+      count: payrollEligibleUsers.length,
+      totalActive: users.length,
+      eligibleCount: payrollEligibleUsers.length,
+    });
+  } catch (error) {
+    console.error("Get payroll-eligible users error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch payroll-eligible users",
     });
   }
 };

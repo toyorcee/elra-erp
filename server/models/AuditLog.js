@@ -55,6 +55,7 @@ const auditLogSchema = new mongoose.Schema(
         "USER_ROLE_CHANGED",
         "USER_DEPARTMENT_CHANGED",
         "USER_PASSWORD_CHANGED",
+        "USER_REGISTERED_FROM_INVITATION",
         "INVITATION_CREATED",
         "INVITATION_RESENT",
         "INVITATION_USED",
@@ -129,6 +130,11 @@ const auditLogSchema = new mongoose.Schema(
         "LOGIN_ATTEMPT",
         "PERMISSION_DENIED",
         "SUSPICIOUS_ACTIVITY",
+
+        // Wallet and transaction actions
+        "ADD_FUNDS",
+        "EXPORT_TRANSACTION_HISTORY_PDF",
+        "EXPORT_TRANSACTION_HISTORY_WORD",
       ],
       required: true,
     },
@@ -152,6 +158,8 @@ const auditLogSchema = new mongoose.Schema(
         "PROJECT",
         "WORKFLOW_TEMPLATE",
         "TASK",
+        "ELRAWallet",
+        "ELRAWALLET",
       ],
     },
 
@@ -176,6 +184,7 @@ const auditLogSchema = new mongoose.Schema(
         "Project",
         "WorkflowTemplate",
         "Task",
+        "ELRAWallet",
       ],
     },
 

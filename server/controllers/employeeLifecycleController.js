@@ -36,7 +36,24 @@ const getAllLifecycles = asyncHandler(async (req, res) => {
 
   // Role-based access control
   const user = req.user;
-  if (user.role.level < 600) {
+
+  // Super Admin (level 1000+) can see all lifecycles
+  if (user.role.level >= 1000) {
+    // No department restriction
+  }
+  // HR HOD (level 700+ in Human Resources department) can see all lifecycles
+  else if (user.role.level >= 700) {
+    // Check if user is in Human Resources department
+    const userWithDept = await User.findById(user._id).populate("department");
+    if (
+      userWithDept.department &&
+      userWithDept.department.name !== "Human Resources"
+    ) {
+      // Non-HR HODs can only see their own department
+      query.department = user.department;
+    }
+    // HR HODs can see all departments (no restriction)
+  } else {
     query.department = user.department;
   }
 
@@ -154,8 +171,8 @@ const createLifecycle = asyncHandler(async (req, res) => {
     });
   }
 
-  // Create lifecycle from templates
-  const lifecycle = await EmployeeLifecycle.createFromTemplates(
+  // Create lifecycle using streamlined 5-task system
+  const lifecycle = await EmployeeLifecycle.createStandardLifecycle(
     employeeId,
     type,
     departmentId,
@@ -261,10 +278,10 @@ const completeChecklistItem = asyncHandler(async (req, res) => {
   });
 });
 
-// Update task status
+// Update task status (Start/Complete tasks)
 const updateTaskStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { taskId, status, notes } = req.body;
+  const { taskId, action, notes } = req.body; // action: "start" or "complete"
 
   const lifecycle = await EmployeeLifecycle.findById(id);
   if (!lifecycle) {
@@ -274,19 +291,66 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
     });
   }
 
-  await lifecycle.updateTaskStatus(taskId, status, req.user._id);
+  const task = lifecycle.tasks.id(taskId);
+  if (!task) {
+    return res.status(404).json({
+      success: false,
+      message: "Task not found",
+    });
+  }
+
+  let status;
+  let message;
+
+  if (action === "start") {
+    if (task.status === "Completed") {
+      return res.status(400).json({
+        success: false,
+        message: "Task is already completed",
+      });
+    }
+    await lifecycle.startTask(taskId, req.user._id);
+    status = "In Progress";
+    message = "Task started successfully";
+  } else if (action === "complete") {
+    if (task.status === "Completed") {
+      return res.status(400).json({
+        success: false,
+        message: "Task is already completed",
+      });
+    }
+    await lifecycle.completeTask(taskId, req.user._id, notes);
+    status = "Completed";
+    message = "Task completed successfully";
+  } else {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid action. Use 'start' or 'complete'",
+    });
+  }
 
   // Add timeline entry
   await lifecycle.addTimelineEntry(
     "Task Updated",
-    `Task status updated to ${status}`,
+    `Task "${task.title}" ${action}ed by HR`,
     req.user._id
   );
 
+  // Get updated lifecycle with populated data
+  const updatedLifecycle = await EmployeeLifecycle.findById(id).populate([
+    { path: "employee", select: "firstName lastName email avatar fullName" },
+    { path: "department", select: "name" },
+    { path: "assignedHR", select: "firstName lastName email" },
+    { path: "initiatedBy", select: "firstName lastName email" },
+    { path: "tasks.assignedTo", select: "firstName lastName email" },
+    { path: "tasks.completedBy", select: "firstName lastName email" },
+  ]);
+
   return res.status(200).json({
     success: true,
-    data: lifecycle,
-    message: "Task status updated successfully",
+    data: updatedLifecycle,
+    message: message,
+    progress: updatedLifecycle.getProgressPercentage(),
   });
 });
 
@@ -316,8 +380,16 @@ const getLifecycleStats = asyncHandler(async (req, res) => {
   const user = req.user;
   const query = {};
 
-  // Role-based filtering
-  if (user.role.level < 600) {
+  if (user.role.level >= 1000) {
+  } else if (user.role.level >= 700) {
+    const userWithDept = await User.findById(user._id).populate("department");
+    if (
+      userWithDept.department &&
+      userWithDept.department.name !== "Human Resources"
+    ) {
+      query.department = user.department;
+    }
+  } else {
     query.department = user.department;
   }
 
@@ -375,61 +447,116 @@ const initiateOffboarding = asyncHandler(async (req, res) => {
     });
   }
 
-  // Find existing offboarding lifecycle for this employee
+  // Get employee details
+  const employee = await User.findById(employeeId).populate("role department");
+  if (!employee) {
+    return res.status(404).json({
+      success: false,
+      message: "Employee not found",
+    });
+  }
+
+  // Check if offboarding lifecycle already exists
   const existingOffboarding = await EmployeeLifecycle.findOne({
     employee: employeeId,
     type: "Offboarding",
   });
 
-  if (!existingOffboarding) {
-    return res.status(404).json({
-      success: false,
-      message: "Offboarding lifecycle not found for this employee",
+  if (existingOffboarding) {
+    // Check if offboarding is already active
+    if (
+      existingOffboarding.status === "Initiated" ||
+      existingOffboarding.status === "In Progress"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Offboarding is already active for this employee",
+      });
+    }
+
+    // Reactivate existing offboarding
+    existingOffboarding.status = "Initiated";
+    existingOffboarding.startDate = new Date();
+    existingOffboarding.notes = `Offboarding re-initiated by ${req.user.firstName} ${req.user.lastName}`;
+
+    await existingOffboarding.save();
+
+    // Add timeline entry
+    await existingOffboarding.addTimelineEntry(
+      "Offboarding Re-initiated",
+      `Offboarding process re-started by ${req.user.firstName} ${req.user.lastName}`,
+      req.user._id
+    );
+
+    const populatedLifecycle = await EmployeeLifecycle.findById(
+      existingOffboarding._id
+    ).populate([
+      {
+        path: "employee",
+        select: "firstName lastName email avatar employeeId",
+      },
+      { path: "department", select: "name" },
+      { path: "assignedHR", select: "firstName lastName email" },
+      { path: "initiatedBy", select: "firstName lastName email" },
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: populatedLifecycle,
+      message: "Offboarding re-initiated successfully",
     });
   }
 
-  // Check if offboarding is already active
-  if (
-    existingOffboarding.status === "Initiated" ||
-    existingOffboarding.status === "In Progress"
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: "Offboarding is already active for this employee",
-    });
-  }
-
-  // Update the offboarding lifecycle to initiate it
-  existingOffboarding.status = "Initiated";
-  existingOffboarding.startDate = new Date();
-  existingOffboarding.targetCompletionDate = new Date(
-    Date.now() + 14 * 24 * 60 * 60 * 1000
-  ); // 14 days
-  existingOffboarding.notes = "Offboarding initiated by HR";
-
-  await existingOffboarding.save();
-
-  // Add timeline entry
-  await existingOffboarding.addTimelineEntry(
-    "Offboarding Initiated",
-    "Offboarding process started for employee",
-    req.user._id
+  // Create new offboarding lifecycle with 5 tasks
+  console.log(
+    `🚀 [OFFBOARDING] Creating offboarding lifecycle for: ${employee.email}`
   );
 
-  const populatedLifecycle = await EmployeeLifecycle.findById(
-    existingOffboarding._id
-  ).populate([
-    { path: "employee", select: "firstName lastName email avatar employeeId" },
-    { path: "department", select: "name" },
-    { path: "assignedHR", select: "firstName lastName email" },
-    { path: "initiatedBy", select: "firstName lastName email" },
-  ]);
+  try {
+    const offboardingLifecycle =
+      await EmployeeLifecycle.createStandardLifecycle(
+        employeeId,
+        "Offboarding",
+        employee.department,
+        employee.role,
+        req.user._id, // initiated by current user
+        req.user._id // assigned to current user (HR)
+      );
 
-  return res.status(200).json({
-    success: true,
-    data: populatedLifecycle,
-    message: "Offboarding initiated successfully",
-  });
+    console.log(
+      `✅ [OFFBOARDING] Created offboarding lifecycle with ID: ${offboardingLifecycle._id}`
+    );
+
+    // Populate the lifecycle for response
+    const populatedLifecycle = await EmployeeLifecycle.findById(
+      offboardingLifecycle._id
+    ).populate([
+      {
+        path: "employee",
+        select: "firstName lastName email avatar employeeId",
+      },
+      { path: "department", select: "name" },
+      { path: "assignedHR", select: "firstName lastName email" },
+      { path: "initiatedBy", select: "firstName lastName email" },
+      { path: "tasks.assignedTo", select: "firstName lastName email" },
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: populatedLifecycle,
+      message: "Offboarding initiated successfully with 5 tasks created",
+    });
+  } catch (error) {
+    console.error(
+      "❌ [OFFBOARDING] Error creating offboarding lifecycle:",
+      error
+    );
+    return res.status(500).json({
+      success: false,
+      message: "Failed to initiate offboarding",
+      error: error.message,
+    });
+  }
 });
 
 // Get offboarding lifecycles (only active ones)
@@ -464,7 +591,26 @@ const getOffboardingLifecycles = asyncHandler(async (req, res) => {
 
   // Role-based access control
   const user = req.user;
-  if (user.role.level < 600) {
+
+  // Super Admin (level 1000+) can see all lifecycles
+  if (user.role.level >= 1000) {
+    // No department restriction
+  }
+  // HR HOD (level 700+ in Human Resources department) can see all lifecycles
+  else if (user.role.level >= 700) {
+    // Check if user is in Human Resources department
+    const userWithDept = await User.findById(user._id).populate("department");
+    if (
+      userWithDept.department &&
+      userWithDept.department.name !== "Human Resources"
+    ) {
+      // Non-HR HODs can only see their own department
+      query.department = user.department;
+    }
+    // HR HODs can see all departments (no restriction)
+  }
+  // Other roles (level < 700) can only see their own department
+  else {
     query.department = user.department;
   }
 

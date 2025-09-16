@@ -251,14 +251,14 @@ const Dashboard = () => {
 
   const getAccessibleModules = () => {
     if (backendModules && backendModules.length > 0) {
-      return backendModules
+      const processedModules = backendModules
         .map((module) => {
           const moduleKey = module.code.toLowerCase().replace(/_/g, "-");
           const colors = getModuleColors(moduleKey);
           const icon = getModuleIcon(moduleKey);
           const description = getModuleDescription(moduleKey);
 
-          return {
+          const processedModule = {
             key: moduleKey,
             label: module.title || module.name,
             icon: icon,
@@ -270,8 +270,12 @@ const Dashboard = () => {
             badge: module.name?.split(" ")[0] || moduleKey,
             permissions: module.permissions,
           };
+
+          return processedModule;
         })
         .filter(Boolean);
+
+      return processedModules;
     }
 
     // Fallback to frontend filtering using the same logic as sidebar
@@ -417,6 +421,26 @@ const Dashboard = () => {
       }
     };
 
+    // Get module-specific icon colors
+    const getModuleIconColor = (moduleKey) => {
+      const colorMap = {
+        "self-service": "from-blue-500 to-blue-600",
+        hr: "from-purple-500 to-purple-600",
+        payroll: "from-green-500 to-green-600",
+        finance: "from-emerald-500 to-emerald-600",
+        procurement: "from-orange-500 to-orange-600",
+        projects: "from-indigo-500 to-indigo-600",
+        inventory: "from-cyan-500 to-cyan-600",
+        "customer-care": "from-pink-500 to-pink-600",
+        it: "from-gray-500 to-gray-600",
+        operations: "from-teal-500 to-teal-600",
+        sales: "from-rose-500 to-rose-600",
+        legal: "from-amber-500 to-amber-600",
+        "system-admin": "from-violet-500 to-violet-600",
+      };
+      return colorMap[moduleKey] || "from-gray-500 to-gray-600";
+    };
+
     return (
       <div
         key={module.key}
@@ -424,25 +448,29 @@ const Dashboard = () => {
           isActive
             ? "bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white shadow-2xl border-[var(--elra-primary)]"
             : `${module.bgColor} ${module.borderColor} hover:shadow-lg`
-        } border-0 rounded-2xl p-6 shadow-md`}
+        } border-0 rounded-2xl p-4 sm:p-6 shadow-md`}
         onClick={handleModuleClick}
       >
         <div className="flex items-center mb-4">
           <div
-            className={`p-3 rounded-xl transition-all duration-300 ${
+            className={`p-3 rounded-xl transition-all duration-300 shadow-lg ${
               isActive
-                ? "bg-white/20 shadow-lg"
-                : "bg-white/80 shadow-md group-hover:shadow-lg group-hover:bg-white"
+                ? "bg-white/20"
+                : `bg-gradient-to-br ${getModuleIconColor(
+                    module.key
+                  )} group-hover:shadow-xl`
             }`}
           >
             <IconComponent
-              className={`h-8 w-8 ${isActive ? "text-white" : ""}`}
+              className={`h-6 w-6 sm:h-8 sm:w-8 ${
+                isActive ? "text-white" : "text-white"
+              }`}
             />
           </div>
         </div>
 
         <h3
-          className={`text-xl font-bold ${
+          className={`text-lg sm:text-xl font-bold ${
             isActive ? "text-white" : module.color
           } mb-2`}
         >
@@ -450,7 +478,7 @@ const Dashboard = () => {
         </h3>
 
         <p
-          className={`text-sm leading-relaxed ${
+          className={`text-xs sm:text-sm leading-relaxed ${
             isActive ? "text-white/90" : "text-[var(--elra-text-secondary)]"
           }`}
         >
@@ -484,27 +512,27 @@ const Dashboard = () => {
     return (
       <div className="space-y-8">
         {/* Welcome Section */}
-        <div className="bg-[var(--elra-primary)] rounded-2xl p-8 text-white shadow-xl">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                <HomeIcon className="h-8 w-8" />
+        <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-xl border border-gray-100">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
+              <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-lg">
+                <HomeIcon className="h-8 w-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
                   Welcome back, {user?.firstName || "User"}!
                 </h1>
-                <p className="text-white/80 text-lg">
+                <p className="text-gray-600 text-base sm:text-lg">
                   Access your ERP modules and manage your business operations
                 </p>
               </div>
             </div>
 
             {/* Date and Time */}
-            <div className="text-right">
+            <div className="text-left lg:text-right">
               <div className="flex items-center space-x-2 mb-1">
-                <ClockIcon className="h-5 w-5 text-white/80" />
-                <span className="text-lg font-semibold">
+                <ClockIcon className="h-5 w-5 text-blue-600" />
+                <span className="text-lg font-semibold text-gray-800">
                   {currentTime.toLocaleTimeString("en-US", {
                     hour: "2-digit",
                     minute: "2-digit",
@@ -513,7 +541,7 @@ const Dashboard = () => {
                   })}
                 </span>
               </div>
-              <div className="text-white/80 text-sm">
+              <div className="text-gray-600 text-sm">
                 {currentTime.toLocaleDateString("en-US", {
                   weekday: "long",
                   year: "numeric",
@@ -524,22 +552,24 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
-              <div className="text-lg font-bold">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 text-center border border-blue-200 shadow-sm">
+              <div className="text-lg font-bold text-blue-800">
                 {accessibleModules.length}
               </div>
-              <div className="text-white/80 text-sm">Available Modules</div>
+              <div className="text-blue-600 text-sm">Available Modules</div>
             </div>
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
-              <div className="text-lg font-bold">
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 text-center border border-green-200 shadow-sm">
+              <div className="text-lg font-bold text-green-800">
                 {(user?.role?.name || "USER").replace(/_/g, " ")}
               </div>
-              <div className="text-white/80 text-sm">Your Role</div>
+              <div className="text-green-600 text-sm">Your Role</div>
             </div>
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center">
-              <div className="text-lg font-bold">{roleLevel}</div>
-              <div className="text-white/80 text-sm">Access Level</div>
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 text-center border border-purple-200 shadow-sm sm:col-span-2 lg:col-span-1">
+              <div className="text-lg font-bold text-purple-800">
+                {roleLevel}
+              </div>
+              <div className="text-purple-600 text-sm">Access Level</div>
             </div>
           </div>
         </div>
@@ -597,7 +627,7 @@ const Dashboard = () => {
           </div>
 
           {!isModulesCollapsed && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {modulesLoading ? (
                 <div className="col-span-full flex items-center justify-center py-12">
                   <div className="text-center">
@@ -784,7 +814,7 @@ const Dashboard = () => {
         </div>
 
         {/* Module Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {(module === "self-service" ||
             module === "self_service" ||
             module === "department-management") &&
@@ -804,17 +834,17 @@ const Dashboard = () => {
             : getModuleStats(module).map((stat, index) => (
                 <div
                   key={index}
-                  className="bg-[var(--elra-primary)] rounded-xl p-6 shadow-sm border border-[var(--elra-primary)] hover:shadow-md transition-all duration-300 hover:scale-105"
+                  className="bg-white rounded-xl p-4 sm:p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 hover:scale-105"
                 >
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-medium text-white">
+                    <h3 className="text-sm font-medium text-gray-800">
                       {stat.label}
                     </h3>
-                    <div className="p-2 rounded-lg bg-white/20">
+                    <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 shadow-md">
                       <stat.icon className="h-5 w-5 text-white" />
                     </div>
                   </div>
-                  <p className="text-2xl font-bold text-white mb-2">
+                  <p className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">
                     {stat.value}
                   </p>
 
@@ -822,17 +852,17 @@ const Dashboard = () => {
                   {module === "hr" && hrDashboardData && (
                     <div className="space-y-2">
                       {stat.label === "Total Staff" && (
-                        <div className="text-xs text-white/80 space-y-1">
+                        <div className="text-xs text-gray-600 space-y-1">
                           <div className="flex justify-between items-center">
                             <span>Active:</span>
-                            <span className="font-medium text-white">
+                            <span className="font-medium text-gray-800">
                               {hrDashboardData.summary?.totalStaff || 0}
                             </span>
                           </div>
                           {hrDashboardData.summary?.pendingInvitations > 0 && (
                             <div className="flex justify-between items-center">
                               <span>Pending Invites:</span>
-                              <span className="font-medium text-yellow-300">
+                              <span className="font-medium text-yellow-600">
                                 {hrDashboardData.summary?.pendingInvitations}
                               </span>
                             </div>
@@ -841,17 +871,17 @@ const Dashboard = () => {
                       )}
 
                       {stat.label === "New Hires" && (
-                        <div className="text-xs text-white/80 space-y-1">
+                        <div className="text-xs text-gray-600 space-y-1">
                           <div className="flex justify-between items-center">
                             <span>Last 30 days:</span>
-                            <span className="font-medium text-white">
+                            <span className="font-medium text-gray-800">
                               {hrDashboardData.summary?.newHires || 0}
                             </span>
                           </div>
                           {hrDashboardData.recentOnboardings?.length > 0 && (
                             <div className="flex justify-between items-center">
                               <span>Latest:</span>
-                              <span className="text-white/60">
+                              <span className="text-gray-500">
                                 {hrDashboardData.recentOnboardings[0]?.usedBy
                                   ?.firstName || "N/A"}
                               </span>
@@ -861,17 +891,17 @@ const Dashboard = () => {
                       )}
 
                       {stat.label === "On Leave" && (
-                        <div className="text-xs text-white/80 space-y-1">
+                        <div className="text-xs text-gray-600 space-y-1">
                           <div className="flex justify-between items-center">
                             <span>Currently:</span>
-                            <span className="font-medium text-white">
+                            <span className="font-medium text-gray-800">
                               {hrDashboardData.summary?.onLeave || 0}
                             </span>
                           </div>
                           {hrDashboardData.upcomingLeaves?.length > 0 && (
                             <div className="flex justify-between items-center">
                               <span>Upcoming:</span>
-                              <span className="font-medium text-white">
+                              <span className="font-medium text-gray-800">
                                 {hrDashboardData.upcomingLeaves.length}
                               </span>
                             </div>
@@ -880,17 +910,17 @@ const Dashboard = () => {
                       )}
 
                       {stat.label === "Departments" && (
-                        <div className="text-xs text-white/80 space-y-1">
+                        <div className="text-xs text-gray-600 space-y-1">
                           <div className="flex justify-between items-center">
                             <span>Active:</span>
-                            <span className="font-medium text-white">
+                            <span className="font-medium text-gray-800">
                               {hrDashboardData.summary?.totalDepartments || 0}
                             </span>
                           </div>
                           {hrDashboardData.leaveStats?.pendingRequests > 0 && (
                             <div className="flex justify-between items-center">
                               <span>Pending Leave:</span>
-                              <span className="font-medium text-yellow-300">
+                              <span className="font-medium text-yellow-600">
                                 {hrDashboardData.leaveStats?.pendingRequests}
                               </span>
                             </div>
@@ -904,14 +934,16 @@ const Dashboard = () => {
                   {module === "department-management" && (
                     <div className="space-y-2">
                       {stat.label === "Team Size" && (
-                        <div className="text-xs text-white/80 space-y-1">
+                        <div className="text-xs text-gray-600 space-y-1">
                           <div className="flex justify-between items-center">
                             <span>Active:</span>
-                            <span className="font-medium text-white">12</span>
+                            <span className="font-medium text-gray-800">
+                              12
+                            </span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span>On Leave:</span>
-                            <span className="font-medium text-yellow-300">
+                            <span className="font-medium text-yellow-600">
                               2
                             </span>
                           </div>
@@ -919,14 +951,14 @@ const Dashboard = () => {
                       )}
 
                       {stat.label === "Active Projects" && (
-                        <div className="text-xs text-white/80 space-y-1">
+                        <div className="text-xs text-gray-600 space-y-1">
                           <div className="flex justify-between items-center">
                             <span>In Progress:</span>
-                            <span className="font-medium text-white">6</span>
+                            <span className="font-medium text-gray-800">6</span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span>Pending Approval:</span>
-                            <span className="font-medium text-yellow-300">
+                            <span className="font-medium text-yellow-600">
                               2
                             </span>
                           </div>
@@ -934,14 +966,14 @@ const Dashboard = () => {
                       )}
 
                       {stat.label === "Pending Approvals" && (
-                        <div className="text-xs text-white/80 space-y-1">
+                        <div className="text-xs text-gray-600 space-y-1">
                           <div className="flex justify-between items-center">
                             <span>Projects:</span>
-                            <span className="font-medium text-white">2</span>
+                            <span className="font-medium text-gray-800">2</span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span>Leave Requests:</span>
-                            <span className="font-medium text-yellow-300">
+                            <span className="font-medium text-yellow-600">
                               1
                             </span>
                           </div>
@@ -949,16 +981,16 @@ const Dashboard = () => {
                       )}
 
                       {stat.label === "Budget Used" && (
-                        <div className="text-xs text-white/80 space-y-1">
+                        <div className="text-xs text-gray-600 space-y-1">
                           <div className="flex justify-between items-center">
                             <span>Allocated:</span>
-                            <span className="font-medium text-white">
+                            <span className="font-medium text-gray-800">
                               ₦2.5M
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span>Remaining:</span>
-                            <span className="font-medium text-green-300">
+                            <span className="font-medium text-green-600">
                               ₦540K
                             </span>
                           </div>
@@ -2315,7 +2347,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
         {renderDashboardContent()}
       </div>
 

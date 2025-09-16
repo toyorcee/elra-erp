@@ -99,6 +99,9 @@ const projectSchema = new mongoose.Schema(
       enum: [
         "hod_auto_approve",
         "department_approval",
+        "project_management_approval",
+        "legal_finance_approval",
+        "legal_executive_approval",
         "finance_approval",
         "executive_approval",
       ],
@@ -803,14 +806,14 @@ projectSchema.pre("save", async function (next) {
     }
 
     // Set budget threshold based on budget amount and budget allocation requirement
-    if (this.budget && !this.budgetThreshold) {
+    if (
+      this.budget &&
+      (!this.budgetThreshold || this.budgetThreshold === "department_approval")
+    ) {
       if (this.requiresBudgetAllocation === true) {
         // Personal Projects with Budget Allocation = TRUE
-        if (this.budget <= 1000000) {
-          // ≤ ₦1M: HOD → Project Management HOD → Legal → Finance → Budget Allocation
-          this.budgetThreshold = "legal_finance_approval";
-        } else if (this.budget <= 5000000) {
-          // ₦1M - ₦5M: HOD → Project Management → Legal → Finance → Budget Allocation
+        if (this.budget < 5000000) {
+          // < ₦5M: HOD → Project Management → Legal → Finance → Budget Allocation
           this.budgetThreshold = "legal_finance_approval";
         } else {
           // ≥ ₦5M: HOD → Project Management → Legal → Finance → Executive → Budget Allocation
@@ -2763,6 +2766,8 @@ projectSchema.methods.generateApprovalChain = async function () {
   // Check budget threshold to determine approval levels needed
   // NEW LOGIC: Consider both budget threshold AND budget allocation requirement
   const needsFullApprovalChain =
+    this.budgetThreshold === "legal_finance_approval" ||
+    this.budgetThreshold === "legal_executive_approval" ||
     this.budgetThreshold === "finance_approval" ||
     this.budgetThreshold === "executive_approval" ||
     this.requiresBudgetAllocation;

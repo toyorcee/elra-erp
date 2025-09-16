@@ -404,9 +404,13 @@ export const checkDepartmentAccess = (options = {}) => {
           });
         }
 
-        // For GET requests, filter by department
+        // For GET requests, filter by department (except for HR HODs)
         if (req.method === "GET") {
-          req.departmentFilter = { [resourceField]: userDepartmentId };
+          if (user.department?.name === "Human Resources") {
+            // HR HODs can see all departments
+          } else {
+            req.departmentFilter = { [resourceField]: userDepartmentId };
+          }
         }
 
         // For other requests, check if the resource belongs to user's department
@@ -414,7 +418,6 @@ export const checkDepartmentAccess = (options = {}) => {
           const resourceDepartmentId =
             req.body[resourceField] || req.params[resourceField];
 
-          // HR HOD can invite users to any department
           if (
             resourceDepartmentId &&
             resourceDepartmentId !== userDepartmentId &&
@@ -466,6 +469,43 @@ export const checkUserManagementAccess = checkDepartmentAccess({
     "Access denied. Only HOD (700) and Super Admin (1000) can manage users.",
 });
 
+// Specific middleware for lifecycle management (onboarding/offboarding)
+export const checkLifecycleAccess = async (req, res, next) => {
+  try {
+    const user = req.user;
+
+    // Super Admin can access everything
+    if (user.role.level >= 1000) {
+      return next();
+    }
+
+    // Check if user is HR HOD (level 700+ AND in Human Resources department)
+    if (user.role.level >= 700) {
+      const userWithDept = await User.findById(user._id).populate("department");
+
+      if (
+        userWithDept.department &&
+        userWithDept.department.name === "Human Resources"
+      ) {
+        return next();
+      }
+    }
+
+    // Access denied
+    return res.status(403).json({
+      success: false,
+      message:
+        "Access denied. Only HR HOD and Super Admin can manage employee lifecycles.",
+    });
+  } catch (error) {
+    console.error("❌ [AUTH] Error in checkLifecycleAccess:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Authentication error",
+    });
+  }
+};
+
 // Specific middleware for leave management
 export const checkLeaveAccess = checkDepartmentAccess({
   allowSuperAdmin: true,
@@ -499,17 +539,16 @@ export const checkWorkflowAccess = checkDepartmentAccess({
     "Access denied. Only HOD (700) and Super Admin (1000) can manage workflow tasks.",
 });
 
-// Specific middleware for budget allocation (Finance HOD only)
+// Specific middleware for budget allocation (Finance HOD and Executive HOD)
 export const checkBudgetAllocationAccess = async (req, res, next) => {
   try {
     const user = req.user;
 
-    // Check minimum role level (HOD = 700, SUPER_ADMIN = 1000)
     if (user.role.level < 700) {
       return res.status(403).json({
         success: false,
         message:
-          "Access denied. Only Finance HOD can manage budget allocations.",
+          "Access denied. Only Finance HOD or Executive HOD can access budget allocations.",
       });
     }
 
@@ -518,19 +557,21 @@ export const checkBudgetAllocationAccess = async (req, res, next) => {
       return next();
     }
 
-    // HOD (level 700) can access only if they're in Finance department
     if (user.role.level >= 700) {
       const userDepartment = user.department?.name || user.department;
 
-      if (userDepartment === "Finance & Accounting") {
+      if (
+        userDepartment === "Finance & Accounting" ||
+        userDepartment === "Executive Office"
+      ) {
         return next();
       }
     }
 
-    // If we reach here, user doesn't have sufficient permissions
     return res.status(403).json({
       success: false,
-      message: "Access denied. Only Finance HOD can manage budget allocations.",
+      message:
+        "Access denied. Only Finance HOD or Executive HOD can access budget allocations.",
     });
   } catch (error) {
     console.error("Budget allocation access check error:", error);
@@ -642,6 +683,178 @@ export const checkUserAccess = (req, res, next) => {
     return res.status(500).json({
       success: false,
       message: "Internal server error during authorization check",
+    });
+  }
+};
+
+// Check Finance & Accounting access
+export const checkFinanceAccess = async (req, res, next) => {
+  try {
+    const user = req.user;
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    // Super Admin has access to everything
+    if (user.isSuperadmin || user.role?.level === 1000) {
+      return next();
+    }
+
+    // Check if user is Finance & Accounting HOD or Executive Office HOD
+    const isFinanceHOD =
+      user.department?.name === "Finance & Accounting" &&
+      user.role?.level === 700;
+
+    const isExecutiveHOD =
+      user.department?.name === "Executive Office" && user.role?.level === 700;
+
+    if (!isFinanceHOD && !isExecutiveHOD) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Finance & Accounting HOD, Executive Office HOD, or Super Admin access required.",
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error("Finance access check error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during finance access check",
+    });
+  }
+};
+
+// Specific middleware for payroll approval access
+export const checkPayrollApprovalAccess = async (req, res, next) => {
+  try {
+    const user = req.user;
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    // Super Admin has access to everything
+    if (user.role.level >= 1000) {
+      return next();
+    }
+
+    // Check if user is Finance & Accounting HOD or Executive Office HOD
+    if (user.role.level >= 700) {
+      const userDepartment = user.department?.name || user.department;
+
+      if (
+        userDepartment === "Finance & Accounting" ||
+        userDepartment === "Executive Office" ||
+        userDepartment === "Human Resources"
+      ) {
+        return next();
+      }
+    }
+
+    return res.status(403).json({
+      success: false,
+      message:
+        "Access denied. Only Finance HOD, Executive HOD, HR HOD, or Super Admin can approve payroll.",
+    });
+  } catch (error) {
+    console.error("Payroll approval access check error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during payroll approval access check",
+    });
+  }
+};
+
+// Check Sales & Marketing access
+export const checkSalesMarketingAccess = async (req, res, next) => {
+  try {
+    const user = req.user;
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    // Super Admin has access to everything
+    if (user.isSuperadmin || user.role?.level === 1000) {
+      return next();
+    }
+
+    const isSalesMarketing = user.department?.name === "Sales & Marketing";
+
+    const isFinanceHOD =
+      user.department?.name === "Finance & Accounting" &&
+      user.role?.level === 700;
+
+    if (!isSalesMarketing && !isFinanceHOD) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Sales & Marketing department or Finance HOD access required.",
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error("Sales & Marketing access check error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during sales & marketing access check",
+    });
+  }
+};
+
+// Specific middleware for Sales & Marketing approval access
+export const checkSalesMarketingApprovalAccess = async (req, res, next) => {
+  try {
+    const user = req.user;
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    // Super Admin has access to everything
+    if (user.role.level >= 1000) {
+      return next();
+    }
+
+    // Check if user is Finance HOD, Sales & Marketing HOD, or Super Admin
+    if (user.role.level >= 700) {
+      const userDepartment = user.department?.name || user.department;
+
+      if (
+        userDepartment === "Finance & Accounting" ||
+        userDepartment === "Sales & Marketing"
+      ) {
+        return next();
+      }
+    }
+
+    return res.status(403).json({
+      success: false,
+      message:
+        "Access denied. Only Finance HOD, Sales & Marketing HOD, or Super Admin can approve transactions.",
+    });
+  } catch (error) {
+    console.error("Sales & Marketing approval access check error:", error);
+    return res.status(500).json({
+      success: false,
+      message:
+        "Internal server error during sales & marketing approval access check",
     });
   }
 };

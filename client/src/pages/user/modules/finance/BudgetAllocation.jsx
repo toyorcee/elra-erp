@@ -10,6 +10,7 @@ import {
   DocumentTextIcon,
   ChartBarIcon,
   MagnifyingGlassIcon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 import {
   CheckCircleIcon,
@@ -53,7 +54,6 @@ const BudgetAllocation = () => {
   const [filters, setFilters] = useState({
     status: "",
     allocationType: "",
-    search: "",
   });
 
   // Create form state
@@ -177,7 +177,7 @@ const BudgetAllocation = () => {
   const filterProjects = () => {
     let filtered = [...projects];
 
-    // Filter by project status
+    // Filter by project status only (DataTable handles search)
     if (filters.status) {
       if (filters.status === "pending_budget_allocation") {
         filtered = filtered.filter(
@@ -186,17 +186,6 @@ const BudgetAllocation = () => {
       } else if (filters.status === "approved") {
         filtered = filtered.filter((project) => project.status === "approved");
       }
-    }
-
-    // Filter by search term
-    if (filters.search) {
-      const searchTerm = filters.search.toLowerCase();
-      filtered = filtered.filter(
-        (project) =>
-          project.name?.toLowerCase().includes(searchTerm) ||
-          project.code?.toLowerCase().includes(searchTerm) ||
-          project.department?.name?.toLowerCase().includes(searchTerm)
-      );
     }
 
     setFilteredProjects(filtered);
@@ -493,162 +482,172 @@ const BudgetAllocation = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-              <CurrencyDollarIcon className="w-8 h-8 text-[var(--elra-primary)]" />
-              Project Budget Allocation
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Manage budget allocations for projects and operational funding
-            </p>
-          </div>
-        </div>
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-600 mb-2">
-                  Need Allocation
-                </p>
-                <p className="text-xl sm:text-2xl font-bold text-red-600 break-words leading-tight">
-                  {stats.pendingProjects || 0}
-                </p>
-              </div>
-              <div className="flex-shrink-0 p-3 bg-red-100 rounded-lg">
-                <DocumentTextIcon className="w-4 h-4 text-red-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-600 mb-2">
-                  Already Allocated
-                </p>
-                <p className="text-xl sm:text-2xl font-bold text-green-600 break-words leading-tight">
-                  {stats.allocatedProjects || 0}
-                </p>
-              </div>
-              <div className="flex-shrink-0 p-3 bg-green-100 rounded-lg">
-                <CheckIcon className="w-4 h-4 text-green-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-600 mb-2">
-                  Pending Approval
-                </p>
-                <p className="text-xl sm:text-2xl font-bold text-yellow-600 break-words leading-tight">
-                  {stats.pendingAllocations || 0}
-                </p>
-              </div>
-              <div className="flex-shrink-0 p-3 bg-yellow-100 rounded-lg">
-                <ClockIcon className="w-4 h-4 text-yellow-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-600 mb-2">
-                  Total Allocated
-                </p>
-                <p className="text-xl sm:text-2xl font-bold text-blue-600 break-words leading-tight">
-                  {formatCurrency(stats.totalAllocated || 0)}
-                </p>
-              </div>
-              <div className="flex-shrink-0 p-3 bg-blue-100 rounded-lg">
-                <CurrencyDollarIcon className="w-4 h-4 text-blue-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-600 mb-2">
-                  Total Items Cost
-                </p>
-                <p className="text-xl sm:text-2xl font-bold text-purple-600 break-words leading-tight">
-                  {formatCurrency(stats.totalProjectItemsCost || 0)}
-                </p>
-              </div>
-              <div className="flex-shrink-0 p-3 bg-purple-100 rounded-lg">
-                <ChartBarIcon className="w-4 h-4 text-purple-600" />
-              </div>
-            </div>
-          </div>
-        </div>
-        {/* Filters */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search
-              </label>
-              <div className="relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder={
-                    activeTab === "projects"
-                      ? "Search projects..."
-                      : "Search allocations..."
-                  }
-                  value={filters.search}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, search: e.target.value }))
-                  }
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            {activeTab === "projects" && (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="py-6">
+            <div className="flex items-center justify-between">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Project Status
-                </label>
-                <select
-                  value={filters.status}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, status: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-                >
-                  <option value="">All Projects</option>
-                  <option value="pending_budget_allocation">
-                    Need Allocation
-                  </option>
-                  <option value="approved">Already Allocated</option>
-                </select>
+                <h1 className="text-3xl font-bold text-slate-900">
+                  Project Budget Allocation
+                </h1>
+                <p className="mt-2 text-slate-600">
+                  Review and approve budget allocations for projects and
+                  operational funding
+                </p>
               </div>
-            )}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    loadStats();
+                    loadProjects();
+                    loadBudgetHistory();
+                  }}
+                  disabled={loading}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors disabled:opacity-50"
+                >
+                  <ArrowPathIcon
+                    className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                  />
+                  Refresh
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Project Budget Allocation Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          {/* Pending Projects Card */}
+          <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl shadow-lg border border-amber-200 p-6 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="p-4 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl shadow-lg">
+                  <DocumentTextIcon className="w-7 h-7 text-white" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-semibold text-amber-700 uppercase tracking-wide">
+                    Pending Projects
+                  </p>
+                  <p className="text-3xl font-bold text-amber-900">
+                    {stats.pendingProjects || 0}
+                  </p>
+                  <p className="text-xs text-amber-600 mt-1">
+                    Need Budget Allocation
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="w-3 h-3 bg-amber-400 rounded-full animate-pulse"></div>
+              </div>
+            </div>
           </div>
 
-          {/* Clear Filters Button */}
-          {(filters.search || filters.status) && (
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={() =>
-                  setFilters({ status: "", allocationType: "", search: "" })
-                }
-                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                Clear Filters
-              </button>
+          {/* Allocated Projects Card */}
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl shadow-lg border border-green-200 p-6 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="p-4 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg">
+                  <CheckIcon className="w-7 h-7 text-white" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-semibold text-green-700 uppercase tracking-wide">
+                    Allocated Projects
+                  </p>
+                  <p className="text-3xl font-bold text-green-900">
+                    {stats.allocatedProjects || 0}
+                  </p>
+                  <p className="text-xs text-green-600 mt-1">Budget Approved</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+              </div>
             </div>
-          )}
+          </div>
+
+          {/* Pending Approvals Card */}
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-lg border border-blue-200 p-6 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="p-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg">
+                  <ClockIcon className="w-7 h-7 text-white" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">
+                    Pending Approvals
+                  </p>
+                  <p className="text-3xl font-bold text-blue-900">
+                    {stats.pendingAllocations || 0}
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">Awaiting Review</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Total Allocated Card */}
+          <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl shadow-lg border border-purple-200 p-6 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="p-4 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl shadow-lg">
+                  <CurrencyDollarIcon className="w-7 h-7 text-white" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-semibold text-purple-700 uppercase tracking-wide">
+                    Total Allocated
+                  </p>
+                  <p className="text-2xl font-bold text-purple-900">
+                    {formatCurrency(stats.totalAllocated || 0)}
+                  </p>
+                  <p className="text-xs text-purple-600 mt-1">
+                    Budget Distributed
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Project Budget Allocation Tracking */}
+        <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl shadow-lg p-6 mb-6 text-white">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold">
+              Project Budget Allocation Tracking
+            </h2>
+            <div className="p-3 bg-white rounded-lg shadow-lg">
+              <ChartBarIcon className="w-6 h-6 text-[var(--elra-primary)]" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white rounded-lg p-4 shadow-lg">
+              <p className="text-sm font-bold text-[var(--elra-primary)] mb-1">
+                Total Project Items Cost
+              </p>
+              <p className="text-2xl font-black text-[var(--elra-primary)]">
+                {formatCurrency(stats.totalProjectItemsCost || 0)}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg p-4 shadow-lg">
+              <p className="text-sm font-bold text-green-600 mb-1">
+                Total Allocated Amount
+              </p>
+              <p className="text-2xl font-black text-green-600">
+                {formatCurrency(stats.totalAllocated || 0)}
+              </p>
+            </div>
+          </div>
         </div>
         {/* Tab Navigation */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
@@ -682,24 +681,17 @@ const BudgetAllocation = () => {
         {activeTab === "projects" ? (
           <>
             {/* Filter Summary */}
-            {(filters.status || filters.search) && (
+            {filters.status && (
               <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm text-blue-800">
-                    <span className="font-medium">Active Filters:</span>
-                    {filters.status && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        Status:{" "}
-                        {filters.status === "pending_budget_allocation"
-                          ? "Need Allocation"
-                          : "Already Allocated"}
-                      </span>
-                    )}
-                    {filters.search && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        Search: "{filters.search}"
-                      </span>
-                    )}
+                    <span className="font-medium">Active Filter:</span>
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      Status:{" "}
+                      {filters.status === "pending_budget_allocation"
+                        ? "Pending Allocation"
+                        : "Approved"}
+                    </span>
                   </div>
                   <span className="text-sm text-blue-600">
                     {filteredProjects.length} project
@@ -746,15 +738,18 @@ const BudgetAllocation = () => {
                     </div>
                   ),
                 }}
+                searchable={true}
+                sortable={true}
+                pagination={true}
+                itemsPerPage={10}
                 emptyState={{
                   icon: (
                     <DocumentTextIcon className="h-12 w-12 text-gray-400" />
                   ),
                   title: "No projects found",
-                  description:
-                    filters.status || filters.search
-                      ? "No projects match your current filters. Try adjusting your search criteria."
-                      : "No projects found that need budget allocation.",
+                  description: filters.status
+                    ? "No projects match your current status filter. Try adjusting your filter criteria."
+                    : "No projects found that need budget allocation.",
                 }}
               />
             </div>

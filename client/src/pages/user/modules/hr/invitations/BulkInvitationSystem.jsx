@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   EnvelopeIcon,
   UserGroupIcon,
@@ -12,9 +12,13 @@ import {
   ArrowPathIcon,
   XMarkIcon,
   DocumentArrowUpIcon,
+  XCircleIcon,
+  UserMinusIcon,
 } from "@heroicons/react/24/outline";
 import { userModulesAPI } from "../../../../../services/userModules.js";
 import { toast } from "react-toastify";
+import { motion, AnimatePresence } from "framer-motion";
+import { getImageUrl } from "../../../../../utils/fileUtils";
 
 const BulkInvitationSystem = () => {
   const [formData, setFormData] = useState({
@@ -39,6 +43,97 @@ const BulkInvitationSystem = () => {
   const [searching, setSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
 
+  // HOD conflict handling
+  const [hodConflict, setHodConflict] = useState(null);
+  const [showHodConflictDialog, setShowHodConflictDialog] = useState(false);
+  const [replacingHOD, setReplacingHOD] = useState(false);
+
+  // Email method state - moved up to avoid hoisting issues
+  const [emailMethod, setEmailMethod] = useState("csv");
+  const [manualEmailError, setManualEmailError] = useState("");
+
+  // Validation functions - moved up to avoid hoisting issues
+  const validateEmails = (emails) => {
+    const emailList = emails
+      .split(/[,\n]/)
+      .map((email) => email.trim())
+      .filter((email) => email);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const validEmails = [];
+    const invalidEmails = [];
+
+    emailList.forEach((email) => {
+      if (emailRegex.test(email)) {
+        validEmails.push(email.toLowerCase());
+      } else {
+        invalidEmails.push(email);
+      }
+    });
+
+    return { validEmails, invalidEmails };
+  };
+
+  // Non-state-updating validation function for internal calculations
+  const validateEmailsOnly = (emails, isManual = false) => {
+    if (!emails.trim()) {
+      return { validEmails: [], invalidEmails: [] };
+    }
+
+    const emailList = emails
+      .split(isManual ? /[,\n\s]+/ : /[,\n]/)
+      .map((email) => email.trim())
+      .filter((email) => email);
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const validEmails = [];
+    const invalidEmails = [];
+
+    emailList.forEach((email) => {
+      if (emailRegex.test(email)) {
+        validEmails.push(email.toLowerCase());
+      } else {
+        invalidEmails.push(email);
+      }
+    });
+
+    return { validEmails, invalidEmails };
+  };
+
+  const validateManualEmails = (emails) => {
+    const result = validateEmailsOnly(emails, true);
+
+    if (result.invalidEmails.length > 0) {
+      setManualEmailError(
+        `Invalid email addresses: ${result.invalidEmails.join(", ")}`
+      );
+    } else {
+      setManualEmailError("");
+    }
+
+    return result;
+  };
+
+  // Smart role filtering based on email count - memoized to prevent infinite re-renders
+  const filteredRoles = useMemo(() => {
+    let emailCount = 0;
+
+    if (emailMethod === "manual") {
+      const validation = validateEmailsOnly(formData.manualEmails, true);
+      emailCount = validation.validEmails.length;
+    } else {
+      const validation = validateEmailsOnly(formData.emails, false);
+      emailCount = validation.validEmails.length;
+    }
+
+    // If more than 1 email, filter out HOD roles
+    if (emailCount > 1) {
+      return roles.filter((role) => role.name !== "HOD" && role.level < 700);
+    }
+
+    // If 1 or 0 emails, show all roles (except Super Admin)
+    return roles;
+  }, [emailMethod, formData.manualEmails, formData.emails, roles]);
+
   const [invitationsLoading, setInvitationsLoading] = useState(false);
   const [invitationsError, setInvitationsError] = useState(null);
   const [invitations, setInvitations] = useState([]);
@@ -60,8 +155,6 @@ const BulkInvitationSystem = () => {
   const [csvFile, setCsvFile] = useState(null);
   const [csvEmails, setCsvEmails] = useState([]);
   const [showCsvPreview, setShowCsvPreview] = useState(false);
-  const [emailMethod, setEmailMethod] = useState("csv");
-  const [manualEmailError, setManualEmailError] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
   const [nextBatchNumber, setNextBatchNumber] = useState("");
   const [batchNumberLoading, setBatchNumberLoading] = useState(false);
@@ -115,11 +208,17 @@ const BulkInvitationSystem = () => {
       ]);
 
       if (departmentsRes.success) {
-        setDepartments(departmentsRes.data || []);
+        const filteredDepartments = (departmentsRes.data || []).filter(
+          (dept) => dept.name !== "System Admin"
+        );
+        setDepartments(filteredDepartments);
       }
 
       if (rolesRes.success) {
-        setRoles(rolesRes.data || []);
+        const filteredRoles = (rolesRes.data || []).filter(
+          (role) => role.name !== "SUPER_ADMIN"
+        );
+        setRoles(filteredRoles);
       }
     } catch (error) {
       console.error("Error loading data:", error);
@@ -318,6 +417,107 @@ const BulkInvitationSystem = () => {
       toast.error("Failed to refresh invitations");
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const handleHODReplacement = async () => {
+    if (!hodConflict) return;
+
+    // Check if HOD is in offboarding process
+    if (hodConflict.existingHOD.status !== "PENDING_OFFBOARDING") {
+      toast.error(
+        <div className="flex items-center space-x-3">
+          <div className="flex-shrink-0">
+            <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+              <ExclamationTriangleIcon className="h-5 w-5 text-white" />
+            </div>
+          </div>
+          <div>
+            <div className="font-medium text-white">
+              HOD Must Be In Offboarding Process
+            </div>
+            <div className="text-sm text-red-100">
+              Please initiate offboarding for {hodConflict.existingHOD.name}{" "}
+              first before replacing them as HOD.
+            </div>
+          </div>
+        </div>
+      );
+      return;
+    }
+
+    setReplacingHOD(true);
+    try {
+      // First, create the new invitation
+      const invitationData = {
+        emails: [formData.emails || formData.manualEmails],
+        departmentId: formData.departmentId,
+        roleId: formData.roleId,
+        batchName: formData.batchName,
+        isBatch: formData.isBatch,
+        replaceExistingHOD: true,
+        existingHODId: hodConflict.existingHOD.id,
+      };
+
+      let response;
+      if (!invitationData.isBatch && invitationData.emails.length === 1) {
+        response = await userModulesAPI.invitations.createSingleInvitation({
+          email: invitationData.emails[0],
+          departmentId: invitationData.departmentId,
+          roleId: invitationData.roleId,
+          replaceExistingHOD: true,
+          existingHODId: hodConflict.existingHOD.id,
+        });
+      } else {
+        response = await userModulesAPI.invitations.createBulkInvitations(
+          invitationData
+        );
+      }
+
+      // Show success message
+      toast.success(
+        <div className="flex items-center space-x-3">
+          <div className="flex-shrink-0">
+            <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+              <CheckCircleIcon className="h-5 w-5 text-white" />
+            </div>
+          </div>
+          <div>
+            <div className="font-medium text-white">
+              HOD Replaced Successfully
+            </div>
+            <div className="text-sm text-green-100">
+              New HOD invitation sent and previous HOD deactivated
+            </div>
+          </div>
+        </div>
+      );
+
+      // Close dialog and reset form
+      setShowHodConflictDialog(false);
+      setHodConflict(null);
+      setFormData({
+        emails: "",
+        manualEmails: "",
+        departmentId: "",
+        roleId: "",
+        batchName: "",
+        isBatch: false,
+      });
+      setShowCreateForm(false);
+      setError(null);
+      setResult(null);
+
+      // Refresh data
+      fetchNextBatchNumber();
+      fetchInvitations(1, invitationPagination.limit, true);
+    } catch (error) {
+      console.error("Error replacing HOD:", error);
+      const errorMessage =
+        error.response?.data?.message || "Failed to replace HOD";
+      toast.error(errorMessage);
+    } finally {
+      setReplacingHOD(false);
     }
   };
 
@@ -532,74 +732,44 @@ const BulkInvitationSystem = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData({
+    const newFormData = {
       ...formData,
       [name]: type === "checkbox" ? checked : value,
-    });
+    };
 
     // Auto-generate batch name if isBatch is checked and batchName is empty
     if (name === "isBatch" && checked && !formData.batchName) {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: checked,
-        batchName: generateBatchNumber(),
-      }));
+      newFormData.batchName = generateBatchNumber();
     }
-  };
 
-  const validateEmails = (emails) => {
-    const emailList = emails
-      .split(/[,\n]/)
-      .map((email) => email.trim())
-      .filter((email) => email);
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const validEmails = [];
-    const invalidEmails = [];
+    // Smart role validation: Clear HOD role if email count changes to > 1
+    if ((name === "emails" || name === "manualEmails") && formData.roleId) {
+      const selectedRole = roles.find((role) => role._id === formData.roleId);
+      if (
+        selectedRole &&
+        (selectedRole.name === "HOD" || selectedRole.level >= 700)
+      ) {
+        let emailCount = 0;
 
-    emailList.forEach((email) => {
-      if (emailRegex.test(email)) {
-        validEmails.push(email.toLowerCase());
-      } else {
-        invalidEmails.push(email);
+        if (name === "manualEmails") {
+          const validation = validateEmailsOnly(value, true);
+          emailCount = validation.validEmails.length;
+        } else {
+          const validation = validateEmailsOnly(value, false);
+          emailCount = validation.validEmails.length;
+        }
+
+        if (emailCount > 1) {
+          console.log("🔄 [FRONTEND] Clearing HOD role due to multiple emails");
+          newFormData.roleId = "";
+        }
       }
-    });
-
-    return { validEmails, invalidEmails };
-  };
-
-  const validateManualEmails = (emails) => {
-    if (!emails.trim()) {
-      setManualEmailError("");
-      return { validEmails: [], invalidEmails: [] };
     }
 
-    const emailList = emails
-      .split(/[,\n\s]+/)
-      .map((email) => email.trim())
-      .filter((email) => email);
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const validEmails = [];
-    const invalidEmails = [];
-
-    emailList.forEach((email) => {
-      if (emailRegex.test(email)) {
-        validEmails.push(email.toLowerCase());
-      } else {
-        invalidEmails.push(email);
-      }
-    });
-
-    if (invalidEmails.length > 0) {
-      setManualEmailError(
-        `Invalid email addresses: ${invalidEmails.join(", ")}`
-      );
-    } else {
-      setManualEmailError("");
-    }
-
-    return { validEmails, invalidEmails };
+    setFormData(newFormData);
   };
+
+  // Function to check for existing HOD in department
 
   const handlePreview = () => {
     let validEmails, invalidEmails;
@@ -664,6 +834,24 @@ const BulkInvitationSystem = () => {
         console.log("✅ [FRONTEND] Valid CSV emails:", validEmails);
       }
 
+      // Smart HOD filtering: Only allow HOD role for single email invitations
+      const selectedRole = roles.find((role) => role._id === formData.roleId);
+      if (
+        selectedRole &&
+        (selectedRole.name === "HOD" || selectedRole.level >= 700)
+      ) {
+        if (validEmails.length > 1) {
+          console.log("⚠️ [FRONTEND] HOD role not allowed for multiple emails");
+          setError(
+            "HOD role can only be assigned to one person at a time. Please select a different role or invite one person at a time."
+          );
+          clearInterval(progressInterval);
+          setSubmitting(false);
+          setSubmissionProgress(0);
+          return;
+        }
+      }
+
       const invitationData = {
         emails: validEmails,
         departmentId: formData.departmentId,
@@ -707,6 +895,7 @@ const BulkInvitationSystem = () => {
       setResult(response);
       setShowPreview(false);
       setShowSubmissionSummary(true);
+      setShowCreateForm(false); // Close the main invitation modal
 
       console.log("🔄 [FRONTEND] Refreshing invitations list");
       await fetchInvitations(1, 10, true);
@@ -760,6 +949,17 @@ const BulkInvitationSystem = () => {
       fetchNextBatchNumber();
     } catch (error) {
       console.error("Error creating invitations:", error);
+
+      // Check if it's a HOD conflict
+      if (
+        error.response?.status === 409 &&
+        error.response?.data?.conflict?.type === "existing_hod"
+      ) {
+        setHodConflict(error.response.data.conflict);
+        setShowHodConflictDialog(true);
+        return;
+      }
+
       const errorMessage =
         error.response?.data?.message ||
         "Error creating invitations. Please try again.";
@@ -799,21 +999,16 @@ const BulkInvitationSystem = () => {
     }
   };
 
-  const emailCount = (() => {
+  // Memoize email count calculation to prevent infinite re-renders
+  const emailCount = useMemo(() => {
     if (emailMethod === "manual") {
-      if (!formData.manualEmails.trim()) return 0;
-      const emailList = formData.manualEmails
-        .split(/[,\n\s]+/)
-        .map((email) => email.trim())
-        .filter((email) => email);
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      return emailList.filter((email) => emailRegex.test(email)).length;
+      const validation = validateEmailsOnly(formData.manualEmails, true);
+      return validation.validEmails.length;
     } else {
-      return formData.emails
-        ? validateEmails(formData.emails).validEmails.length
-        : 0;
+      const validation = validateEmailsOnly(formData.emails, false);
+      return validation.validEmails.length;
     }
-  })();
+  }, [emailMethod, formData.manualEmails, formData.emails]);
 
   const emailCountText = emailCount === 1 ? "email" : "emails";
 
@@ -1191,377 +1386,417 @@ const BulkInvitationSystem = () => {
         )}
 
         {/* Main Form */}
-        {showCreateForm && (
-          <div className="bg-white rounded-xl shadow-lg p-6 border border-[var(--elra-border-primary)] mb-6">
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
-                Email Addresses *
-              </label>
-
-              {/* Email Input Method Toggle */}
-              <div className="mb-4">
-                <div className="flex items-center space-x-4">
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="emailMethod"
-                      value="csv"
-                      checked={emailMethod === "csv"}
-                      onChange={(e) => setEmailMethod(e.target.value)}
-                      className="h-4 w-4 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] border-gray-300 cursor-pointer"
-                    />
-                    <span className="text-sm font-medium text-[var(--elra-text-primary)] cursor-pointer">
-                      Upload CSV File
-                    </span>
-                  </label>
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="emailMethod"
-                      value="manual"
-                      checked={emailMethod === "manual"}
-                      onChange={(e) => setEmailMethod(e.target.value)}
-                      className="h-4 w-4 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] border-gray-300 cursor-pointer"
-                    />
-                    <span className="text-sm font-medium text-[var(--elra-text-primary)] cursor-pointer">
-                      Enter Manually
-                    </span>
-                  </label>
+        {/* Beautiful Invitation Modal */}
+        <AnimatePresence>
+          {showCreateForm && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="fixed inset-0 bg-white bg-opacity-90 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                  setShowCreateForm(false);
+                }
+              }}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                transition={{
+                  duration: 0.3,
+                  type: "spring",
+                  damping: 25,
+                  stiffness: 300,
+                }}
+                className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="sticky top-0 bg-[var(--elra-primary)] text-white p-6 rounded-t-2xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <motion.div
+                        initial={{ rotate: -180, scale: 0 }}
+                        animate={{ rotate: 0, scale: 1 }}
+                        transition={{
+                          delay: 0.2,
+                          duration: 0.5,
+                          type: "spring",
+                        }}
+                        className="p-2 bg-white rounded-lg"
+                      >
+                        <EnvelopeIcon className="h-6 w-6 text-[var(--elra-primary)]" />
+                      </motion.div>
+                      <div>
+                        <h2 className="text-2xl font-bold">
+                          Create Invitation
+                        </h2>
+                        <p className="text-green-100 text-sm">
+                          Invite new users to join ELRA
+                        </p>
+                      </div>
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.1, rotate: 90 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => setShowCreateForm(false)}
+                      className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-all duration-200"
+                    >
+                      <XMarkIcon className="h-6 w-6" />
+                    </motion.button>
+                  </div>
                 </div>
-              </div>
 
-              {/* CSV Upload Section */}
-              {emailMethod === "csv" && (
-                <div
-                  className={`mb-4 p-4 border-2 border-dashed rounded-lg transition-all duration-200 ${
-                    isDragOver
-                      ? "border-[var(--elra-primary)] bg-blue-50 scale-105"
-                      : "border-[var(--elra-border-primary)] bg-gray-50"
-                  }`}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                >
-                  <div className="text-center">
-                    <DocumentArrowUpIcon
-                      className={`h-8 w-8 mx-auto mb-2 transition-all duration-200 ${
-                        isDragOver
-                          ? "text-[var(--elra-primary)] animate-bounce scale-110"
-                          : "text-[var(--elra-primary)]"
-                      }`}
-                    />
-                    <p
-                      className={`text-sm mb-2 transition-colors duration-200 ${
-                        isDragOver
-                          ? "text-[var(--elra-primary)] font-medium"
-                          : "text-[var(--elra-text-secondary)]"
-                      }`}
-                    >
-                      {isDragOver
-                        ? "Drop your CSV file here!"
-                        : "Upload CSV file with email addresses"}
-                    </p>
-                    <p className="text-xs text-[var(--elra-text-muted)] mb-3">
-                      Drag and drop your CSV file here, or click to browse
-                    </p>
-                    <input
-                      type="file"
-                      accept=".csv"
-                      onChange={handleCsvUpload}
-                      className="hidden"
-                      id="csv-upload"
-                    />
-                    <label
-                      htmlFor="csv-upload"
-                      className="inline-flex items-center px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary)] cursor-pointer transition-colors"
-                    >
-                      <DocumentArrowUpIcon className="h-4 w-4 mr-2" />
-                      {csvFile ? "Change File" : "Choose File"}
+                {/* Modal Content */}
+                <div className="p-6">
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
+                      Email Addresses *
                     </label>
-                    <p className="text-xs text-[var(--elra-text-muted)] mt-2">
-                      CSV should contain only email addresses (one per row). Max
-                      size: 5MB
-                    </p>
 
-                    {/* Show selected file name */}
-                    {csvFile && (
-                      <div className="mt-3 p-2 bg-white border border-[var(--elra-border-primary)] rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <DocumentArrowUpIcon className="h-4 w-4 text-[var(--elra-primary)]" />
-                            <span className="text-sm font-medium text-[var(--elra-text-primary)]">
-                              {csvFile.name}
-                            </span>
-                          </div>
-                          <button
-                            onClick={clearCsvData}
-                            className="text-red-600 hover:text-red-800 text-sm"
+                    {/* Email Input Method Toggle */}
+                    <div className="mb-4">
+                      <div className="flex items-center space-x-4">
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="emailMethod"
+                            value="csv"
+                            checked={emailMethod === "csv"}
+                            onChange={(e) => setEmailMethod(e.target.value)}
+                            className="h-4 w-4 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] border-gray-300 cursor-pointer"
+                          />
+                          <span className="text-sm font-medium text-[var(--elra-text-primary)] cursor-pointer">
+                            Upload CSV File
+                          </span>
+                        </label>
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="emailMethod"
+                            value="manual"
+                            checked={emailMethod === "manual"}
+                            onChange={(e) => setEmailMethod(e.target.value)}
+                            className="h-4 w-4 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] border-gray-300 cursor-pointer"
+                          />
+                          <span className="text-sm font-medium text-[var(--elra-text-primary)] cursor-pointer">
+                            Enter Manually
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* CSV Upload Section */}
+                    {emailMethod === "csv" && (
+                      <div
+                        className={`mb-4 p-4 border-2 border-dashed rounded-lg transition-all duration-200 ${
+                          isDragOver
+                            ? "border-[var(--elra-primary)] bg-green-50 scale-105"
+                            : "border-[var(--elra-border-primary)] bg-gray-50"
+                        }`}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                      >
+                        <div className="text-center">
+                          <DocumentArrowUpIcon
+                            className={`h-8 w-8 mx-auto mb-2 transition-all duration-200 ${
+                              isDragOver
+                                ? "text-[var(--elra-primary)] animate-bounce scale-110"
+                                : "text-[var(--elra-primary)]"
+                            }`}
+                          />
+                          <p
+                            className={`text-sm mb-2 transition-colors duration-200 ${
+                              isDragOver
+                                ? "text-[var(--elra-primary)] font-medium"
+                                : "text-[var(--elra-text-secondary)]"
+                            }`}
                           >
-                            Remove
-                          </button>
+                            {isDragOver
+                              ? "Drop your CSV file here!"
+                              : "Upload CSV file with email addresses"}
+                          </p>
+                          <p className="text-xs text-[var(--elra-text-muted)] mb-3">
+                            Drag and drop your CSV file here, or click to browse
+                          </p>
+                          <input
+                            type="file"
+                            accept=".csv"
+                            onChange={handleCsvUpload}
+                            className="hidden"
+                            id="csv-upload"
+                          />
+                          <label
+                            htmlFor="csv-upload"
+                            className="inline-flex items-center px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary)] cursor-pointer transition-colors"
+                          >
+                            <DocumentArrowUpIcon className="h-4 w-4 mr-2" />
+                            {csvFile ? "Change File" : "Choose File"}
+                          </label>
+                          <p className="text-xs text-[var(--elra-text-muted)] mt-2">
+                            CSV should contain only email addresses (one per
+                            row). Max size: 5MB
+                          </p>
+
+                          {csvFile && (
+                            <div className="mt-3 p-2 bg-white border border-[var(--elra-border-primary)] rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                  <DocumentArrowUpIcon className="h-4 w-4 text-[var(--elra-primary)]" />
+                                  <span className="text-sm font-medium text-[var(--elra-text-primary)]">
+                                    {csvFile.name}
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={clearCsvData}
+                                  className="text-red-600 hover:text-red-800 text-sm"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                              <p className="text-xs text-[var(--elra-text-secondary)] mt-1">
+                                Size: {(csvFile.size / 1024).toFixed(1)} KB
+                              </p>
+                            </div>
+                          )}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Manual Email Input */}
+                    {emailMethod === "manual" && (
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
+                          Enter Email Addresses
+                        </label>
+                        <textarea
+                          name="manualEmails"
+                          value={formData.manualEmails}
+                          onChange={(e) => {
+                            handleInputChange(e);
+                            clearTimeout(window.validationTimeout);
+                            window.validationTimeout = setTimeout(() => {
+                              validateManualEmails(e.target.value);
+                            }, 300);
+                          }}
+                          onBlur={(e) => {
+                            validateManualEmails(e.target.value);
+                          }}
+                          onPaste={(e) => {
+                            e.preventDefault();
+                            const pastedText = e.clipboardData.getData("text");
+                            const normalizedText = pastedText
+                              .replace(/\r\n/g, "\n")
+                              .replace(/\r/g, "\n")
+                              .replace(/[,\s]+/g, "\n")
+                              .split("\n")
+                              .map((email) => email.trim())
+                              .filter((email) => email)
+                              .join("\n");
+
+                            const newValue = formData.manualEmails
+                              ? formData.manualEmails + "\n" + normalizedText
+                              : normalizedText;
+
+                            setFormData((prev) => ({
+                              ...prev,
+                              manualEmails: newValue,
+                            }));
+                            validateManualEmails(newValue);
+                          }}
+                          placeholder="Enter email addresses separated by commas, spaces, or new lines&#10;Example:&#10;john@company.com&#10;jane@company.com&#10;mike@company.com&#10;&#10;💡 You can also paste a list of emails from Excel, Word, or any text source"
+                          rows={4}
+                          className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none bg-white/80 backdrop-blur-sm shadow-sm placeholder:text-xs ${
+                            manualEmailError
+                              ? "border-red-500"
+                              : "border-[var(--elra-border-primary)]"
+                          }`}
+                        />
+                        {manualEmailError && (
+                          <p className="text-xs text-red-600 mt-1 flex items-center">
+                            <ExclamationTriangleIcon className="h-3 w-3 mr-1" />
+                            {manualEmailError}
+                          </p>
+                        )}
+                        {formData.manualEmails && !manualEmailError && (
+                          <div className="mt-2 p-2 bg-[var(--elra-secondary-3)] rounded-lg">
+                            <div className="flex items-center space-x-2">
+                              <CheckCircleIcon className="h-4 w-4 text-[var(--elra-primary)]" />
+                              <span className="text-sm text-[var(--elra-primary)]">
+                                {(() => {
+                                  if (!formData.manualEmails.trim()) return 0;
+                                  const emailList = formData.manualEmails
+                                    .split(/[,\n\s]+/)
+                                    .map((email) => email.trim())
+                                    .filter((email) => email);
+                                  const emailRegex =
+                                    /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                                  const count = emailList.filter((email) =>
+                                    emailRegex.test(email)
+                                  ).length;
+                                  return `${count} valid ${
+                                    count === 1 ? "email" : "emails"
+                                  } detected`;
+                                })()}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                         <p className="text-xs text-[var(--elra-text-secondary)] mt-1">
-                          Size: {(csvFile.size / 1024).toFixed(1)} KB
+                          💡 You can separate emails with commas, spaces, or new
+                          lines. You can also paste email lists from Excel,
+                          Word, or any text source. Validation happens in
+                          real-time.
                         </p>
                       </div>
                     )}
-                  </div>
-                </div>
-              )}
 
-              {/* Manual Email Entry Section */}
-              {emailMethod === "manual" && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
-                    Enter Email Addresses
-                  </label>
-                  <textarea
-                    name="manualEmails"
-                    value={formData.manualEmails}
-                    onChange={(e) => {
-                      handleInputChange(e);
-                      // Debounce the validation to avoid too many calls
-                      clearTimeout(window.validationTimeout);
-                      window.validationTimeout = setTimeout(() => {
-                        validateManualEmails(e.target.value);
-                      }, 300);
-                    }}
-                    onBlur={(e) => {
-                      validateManualEmails(e.target.value);
-                    }}
-                    onPaste={(e) => {
-                      e.preventDefault();
-                      const pastedText = e.clipboardData.getData("text");
-                      const normalizedText = pastedText
-                        .replace(/\r\n/g, "\n")
-                        .replace(/\r/g, "\n")
-                        .replace(/[,\s]+/g, "\n")
-                        .split("\n")
-                        .map((email) => email.trim())
-                        .filter((email) => email)
-                        .join("\n");
-
-                      const newValue = formData.manualEmails
-                        ? formData.manualEmails + "\n" + normalizedText
-                        : normalizedText;
-
-                      setFormData((prev) => ({
-                        ...prev,
-                        manualEmails: newValue,
-                      }));
-                      validateManualEmails(newValue);
-                    }}
-                    placeholder="Enter email addresses separated by commas, spaces, or new lines&#10;Example:&#10;john@company.com&#10;jane@company.com&#10;mike@company.com&#10;&#10;💡 You can also paste a list of emails from Excel, Word, or any text source"
-                    rows={6}
-                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none bg-white/80 backdrop-blur-sm shadow-sm ${
-                      manualEmailError
-                        ? "border-red-500"
-                        : "border-[var(--elra-border-primary)]"
-                    }`}
-                  />
-                  {manualEmailError && (
-                    <p className="text-xs text-red-600 mt-1 flex items-center">
-                      <ExclamationTriangleIcon className="h-3 w-3 mr-1" />
-                      {manualEmailError}
-                    </p>
-                  )}
-                  {formData.manualEmails && !manualEmailError && (
-                    <div className="mt-2 p-2 bg-[var(--elra-secondary-3)] rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <CheckCircleIcon className="h-4 w-4 text-[var(--elra-primary)]" />
-                        <span className="text-sm text-[var(--elra-primary)]">
-                          {(() => {
-                            if (!formData.manualEmails.trim()) return 0;
-                            const emailList = formData.manualEmails
-                              .split(/[,\n\s]+/)
-                              .map((email) => email.trim())
-                              .filter((email) => email);
-                            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                            const count = emailList.filter((email) =>
-                              emailRegex.test(email)
-                            ).length;
-                            return `${count} valid ${
-                              count === 1 ? "email" : "emails"
-                            } detected`;
-                          })()}
-                        </span>
+                    {/* CSV Preview */}
+                    {showCsvPreview && csvEmails.length > 0 && (
+                      <div className="mb-4 p-3 bg-[var(--elra-secondary-3)] border border-[var(--elra-primary)] rounded-lg">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <CheckCircleIcon className="h-4 w-4 text-[var(--elra-primary)]" />
+                          <span className="text-sm font-medium text-[var(--elra-primary)]">
+                            📊 CSV Uploaded: {csvEmails.length} emails found
+                          </span>
+                        </div>
+                        <div className="max-h-20 overflow-y-auto">
+                          <p className="text-xs text-[var(--elra-primary)]">
+                            {csvEmails.slice(0, 5).join(", ")}
+                            {csvEmails.length > 5 &&
+                              ` ... and ${csvEmails.length - 5} more`}
+                          </p>
+                        </div>
                       </div>
+                    )}
+                  </div>
+
+                  {/* Department and Role Selection */}
+                  <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
+                        Department *
+                      </label>
+                      <select
+                        name="departmentId"
+                        value={formData.departmentId}
+                        onChange={handleInputChange}
+                        className="w-full p-3 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-border-focus)] focus:border-[var(--elra-border-focus)] bg-white text-[var(--elra-primary)]"
+                      >
+                        <option value="" className="text-gray-500">
+                          Select Department
+                        </option>
+                        {departments.map((dept) => (
+                          <option
+                            key={dept._id}
+                            value={dept._id}
+                            className="text-[var(--elra-primary)]"
+                          >
+                            {dept.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                  )}
-                  <p className="text-xs text-[var(--elra-text-secondary)] mt-1">
-                    💡 You can separate emails with commas, spaces, or new
-                    lines. You can also paste email lists from Excel, Word, or
-                    any text source. Validation happens in real-time.
-                  </p>
-                </div>
-              )}
 
-              {/* CSV Preview */}
-              {showCsvPreview && csvEmails.length > 0 && (
-                <div className="mb-4 p-3 bg-[var(--elra-secondary-3)] border border-[var(--elra-primary)] rounded-lg">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <CheckCircleIcon className="h-4 w-4 text-[var(--elra-primary)]" />
-                    <span className="text-sm font-medium text-[var(--elra-primary)]">
-                      📊 CSV Uploaded: {csvEmails.length} emails found
-                    </span>
-                  </div>
-                  <div className="max-h-20 overflow-y-auto">
-                    <p className="text-xs text-[var(--elra-primary)]">
-                      {csvEmails.slice(0, 5).join(", ")}
-                      {csvEmails.length > 5 &&
-                        ` ... and ${csvEmails.length - 5} more`}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
+                        Role *
+                      </label>
+                      <select
+                        name="roleId"
+                        value={formData.roleId}
+                        onChange={handleInputChange}
+                        className="w-full p-3 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-border-focus)] focus:border-[var(--elra-border-focus)] bg-white text-[var(--elra-primary)]"
+                      >
+                        <option value="" className="text-gray-500">
+                          Select Role
+                        </option>
+                        {filteredRoles.map((role) => (
+                          <option
+                            key={role._id}
+                            value={role._id}
+                            className="text-[var(--elra-primary)]"
+                          >
+                            {role.name.replace(/_/g, " ")}
+                          </option>
+                        ))}
+                      </select>
 
-            {/* Dynamic Layout based on batch option visibility */}
-            <div
-              className={`grid gap-6 ${
-                showBatchOption
-                  ? "grid-cols-1 md:grid-cols-2"
-                  : "grid-cols-1 md:grid-cols-2"
-              }`}
-            >
-              {/* Left Column - Only show when batch option is available */}
-              {showBatchOption && (
-                <div className="space-y-6">
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      name="isBatch"
-                      checked={formData.isBatch}
-                      onChange={handleInputChange}
-                      className="h-4 w-4 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] border-gray-300 rounded cursor-pointer"
-                    />
-                    <label className="text-sm font-medium text-[var(--elra-text-primary)] cursor-pointer">
-                      Create as batch invitation
-                    </label>
-                  </div>
-                </div>
-              )}
-
-              {/* Single Email Info - Show when batch option is hidden */}
-              {!showBatchOption && emailCount === 1 && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    <InformationCircleIcon className="h-4 w-4 text-blue-500" />
-                    <span className="text-sm text-blue-700">
-                      Single email invitation - batch option not available
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Department, Role, and Batch Number Selection */}
-              <div
-                className={`grid gap-6 ${
-                  showBatchOption && formData.isBatch && emailCount >= 2
-                    ? "grid-cols-3"
-                    : "grid-cols-1 md:grid-cols-2"
-                }`}
-              >
-                {/* Batch Number - Only show when batch is enabled and 2+ emails */}
-                {showBatchOption && formData.isBatch && emailCount >= 2 && (
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
-                      Next Batch Number:
-                    </label>
-                    <div className="p-3 bg-gray-100 border border-gray-200 rounded-lg">
-                      {batchNumberLoading ? (
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-700"></div>
-                      ) : (
-                        <span className="text-lg font-bold text-black uppercase tracking-wider">
-                          {(nextBatchNumber || "BATCH_001").replace(
-                            /[_-]/g,
-                            ""
-                          )}
-                        </span>
+                      {/* HOD Role Warning */}
+                      {emailCount > 1 && (
+                        <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <div className="flex items-center space-x-2">
+                            <InformationCircleIcon className="h-4 w-4 text-[var(--elra-primary)]" />
+                            <p className="text-sm text-green-700">
+                              <strong>HOD role hidden:</strong> HOD can only be
+                              assigned to one person at a time. For multiple
+                              invitations, please select Staff, Manager, or
+                              other roles.
+                            </p>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
-                )}
 
-                <div>
-                  <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
-                    Department *
-                  </label>
-                  <select
-                    name="departmentId"
-                    value={formData.departmentId}
-                    onChange={handleInputChange}
-                    className="w-full p-3 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-border-focus)] focus:border-[var(--elra-border-focus)] bg-white text-[var(--elra-primary)]"
-                  >
-                    <option value="" className="text-gray-500">
-                      Select Department
-                    </option>
-                    {departments.map((dept) => (
-                      <option
-                        key={dept._id}
-                        value={dept._id}
-                        className="text-[var(--elra-primary)]"
-                      >
-                        {dept.name}
-                      </option>
-                    ))}
-                  </select>
+                  {/* Info Text */}
+                  <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-start space-x-3">
+                      <InformationCircleIcon className="h-5 w-5 text-[var(--elra-primary)] mt-0.5 flex-shrink-0" />
+                      <div className="text-sm text-green-700">
+                        <h4 className="font-medium text-green-800 mb-1">
+                          Automatic Role Assignment
+                        </h4>
+                        <p>
+                          When you select a role, the system automatically
+                          assigns the appropriate salary grade, compensation
+                          structure, and allowances. This ensures consistency
+                          across your organization.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-[var(--elra-text-primary)] mb-2">
-                    Role *
-                  </label>
-                  <select
-                    name="roleId"
-                    value={formData.roleId}
-                    onChange={handleInputChange}
-                    className="w-full p-3 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-border-focus)] focus:border-[var(--elra-border-focus)] bg-white text-[var(--elra-primary)]"
-                  >
-                    <option value="" className="text-gray-500">
-                      Select Role
-                    </option>
-                    {roles.map((role) => (
-                      <option
-                        key={role._id}
-                        value={role._id}
-                        className="text-[var(--elra-primary)]"
-                      >
-                        {role.name.replace(/_/g, " ")}
-                      </option>
-                    ))}
-                  </select>
+                {/* Modal Footer */}
+                <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t border-gray-200 rounded-b-2xl">
+                  <div className="flex justify-between items-center">
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setShowCreateForm(false)}
+                      className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-100 transition-all duration-200 font-medium"
+                    >
+                      Cancel
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handlePreview}
+                      disabled={
+                        (emailMethod === "manual"
+                          ? !formData.manualEmails
+                          : !formData.emails) ||
+                        !formData.departmentId ||
+                        !formData.roleId ||
+                        (emailMethod === "manual" && manualEmailError)
+                      }
+                      className="px-8 py-3 bg-[var(--elra-primary)] text-white rounded-xl hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-3 font-medium shadow-lg"
+                    >
+                      <ClipboardDocumentListIcon className="h-5 w-5" />
+                      <span>Preview Invitations</span>
+                      <ArrowRightIcon className="h-4 w-4" />
+                    </motion.button>
+                  </div>
                 </div>
-              </div>
-
-              {/* Informational text about automatic salary grade assignment */}
-              <p className="text-sm text-[var(--elra-text-secondary)] mt-4">
-                When you select a role, the system automatically assigns the
-                appropriate salary grade, compensation structure, and
-                allowances. This ensures consistency across your organization.
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex justify-end space-x-4 mt-8 pt-6 border-t border-[var(--elra-border-primary)]">
-              <button
-                onClick={handlePreview}
-                disabled={
-                  (emailMethod === "manual"
-                    ? !formData.manualEmails
-                    : !formData.emails) ||
-                  !formData.departmentId ||
-                  !formData.roleId ||
-                  (emailMethod === "manual" && manualEmailError)
-                }
-                className="px-6 py-3 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-              >
-                <ClipboardDocumentListIcon className="h-5 w-5" />
-                <span>Preview</span>
-              </button>
-            </div>
-          </div>
-        )}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Recent Invitations */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6 border border-[var(--elra-border-primary)]">
@@ -2338,6 +2573,289 @@ const BulkInvitationSystem = () => {
                     className="px-6 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors cursor-pointer"
                   >
                     Confirm Retry
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* HOD Conflict Dialog */}
+        {showHodConflictDialog && hodConflict && (
+          <div className="fixed inset-0 bg-white bg-opacity-90 backdrop-blur-sm flex items-center justify-center p-8 z-50 animate-in fade-in duration-300">
+            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto transform transition-all duration-500 ease-out border border-gray-200 animate-in slide-in-from-bottom-4 scale-in-95">
+              {/* Header with ELRA green */}
+              <div className="relative bg-[var(--elra-primary)] rounded-t-xl p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-white rounded-lg">
+                      <ExclamationTriangleIcon className="h-6 w-6 text-[var(--elra-primary)]" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold">
+                        Department Already Has HOD
+                      </h3>
+                      <p className="text-green-100 text-sm mt-1">
+                        This department already has a Head of Department
+                        assigned
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowHodConflictDialog(false);
+                      setHodConflict(null);
+                    }}
+                    className="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-all duration-200"
+                  >
+                    <XMarkIcon className="h-5 w-5 text-white" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 space-y-6">
+                {/* Current HOD Card */}
+                <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-xl p-6">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex-shrink-0">
+                      {hodConflict.existingHOD.avatar ? (
+                        <img
+                          src={getImageUrl(hodConflict.existingHOD.avatar)}
+                          alt={hodConflict.existingHOD.name}
+                          className="w-16 h-16 rounded-full object-cover border-2 border-[var(--elra-primary)]"
+                          onError={(e) => {
+                            e.target.style.display = "none";
+                            e.target.nextSibling.style.display = "flex";
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className={`w-16 h-16 bg-gradient-to-br from-[var(--elra-primary)] to-green-600 rounded-full flex items-center justify-center text-white font-bold text-xl ${
+                          hodConflict.existingHOD.avatar ? "hidden" : ""
+                        }`}
+                      >
+                        {hodConflict.existingHOD.name?.charAt(0) || "H"}
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                        Current HOD Information
+                      </h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-[var(--elra-primary)] rounded-full"></div>
+                          <span className="text-sm text-gray-700">
+                            <strong>Name:</strong>{" "}
+                            {hodConflict.existingHOD.name}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-[var(--elra-primary)] rounded-full"></div>
+                          <span className="text-sm text-gray-700">
+                            <strong>Email:</strong>{" "}
+                            {hodConflict.existingHOD.email}
+                          </span>
+                        </div>
+                        {hodConflict.existingHOD.employeeId && (
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-[var(--elra-primary)] rounded-full"></div>
+                            <span className="text-sm text-gray-700">
+                              <strong>Employee ID:</strong>{" "}
+                              {hodConflict.existingHOD.employeeId}
+                            </span>
+                          </div>
+                        )}
+                        {hodConflict.existingHOD.phone && (
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-[var(--elra-primary)] rounded-full"></div>
+                            <span className="text-sm text-gray-700">
+                              <strong>Phone:</strong>{" "}
+                              {hodConflict.existingHOD.phone}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-[var(--elra-primary)] rounded-full"></div>
+                          <span className="text-sm text-gray-700">
+                            <strong>Department:</strong>{" "}
+                            {hodConflict.department}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-[var(--elra-primary)] rounded-full"></div>
+                          <span className="text-sm text-gray-700">
+                            <strong>Status:</strong>{" "}
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                hodConflict.existingHOD.status === "ACTIVE"
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-yellow-100 text-yellow-800"
+                              }`}
+                            >
+                              {hodConflict.existingHOD.status}
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Warning Message */}
+                <div
+                  className={`bg-gradient-to-r ${
+                    hodConflict.existingHOD.status === "PENDING_OFFBOARDING"
+                      ? "from-green-50 to-green-100 border-green-200"
+                      : "from-amber-50 to-yellow-100 border-amber-200"
+                  } border rounded-xl p-4`}
+                >
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <div
+                        className={`w-8 h-8 ${
+                          hodConflict.existingHOD.status ===
+                          "PENDING_OFFBOARDING"
+                            ? "bg-[var(--elra-primary)]"
+                            : "bg-amber-500"
+                        } rounded-full flex items-center justify-center`}
+                      >
+                        <ExclamationTriangleIcon className="h-4 w-4 text-white" />
+                      </div>
+                    </div>
+                    <div>
+                      <h5
+                        className={`font-medium ${
+                          hodConflict.existingHOD.status ===
+                          "PENDING_OFFBOARDING"
+                            ? "text-green-800"
+                            : "text-amber-800"
+                        } mb-1`}
+                      >
+                        {hodConflict.existingHOD.status ===
+                        "PENDING_OFFBOARDING"
+                          ? "Ready for Replacement"
+                          : "Offboarding Required"}
+                      </h5>
+                      <p
+                        className={`text-sm ${
+                          hodConflict.existingHOD.status ===
+                          "PENDING_OFFBOARDING"
+                            ? "text-green-700"
+                            : "text-amber-700"
+                        }`}
+                      >
+                        {hodConflict.existingHOD.status ===
+                        "PENDING_OFFBOARDING"
+                          ? "This HOD is already in the offboarding process and can be safely replaced. The new HOD will need to complete the invitation process to gain access."
+                          : "This HOD must be put through the offboarding process first before they can be replaced. Please initiate offboarding for this employee before proceeding with replacement."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Options */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0">
+                        <div className="w-8 h-8 bg-[var(--elra-primary)] rounded-full flex items-center justify-center">
+                          <ArrowRightIcon className="h-4 w-4 text-white" />
+                        </div>
+                      </div>
+                      <div>
+                        <h5 className="font-medium text-green-800 mb-1">
+                          Alternative Options
+                        </h5>
+                        <ul className="text-sm text-green-700 space-y-1">
+                          <li>• Choose a different department</li>
+                          <li>• Select a non-HOD role</li>
+                          <li>• Contact current HOD first</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0">
+                        <div className="w-8 h-8 bg-[var(--elra-primary)] rounded-full flex items-center justify-center">
+                          <ExclamationTriangleIcon className="h-4 w-4 text-white" />
+                        </div>
+                      </div>
+                      <div>
+                        <h5 className="font-medium text-green-800 mb-1">
+                          Replace HOD
+                        </h5>
+                        <p className="text-sm text-green-700">
+                          Deactivate current HOD and send invitation to new
+                          candidate
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-between items-center p-6 border-t border-gray-200 bg-green-50 rounded-b-xl">
+                <button
+                  onClick={() => {
+                    setShowHodConflictDialog(false);
+                    setHodConflict(null);
+                    setShowInvitationModal(true); // Return to invitation modal
+                  }}
+                  disabled={replacingHOD}
+                  className="px-4 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all duration-200 font-medium flex items-center space-x-2 group relative disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Cancel and return to invitation form"
+                >
+                  <XCircleIcon className="h-5 w-5" />
+                  <span>Cancel</span>
+                </button>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowHodConflictDialog(false);
+                      setHodConflict(null);
+                      setShowInvitationModal(true); // Return to invitation modal
+                    }}
+                    disabled={replacingHOD}
+                    className="px-4 py-3 bg-white border border-[var(--elra-primary)] text-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary)] hover:text-white transition-all duration-200 font-medium flex items-center space-x-2 group relative disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Choose a different role instead of HOD"
+                  >
+                    <UserGroupIcon className="h-5 w-5" />
+                    <span>Choose Different Role</span>
+                  </button>
+
+                  <button
+                    onClick={handleHODReplacement}
+                    disabled={
+                      replacingHOD ||
+                      hodConflict.existingHOD.status !== "PENDING_OFFBOARDING"
+                    }
+                    className={`px-4 py-3 ${
+                      hodConflict.existingHOD.status === "PENDING_OFFBOARDING"
+                        ? "bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)]"
+                        : "bg-gray-400 cursor-not-allowed"
+                    } text-white rounded-lg transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 group relative`}
+                    title={
+                      hodConflict.existingHOD.status === "PENDING_OFFBOARDING"
+                        ? "Replace the current HOD with the new candidate"
+                        : "HOD must be in offboarding process first"
+                    }
+                  >
+                    {replacingHOD ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Replacing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <UserMinusIcon className="h-5 w-5" />
+                        <span>Replace HOD</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

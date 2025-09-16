@@ -266,304 +266,609 @@ const PayrollProcessing = () => {
   };
 
   return (
-    <div className="space-y-6 p-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Payroll Processing
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Calculate and process payroll for employees with scope-based
-            processing
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50">
+      <div className="space-y-8 p-6">
+        {/* Header Section */}
+        <div className="relative overflow-hidden bg-gradient-to-r from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] rounded-2xl shadow-2xl">
+          <div className="absolute inset-0 bg-black/10"></div>
+          <div className="relative px-8 py-12">
+            <div className="flex items-center justify-between">
+              <div className="text-white">
+                <div className="flex items-center space-x-4 mb-4">
+                  <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+                    <HiCalculator className="w-8 h-8 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-4xl font-bold mb-2">
+                      Payroll Processing
+                    </h1>
+                    <p className="text-white/90 text-lg">
+                      Advanced scope-based payroll management with ELRA
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-6 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <span>Real-time Processing</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                    <span>Scope-based Calculations</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+                    <span>Usage Tracking</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsFormOpen(true)}
+                className="group relative px-8 py-4 text-lg font-semibold text-[var(--elra-primary)] bg-white rounded-2xl hover:bg-gray-50 transition-all duration-300 transform hover:scale-105 shadow-xl hover:shadow-2xl flex items-center space-x-3"
+              >
+                <div className="w-8 h-8 bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-lg flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
+                  <HiPlus className="w-5 h-5 text-white" />
+                </div>
+                <span>Process New Payroll</span>
+              </button>
+            </div>
+          </div>
         </div>
-        <button
-          onClick={() => setIsFormOpen(true)}
-          className="px-6 py-2 text-sm font-medium text-white bg-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors flex items-center cursor-pointer"
-        >
-          <HiPlus className="w-4 h-4 mr-2 cursor-pointer" />
-          Process Payroll
-        </button>
-      </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-          Filter Payrolls
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Month
-            </label>
-            <select
-              value={filters.month}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  month: parseInt(e.target.value),
-                }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-            >
-              {[
-                { value: 1, label: "January" },
-                { value: 2, label: "February" },
-                { value: 3, label: "March" },
-                { value: 4, label: "April" },
-                { value: 5, label: "May" },
-                { value: 6, label: "June" },
-                { value: 7, label: "July" },
-                { value: 8, label: "August" },
-                { value: 9, label: "September" },
-                { value: 10, label: "October" },
-                { value: 11, label: "November" },
-                { value: 12, label: "December" },
-              ].map((month) => (
-                <option key={month.value} value={month.value}>
-                  {month.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Year
-            </label>
-            <select
-              value={filters.year}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  year: parseInt(e.target.value),
-                }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-            >
-              {Array.from(
-                { length: 5 },
-                (_, i) => new Date().getFullYear() - 2 + i
-              ).map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={fetchSavedPayrolls}
-              disabled={loading}
-              className="w-full px-4 py-2 text-sm font-medium text-white bg-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors disabled:opacity-50 flex items-center justify-center"
-            >
-              {loading ? (
-                <>
-                  <HiRefresh className="w-4 h-4 mr-2 animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                <>
-                  <HiRefresh className="w-4 h-4 mr-2" />
-                  Refresh
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <HiUserGroup className="w-8 h-8 text-blue-500" />
-            <div className="ml-3">
-              <p className="text-sm font-medium text-blue-600">
-                Total Payroll Groups
-              </p>
-              <p className="text-2xl font-bold text-blue-900">
-                {recentPayrolls.length}
-              </p>
+        {/* Filters Section */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-8">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-10 h-10 bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl flex items-center justify-center">
+              <HiCalendar className="w-5 h-5 text-white" />
             </div>
+            <h2 className="text-2xl font-bold text-gray-900">
+              Filter & Search
+            </h2>
           </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <HiCurrencyDollar className="w-8 h-8 text-green-500" />
-            <div className="ml-3">
-              <p className="text-sm font-medium text-green-600">
-                Total Gross Pay
-              </p>
-              <p className="text-2xl font-bold text-green-900">
-                {formatCurrency(
-                  recentPayrolls.reduce(
-                    (sum, payroll) => sum + (payroll.totalGrossPay || 0),
-                    0
-                  )
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <HiMinusCircle className="w-8 h-8 text-red-500" />
-            <div className="ml-3">
-              <p className="text-sm font-medium text-red-600">
-                Total Deductions
-              </p>
-              <p className="text-2xl font-bold text-red-900">
-                {formatCurrency(
-                  recentPayrolls.reduce(
-                    (sum, payroll) => sum + (payroll.totalDeductions || 0),
-                    0
-                  )
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center">
-            <HiCheckCircle className="w-8 h-8 text-purple-500" />
-            <div className="ml-3">
-              <p className="text-sm font-medium text-purple-600">
-                Total Net Pay
-              </p>
-              <p className="text-2xl font-bold text-purple-900">
-                {formatCurrency(
-                  recentPayrolls.reduce(
-                    (sum, payroll) => sum + (payroll.totalNetPay || 0),
-                    0
-                  )
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Saved Payrolls */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-          Saved Payrolls
-        </h2>
-        {loading ? (
-          <div className="text-center py-12">
-            <HiRefresh className="w-12 h-12 text-gray-400 mx-auto mb-4 animate-spin" />
-            <p className="text-gray-600">Loading payrolls...</p>
-          </div>
-        ) : recentPayrolls.length === 0 ? (
-          <div className="text-center py-12">
-            <HiDocumentText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">
-              No payrolls found for the selected period. Click "Process Payroll"
-              to get started.
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Period
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Scope
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Frequency
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Employees
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Gross Pay
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Net Pay
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Processing Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {recentPayrolls.map((payroll, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {payroll.period?.monthName} {payroll.period?.year}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {payroll.period?.frequency}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {payroll.scope || "company"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {payroll.period?.frequency || "monthly"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {payroll.totalEmployees || 0}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                      {formatCurrency(payroll.totalGrossPay || 0)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-purple-600">
-                      {formatCurrency(payroll.totalNetPay || 0)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {payroll.processingDate
-                        ? new Date(payroll.processingDate).toLocaleDateString()
-                        : "N/A"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleViewPayrollDetails(payroll)}
-                          className="text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] flex items-center cursor-pointer"
-                        >
-                          <HiEye className="w-4 h-4 mr-1" />
-                          View
-                        </button>
-                        <button
-                          onClick={() => handleViewPayslip(payroll)}
-                          className="text-blue-600 hover:text-blue-700 flex items-center cursor-pointer"
-                          title="View payslip"
-                        >
-                          <HiEye className="w-4 h-4 mr-1" />
-                          View
-                        </button>
-                        <button
-                          onClick={() => handleResendPayslips(payroll._id)}
-                          disabled={resendingPayslips}
-                          className="text-green-600 hover:text-green-700 flex items-center disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                          title="Resend payslip"
-                        >
-                          <HiRefresh
-                            className={`w-4 h-4 mr-1 ${
-                              resendingPayslips ? "animate-spin" : ""
-                            }`}
-                          />
-                          {resendingPayslips ? "Sending..." : "Resend"}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                Month
+              </label>
+              <select
+                value={filters.month}
+                onChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    month: parseInt(e.target.value),
+                  }))
+                }
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200 bg-white/50 backdrop-blur-sm"
+              >
+                {[
+                  { value: 1, label: "January" },
+                  { value: 2, label: "February" },
+                  { value: 3, label: "March" },
+                  { value: 4, label: "April" },
+                  { value: 5, label: "May" },
+                  { value: 6, label: "June" },
+                  { value: 7, label: "July" },
+                  { value: 8, label: "August" },
+                  { value: 9, label: "September" },
+                  { value: 10, label: "October" },
+                  { value: 11, label: "November" },
+                  { value: 12, label: "December" },
+                ].map((month) => (
+                  <option key={month.value} value={month.value}>
+                    {month.label}
+                  </option>
                 ))}
-              </tbody>
-            </table>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                Year
+              </label>
+              <select
+                value={filters.year}
+                onChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    year: parseInt(e.target.value),
+                  }))
+                }
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200 bg-white/50 backdrop-blur-sm"
+              >
+                {Array.from(
+                  { length: 5 },
+                  (_, i) => new Date().getFullYear() - 2 + i
+                ).map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-gray-700">
+                Quick Actions
+              </label>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() =>
+                    setFilters({
+                      month: new Date().getMonth() + 1,
+                      year: new Date().getFullYear(),
+                    })
+                  }
+                  className="px-4 py-3 text-sm font-medium text-[var(--elra-primary)] bg-[var(--elra-primary)]/10 rounded-xl hover:bg-[var(--elra-primary)]/20 transition-colors"
+                >
+                  Current Month
+                </button>
+                <button
+                  onClick={() =>
+                    setFilters({
+                      month: new Date().getMonth(),
+                      year: new Date().getFullYear(),
+                    })
+                  }
+                  className="px-4 py-3 text-sm font-medium text-[var(--elra-primary)] bg-[var(--elra-primary)]/10 rounded-xl hover:bg-[var(--elra-primary)]/20 transition-colors"
+                >
+                  Last Month
+                </button>
+              </div>
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={fetchSavedPayrolls}
+                disabled={loading}
+                className="w-full px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl hover:shadow-lg transition-all duration-300 disabled:opacity-50 flex items-center justify-center space-x-2 transform hover:scale-105"
+              >
+                {loading ? (
+                  <>
+                    <HiRefresh className="w-5 h-5 animate-spin" />
+                    <span>Loading...</span>
+                  </>
+                ) : (
+                  <>
+                    <HiRefresh className="w-5 h-5" />
+                    <span>Refresh Data</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-        )}
+        </div>
+
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="group relative overflow-hidden bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:scale-105">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
+            <div className="relative p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-blue-100 text-sm font-medium mb-1">
+                    Payroll Groups
+                  </p>
+                  <p className="text-3xl font-bold text-white mb-2">
+                    {recentPayrolls.length}
+                  </p>
+                  <p className="text-blue-200 text-xs">
+                    Active payroll periods
+                  </p>
+                </div>
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
+                  <HiUserGroup className="w-8 h-8 text-white" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="group relative overflow-hidden bg-gradient-to-br from-green-500 via-green-600 to-green-700 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:scale-105">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
+            <div className="relative p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-green-100 text-sm font-medium mb-1">
+                    Total Gross Pay
+                  </p>
+                  <p className="text-2xl font-bold text-white mb-2">
+                    {formatCurrency(
+                      recentPayrolls.reduce(
+                        (sum, payroll) => sum + (payroll.totalGrossPay || 0),
+                        0
+                      )
+                    )}
+                  </p>
+                  <p className="text-green-200 text-xs">Before deductions</p>
+                </div>
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
+                  <HiCurrencyDollar className="w-8 h-8 text-white" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="group relative overflow-hidden bg-gradient-to-br from-red-500 via-red-600 to-red-700 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:scale-105">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
+            <div className="relative p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-red-100 text-sm font-medium mb-1">
+                    Total Deductions
+                  </p>
+                  <p className="text-2xl font-bold text-white mb-2">
+                    {formatCurrency(
+                      recentPayrolls.reduce(
+                        (sum, payroll) => sum + (payroll.totalDeductions || 0),
+                        0
+                      )
+                    )}
+                  </p>
+                  <p className="text-red-200 text-xs">Taxes & other</p>
+                </div>
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
+                  <HiMinusCircle className="w-8 h-8 text-white" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="group relative overflow-hidden bg-gradient-to-br from-purple-500 via-purple-600 to-purple-700 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:scale-105">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
+            <div className="relative p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-purple-100 text-sm font-medium mb-1">
+                    Total Net Pay
+                  </p>
+                  <p className="text-2xl font-bold text-white mb-2">
+                    {formatCurrency(
+                      recentPayrolls.reduce(
+                        (sum, payroll) => sum + (payroll.totalNetPay || 0),
+                        0
+                      )
+                    )}
+                  </p>
+                  <p className="text-purple-200 text-xs">Take-home amount</p>
+                </div>
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
+                  <HiCheckCircle className="w-8 h-8 text-white" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Payroll Management Section */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
+          <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] px-8 py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                  <HiDocumentText className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">
+                    Payroll Management
+                  </h2>
+                  <p className="text-white/90">
+                    Manage and track all payroll processing activities
+                  </p>
+                </div>
+              </div>
+              <div className="text-right text-white/90">
+                <p className="text-sm">Total Records</p>
+                <p className="text-2xl font-bold">{recentPayrolls.length}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-8">
+            {loading ? (
+              <div className="text-center py-16">
+                <div className="relative">
+                  <div className="w-20 h-20 bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-full mx-auto mb-6 flex items-center justify-center">
+                    <HiRefresh className="w-10 h-10 text-white animate-spin" />
+                  </div>
+                  <div className="absolute inset-0 w-20 h-20 bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-full mx-auto opacity-20 animate-ping"></div>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  Loading Payroll Data
+                </h3>
+                <p className="text-gray-600">
+                  Please wait while we fetch your payroll information...
+                </p>
+              </div>
+            ) : recentPayrolls.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="relative mb-8">
+                  <div className="w-32 h-32 bg-gradient-to-br from-[var(--elra-primary)]/10 to-[var(--elra-primary-dark)]/10 rounded-full mx-auto flex items-center justify-center">
+                    <HiDocumentText className="w-16 h-16 text-[var(--elra-primary)]" />
+                  </div>
+                  <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
+                    <HiExclamation className="w-4 h-4 text-white" />
+                  </div>
+                </div>
+                <h3 className="text-3xl font-bold text-gray-900 mb-4">
+                  No Payrolls Found
+                </h3>
+                <p className="text-gray-600 text-lg mb-8 max-w-md mx-auto">
+                  No payrolls have been processed for the selected period. Start
+                  by creating your first payroll to get started.
+                </p>
+                <div className="space-y-4">
+                  <button
+                    onClick={() => setIsFormOpen(true)}
+                    className="group relative px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-2xl hover:shadow-xl transition-all duration-300 transform hover:scale-105 flex items-center space-x-3 mx-auto"
+                  >
+                    <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
+                      <HiPlus className="w-5 h-5 text-white" />
+                    </div>
+                    <span>Create First Payroll</span>
+                  </button>
+                  <div className="text-sm text-gray-500">
+                    <p className="mb-2">
+                      💡 <strong>Quick Tips:</strong>
+                    </p>
+                    <ul className="text-left max-w-md mx-auto space-y-1">
+                      <li>• Choose the correct period and frequency</li>
+                      <li>
+                        • Select appropriate scope
+                        (Company/Department/Individual)
+                      </li>
+                      <li>• Review employee eligibility before processing</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="bg-gradient-to-r from-gray-50 to-gray-100">
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Period
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Scope
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Frequency
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Employees
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Gross Pay
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Net Pay
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Processing Date
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {recentPayrolls.map((payroll, index) => (
+                      <tr
+                        key={index}
+                        className="group hover:bg-gradient-to-r hover:from-[var(--elra-primary)]/5 hover:to-[var(--elra-primary-dark)]/5 transition-all duration-200"
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-gradient-to-r from-[var(--elra-primary)]/10 to-[var(--elra-primary-dark)]/10 rounded-lg flex items-center justify-center">
+                              <HiCalendar className="w-5 h-5 text-[var(--elra-primary)]" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-semibold text-gray-900">
+                                {payroll.period?.monthName}{" "}
+                                {payroll.period?.year}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {payroll.period?.frequency}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                              payroll.scope === "company"
+                                ? "bg-blue-100 text-blue-800"
+                                : payroll.scope === "department"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-purple-100 text-purple-800"
+                            }`}
+                          >
+                            {payroll.scope || "company"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                            <span className="text-sm font-medium text-gray-900">
+                              {payroll.period?.frequency || "monthly"}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center space-x-2">
+                            <HiUserGroup className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm font-semibold text-gray-900">
+                              {payroll.totalEmployees || 0}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-bold text-green-600">
+                            {formatCurrency(payroll.totalGrossPay || 0)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-bold text-purple-600">
+                            {formatCurrency(payroll.totalNetPay || 0)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-500">
+                            {payroll.processingDate
+                              ? new Date(
+                                  payroll.processingDate
+                                ).toLocaleDateString()
+                              : "N/A"}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => handleViewPayrollDetails(payroll)}
+                              className="group/btn px-3 py-2 text-xs font-semibold text-[var(--elra-primary)] bg-[var(--elra-primary)]/10 rounded-lg hover:bg-[var(--elra-primary)] hover:text-white transition-all duration-200 flex items-center space-x-1"
+                            >
+                              <HiEye className="w-3 h-3" />
+                              <span>View</span>
+                            </button>
+                            <button
+                              onClick={() => handleViewPayslip(payroll)}
+                              className="group/btn px-3 py-2 text-xs font-semibold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-600 hover:text-white transition-all duration-200 flex items-center space-x-1"
+                              title="View payslip"
+                            >
+                              <HiEye className="w-3 h-3" />
+                              <span>Payslip</span>
+                            </button>
+                            <button
+                              onClick={() => handleResendPayslips(payroll._id)}
+                              disabled={resendingPayslips}
+                              className="group/btn px-3 py-2 text-xs font-semibold text-green-600 bg-green-50 rounded-lg hover:bg-green-600 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                              title="Resend payslip"
+                            >
+                              <HiRefresh
+                                className={`w-3 h-3 ${
+                                  resendingPayslips ? "animate-spin" : ""
+                                }`}
+                              />
+                              <span>
+                                {resendingPayslips ? "Sending..." : "Resend"}
+                              </span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Scope Processing Guide */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-8">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="w-10 h-10 bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl flex items-center justify-center">
+              <HiOfficeBuilding className="w-5 h-5 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">
+              Scope-Based Processing Guide
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+                  <HiOfficeBuilding className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-blue-900">
+                    Company Scope
+                  </h3>
+                  <p className="text-blue-700 text-sm">All employees</p>
+                </div>
+              </div>
+              <p className="text-blue-800 text-sm mb-4">
+                Processes payroll for all active employees in the organization.
+                Perfect for monthly company-wide payroll runs.
+              </p>
+              <div className="space-y-2 text-xs text-blue-700">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span>All departments included</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span>Company-wide allowances/bonuses</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span>Standard deductions applied</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
+                  <HiUserGroup className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-green-900">
+                    Department Scope
+                  </h3>
+                  <p className="text-green-700 text-sm">Specific departments</p>
+                </div>
+              </div>
+              <p className="text-green-800 text-sm mb-4">
+                Processes payroll for employees in selected departments only.
+                Ideal for department-specific bonuses or adjustments.
+              </p>
+              <div className="space-y-2 text-xs text-green-700">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span>Select specific departments</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span>Department-specific items</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span>Targeted processing</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center">
+                  <HiUser className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-purple-900">
+                    Individual Scope
+                  </h3>
+                  <p className="text-purple-700 text-sm">Specific employees</p>
+                </div>
+              </div>
+              <p className="text-purple-800 text-sm mb-4">
+                Processes payroll for individually selected employees. Perfect
+                for bonuses, adjustments, or corrections.
+              </p>
+              <div className="space-y-2 text-xs text-purple-700">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                  <span>Select specific employees</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                  <span>Personal allowances/bonuses</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                  <span>Individual adjustments</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Payroll Processing Form Modal */}

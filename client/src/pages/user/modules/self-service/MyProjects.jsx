@@ -394,7 +394,7 @@ const MyProjects = () => {
       // Self-funded projects (Budget Allocation = FALSE)
       if (numBudget < 5000000) {
         return {
-          text: "HOD → Project Management HOD (stops here)",
+          text: "HOD → Project Management HOD",
           color: "text-green-600",
           description:
             "Self-funded project starts after HOD and Project Management HOD approvals",
@@ -409,13 +409,7 @@ const MyProjects = () => {
       }
     } else {
       // Budget allocation required (Budget Allocation = TRUE)
-      if (numBudget <= 1000000) {
-        return {
-          text: "HOD → Project Management HOD → Legal → Finance → Budget Allocation",
-          color: "text-blue-600",
-          description: "Legal review required before Finance allocation",
-        };
-      } else if (numBudget <= 5000000) {
+      if (numBudget < 5000000) {
         return {
           text: "HOD → Project Management → Legal → Finance → Budget Allocation",
           color: "text-blue-600",
@@ -1852,7 +1846,7 @@ const MyProjects = () => {
                       </div>
                       <p className="mt-2 text-sm text-gray-600">
                         {formData.requiresBudgetAllocation === "true"
-                          ? "Project will go through enhanced approval workflow: HOD → Project Management → Legal → Finance → Executive for budget allocation."
+                          ? "Project will go through: HOD → Project Management → Legal → Finance → Executive for budget allocation."
                           : "Project will go through: HOD → Project Management approval. You'll manage your own budget."}
                       </p>
                     </div>

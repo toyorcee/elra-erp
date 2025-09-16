@@ -68,7 +68,9 @@ import documentApprovalRoutes from "./routes/documentApproval.js";
 import workflowTaskRoutes from "./routes/workflowTasks.js";
 import vendorRoutes from "./routes/vendors.js";
 import budgetAllocationRoutes from "./routes/budgetAllocationRoutes.js";
+import companyWalletRoutes from "./routes/companyWalletRoutes.js";
 import analyticsRoutes from "./routes/analytics.js";
+import salesMarketingFinancialRoutes from "./routes/salesMarketingFinancialRoutes.js";
 
 const isValidObjectId = (id) => {
   return (
@@ -263,7 +265,9 @@ app.use("/api/document-approval", documentApprovalRoutes);
 app.use("/api/workflow-tasks", workflowTaskRoutes);
 app.use("/api/vendors", vendorRoutes);
 app.use("/api/budget-allocations", budgetAllocationRoutes);
+app.use("/api/elra-wallet", companyWalletRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/sales-marketing", salesMarketingFinancialRoutes);
 
 const io = new SocketIOServer(httpServer, {
   cors: {

@@ -75,11 +75,17 @@ export const DynamicSidebarProvider = ({ children }) => {
         normalizedModuleKey = moduleKey.replace(/_/g, "-");
       }
 
-      const configKey = normalizedModuleKey.replace(/-([a-z])/g, (g) =>
+      let configKey = normalizedModuleKey.replace(/-([a-z])/g, (g) =>
         g[1].toUpperCase()
       );
 
-      if (moduleExists(configKey)) {
+      if (configKey === "sales") {
+        configKey = "salesMarketing";
+      }
+
+      const exists = moduleExists(configKey);
+
+      if (exists) {
         if (currentModule !== normalizedModuleKey) {
           setPreviousModule(currentModule);
 
@@ -138,9 +144,15 @@ export const DynamicSidebarProvider = ({ children }) => {
 
   const getCurrentModuleInfo = () => {
     if (!currentModule) return null;
-    const configKey = currentModule.replace(/-([a-z])/g, (g) =>
+    let configKey = currentModule.replace(/-([a-z])/g, (g) =>
       g[1].toUpperCase()
     );
+
+    // Special mapping for sales module
+    if (configKey === "sales") {
+      configKey = "salesMarketing";
+    }
+
     return getModuleSidebarConfig(configKey);
   };
 
@@ -153,7 +165,12 @@ export const DynamicSidebarProvider = ({ children }) => {
   };
 
   const switchToModule = (moduleKey) => {
-    const configKey = moduleKey.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+    let configKey = moduleKey.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
+
+    // Special mapping for sales module
+    if (configKey === "sales") {
+      configKey = "salesMarketing";
+    }
 
     if (moduleExists(configKey)) {
       setPreviousModule(currentModule);

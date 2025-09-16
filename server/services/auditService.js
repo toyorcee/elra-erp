@@ -128,14 +128,32 @@ class AuditService {
    */
   static async logActivity(data) {
     try {
+      // Map resource types to their corresponding models
+      const resourceModelMap = {
+        ELRAWALLET: "ELRAWallet",
+        DOCUMENT: "Document",
+        USER: "User",
+        DEPARTMENT: "Department",
+        SYSTEM: "SystemSettings",
+        AUTH: "User",
+        SALARY_GRADE: "SalaryGrade",
+        LEAVE_REQUEST: "LeaveRequest",
+        DEDUCTION: "Deduction",
+        PAYROLL: "Payroll",
+        PERSONAL_ALLOWANCE: "PersonalAllowance",
+        PERSONAL_BONUS: "PersonalBonus",
+        PROJECT: "Project",
+        WORKFLOW_TEMPLATE: "WorkflowTemplate",
+        TASK: "Task",
+      };
+
       const auditData = {
         userId: data.userId,
         action: data.action,
         resourceType: data.resourceType?.toUpperCase(),
         resourceId: data.resourceId,
         resourceModel:
-          data.resourceType?.charAt(0).toUpperCase() +
-          data.resourceType?.slice(1),
+          resourceModelMap[data.resourceType?.toUpperCase()] || null,
         details: {
           ...data.details,
         },
@@ -273,6 +291,7 @@ class AuditService {
       "DEDUCTION_UPDATED",
       "DEDUCTION_ACTIVATED",
       "DEDUCTION_DEACTIVATED",
+      "FINAL_PAYROLL_CALCULATED",
     ];
 
     if (highRiskActions.includes(action)) {
@@ -489,7 +508,7 @@ class AuditService {
         userId,
         action: "PAYROLL_PROCESSED",
         resourceType: "PAYROLL",
-        resourceId: null, 
+        resourceId: null,
         resourceModel: "Payroll",
         details: {
           description: `Payroll processed for ${payrollData.scope} scope`,
@@ -499,7 +518,7 @@ class AuditService {
             frequency: payrollData.frequency,
           },
           payrollScope: payrollData.scope,
-          payrollScopeId: null, 
+          payrollScopeId: null,
           metadata: {
             totalEmployees: payrollData.totalEmployees,
             totalGrossPay: payrollData.totalGrossPay,

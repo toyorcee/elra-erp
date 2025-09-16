@@ -11,13 +11,23 @@ const taskSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    taskTemplate: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "TaskTemplate",
-    },
-    category: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Department",
+    taskType: {
+      type: String,
+      enum: [
+        // Onboarding Tasks
+        "documentation_paperwork",
+        "system_access_equipment",
+        "department_orientation",
+        "training_compliance",
+        "final_review_activation",
+        // Offboarding Tasks
+        "exit_documentation",
+        "access_equipment_return",
+        "exit_interview",
+        "knowledge_transfer",
+        "final_clearance_deactivation",
+      ],
+      required: true,
     },
     priority: {
       type: String,
@@ -41,6 +51,9 @@ const taskSchema = new mongoose.Schema(
     dueDate: {
       type: Date,
       required: true,
+    },
+    startedAt: {
+      type: Date,
     },
     completedAt: {
       type: Date,
@@ -273,6 +286,11 @@ const employeeLifecycleSchema = new mongoose.Schema(
         ],
       },
     ],
+    // Final payroll data (for offboarding)
+    finalPayrollData: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -367,13 +385,57 @@ employeeLifecycleSchema.methods.updateTaskStatus = function (
   const task = this.tasks.id(taskId);
   if (task) {
     task.status = status;
+
+    if (status === "In Progress" && !task.startedAt) {
+      task.startedAt = new Date();
+    }
+
     if (status === "Completed" && completedBy) {
       task.completedBy = completedBy;
       task.completedAt = new Date();
     }
+
     return this.save();
   }
   throw new Error("Task not found");
+};
+
+// Instance method to start a task
+employeeLifecycleSchema.methods.startTask = function (taskId, startedBy) {
+  return this.updateTaskStatus(taskId, "In Progress", startedBy);
+};
+
+// Instance method to complete a task
+employeeLifecycleSchema.methods.completeTask = function (
+  taskId,
+  completedBy,
+  notes = ""
+) {
+  const task = this.tasks.id(taskId);
+  if (task) {
+    task.status = "Completed";
+    task.completedBy = completedBy;
+    task.completedAt = new Date();
+    if (notes) {
+      task.notes = notes;
+    }
+    return this.save();
+  }
+  throw new Error("Task not found");
+};
+
+// Instance method to get task by type
+employeeLifecycleSchema.methods.getTaskByType = function (taskType) {
+  return this.tasks.find((task) => task.taskType === taskType);
+};
+
+// Instance method to get progress percentage
+employeeLifecycleSchema.methods.getProgressPercentage = function () {
+  if (!this.tasks || this.tasks.length === 0) return 0;
+  const completedTasks = this.tasks.filter(
+    (task) => task.status === "Completed"
+  ).length;
+  return Math.round((completedTasks / this.tasks.length) * 100);
 };
 
 // Static method to get lifecycle by employee and type
@@ -416,8 +478,8 @@ employeeLifecycleSchema.statics.findOverdue = function () {
   ]);
 };
 
-// Static method to create lifecycle from templates
-employeeLifecycleSchema.statics.createFromTemplates = async function (
+// Static method to create standardized 5-task lifecycle
+employeeLifecycleSchema.statics.createStandardLifecycle = async function (
   employeeId,
   type,
   departmentId,
@@ -425,103 +487,101 @@ employeeLifecycleSchema.statics.createFromTemplates = async function (
   initiatedBy,
   assignedHR
 ) {
-  const TaskTemplate = mongoose.model("TaskTemplate");
-  const ChecklistTemplate = mongoose.model("ChecklistTemplate");
-  const DocumentType = mongoose.model("DocumentType");
-
-  // Get templates based on department and role
-  const taskTemplates = await TaskTemplate.findByDepartmentAndType(
-    departmentId,
-    type
-  );
-  const checklistTemplates = await ChecklistTemplate.findByDepartmentAndType(
-    departmentId,
-    type
-  );
-  const documentTypes = await DocumentType.findByDepartmentAndCategory(
-    departmentId,
-    "Employment"
+  console.log(
+    `🚀 [LIFECYCLE] Creating ${type} lifecycle for employee: ${employeeId}`
   );
 
-  // Create tasks from templates
-  const tasks = taskTemplates.map((template) => ({
-    title: template.name,
-    description: template.description,
-    taskTemplate: template._id,
-    category: template.department || departmentId,
-    priority: template.defaultPriority,
+  // Define the 5 core tasks based on type
+  const taskDefinitions =
+    type === "Onboarding"
+      ? [
+          {
+            title: "📄 Documentation & Paperwork",
+            description:
+              "Collect all required documents (ID, certificates, bank details, etc.)",
+            taskType: "documentation_paperwork",
+            priority: "High",
+            dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days
+          },
+          {
+            title: "💻 System Access & Equipment",
+            description:
+              "Set up accounts, assign equipment, and provide system access",
+            taskType: "system_access_equipment",
+            priority: "High",
+            dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days
+          },
+          {
+            title: "🏢 Department Orientation",
+            description:
+              "Meet team, learn department processes, and understand role",
+            taskType: "department_orientation",
+            priority: "Medium",
+            dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+          },
+          {
+            title: "📚 Training & Compliance",
+            description:
+              "Complete required training programs and compliance requirements",
+            taskType: "training_compliance",
+            priority: "High",
+            dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days
+          },
+          {
+            title: "✅ Final Review & Activation",
+            description:
+              "Final check and activate employee for full system access",
+            taskType: "final_review_activation",
+            priority: "Critical",
+            dueDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000), // 21 days
+          },
+        ]
+      : [
+          {
+            title: "📋 Exit Documentation",
+            description: "Complete exit forms and final paperwork",
+            taskType: "exit_documentation",
+            priority: "High",
+            dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days
+          },
+          {
+            title: "🔒 Access & Equipment Return",
+            description:
+              "Revoke access, return equipment, and collect company assets",
+            taskType: "access_equipment_return",
+            priority: "Critical",
+            dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days
+          },
+          {
+            title: "💬 Exit Interview",
+            description: "Conduct exit interview and gather feedback",
+            taskType: "exit_interview",
+            priority: "Medium",
+            dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+          },
+          {
+            title: "📊 Knowledge Transfer",
+            description:
+              "Hand over responsibilities and knowledge to team members",
+            taskType: "knowledge_transfer",
+            priority: "High",
+            dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days
+          },
+          {
+            title: "✅ Final Clearance & Deactivation",
+            description: "Final check and deactivate employee from all systems",
+            taskType: "final_clearance_deactivation",
+            priority: "Critical",
+            dueDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000), // 21 days
+          },
+        ];
+
+  // Create tasks with HR assignment
+  const tasks = taskDefinitions.map((taskDef) => ({
+    ...taskDef,
     assignedTo: assignedHR,
-    dueDate: new Date(
-      Date.now() + template.defaultDueDateOffset * 24 * 60 * 60 * 1000
-    ),
-    notes: template.instructions,
+    status: "Pending",
   }));
-
-  // Create checklist from templates
-  const checklist = checklistTemplates.flatMap((template) =>
-    template.items.map((item) => ({
-      item: item.item,
-      checklistTemplate: template._id,
-      category: item.category || departmentId,
-      isRequired: item.isRequired,
-      notes: item.instructions,
-    }))
-  );
-
-  // Create documents from document types
-  const documents = documentTypes.map((docType) => ({
-    name: docType.name,
-    documentTemplate: docType._id,
-    documentType: docType._id,
-    status: docType.isRequired ? "Required" : "Missing",
-    notes: docType.instructions,
-  }));
-
-  // Create process steps based on type
-  const processSteps = [];
-  if (type === "Onboarding") {
-    processSteps.push(
-      {
-        stepName: "Orientation Session",
-        stepType: "Orientation",
-        scheduled: false,
-        isRequired: true,
-      },
-      {
-        stepName: "Equipment Assignment",
-        stepType: "Equipment",
-        scheduled: false,
-        isRequired: true,
-      },
-      {
-        stepName: "Training Program",
-        stepType: "Training",
-        scheduled: false,
-        isRequired: true,
-      }
-    );
-  } else if (type === "Offboarding") {
-    processSteps.push(
-      {
-        stepName: "Exit Interview",
-        stepType: "Interview",
-        scheduled: false,
-        isRequired: true,
-      },
-      {
-        stepName: "Equipment Return",
-        stepType: "Equipment",
-        scheduled: false,
-        isRequired: true,
-      },
-      {
-        stepName: "Access Revocation",
-        stepType: "Custom",
-        scheduled: false,
-        isRequired: true,
-      }
-    );
-  }
 
   // Create the lifecycle
   const lifecycle = new this({
@@ -533,25 +593,83 @@ employeeLifecycleSchema.statics.createFromTemplates = async function (
     assignedHR,
     department: departmentId,
     tasks,
-    checklist,
-    documents,
-    processSteps,
+    checklist: [], // Simplified - no complex checklist
+    documents: [], // Simplified - no complex documents
+    processSteps: [], // Simplified - no complex process steps
   });
 
+  console.log(
+    `✅ [LIFECYCLE] Created ${type} lifecycle with ${tasks.length} tasks`
+  );
   return lifecycle.save();
 };
 
-// Pre-save middleware to update status based on progress
-employeeLifecycleSchema.pre("save", function (next) {
-  if (this.checklist && this.checklist.length > 0) {
-    const completedCount = this.checklist.filter(
-      (item) => item.isCompleted
+// Pre-save middleware to update status based on task progress
+employeeLifecycleSchema.pre("save", async function (next) {
+  if (this.tasks && this.tasks.length > 0) {
+    const completedCount = this.tasks.filter(
+      (task) => task.status === "Completed"
     ).length;
-    const totalCount = this.checklist.length;
+    const totalCount = this.tasks.length;
 
     if (completedCount === totalCount && this.status !== "Completed") {
       this.status = "Completed";
       this.actualCompletionDate = new Date();
+      console.log(
+        `✅ [LIFECYCLE] ${this.type} lifecycle completed for employee: ${this.employee}`
+      );
+
+      // Update employee status based on lifecycle type
+      if (this.type === "Offboarding") {
+        try {
+          const User = mongoose.model("User");
+          await User.findByIdAndUpdate(this.employee, {
+            status: "PENDING_OFFBOARDING",
+            isActive: false,
+          });
+          console.log(
+            `🔄 [LIFECYCLE] Employee status updated to PENDING_OFFBOARDING and deactivated`
+          );
+
+          // Trigger final payroll calculation
+          try {
+            const PayrollService = (
+              await import("../services/payrollService.js")
+            ).default;
+            const currentDate = new Date();
+            const month = currentDate.getMonth() + 1;
+            const year = currentDate.getFullYear();
+
+            console.log(
+              `💰 [FINAL PAYROLL] Triggering final payroll calculation for offboarded employee: ${this.employee}`
+            );
+
+            // Calculate final payroll (this will be stored for HR to review and process)
+            const finalPayrollData = await PayrollService.calculateFinalPayroll(
+              this.employee,
+              month,
+              year
+            );
+
+            // Store final payroll data in the lifecycle for HR review
+            this.finalPayrollData = finalPayrollData;
+            console.log(
+              `✅ [FINAL PAYROLL] Final payroll calculated and stored for employee: ${this.employee}`
+            );
+          } catch (payrollError) {
+            console.error(
+              "❌ [FINAL PAYROLL] Error calculating final payroll:",
+              payrollError
+            );
+            // Don't fail the offboarding process if payroll calculation fails
+          }
+        } catch (error) {
+          console.error(
+            "❌ [LIFECYCLE] Error updating employee status:",
+            error
+          );
+        }
+      }
     } else if (completedCount > 0 && this.status === "Initiated") {
       this.status = "In Progress";
     }

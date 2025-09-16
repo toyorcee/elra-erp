@@ -164,13 +164,6 @@ export const moduleSidebarConfig = {
                 user.department;
               const isHRHOD = userDeptName === "Human Resources";
 
-              console.log("🔍 [Sidebar] HR HOD check:", {
-                userLevel: user.role.level,
-                userDept: userDeptName,
-                isHRHOD: isHRHOD,
-                shouldHide: isHRHOD,
-              });
-
               return isHRHOD; // Hide if user is HR HOD
             },
           },
@@ -586,30 +579,28 @@ export const moduleSidebarConfig = {
     borderColor: "border-[var(--elra-primary)]",
     sections: [
       {
-        title: "General Finance",
+        title: "ELRA Wallet Management",
         collapsible: true,
-        defaultExpanded: false,
+        defaultExpanded: true,
         items: [
           {
-            label: "Financial Transactions",
-            icon: "CurrencyDollarIcon",
-            path: "/dashboard/modules/finance/transactions",
-            required: { minLevel: 600 },
-            description: "View and manage financial transactions",
-          },
-          {
-            label: "Revenue Management",
-            icon: "ArrowTrendingUpIcon",
-            path: "/dashboard/modules/finance/revenue",
-            required: { minLevel: 600 },
-            description: "Track and manage revenue streams",
-          },
-          {
-            label: "Expense Management",
-            icon: "ArrowTrendingDownIcon",
-            path: "/dashboard/modules/finance/expenses",
-            required: { minLevel: 600 },
-            description: "Track and manage expenses",
+            label: "ELRA Wallet",
+            icon: "WalletIcon",
+            path: "/dashboard/modules/finance/elra-wallet",
+            required: { minLevel: 700 },
+            description: "Manage ELRA company funds and allocations",
+            hidden: (user) => {
+              const userDepartment = user?.department?.name;
+              const isSuperAdmin = user?.role?.level === 1000;
+              const isFinanceHOD =
+                user?.role?.level === 700 &&
+                userDepartment === "Finance & Accounting";
+              const isExecutive =
+                user?.role?.level === 700 &&
+                userDepartment === "Executive Office";
+
+              return !(isSuperAdmin || isFinanceHOD || isExecutive);
+            },
           },
         ],
       },
@@ -619,12 +610,23 @@ export const moduleSidebarConfig = {
         defaultExpanded: false,
         items: [
           {
-            label: "Budget Allocation",
+            label: "Project Budget Approvals",
             icon: "CurrencyDollarIcon",
             path: "/dashboard/modules/finance/budget-allocation",
-            required: { minLevel: 600 },
-            description:
-              "Manage budget allocations for projects and operational funding",
+            required: { minLevel: 700 },
+            description: "Approve and manage project budget allocations",
+            hidden: (user) => {
+              const userDepartment = user?.department?.name;
+              const isSuperAdmin = user?.role?.level === 1000;
+              const isFinanceHOD =
+                user?.role?.level === 700 &&
+                userDepartment === "Finance & Accounting";
+              const isExecutive =
+                user?.role?.level === 700 &&
+                userDepartment === "Executive Office";
+
+              return !(isSuperAdmin || isFinanceHOD || isExecutive);
+            },
           },
         ],
       },
@@ -634,32 +636,166 @@ export const moduleSidebarConfig = {
         defaultExpanded: false,
         items: [
           {
-            label: "Payroll Oversight",
-            icon: "CurrencyDollarIcon",
-            path: "/dashboard/modules/payroll",
+            label: "Payroll Approvals",
+            icon: "CheckCircleIcon",
+            path: "/dashboard/modules/finance/payroll-approvals",
             required: { minLevel: 700 },
-            description: "Oversee payroll operations and approvals",
+            description: "Approve payroll allocations and manage funding",
+            hidden: (user) => {
+              const userDepartment = user?.department?.name;
+              const isSuperAdmin = user?.role?.level === 1000;
+              const isFinanceHOD =
+                user?.role?.level === 700 &&
+                userDepartment === "Finance & Accounting";
+              const isExecutive =
+                user?.role?.level === 700 &&
+                userDepartment === "Executive Office";
+
+              return !(isSuperAdmin || isFinanceHOD || isExecutive);
+            },
           },
         ],
       },
       {
-        title: "Financial Planning",
+        title: "Financial Reports & History",
         collapsible: true,
         defaultExpanded: false,
         items: [
           {
-            label: "Budget Management",
+            label: "Transaction History & Reports",
+            icon: "ClockIcon",
+            path: "/dashboard/modules/finance/transaction-history",
+            required: { minLevel: 700 },
+            description:
+              "View detailed transaction history, audit trail, and export reports",
+            hidden: (user) => {
+              const userDepartment = user?.department?.name;
+              const isSuperAdmin = user?.role?.level === 1000;
+              const isFinanceHOD =
+                user?.role?.level === 700 &&
+                userDepartment === "Finance & Accounting";
+              const isExecutive =
+                user?.role?.level === 700 &&
+                userDepartment === "Executive Office";
+
+              return !(isSuperAdmin || isFinanceHOD || isExecutive);
+            },
+          },
+        ],
+      },
+    ],
+  },
+
+  // ===== SALES & MARKETING MODULE =====
+  salesMarketing: {
+    label: "Sales & Marketing",
+    icon: "MegaphoneIcon",
+    path: "/dashboard/modules/sales",
+    color: "text-[var(--elra-primary)]",
+    bgColor: "bg-[var(--elra-secondary-3)]",
+    borderColor: "border-[var(--elra-primary)]",
+    sections: [
+      {
+        title: "Sales & Marketing Dashboard",
+        collapsible: true,
+        defaultExpanded: true,
+        items: [
+          {
+            label: "Dashboard",
             icon: "ChartBarIcon",
-            path: "/dashboard/modules/finance/budget",
-            required: { minLevel: 600 },
-            description: "Create and manage budgets",
+            path: "/dashboard/modules/sales",
+            required: { minLevel: 300 },
+            description: "Overview of sales and marketing performance",
+            hidden: (user) => {
+              const userDepartment = user?.department?.name;
+              const isSalesMarketing = userDepartment === "Sales & Marketing";
+              const isSuperAdmin = user?.role?.level === 1000;
+              const isFinanceHOD =
+                user?.role?.level === 700 &&
+                userDepartment === "Finance & Accounting";
+              const isExecutive =
+                user?.role?.level === 700 &&
+                userDepartment === "Executive Office";
+
+              return !(
+                isSalesMarketing ||
+                isSuperAdmin ||
+                isFinanceHOD ||
+                isExecutive
+              );
+            },
+          },
+        ],
+      },
+      {
+        title: "Transaction Management",
+        collapsible: true,
+        defaultExpanded: true,
+        items: [
+          {
+            label: "Transactions",
+            icon: "DocumentTextIcon",
+            path: "/dashboard/modules/sales/transactions",
+            required: { minLevel: 300 },
+            description: "Create and manage sales & marketing transactions",
+            hidden: (user) => {
+              const userDepartment = user?.department?.name;
+              const isSalesMarketing = userDepartment === "Sales & Marketing";
+              const isSuperAdmin = user?.role?.level === 1000;
+
+              return !(isSalesMarketing || isSuperAdmin);
+            },
           },
           {
-            label: "Cash Flow Analysis",
-            icon: "ChartBarIcon",
-            path: "/dashboard/modules/finance/cash-flow",
-            required: { minLevel: 600 },
-            description: "Analyze cash flow patterns",
+            label: "Approvals",
+            icon: "CheckIcon",
+            path: "/dashboard/modules/sales/approvals",
+            required: { minLevel: 700 },
+            description: "Review and approve sales & marketing transactions",
+            hidden: (user) => {
+              const userDepartment = user?.department?.name;
+              const isSuperAdmin = user?.role?.level === 1000;
+              const isFinanceHOD =
+                user?.role?.level === 700 &&
+                userDepartment === "Finance & Accounting";
+              const isSalesMarketingHOD =
+                user?.role?.level === 700 &&
+                userDepartment === "Sales & Marketing";
+
+              return !(isSuperAdmin || isFinanceHOD || isSalesMarketingHOD);
+            },
+          },
+        ],
+      },
+      {
+        title: "Analytics & Reports",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Reports",
+            icon: "ChartPieIcon",
+            path: "/dashboard/modules/sales/reports",
+            required: { minLevel: 300 },
+            description: "Sales & marketing analytics and performance reports",
+            hidden: (user) => {
+              const userDepartment = user?.department?.name;
+              const isSalesMarketing = userDepartment === "Sales & Marketing";
+              const isSuperAdmin = user?.role?.level === 1000;
+              const isFinanceHOD =
+                user?.role?.level === 700 &&
+                userDepartment === "Finance & Accounting";
+              const isExecutive =
+                user?.role?.level === 700 &&
+                userDepartment === "Executive Office";
+
+              return !(
+                isSalesMarketing ||
+                isSuperAdmin ||
+                isFinanceHOD ||
+                isExecutive
+              );
+            },
           },
         ],
       },
@@ -877,7 +1013,10 @@ export const getAvailableModules = () => {
 
 // Helper function to check if a module exists
 export const moduleExists = (moduleKey) => {
-  return moduleKey in moduleSidebarConfig;
+  const exists = moduleKey in moduleSidebarConfig;
+  if (!exists) {
+  }
+  return exists;
 };
 
 // Helper function to get module navigation items for a specific role

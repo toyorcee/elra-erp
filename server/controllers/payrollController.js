@@ -1,4 +1,5 @@
 import PayrollService from "../services/payrollService.js";
+import PayrollApprovalService from "../services/payrollApprovalService.js";
 import { protect, checkPayrollAccess } from "../middleware/auth.js";
 import AuditService from "../services/auditService.js";
 import NotificationService from "../services/notificationService.js";
@@ -92,6 +93,10 @@ const processPayroll = async (req, res) => {
       });
     }
 
+    // Super Admin can process directly, others need to go through approval workflow
+    const userRole = PayrollApprovalService.getUserRole(req.user);
+    const markAsUsed = userRole === "superadmin"; // Super Admin can process directly
+
     const payrollResult = await PayrollService.processPayroll(
       month,
       year,
@@ -99,12 +104,37 @@ const processPayroll = async (req, res) => {
       scope,
       scopeId,
       req.user._id,
-      false
+      markAsUsed
     );
+
+    // Prepare response message based on processing summary
+    let message = "Payroll processed successfully";
+    if (payrollResult.processingSummary) {
+      const summary = payrollResult.processingSummary;
+      const parts = [];
+
+      if (summary.successful > 0) {
+        parts.push(`${summary.successful} successful`);
+      }
+      if (summary.duplicates > 0) {
+        parts.push(`${summary.duplicates} duplicates skipped`);
+      }
+      if (summary.failed > 0) {
+        parts.push(`${summary.failed} failed`);
+      }
+
+      if (parts.length > 0) {
+        message = `Payroll processed: ${parts.join(", ")} out of ${
+          summary.totalEmployees
+        } employees`;
+      } else {
+        message = `Payroll processed successfully for ${summary.successful} employees`;
+      }
+    }
 
     res.status(200).json({
       success: true,
-      message: "Payroll processed successfully",
+      message: message,
       data: payrollResult,
     });
   } catch (error) {
@@ -386,16 +416,260 @@ const getPayrollPreview = async (req, res) => {
       req.user._id
     );
 
+    // Create approval request instead of just returning preview
+    const approvalRequest = await PayrollApprovalService.createApprovalRequest(
+      previewResult,
+      req.user._id
+    );
+
     res.status(200).json({
       success: true,
-      message: "Payroll preview generated successfully",
-      data: previewResult,
+      message: "Payroll approval request created successfully",
+      data: {
+        preview: previewResult,
+        approval: {
+          approvalId: approvalRequest.approvalId,
+          status: approvalRequest.approvalStatus,
+          requestedAt: approvalRequest.requestedAt,
+        },
+      },
     });
   } catch (error) {
     console.error("Error generating payroll preview:", error);
     res.status(500).json({
       success: false,
       message: "Error generating payroll preview",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get pending payroll approvals
+// @route   GET /api/payroll/approvals/pending
+// @access  Private (Finance HOD, HR HOD, Super Admin)
+const getPendingApprovals = async (req, res) => {
+  try {
+    const pendingApprovals = await PayrollApprovalService.getPendingApprovals(
+      req.user._id
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Pending approvals retrieved successfully",
+      data: pendingApprovals,
+    });
+  } catch (error) {
+    console.error("Error getting pending approvals:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error getting pending approvals",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get payroll approval details
+// @route   GET /api/payroll/approvals/:approvalId
+// @access  Private (Finance HOD, HR HOD, Super Admin)
+const getApprovalDetails = async (req, res) => {
+  try {
+    const { approvalId } = req.params;
+
+    const approvalDetails = await PayrollApprovalService.getApprovalDetails(
+      approvalId
+    );
+
+    if (!approvalDetails) {
+      return res.status(404).json({
+        success: false,
+        message: "Payroll approval not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Approval details retrieved successfully",
+      data: approvalDetails,
+    });
+  } catch (error) {
+    console.error("Error getting approval details:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error getting approval details",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Approve payroll (Finance or HR)
+// @route   POST /api/payroll/approvals/:approvalId/approve
+// @access  Private (Finance HOD, HR HOD)
+const approvePayroll = async (req, res) => {
+  try {
+    const { approvalId } = req.params;
+    const { comments = "" } = req.body;
+
+    if (req.userType?.isExecutiveHOD) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Executive HOD can only view payroll approvals, not approve them",
+      });
+    }
+
+    const userRole = PayrollApprovalService.getUserRole(req.user);
+
+    if (userRole === "finance_hod") {
+      const approval = await PayrollApprovalService.approveByFinance(
+        approvalId,
+        req.user._id,
+        comments
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Payroll approved by Finance HOD",
+        data: approval,
+      });
+    } else if (userRole === "hr_hod") {
+      const approval = await PayrollApprovalService.approveByHR(
+        approvalId,
+        req.user._id,
+        comments
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Payroll approved by HR HOD",
+        data: approval,
+      });
+    } else {
+      res.status(403).json({
+        success: false,
+        message: "Insufficient permissions to approve payroll",
+      });
+    }
+  } catch (error) {
+    console.error("Error approving payroll:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error approving payroll",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Reject payroll approval
+// @route   POST /api/payroll/approvals/:approvalId/reject
+// @access  Private (Finance HOD, HR HOD)
+const rejectPayroll = async (req, res) => {
+  try {
+    const { approvalId } = req.params;
+    const { reason } = req.body;
+
+    if (req.userType?.isExecutiveHOD) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Executive HOD can only view payroll approvals, not reject them",
+      });
+    }
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: "Rejection reason is required",
+      });
+    }
+
+    // Determine user role
+    const userRole = PayrollApprovalService.getUserRole(req.user);
+
+    if (userRole === "finance_hod" || userRole === "hr_hod") {
+      const approval = await PayrollApprovalService.rejectApproval(
+        approvalId,
+        req.user._id,
+        reason,
+        userRole
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Payroll approval rejected",
+        data: approval,
+      });
+    } else {
+      res.status(403).json({
+        success: false,
+        message: "Insufficient permissions to reject payroll",
+      });
+    }
+  } catch (error) {
+    console.error("Error rejecting payroll:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error rejecting payroll",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Process approved payroll
+// @route   POST /api/payroll/process-approved/:approvalId
+// @access  Private (Super Admin, HR HOD)
+const processApprovedPayroll = async (req, res) => {
+  try {
+    const { approvalId } = req.params;
+
+    // Get approval details
+    const approval = await PayrollApprovalService.getApprovalDetails(
+      approvalId
+    );
+
+    if (!approval) {
+      return res.status(404).json({
+        success: false,
+        message: "Payroll approval not found",
+      });
+    }
+
+    // Super Admin can process anytime, others need HR approval
+    const userRole = PayrollApprovalService.getUserRole(req.user);
+    if (
+      userRole !== "superadmin" &&
+      approval.approvalStatus !== "approved_hr"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Payroll must be approved by both Finance and HR before processing",
+      });
+    }
+
+    // Process the payroll using the approved data
+    const payrollResult = await PayrollService.processPayroll(
+      approval.period.month,
+      approval.period.year,
+      approval.metadata.frequency,
+      approval.scope.type,
+      approval.scope.details?.scopeId,
+      req.user._id,
+      true // markAsUsed = true for actual processing
+    );
+
+    // Mark approval as processed
+    await PayrollApprovalService.markAsProcessed(approvalId, req.user._id);
+
+    res.status(200).json({
+      success: true,
+      message: "Approved payroll processed successfully",
+      data: payrollResult,
+    });
+  } catch (error) {
+    console.error("Error processing approved payroll:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error processing approved payroll",
       error: error.message,
     });
   }
@@ -460,17 +734,6 @@ const getSavedPayrolls = async (req, res) => {
 
     const isSuperAdmin = req.user.role && req.user.role.level >= 1000;
     const isHOD = req.user.role && req.user.role.level >= 700;
-
-    if (isHOD && !isSuperAdmin) {
-      if (req.user.department) {
-        filter.department = req.user.department._id;
-      } else {
-        return res.status(403).json({
-          success: false,
-          message: "Access denied. HOD must be assigned to a department.",
-        });
-      }
-    }
 
     const Payroll = (await import("../models/Payroll.js")).default;
 
@@ -613,18 +876,8 @@ const resendPayslips = async (req, res) => {
     const isSuperAdmin = req.user.role && req.user.role.level >= 1000;
     const isHOD = req.user.role && req.user.role.level >= 700;
 
-    // For HOD, check if they can access payrolls from their department
-    const canHODAccess =
-      isHOD &&
-      // Check if any payroll in the batch belongs to HOD's department
-      batchPayrolls.some(
-        (payroll) =>
-          payroll.employee &&
-          payroll.employee.department &&
-          req.user.department &&
-          payroll.employee.department._id.toString() ===
-            req.user.department._id.toString()
-      );
+    // HR HODs can access all payroll batches, not just their department
+    const canHODAccess = isHOD; // HR HODs have full access
 
     const hasAccess = isOwner || isSuperAdmin || canHODAccess;
 
@@ -648,17 +901,8 @@ const resendPayslips = async (req, res) => {
         )
       : batchPayrolls;
 
-    // For HOD, further filter to only include employees from their department
-    if (isHOD && !isSuperAdmin) {
-      payrollsToProcess = payrollsToProcess.filter(
-        (payroll) =>
-          payroll.employee &&
-          payroll.employee.department &&
-          req.user.department &&
-          payroll.employee.department._id.toString() ===
-            req.user.department._id.toString()
-      );
-    }
+    // HR HODs can process payrolls for all employees, not just their department
+    // No department filtering for HR HODs (level 700+)
 
     // Process each employee's payroll data
     for (const payroll of payrollsToProcess) {
@@ -894,17 +1138,8 @@ const getAllPayslips = async (req, res) => {
       searchTerm,
     };
 
-    // For HOD, restrict to their department
-    if (isHOD && !isSuperAdmin) {
-      if (req.user.department) {
-        filters.department = req.user.department._id.toString();
-      } else {
-        return res.status(403).json({
-          success: false,
-          message: "Access denied. HOD must be assigned to a department.",
-        });
-      }
-    }
+    // HR HODs can see all payslips, not just their department
+    // No department filtering for HR HODs (level 700+)
 
     const payslipService = new PayslipService();
     const payslips = await payslipService.getPayslipsByFilters(filters);
@@ -1069,17 +1304,8 @@ const searchPayslips = async (req, res) => {
       searchTerm,
     };
 
-    // For HOD, restrict to their department
-    if (isHOD && !isSuperAdmin) {
-      if (req.user.department) {
-        filters.department = req.user.department._id.toString();
-      } else {
-        return res.status(403).json({
-          success: false,
-          message: "Access denied. HOD must be assigned to a department.",
-        });
-      }
-    }
+    // HR HODs can see all payslips, not just their department
+    // No department filtering for HR HODs (level 700+)
 
     const payslipService = new PayslipService();
     const payslips = await payslipService.getPayslipsByFilters(filters);
@@ -1227,7 +1453,7 @@ const getPayslips = async (req, res) => {
     // Check if user has access to this payroll
     if (
       savedPayroll.createdBy.toString() !== req.user._id.toString() &&
-      !(req.user.role && req.user.role.level >= 1000)
+      !(req.user.role && req.user.role.level >= 700)
     ) {
       return res.status(403).json({
         success: false,
@@ -1402,16 +1628,8 @@ const viewPayslip = async (req, res) => {
       employeePayroll.employee._id.toString() === req.user._id.toString();
     const isHOD = req.user.role && req.user.role.level >= 700;
 
-    const canHODAccess =
-      isHOD &&
-      ((employeePayroll.employee.department &&
-        req.user.department &&
-        employeePayroll.employee.department._id.toString() ===
-          req.user.department._id.toString()) ||
-        (employeePayroll.employee.department &&
-          employeePayroll.employee.department.manager &&
-          employeePayroll.employee.department.manager.toString() ===
-            req.user._id.toString()));
+    // HR HODs can access all employee payroll breakdowns
+    const canHODAccess = isHOD;
 
     if (!isOwner && !isSuperAdmin && !isEmployee && !canHODAccess) {
       return res.status(403).json({
@@ -1651,16 +1869,8 @@ const downloadPayslip = async (req, res) => {
       employeePayroll.employee._id.toString() === req.user._id.toString();
     const isHOD = req.user.role && req.user.role.level >= 700;
 
-    const canHODAccess =
-      isHOD &&
-      ((employeePayroll.employee.department &&
-        req.user.department &&
-        employeePayroll.employee.department._id.toString() ===
-          req.user.department._id.toString()) ||
-        (employeePayroll.employee.department &&
-          employeePayroll.employee.department.manager &&
-          employeePayroll.employee.department.manager.toString() ===
-            req.user._id.toString()));
+    // HR HODs can access all employee payroll breakdowns
+    const canHODAccess = isHOD;
 
     if (!isOwner && !isSuperAdmin && !isEmployee && !canHODAccess) {
       return res.status(403).json({
@@ -1866,6 +2076,11 @@ export {
   processPayrollWithData,
   calculateEmployeePayroll,
   getPayrollPreview,
+  getPendingApprovals,
+  getApprovalDetails,
+  approvePayroll,
+  rejectPayroll,
+  processApprovedPayroll,
   getPayrollSummary,
   getSavedPayrolls,
   getEmployeePayrollBreakdown,
@@ -1877,4 +2092,118 @@ export {
   getAllPayslips,
   getPersonalPayslips,
   downloadPayslip,
+  calculateFinalPayroll,
+  getFinalPayrollData,
+};
+
+// @desc    Calculate final payroll for offboarding employee
+// @route   POST /api/payroll/final
+// @access  Private (Super Admin, HR HOD)
+const calculateFinalPayroll = async (req, res) => {
+  try {
+    const { employeeId, month, year } = req.body;
+
+    // Validate input
+    if (!employeeId) {
+      return res.status(400).json({
+        success: false,
+        message: "Employee ID is required",
+      });
+    }
+
+    const currentDate = new Date();
+    const finalMonth = month || currentDate.getMonth() + 1;
+    const finalYear = year || currentDate.getFullYear();
+
+    console.log(
+      `🚀 [FINAL PAYROLL API] Calculating final payroll for employee: ${employeeId}`
+    );
+
+    // Calculate final payroll
+    const finalPayrollData = await PayrollService.calculateFinalPayroll(
+      employeeId,
+      finalMonth,
+      finalYear
+    );
+
+    // Log the action
+    await AuditService.logUserAction(
+      req.user._id,
+      "FINAL_PAYROLL_CALCULATED",
+      employeeId,
+      {
+        employeeId,
+        month: finalMonth,
+        year: finalYear,
+        finalNetPay: finalPayrollData.summary.finalNetPay,
+        gratuityAmount: finalPayrollData.finalPayments.gratuity.gratuityAmount,
+        leavePayoutAmount:
+          finalPayrollData.finalPayments.leavePayout.leavePayout,
+        description: `Final payroll calculated for ${finalPayrollData.employee.name}`,
+        ipAddress: req.ip,
+        userAgent: req.get("User-Agent"),
+      }
+    );
+
+    res.json({
+      success: true,
+      message: "Final payroll calculated successfully",
+      data: finalPayrollData,
+    });
+  } catch (error) {
+    console.error(
+      "❌ [FINAL PAYROLL API] Error calculating final payroll:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to calculate final payroll",
+    });
+  }
+};
+
+// @desc    Get final payroll data for offboarded employee
+// @route   GET /api/payroll/final/:employeeId
+// @access  Private (Super Admin, HR HOD)
+const getFinalPayrollData = async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+
+    // Find the offboarding lifecycle with final payroll data
+    const EmployeeLifecycle = (await import("../models/EmployeeLifecycle.js"))
+      .default;
+
+    const offboardingLifecycle = await EmployeeLifecycle.findOne({
+      employee: employeeId,
+      type: "Offboarding",
+      status: "Completed",
+      finalPayrollData: { $exists: true, $ne: null },
+    }).populate("employee", "firstName lastName email employeeId");
+
+    if (!offboardingLifecycle) {
+      return res.status(404).json({
+        success: false,
+        message: "Final payroll data not found for this employee",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Final payroll data retrieved successfully",
+      data: {
+        employee: offboardingLifecycle.employee,
+        finalPayrollData: offboardingLifecycle.finalPayrollData,
+        offboardingCompletedAt: offboardingLifecycle.actualCompletionDate,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "❌ [FINAL PAYROLL API] Error retrieving final payroll data:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to retrieve final payroll data",
+    });
+  }
 };

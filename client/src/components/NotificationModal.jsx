@@ -58,6 +58,8 @@ const NotificationModal = ({
         return "📋";
       case "POLICY_UPDATED":
         return "📝";
+      case "FUND_ADDITION":
+        return "💰";
       default:
         return "📢";
     }

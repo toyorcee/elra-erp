@@ -215,6 +215,8 @@ const Notifications = () => {
         return <MdSchedule className="text-[var(--elra-primary)]" size={24} />;
       case "info":
         return <MdInfo className="text-[var(--elra-primary)]" size={24} />;
+      case "FUND_ADDITION":
+        return <span className="text-[var(--elra-primary)] text-2xl">💰</span>;
       default:
         return (
           <MdNotifications className="text-[var(--elra-primary)]" size={24} />

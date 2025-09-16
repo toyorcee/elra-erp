@@ -9,6 +9,94 @@ import NotificationService from "../services/notificationService.js";
 
 const notificationService = new NotificationService();
 
+const checkExistingHOD = async (departmentId, roleId) => {
+  try {
+    console.log(
+      `🔍 [CHECK_HOD] Checking for existing HOD - Department: ${departmentId}, Role: ${roleId}`
+    );
+
+    const role = await Role.findById(roleId);
+    if (!role) {
+      console.log(`❌ [CHECK_HOD] Role not found for ID: ${roleId}`);
+      return null;
+    }
+
+    console.log(
+      `🎭 [CHECK_HOD] Role found: ${role.name} (Level: ${role.level})`
+    );
+
+    // Check if the role is HOD level (level >= 700 or name === "HOD")
+    const isHODRole = role.level >= 700 || role.name === "HOD";
+    console.log(`🎯 [CHECK_HOD] Is HOD role: ${isHODRole}`);
+
+    if (!isHODRole) {
+      console.log(`ℹ️ [CHECK_HOD] Not a HOD role - skipping HOD check`);
+      return null;
+    }
+
+    console.log(`🔍 [CHECK_HOD] Searching for existing HOD in department...`);
+
+    const hodRole = await Role.findOne({
+      $or: [{ name: "HOD" }, { level: { $gte: 700 } }],
+    });
+
+    if (!hodRole) {
+      console.log(`❌ [CHECK_HOD] No HOD role found in system`);
+      return null;
+    }
+
+    console.log(
+      `🎭 [CHECK_HOD] Found HOD role: ${hodRole.name} (Level: ${hodRole.level})`
+    );
+
+    const existingHOD = await User.findOne({
+      department: departmentId,
+      role: hodRole._id,
+      isActive: true,
+      status: { $nin: ["INACTIVE", "SUSPENDED", "PENDING_OFFBOARDING"] },
+    }).populate("role department");
+
+    if (existingHOD) {
+      console.log(
+        `👤 [CHECK_HOD] Existing HOD found: ${existingHOD.fullName} (${existingHOD.email}) - Status: ${existingHOD.status}`
+      );
+    } else {
+      console.log(`✅ [CHECK_HOD] No existing HOD found in department`);
+    }
+
+    return existingHOD;
+  } catch (error) {
+    console.error("❌ [CHECK_HOD] Error checking existing HOD:", error);
+    return null;
+  }
+};
+
+// Helper function to check if department has an offboarding HOD
+const checkOffboardingHOD = async (departmentId, roleId) => {
+  try {
+    const role = await Role.findById(roleId);
+    if (!role) return null;
+
+    // Check if the role is HOD level (level >= 700 or name === "HOD")
+    const isHODRole = role.level >= 700 || role.name === "HOD";
+
+    if (!isHODRole) return null;
+
+    // Find HOD in offboarding process (for replacement)
+    const offboardingHOD = await User.findOne({
+      department: departmentId,
+      $or: [{ "role.name": "HOD" }, { "role.level": { $gte: 700 } }],
+      isActive: true,
+      status: { $in: ["INACTIVE", "SUSPENDED", "PENDING_OFFBOARDING"] },
+    }).populate("role department");
+
+    return offboardingHOD;
+  } catch (error) {
+    console.error("Error checking offboarding HOD:", error);
+    return null;
+  }
+};
+
 const validateEmails = (emails) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -751,6 +839,71 @@ export const createSingleInvitation = asyncHandler(async (req, res) => {
     });
   }
 
+  // Check if department already has a HOD and this is a HOD invitation
+  console.log(
+    `🔍 [SINGLE_INVITATION] Checking for existing HOD in department: ${department.name} (${departmentId}) for role: ${roleId}`
+  );
+  const existingHOD = await checkExistingHOD(departmentId, roleId);
+  const offboardingHOD = await checkOffboardingHOD(departmentId, roleId);
+
+  console.log(
+    `🔍 [SINGLE_INVITATION] Existing HOD found:`,
+    existingHOD ? `${existingHOD.fullName} (${existingHOD.email})` : "None"
+  );
+  console.log(
+    `🔍 [SINGLE_INVITATION] Replace existing HOD flag:`,
+    req.body.replaceExistingHOD
+  );
+
+  if (existingHOD && !req.body.replaceExistingHOD) {
+    console.log(
+      `⚠️ [SINGLE_INVITATION] Department ${department.name} already has HOD: ${existingHOD.fullName} - Returning 409 error`
+    );
+    return res.status(409).json({
+      success: false,
+      message: `Department ${department.name} already has a HOD: ${existingHOD.fullName}`,
+      conflict: {
+        type: "existing_hod",
+        department: department.name,
+        existingHOD: {
+          id: existingHOD._id,
+          name: existingHOD.fullName,
+          email: existingHOD.email,
+          avatar: existingHOD.avatar,
+          employeeId: existingHOD.employeeId,
+          phone: existingHOD.phone,
+          status: existingHOD.status,
+        },
+      },
+    });
+  }
+
+  // If there's a HOD in offboarding process, allow replacement without conflict
+  if (offboardingHOD && !existingHOD) {
+    console.log(
+      `ℹ️ [SINGLE_INVITATION] Department ${department.name} has HOD in offboarding process: ${offboardingHOD.fullName} (${offboardingHOD.status}) - allowing replacement`
+    );
+  }
+
+  // If replacing HOD, deactivate the existing one
+  if (existingHOD && req.body.replaceExistingHOD) {
+    console.log(
+      `🔄 [SINGLE_INVITATION] Replacing existing HOD: ${existingHOD.fullName}`
+    );
+
+    // Deactivate the existing HOD
+    existingHOD.isActive = false;
+    existingHOD.status = "INACTIVE";
+    existingHOD.deactivatedAt = new Date();
+    existingHOD.deactivatedBy = currentUser._id;
+    existingHOD.deactivationReason = "Replaced by new HOD invitation";
+    await existingHOD.save();
+
+    console.log(
+      `✅ [SINGLE_INVITATION] Existing HOD deactivated: ${existingHOD.fullName}`
+    );
+  }
+
   // Validate role
   const role = await Role.findById(roleId);
   if (!role) {
@@ -761,10 +914,9 @@ export const createSingleInvitation = asyncHandler(async (req, res) => {
     });
   }
 
-  // Generate username from email
-  const username = email.split("@")[0];
-  const firstName = username.split(".")[0] || username;
-  const lastName = username.split(".")[1] || "User";
+  // For single invitations, we don't generate names - user will set them during registration
+  const firstName = "";
+  const lastName = "";
 
   try {
     // Create invitation
@@ -779,9 +931,13 @@ export const createSingleInvitation = asyncHandler(async (req, res) => {
 
     // Send email
     console.log(`📧 [SINGLE_INVITATION] Sending email to ${email}...`);
+    const userName =
+      invitation.firstName && invitation.lastName
+        ? `${invitation.firstName} ${invitation.lastName}`
+        : "New User";
     const emailResult = await sendInvitationEmail(
       invitation.email,
-      `${invitation.firstName} ${invitation.lastName}`,
+      userName,
       invitation.code,
       role.name,
       department.name
@@ -971,6 +1127,59 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
     level: role.level,
   });
 
+  // Check if department already has a HOD and this is a HOD invitation
+  const existingHOD = await checkExistingHOD(departmentId, roleId);
+  const offboardingHOD = await checkOffboardingHOD(departmentId, roleId);
+
+  if (existingHOD && !req.body.replaceExistingHOD) {
+    console.log(
+      `⚠️ [BULK_INVITATION] Department ${department.name} already has HOD: ${existingHOD.fullName}`
+    );
+    return res.status(409).json({
+      success: false,
+      message: `Department ${department.name} already has a HOD: ${existingHOD.fullName}`,
+      conflict: {
+        type: "existing_hod",
+        department: department.name,
+        existingHOD: {
+          id: existingHOD._id,
+          name: existingHOD.fullName,
+          email: existingHOD.email,
+          avatar: existingHOD.avatar,
+          employeeId: existingHOD.employeeId,
+          phone: existingHOD.phone,
+          status: existingHOD.status,
+        },
+      },
+    });
+  }
+
+  // If there's a HOD in offboarding process, allow replacement without conflict
+  if (offboardingHOD && !existingHOD) {
+    console.log(
+      `ℹ️ [BULK_INVITATION] Department ${department.name} has HOD in offboarding process: ${offboardingHOD.fullName} (${offboardingHOD.status}) - allowing replacement`
+    );
+  }
+
+  // If replacing HOD, deactivate the existing one
+  if (existingHOD && req.body.replaceExistingHOD) {
+    console.log(
+      `🔄 [BULK_INVITATION] Replacing existing HOD: ${existingHOD.fullName}`
+    );
+
+    // Deactivate the existing HOD
+    existingHOD.isActive = false;
+    existingHOD.status = "INACTIVE";
+    existingHOD.deactivatedAt = new Date();
+    existingHOD.deactivatedBy = currentUser._id;
+    existingHOD.deactivationReason = "Replaced by new HOD invitation";
+    await existingHOD.save();
+
+    console.log(
+      `✅ [BULK_INVITATION] Existing HOD deactivated: ${existingHOD.fullName}`
+    );
+  }
+
   // Generate sequential batch ID only for bulk invitations
   console.log("🆔 [BULK_INVITATION] Generating batch ID...");
   const batchId = await Invitation.generateSequentialBatchNumber();
@@ -1023,10 +1232,9 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
         continue;
       }
 
-      // Generate username from email
-      const username = email.split("@")[0];
-      const firstName = username.split(".")[0] || username;
-      const lastName = username.split(".")[1] || "User";
+      // For bulk invitations, we don't generate names - user will set them during registration
+      const firstName = "";
+      const lastName = "";
 
       console.log(
         `📝 [BULK_INVITATION] Creating invitation for ${email} (${firstName} ${lastName})`
@@ -1052,9 +1260,13 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
 
       // Send invitation email
       console.log(`📧 [BULK_INVITATION] Sending email to ${email}...`);
+      const userName =
+        invitation.firstName && invitation.lastName
+          ? `${invitation.firstName} ${invitation.lastName}`
+          : "New User";
       const emailResult = await sendInvitationEmail(
         invitation.email,
-        `${invitation.firstName} ${invitation.lastName}`,
+        userName,
         invitation.code,
         role.name,
         department.name
@@ -1574,6 +1786,46 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
         console.log(`❌ [CSV_BULK_INVITATION] ${errorMsg}`);
         errors.push(errorMsg);
         continue;
+      }
+
+      // Check if department already has a HOD and this is a HOD invitation
+      const existingHOD = await checkExistingHOD(department._id, role._id);
+      const offboardingHOD = await checkOffboardingHOD(
+        department._id,
+        role._id
+      );
+
+      if (existingHOD && !req.body.replaceExistingHOD) {
+        const errorMsg = `Row ${rowNumber}: Department "${department.name}" already has HOD: ${existingHOD.fullName}`;
+        console.log(`⚠️ [CSV_BULK_INVITATION] ${errorMsg}`);
+        errors.push(errorMsg);
+        continue;
+      }
+
+      // If there's a HOD in offboarding process, allow replacement without conflict
+      if (offboardingHOD && !existingHOD) {
+        console.log(
+          `ℹ️ [CSV_BULK_INVITATION] Row ${rowNumber}: Department ${department.name} has HOD in offboarding process: ${offboardingHOD.fullName} (${offboardingHOD.status}) - allowing replacement`
+        );
+      }
+
+      // If replacing HOD, deactivate the existing one
+      if (existingHOD && req.body.replaceExistingHOD) {
+        console.log(
+          `🔄 [CSV_BULK_INVITATION] Replacing existing HOD: ${existingHOD.fullName}`
+        );
+
+        // Deactivate the existing HOD
+        existingHOD.isActive = false;
+        existingHOD.status = "INACTIVE";
+        existingHOD.deactivatedAt = new Date();
+        existingHOD.deactivatedBy = currentUser._id;
+        existingHOD.deactivationReason = "Replaced by new HOD invitation";
+        await existingHOD.save();
+
+        console.log(
+          `✅ [CSV_BULK_INVITATION] Existing HOD deactivated: ${existingHOD.fullName}`
+        );
       }
 
       // Determine invitation status based on approval requirements and role level

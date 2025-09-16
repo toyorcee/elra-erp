@@ -212,11 +212,11 @@ const OnboardingManagement = () => {
   };
 
   const calculateProgress = (lifecycle) => {
-    if (!lifecycle.checklist || lifecycle.checklist.length === 0) return 0;
-    const completed = lifecycle.checklist.filter(
-      (item) => item.isCompleted
+    if (!lifecycle.tasks || lifecycle.tasks.length === 0) return 0;
+    const completed = lifecycle.tasks.filter(
+      (task) => task.status === "Completed"
     ).length;
-    return Math.round((completed / lifecycle.checklist.length) * 100);
+    return Math.round((completed / lifecycle.tasks.length) * 100);
   };
 
   const isOverdue = (lifecycle) => {
@@ -232,6 +232,15 @@ const OnboardingManagement = () => {
     const grouped = {};
 
     lifecyclesData.forEach((lifecycle) => {
+      // Skip if employee is null or undefined
+      if (!lifecycle.employee) {
+        console.warn(
+          "⚠️ [ONBOARDING] Skipping lifecycle with null employee:",
+          lifecycle._id
+        );
+        return;
+      }
+
       const userId = lifecycle.employee._id;
       const userName = `${lifecycle.employee.firstName} ${lifecycle.employee.lastName}`;
 
@@ -287,6 +296,32 @@ const OnboardingManagement = () => {
     } catch (error) {
       console.error("Error initiating offboarding:", error);
       toast.error("Failed to initiate offboarding");
+    }
+  };
+
+  const handleTaskAction = async (lifecycleId, taskId, action) => {
+    try {
+      console.log(`🚀 [TASK] ${action}ing task:`, {
+        lifecycleId,
+        taskId,
+        action,
+      });
+
+      const response = await userModulesAPI.employeeLifecycle.updateTaskStatus(
+        lifecycleId,
+        { taskId, action }
+      );
+
+      if (response.success) {
+        toast.success(`Task ${action}ed successfully`);
+        // Refresh data to show updated progress
+        fetchData();
+      } else {
+        toast.error(`Failed to ${action} task`);
+      }
+    } catch (error) {
+      console.error(`Error ${action}ing task:`, error);
+      toast.error(`Failed to ${action} task`);
     }
   };
 
@@ -822,111 +857,109 @@ const OnboardingManagement = () => {
                     </div>
                   </div>
 
-                  {/* Completed Checklist Items */}
+                  {/* 5-Task System */}
                   <div className="mb-6">
                     <div className="flex items-center space-x-2 mb-4">
                       <ClipboardDocumentCheckIcon className="w-5 h-5 text-[var(--elra-primary)]" />
                       <h4 className="text-md font-semibold text-gray-900">
-                        Completed Tasks (
-                        {selectedUser.lifecycles.Onboarding.checklist?.filter(
-                          (item) => item.isCompleted
+                        Onboarding Tasks (
+                        {selectedUser.lifecycles.Onboarding.tasks?.filter(
+                          (task) => task.status === "Completed"
                         ).length || 0}
-                        /
-                        {selectedUser.lifecycles.Onboarding.checklist?.length ||
-                          0}
-                        )
+                        /5)
                       </h4>
                     </div>
 
                     <div className="space-y-3">
-                      {selectedUser.lifecycles.Onboarding.checklist?.map(
-                        (item, index) => (
+                      {selectedUser.lifecycles.Onboarding.tasks?.map(
+                        (task, index) => (
                           <div
-                            key={item._id}
-                            className={`flex items-center space-x-3 p-3 rounded-lg border ${
-                              item.isCompleted
-                                ? "bg-[var(--elra-primary)] border-[var(--elra-primary)]"
+                            key={task._id}
+                            className={`flex items-center justify-between p-4 rounded-lg border ${
+                              task.status === "Completed"
+                                ? "bg-green-50 border-green-200"
+                                : task.status === "In Progress"
+                                ? "bg-yellow-50 border-yellow-200"
                                 : "bg-gray-50 border-gray-200"
                             }`}
                           >
-                            <div
-                              className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                                item.isCompleted ? "bg-white" : "bg-gray-300"
-                              }`}
-                            >
-                              {item.isCompleted ? (
-                                <CheckCircleIcon className="w-3 h-3 text-[var(--elra-primary)]" />
-                              ) : (
-                                <div className="w-2 h-2 bg-white rounded-full"></div>
-                              )}
-                            </div>
-                            <div className="flex-1">
+                            <div className="flex items-center space-x-3 flex-1">
                               <div
-                                className={`font-medium ${
-                                  item.isCompleted
-                                    ? "text-white"
-                                    : "text-gray-600"
+                                className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                                  task.status === "Completed"
+                                    ? "bg-green-500"
+                                    : task.status === "In Progress"
+                                    ? "bg-yellow-500"
+                                    : "bg-gray-300"
                                 }`}
                               >
-                                {item.item}
+                                {task.status === "Completed" ? (
+                                  <CheckCircleIcon className="w-4 h-4 text-white" />
+                                ) : task.status === "In Progress" ? (
+                                  <ClockIcon className="w-4 h-4 text-white" />
+                                ) : (
+                                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                                )}
                               </div>
-                              {item.isCompleted && (
-                                <div className="text-xs text-white opacity-80 mt-1">
-                                  Completed on {formatDate(item.completedAt)}
+                              <div className="flex-1">
+                                <div className="font-medium text-gray-900">
+                                  {task.title}
                                 </div>
+                                <div className="text-sm text-gray-600">
+                                  {task.description}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  Due: {formatDate(task.dueDate)}
+                                  {task.status === "Completed" &&
+                                    task.completedAt && (
+                                      <span className="ml-2">
+                                        • Completed:{" "}
+                                        {formatDate(task.completedAt)}
+                                      </span>
+                                    )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Task Action Buttons */}
+                            <div className="flex items-center space-x-2">
+                              {task.status === "Pending" && (
+                                <button
+                                  onClick={() =>
+                                    handleTaskAction(
+                                      selectedUser.lifecycles.Onboarding._id,
+                                      task._id,
+                                      "start"
+                                    )
+                                  }
+                                  className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                  Start
+                                </button>
+                              )}
+                              {task.status === "In Progress" && (
+                                <button
+                                  onClick={() =>
+                                    handleTaskAction(
+                                      selectedUser.lifecycles.Onboarding._id,
+                                      task._id,
+                                      "complete"
+                                    )
+                                  }
+                                  className="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                                >
+                                  Complete
+                                </button>
+                              )}
+                              {task.status === "Completed" && (
+                                <span className="px-3 py-1 bg-green-100 text-green-800 text-sm rounded-lg font-medium">
+                                  ✓ Done
+                                </span>
                               )}
                             </div>
                           </div>
                         )
                       )}
-                    </div>
-                  </div>
-
-                  {/* Tasks Overview */}
-                  <div>
-                    <div className="flex items-center space-x-2 mb-4">
-                      <DocumentTextIcon className="w-5 h-5 text-blue-600" />
-                      <h4 className="text-md font-semibold text-gray-900">
-                        Tasks Overview
-                      </h4>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {selectedUser.lifecycles.Onboarding.tasks?.map((task) => (
-                        <div
-                          key={task._id}
-                          className={`p-4 rounded-lg border ${
-                            task.status === "Completed"
-                              ? "bg-[var(--elra-primary)] bg-opacity-10 border-[var(--elra-primary)] border-opacity-20"
-                              : task.status === "In Progress"
-                              ? "bg-yellow-50 border-yellow-200"
-                              : "bg-gray-50 border-gray-200"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <h5 className="font-medium text-gray-900">
-                              {task.title}
-                            </h5>
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                task.status === "Completed"
-                                  ? "bg-[var(--elra-primary)] bg-opacity-20 text-[var(--elra-primary)]"
-                                  : task.status === "In Progress"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-gray-100 text-gray-800"
-                              }`}
-                            >
-                              {task.status}
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-600 mb-2">
-                            {task.description}
-                          </p>
-                          <div className="text-xs text-gray-500">
-                            Due: {formatDate(task.dueDate)}
-                          </div>
-                        </div>
-                      ))}
                     </div>
                   </div>
                 </div>

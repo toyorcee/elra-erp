@@ -287,13 +287,9 @@ export const createDeduction = async (req, res) => {
         "✅ [deductionController] Company-wide deduction - no specific employee/department"
       );
     } else if (deductionData.scope === "department") {
-      if (user.role.level === 700) {
-        deductionData.department = user.department;
-        deductionData.departments = null;
-      } else {
-        if (deductionData.departments && deductionData.departments.length > 0) {
-          deductionData.department = null;
-        }
+      // HR HOD and Super Admin can create deductions for any department
+      if (deductionData.departments && deductionData.departments.length > 0) {
+        deductionData.department = null;
       }
       deductionData.employee = null;
       deductionData.employees = null;
@@ -302,13 +298,9 @@ export const createDeduction = async (req, res) => {
         deductionData.departments || deductionData.department
       );
     } else if (deductionData.scope === "individual") {
-      if (user.role.level === 700) {
-        deductionData.department = user.department;
-        deductionData.departments = null;
-      } else {
-        if (deductionData.departments && deductionData.departments.length > 0) {
-          deductionData.department = null;
-        }
+      // HR HOD and Super Admin can create deductions for any department
+      if (deductionData.departments && deductionData.departments.length > 0) {
+        deductionData.department = null;
       }
       deductionData.employee = null;
       console.log(
@@ -444,15 +436,8 @@ export const updateDeduction = async (req, res) => {
       });
     }
 
-    // For HODs, ensure they can only update deductions in their department
-    if (user.role.level === 700) {
-      if (deduction.department?.toString() !== user.department?.toString()) {
-        return res.status(403).json({
-          success: false,
-          message: "You can only update deductions in your department",
-        });
-      }
-    }
+    // HR HOD and Super Admin can update deductions from any department
+    // No department restrictions for level 700+ users
 
     // Set updated by
     updateData.updatedBy = user._id;
@@ -463,24 +448,16 @@ export const updateDeduction = async (req, res) => {
       updateData.department = null;
       updateData.departments = null;
     } else if (updateData.scope === "department") {
-      if (user.role.level === 700) {
-        updateData.department = user.department;
-        updateData.departments = null;
-      } else {
-        if (updateData.departments && updateData.departments.length > 0) {
-          updateData.department = null;
-        }
+      // HR HOD and Super Admin can update deductions for any department
+      if (updateData.departments && updateData.departments.length > 0) {
+        updateData.department = null;
       }
       updateData.employee = null;
       updateData.employees = null;
     } else if (updateData.scope === "individual") {
-      if (user.role.level === 700) {
-        updateData.department = user.department;
-        updateData.departments = null;
-      } else {
-        if (updateData.departments && updateData.departments.length > 0) {
-          updateData.department = null;
-        }
+      // HR HOD and Super Admin can update deductions for any department
+      if (updateData.departments && updateData.departments.length > 0) {
+        updateData.department = null;
       }
     }
 
@@ -555,15 +532,8 @@ export const deleteDeduction = async (req, res) => {
       });
     }
 
-    // For HODs, ensure they can only delete deductions in their department
-    if (user.role.level === 700) {
-      if (deduction.department?.toString() !== user.department?.toString()) {
-        return res.status(403).json({
-          success: false,
-          message: "You can only delete deductions in your department",
-        });
-      }
-    }
+    // HR HOD and Super Admin can delete deductions from any department
+    // No department restrictions for level 700+ users
 
     // Log activity before deletion
     await AuditService.logDeductionAction(
@@ -630,15 +600,8 @@ export const getDeductionById = async (req, res) => {
       });
     }
 
-    // For HODs, ensure they can only view deductions in their department
-    if (user.role.level === 700) {
-      if (deduction.department?.toString() !== user.department?.toString()) {
-        return res.status(403).json({
-          success: false,
-          message: "You can only view deductions in your department",
-        });
-      }
-    }
+    // HR HOD and Super Admin can view deductions from any department
+    // No department restrictions for level 700+ users
 
     res.status(200).json({
       success: true,
@@ -754,12 +717,8 @@ export const updateDeductionUsage = async (req, res) => {
         throw new Error(`Deduction ${deductionId} not found`);
       }
 
-      // For HODs, ensure they can only update deductions in their department
-      if (user.role.level === 700) {
-        if (deduction.department?.toString() !== user.department?.toString()) {
-          throw new Error("You can only update deductions in your department");
-        }
-      }
+      // HR HOD and Super Admin can update deductions from any department
+      // No department restrictions for level 700+ users
 
       deduction.isUsed = true;
       deduction.lastUsedInPayroll = payrollId;
@@ -807,15 +766,10 @@ export const toggleDeductionStatus = async (req, res) => {
     }
 
     // Role-based access control
-    if (user.role.level === 700) {
-      // HOD can only toggle deductions in their department
-      if (deduction.department?.toString() !== user.department?.toString()) {
-        return res.status(403).json({
-          success: false,
-          message: "You can only toggle deductions in your department",
-        });
-      }
-    } else if (user.role.level !== 1000) {
+    if (user.role.level >= 700) {
+      // HR HOD and Super Admin can toggle deductions from any department
+      // No department restrictions for level 700+ users
+    } else {
       // Only Super Admin (1000) and HOD (700) can toggle
       return res.status(403).json({
         success: false,

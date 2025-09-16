@@ -19,14 +19,9 @@ export const getAllAllowances = async (req, res) => {
     }
 
     if (!scope || scope === "") {
-      if (user.role.level === 700) {
-        query.$or = [
-          { scope: "department", department: user.department },
-          { scope: "company" },
-          { scope: "individual", department: user.department },
-        ];
-      } else if (user.role.level === 1000) {
-        // Super Admin can see all allowances
+      if (user.role.level >= 700) {
+        // HR HOD and Super Admin can see all allowances
+        // No additional filtering needed - they can see everything
       } else {
         // Regular users can only see their own allowances
         query.$or = [
@@ -224,13 +219,9 @@ export const createAllowance = async (req, res) => {
         "✅ [allowanceController] Company-wide allowance - no specific employee/department"
       );
     } else if (allowanceData.scope === "department") {
-      if (user.role.level === 700) {
-        allowanceData.department = user.department;
-        allowanceData.departments = null;
-      } else {
-        if (allowanceData.departments && allowanceData.departments.length > 0) {
-          allowanceData.department = null;
-        }
+      // HR HOD and Super Admin can create allowances for any department
+      if (allowanceData.departments && allowanceData.departments.length > 0) {
+        allowanceData.department = null;
       }
       allowanceData.employee = null;
       allowanceData.employees = null;
@@ -239,13 +230,9 @@ export const createAllowance = async (req, res) => {
         allowanceData.departments || allowanceData.department
       );
     } else if (allowanceData.scope === "individual") {
-      if (user.role.level === 700) {
-        allowanceData.department = user.department;
-        allowanceData.departments = null;
-      } else {
-        if (allowanceData.departments && allowanceData.departments.length > 0) {
-          allowanceData.department = null;
-        }
+      // HR HOD and Super Admin can create allowances for any department
+      if (allowanceData.departments && allowanceData.departments.length > 0) {
+        allowanceData.department = null;
       }
       allowanceData.employee = null;
       console.log(
@@ -338,15 +325,8 @@ export const updateAllowance = async (req, res) => {
       });
     }
 
-    // Check if HOD is trying to update allowance from different department
-    if (user.role.level === 700) {
-      if (allowance.department?.toString() !== user.department?.toString()) {
-        return res.status(403).json({
-          success: false,
-          message: "You can only update allowances for your department",
-        });
-      }
-    }
+    // HR HOD and Super Admin can update allowances from any department
+    // No department restrictions for level 700+ users
 
     // Handle scope-based data cleaning (same as create function)
     if (updateData.scope === "company") {
@@ -358,13 +338,9 @@ export const updateAllowance = async (req, res) => {
         "✅ [allowanceController] Company-wide allowance update - no specific employee/department"
       );
     } else if (updateData.scope === "department") {
-      if (user.role.level === 700) {
-        updateData.department = user.department;
-        updateData.departments = null;
-      } else {
-        if (updateData.departments && updateData.departments.length > 0) {
-          updateData.department = null;
-        }
+      // HR HOD and Super Admin can update allowances for any department
+      if (updateData.departments && updateData.departments.length > 0) {
+        updateData.department = null;
       }
       updateData.employee = null;
       updateData.employees = null;
@@ -373,13 +349,9 @@ export const updateAllowance = async (req, res) => {
         updateData.departments || updateData.department
       );
     } else if (updateData.scope === "individual") {
-      if (user.role.level === 700) {
-        updateData.department = user.department;
-        updateData.departments = null;
-      } else {
-        if (updateData.departments && updateData.departments.length > 0) {
-          updateData.department = null;
-        }
+      // HR HOD and Super Admin can update allowances for any department
+      if (updateData.departments && updateData.departments.length > 0) {
+        updateData.department = null;
       }
       updateData.employee = null;
       console.log(
@@ -456,15 +428,8 @@ export const deleteAllowance = async (req, res) => {
       });
     }
 
-    // Check if HOD is trying to delete allowance from different department
-    if (user.role.level === 700) {
-      if (allowance.department?.toString() !== user.department?.toString()) {
-        return res.status(403).json({
-          success: false,
-          message: "You can only delete allowances for your department",
-        });
-      }
-    }
+    // HR HOD and Super Admin can delete allowances from any department
+    // No department restrictions for level 700+ users
 
     // Soft delete
     await PersonalAllowance.findByIdAndUpdate(id, {
@@ -507,15 +472,8 @@ export const getAllowanceById = async (req, res) => {
       });
     }
 
-    // Check if HOD is trying to view allowance from different department
-    if (user.role.level === 700) {
-      if (allowance.department?.toString() !== user.department?.toString()) {
-        return res.status(403).json({
-          success: false,
-          message: "You can only view allowances for your department",
-        });
-      }
-    }
+    // HR HOD and Super Admin can view allowances from any department
+    // No department restrictions for level 700+ users
 
     res.status(200).json({
       success: true,

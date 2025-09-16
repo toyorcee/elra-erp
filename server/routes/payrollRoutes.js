@@ -4,6 +4,11 @@ import {
   processPayrollWithData,
   calculateEmployeePayroll,
   getPayrollPreview,
+  getPendingApprovals,
+  getApprovalDetails,
+  approvePayroll,
+  rejectPayroll,
+  processApprovedPayroll,
   getPayrollSummary,
   getSavedPayrolls,
   getEmployeePayrollBreakdown,
@@ -15,8 +20,14 @@ import {
   resendPayslip,
   getAllPayslips,
   getPersonalPayslips,
+  calculateFinalPayroll,
+  getFinalPayrollData,
 } from "../controllers/payrollController.js";
-import { protect, checkPayrollAccess } from "../middleware/auth.js";
+import {
+  protect,
+  checkPayrollAccess,
+  checkPayrollApprovalAccess,
+} from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -39,6 +50,29 @@ router.get("/summary", getPayrollSummary);
 router.get("/saved", getSavedPayrolls);
 router.get("/breakdown/:employeeId", getEmployeePayrollBreakdown);
 
+// Payroll approval routes - use specific approval access middleware
+router.get(
+  "/approvals/pending",
+  checkPayrollApprovalAccess,
+  getPendingApprovals
+);
+router.get(
+  "/approvals/:approvalId",
+  checkPayrollApprovalAccess,
+  getApprovalDetails
+);
+router.post(
+  "/approvals/:approvalId/approve",
+  checkPayrollApprovalAccess,
+  approvePayroll
+);
+router.post(
+  "/approvals/:approvalId/reject",
+  checkPayrollApprovalAccess,
+  rejectPayroll
+);
+router.post("/process-approved/:approvalId", processApprovedPayroll);
+
 // Payslip management routes
 router.post("/resend-payslips", resendPayslips);
 
@@ -48,5 +82,9 @@ router.get("/payslips", getAllPayslips);
 router.get("/payslips/:payrollId", getPayslips);
 
 router.post("/payslips/:payrollId/resend/:employeeId", resendPayslip);
+
+// Final payroll routes
+router.post("/final", checkPayrollAccess, calculateFinalPayroll);
+router.get("/final/:employeeId", checkPayrollAccess, getFinalPayrollData);
 
 export default router;

@@ -82,11 +82,11 @@ const getSalaryGradeById = async (req, res) => {
 // Create new salary grade
 const createSalaryGrade = async (req, res) => {
   try {
-    // Check user permissions (Super Admin or HOD level 600+)
-    if (req.user.level < 600) {
+    // Check user permissions (Super Admin or HR HOD)
+    if (req.user.role.level < 700) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. Super Admin or HOD level required.",
+        message: "Access denied. Super Admin or HR HOD level required.",
       });
     }
 
@@ -224,11 +224,11 @@ const createSalaryGrade = async (req, res) => {
 // Update salary grade
 const updateSalaryGrade = async (req, res) => {
   try {
-    // Check user permissions (Super Admin or HOD level 600+)
-    if (req.user.level < 600) {
+    // Check user permissions (Super Admin or HR HOD)
+    if (req.user.role.level < 700) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. Super Admin or HOD level required.",
+        message: "Access denied. Super Admin or HR HOD level required.",
       });
     }
 
@@ -357,11 +357,11 @@ const updateSalaryGrade = async (req, res) => {
 // Delete salary grade (soft delete)
 const deleteSalaryGrade = async (req, res) => {
   try {
-    // Check user permissions (Super Admin or HOD level 600+)
-    if (req.user.level < 600) {
+    // Check user permissions (Super Admin or HR HOD)
+    if (req.user.role.level < 700) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. Super Admin or HOD level required.",
+        message: "Access denied. Super Admin or HR HOD level required.",
       });
     }
 

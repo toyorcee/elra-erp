@@ -3,7 +3,6 @@ import { validationResult } from "express-validator";
 import bcrypt from "bcryptjs";
 import User from "../models/User.js";
 import Role from "../models/Role.js";
-import Company from "../models/Company.js";
 import Department from "../models/Department.js";
 import Notification from "../models/Notification.js";
 import {
@@ -215,7 +214,6 @@ export const register = async (req, res) => {
     }
 
     let userRole;
-    let company;
     let selectedDepartment;
     let approvalStatus = "PENDING_REGISTRATION";
     let approvalMessage = "";
@@ -271,62 +269,29 @@ export const register = async (req, res) => {
       }
     }
 
-    // Check if this is the first user (first superadmin)
-    const existingCompany = await Company.findOne();
-
-    if (!existingCompany) {
-      company = await Company.create({
-        name: `${firstName} ${lastName}'s Company`,
-        description: "Default company created for superadmin",
-        industry: "Technology",
-        size: "Small",
-        address: "To be updated",
-        phone: "To be updated",
-        email: email,
-        website: "To be updated",
-        isActive: true,
-        createdBy: null, // Will be set after user creation
+    // Handle department selection for ELRA
+    if (departmentId) {
+      // User specified a department
+      selectedDepartment = await Department.findOne({
+        _id: departmentId,
       });
-
-      // Create default department
-      selectedDepartment = await Department.create({
-        name: "General",
-        description: "Default department for all users",
-        company: company._id,
-        manager: null, // Will be set after user creation
-        isActive: true,
-        createdBy: null, // Will be set after user creation
-      });
-    } else {
-      // Use existing company and department
-      company = existingCompany;
-
-      // Handle department selection
-      if (departmentId) {
-        // User specified a department
-        selectedDepartment = await Department.findOne({
-          _id: departmentId,
-          company: company._id,
+      if (!selectedDepartment) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid department selected",
         });
-        if (!selectedDepartment) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid department selected",
-          });
-        }
-      } else {
-        // Use default department
-        selectedDepartment = await Department.findOne({ company: company._id });
-        if (!selectedDepartment) {
-          selectedDepartment = await Department.create({
-            name: "General",
-            description: "Default department for all users",
-            company: company._id,
-            manager: null,
-            isActive: true,
-            createdBy: null,
-          });
-        }
+      }
+    } else {
+      // Use default department for ELRA
+      selectedDepartment = await Department.findOne({ name: "General" });
+      if (!selectedDepartment) {
+        selectedDepartment = await Department.create({
+          name: "General",
+          description: "Default department for ELRA users",
+          manager: null,
+          isActive: true,
+          createdBy: null,
+        });
       }
     }
 
@@ -344,7 +309,6 @@ export const register = async (req, res) => {
       firstName,
       lastName,
       role: userRole._id,
-      company: company?._id,
       department: selectedDepartment?._id,
       isSuperadmin: !existingSuperAdmin, // Only first user becomes superadmin
       isEmailVerified: false, // Email not verified yet
@@ -356,13 +320,8 @@ export const register = async (req, res) => {
 
     await user.save();
 
-    // Update company and department with the created user as creator/manager
-    if (company && selectedDepartment) {
-      await Company.findByIdAndUpdate(company._id, {
-        createdBy: user._id,
-        updatedBy: user._id,
-      });
-
+    // Update department with the created user as manager
+    if (selectedDepartment) {
       await Department.findByIdAndUpdate(selectedDepartment._id, {
         manager: user._id,
         createdBy: user._id,
@@ -370,8 +329,8 @@ export const register = async (req, res) => {
       });
     }
 
-    // Populate role, company, and department after saving
-    await user.populate(["role", "company", "department"]);
+    // Populate role and department after saving
+    await user.populate(["role", "department"]);
 
     // Send appropriate email and notifications based on approval status
     try {
@@ -820,6 +779,11 @@ export const changePassword = async (req, res) => {
     }
 
     // Update password
+    console.log(
+      "🔐 [CHANGE PASSWORD] Setting new password for user:",
+      user.email
+    );
+    console.log("🔐 [CHANGE PASSWORD] Password length:", newPassword?.length);
     user.password = newPassword;
 
     if (user.isTemporaryPassword) {
@@ -1025,6 +989,11 @@ export const resetPassword = async (req, res) => {
     }
 
     // Update password
+    console.log(
+      "🔐 [RESET PASSWORD] Setting new password for user:",
+      user.email
+    );
+    console.log("🔐 [RESET PASSWORD] Password length:", newPassword?.length);
     user.password = newPassword;
     user.passwordResetToken = undefined;
     user.passwordResetExpires = undefined;
@@ -1141,27 +1110,66 @@ export const joinCompany = async (req, res) => {
     }
 
     // Always use the invitation's role/department as it represents the admin's intent
-    existingUser.company = invitation.company._id;
     existingUser.department = invitation.department._id;
     existingUser.role = invitation.role._id;
     existingUser.isActive = true;
     existingUser.status = "ACTIVE";
     existingUser.isEmailVerified = true;
 
-    const isPasswordCorrect = await existingUser.correctPassword(
-      userData.password,
-      existingUser.password
+    // Set the new password from userData
+    console.log(
+      "🔐 [PASSWORD] Setting new password for user:",
+      existingUser.email
     );
-
-    if (!isPasswordCorrect) {
-      return res.status(401).json({
-        success: false,
-        message:
-          "Invalid credentials. Please check your username and password.",
-      });
-    }
+    console.log("🔐 [PASSWORD] Password length:", userData.password?.length);
+    existingUser.password = userData.password;
 
     await existingUser.save();
+
+    // Auto-generate onboarding lifecycle for new employees
+    try {
+      const EmployeeLifecycle = (await import("../models/EmployeeLifecycle.js"))
+        .default;
+
+      // Check if onboarding lifecycle already exists
+      const existingLifecycle = await EmployeeLifecycle.findOne({
+        employee: existingUser._id,
+        type: "Onboarding",
+      });
+
+      if (!existingLifecycle) {
+        // Find HR user to assign tasks to
+        const hrUser = await User.findOne({
+          "role.name": "HR",
+          isActive: true,
+          status: "ACTIVE",
+        });
+
+        if (hrUser) {
+          await EmployeeLifecycle.createStandardLifecycle(
+            existingUser._id,
+            "Onboarding",
+            existingUser.department,
+            existingUser.role,
+            existingUser._id, // initiated by the employee themselves
+            hrUser._id // assigned to HR
+          );
+          console.log(
+            `🚀 [ONBOARDING] Auto-generated onboarding lifecycle for: ${existingUser.email}`
+          );
+        } else {
+          console.log(
+            `⚠️ [ONBOARDING] No HR user found to assign onboarding tasks for: ${existingUser.email}`
+          );
+        }
+      }
+    } catch (error) {
+      console.error(
+        "❌ [ONBOARDING] Error creating onboarding lifecycle:",
+        error
+      );
+      // Don't fail the invitation process if lifecycle creation fails
+    }
 
     invitation.status = "used";
     invitation.usedBy = existingUser._id;

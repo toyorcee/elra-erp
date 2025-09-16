@@ -21,15 +21,9 @@ export const getAllBonuses = async (req, res) => {
 
     // Apply department filter based on user role (but only if scope filter is not applied)
     if (!scope || scope === "") {
-      if (user.role.level === 700) {
-        // HOD can only see bonuses for their department
-        query.$or = [
-          { scope: "department", department: user.department },
-          { scope: "company" },
-          { scope: "individual", department: user.department },
-        ];
-      } else if (user.role.level === 1000) {
-        // Super Admin can see all bonuses
+      if (user.role.level >= 700) {
+        // HR HOD and Super Admin can see all bonuses
+        // No additional filtering needed - they can see everything
       } else {
         // Regular users can only see their own bonuses
         query.$or = [
@@ -223,13 +217,9 @@ export const createBonus = async (req, res) => {
         "✅ [bonusController] Company-wide bonus - no specific employee/department"
       );
     } else if (bonusData.scope === "department") {
-      if (user.role.level === 700) {
-        bonusData.department = user.department;
-        bonusData.departments = null;
-      } else {
-        if (bonusData.departments && bonusData.departments.length > 0) {
-          bonusData.department = null;
-        }
+      // HR HOD and Super Admin can create bonuses for any department
+      if (bonusData.departments && bonusData.departments.length > 0) {
+        bonusData.department = null;
       }
       bonusData.employee = null;
       bonusData.employees = null;
@@ -238,13 +228,9 @@ export const createBonus = async (req, res) => {
         bonusData.departments || bonusData.department
       );
     } else if (bonusData.scope === "individual") {
-      if (user.role.level === 700) {
-        bonusData.department = user.department;
-        bonusData.departments = null;
-      } else {
-        if (bonusData.departments && bonusData.departments.length > 0) {
-          bonusData.department = null;
-        }
+      // HR HOD and Super Admin can create bonuses for any department
+      if (bonusData.departments && bonusData.departments.length > 0) {
+        bonusData.department = null;
       }
       bonusData.employee = null;
       console.log(
@@ -329,15 +315,8 @@ export const updateBonus = async (req, res) => {
       });
     }
 
-    // Check if HOD is trying to update bonus from different department
-    if (user.role.level === 700) {
-      if (bonus.department?.toString() !== user.department?.toString()) {
-        return res.status(403).json({
-          success: false,
-          message: "You can only update bonuses for your department",
-        });
-      }
-    }
+    // HR HOD and Super Admin can update bonuses from any department
+    // No department restrictions for level 700+ users
 
     // Handle scope-based data cleaning (same as create function)
     if (updateData.scope === "company") {
@@ -349,13 +328,9 @@ export const updateBonus = async (req, res) => {
         "✅ [bonusController] Company-wide bonus update - no specific employee/department"
       );
     } else if (updateData.scope === "department") {
-      if (user.role.level === 700) {
-        updateData.department = user.department;
-        updateData.departments = null;
-      } else {
-        if (updateData.departments && updateData.departments.length > 0) {
-          updateData.department = null;
-        }
+      // HR HOD and Super Admin can update bonuses for any department
+      if (updateData.departments && updateData.departments.length > 0) {
+        updateData.department = null;
       }
       updateData.employee = null;
       updateData.employees = null;
@@ -364,13 +339,9 @@ export const updateBonus = async (req, res) => {
         updateData.departments || updateData.department
       );
     } else if (updateData.scope === "individual") {
-      if (user.role.level === 700) {
-        updateData.department = user.department;
-        updateData.departments = null;
-      } else {
-        if (updateData.departments && updateData.departments.length > 0) {
-          updateData.department = null;
-        }
+      // HR HOD and Super Admin can update bonuses for any department
+      if (updateData.departments && updateData.departments.length > 0) {
+        updateData.department = null;
       }
       updateData.employee = null;
       console.log(
@@ -443,15 +414,8 @@ export const deleteBonus = async (req, res) => {
       });
     }
 
-    // Check if HOD is trying to delete bonus from different department
-    if (user.role.level === 700) {
-      if (bonus.department?.toString() !== user.department?.toString()) {
-        return res.status(403).json({
-          success: false,
-          message: "You can only delete bonuses for your department",
-        });
-      }
-    }
+    // HR HOD and Super Admin can delete bonuses from any department
+    // No department restrictions for level 700+ users
 
     // Soft delete
     await PersonalBonus.findByIdAndUpdate(id, {

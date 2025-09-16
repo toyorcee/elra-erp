@@ -1200,14 +1200,23 @@ export const userModulesAPI = {
 
     getEmployeesForPayroll: async () => {
       try {
-        console.log("📋 [payrollAPI] Getting employees for payroll");
-        const response = await userModulesAPI.users.getAllUsers();
-        const employees = response.data.filter((user) => user.isActive);
-        console.log("✅ [payrollAPI] Employees for payroll:", employees);
-        return employees;
+        console.log("📋 [payrollAPI] Getting payroll-eligible employees");
+        const response = await api.get("/users/payroll-eligible");
+
+        if (response.data.success) {
+          console.log(
+            `✅ [payrollAPI] Found ${response.data.eligibleCount} payroll-eligible employees out of ${response.data.totalActive} active users`
+          );
+          return response.data.data;
+        } else {
+          throw new Error(
+            response.data.message ||
+              "Failed to fetch payroll-eligible employees"
+          );
+        }
       } catch (error) {
         console.error(
-          "❌ [payrollAPI] Error getting employees for payroll:",
+          "❌ [payrollAPI] Error getting payroll-eligible employees:",
           error
         );
         throw error;

@@ -469,20 +469,22 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
           onClick={handleClick}
           className={`group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-300 relative cursor-pointer ${
             isItemActive
-              ? "bg-white text-[var(--elra-primary)] font-semibold"
-              : "text-white hover:bg-white/20"
+              ? "bg-[var(--elra-primary)] text-white font-semibold shadow-lg"
+              : "text-gray-700 hover:bg-gray-100 hover:text-[var(--elra-primary)]"
           } ${!shouldShowExpanded && "justify-center"}`}
         >
           {/* Active indicator */}
           {isItemActive && (
             <div
-              className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl bg-white`}
+              className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl bg-[var(--elra-primary-dark)]`}
             />
           )}
           <div className="relative">
             <IconComponent
               className={`h-5 w-5 ${
-                isItemActive ? "text-[var(--elra-primary)]" : "text-white"
+                isItemActive
+                  ? "text-white"
+                  : "text-gray-600 group-hover:text-[var(--elra-primary)]"
               } ${
                 !shouldShowExpanded && "mx-auto"
               } transition-transform duration-200 group-hover:scale-110`}
@@ -492,21 +494,25 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             <>
               <span
                 className={`ml-3 flex-1 ${
-                  isItemActive ? "text-[var(--elra-primary)]" : "text-white"
+                  isItemActive
+                    ? "text-white"
+                    : "text-gray-700 group-hover:text-[var(--elra-primary)]"
                 }`}
               >
                 {item.label}
               </span>
               <div className="flex items-center space-x-2">
                 {isMostSpecific && (
-                  <span className="px-2 py-1 text-xs font-bold text-[var(--elra-primary)] bg-white/20 rounded-full">
+                  <span className="px-2 py-1 text-xs font-bold text-white bg-white/20 rounded-full">
                     Active
                   </span>
                 )}
                 {isPinned && (
                   <MapPinIcon
                     className={`h-4 w-4 ${
-                      isItemActive ? "text-[var(--elra-primary)]" : "text-white"
+                      isItemActive
+                        ? "text-white"
+                        : "text-gray-600 group-hover:text-[var(--elra-primary)]"
                     }`}
                   />
                 )}
@@ -518,7 +524,9 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
           <button
             onClick={() => togglePin(item.label)}
             className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-md transition-all duration-200 cursor-pointer ${
-              isPinned ? "text-white" : "text-white/60 hover:text-white"
+              isPinned
+                ? "text-[var(--elra-primary)]"
+                : "text-gray-400 hover:text-[var(--elra-primary)]"
             }`}
           >
             <MapPinIcon className={`h-4 w-4 ${isPinned ? "rotate-45" : ""}`} />
@@ -544,7 +552,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
         {shouldShowExpanded && (
           <button
             onClick={(e) => toggleSectionCollapse(sectionTitle, e)}
-            className={`w-full px-4 text-sm font-bold uppercase tracking-wider mb-3 py-3 rounded-lg flex items-center justify-between transition-all duration-200 text-white cursor-pointer hover:bg-white/20`}
+            className={`w-full px-4 text-sm font-bold uppercase tracking-wider mb-3 py-3 rounded-lg flex items-center justify-between transition-all duration-200 text-[var(--elra-primary)] cursor-pointer hover:bg-gray-100`}
           >
             <div className="flex items-center">
               <span>{sectionTitle.toUpperCase()}</span>
@@ -582,8 +590,8 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                 to={item.path}
                 className={`flex flex-col items-center p-2 rounded-lg transition-all duration-200 cursor-pointer ${
                   isItemActive
-                    ? "bg-white text-[var(--elra-primary)]"
-                    : "text-white hover:bg-white/20"
+                    ? "bg-[var(--elra-primary)] text-white shadow-lg"
+                    : "text-gray-700 hover:bg-gray-100 hover:text-[var(--elra-primary)]"
                 }`}
                 title={item.label}
               >
@@ -597,7 +605,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
         </div>
         {sections.erp.length > 8 && (
           <div className="mt-2 text-center">
-            <button className="text-white/70 text-xs hover:text-white">
+            <button className="text-gray-500 text-xs hover:text-[var(--elra-primary)]">
               +{sections.erp.length - 8} more
             </button>
           </div>
@@ -631,7 +639,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
 
       {/* Sidebar */}
       <div
-        className={`fixed top-0 left-0 h-full bg-[var(--elra-primary)] backdrop-blur-xl border-r border-[var(--elra-primary-dark)] z-50 transition-all duration-300 ease-in-out ${
+        className={`fixed top-0 left-0 h-full bg-white backdrop-blur-xl border-r border-gray-200 z-50 transition-all duration-300 ease-in-out ${
           shouldShowExpanded ? "w-64" : "w-16"
         } ${
           isMobile
@@ -641,16 +649,16 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             : ""
         } ${
           !isOpen && !isMobile ? "lg:translate-x-0" : ""
-        } shadow-2xl shadow-[var(--elra-primary-dark)]/20 overflow-hidden`}
+        } shadow-2xl shadow-gray-200/20 overflow-hidden`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
         {/* Header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-[var(--elra-primary-dark)] bg-[var(--elra-primary)]">
+        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 bg-white">
           {/* Section Title when expanded or hovered */}
           {shouldShowExpanded && (
             <div className="flex items-center">
-              <span className="font-bold text-white text-lg">
+              <span className="font-bold text-[var(--elra-primary)] text-lg">
                 {isModuleView && currentModule
                   ? getCurrentModuleInfo()?.label || currentModule
                   : "Dashboard"}
@@ -663,7 +671,9 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             <button
               onClick={toggleSidebarPin}
               className={`p-2 rounded-xl transition-all duration-200 hover:scale-110 cursor-pointer ${
-                isPinned ? "text-white" : "text-white/60 hover:text-white"
+                isPinned
+                  ? "text-[var(--elra-primary)]"
+                  : "text-gray-500 hover:text-[var(--elra-primary)]"
               }`}
               title={isPinned ? "Unpin sidebar" : "Pin sidebar"}
             >
@@ -674,7 +684,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
           ) : (
             <button
               onClick={handleToggle}
-              className="p-2 rounded-xl text-white hover:text-white/80 transition-all duration-200 hover:scale-110 cursor-pointer"
+              className="p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer"
               title="Expand sidebar"
             >
               <Bars3Icon className="h-5 w-5" />
@@ -684,7 +694,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
           {/* Only show hamburger on mobile */}
           <button
             onClick={handleToggle}
-            className="p-2 rounded-xl text-white hover:text-white/80 transition-all duration-200 hover:scale-110 cursor-pointer lg:hidden"
+            className="p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer lg:hidden"
           >
             {isOpen ? (
               <XMarkIcon className="h-5 w-5" />
@@ -697,7 +707,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
           {shouldShowExpanded && (
             <button
               onClick={handleToggle}
-              className="hidden lg:block p-2 rounded-xl text-white hover:text-white/80 transition-all duration-200 hover:scale-110 cursor-pointer"
+              className="hidden lg:block p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer"
             >
               <XMarkIcon className="h-5 w-5" />
             </button>
@@ -705,18 +715,18 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
         </div>
 
         {/* User Profile */}
-        <div className="px-4 py-4 border-b border-[var(--elra-primary-dark)] bg-[var(--elra-primary-dark)]">
+        <div className="px-4 py-4 border-b border-gray-200 bg-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div
                 className={`${
                   shouldShowExpanded ? "w-12 h-12" : "w-10 h-10"
-                } bg-white rounded-2xl flex items-center justify-center shadow-lg ${
+                } bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-2xl flex items-center justify-center shadow-lg ${
                   !shouldShowExpanded ? "mx-auto" : ""
                 }`}
               >
                 <span
-                  className={`text-[var(--elra-primary)] font-bold ${
+                  className={`text-white font-bold ${
                     shouldShowExpanded ? "text-lg" : "text-base"
                   }`}
                 >
@@ -725,13 +735,13 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
               </div>
               {shouldShowExpanded && (
                 <div className="ml-4 flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white truncate">
+                  <p className="text-sm font-semibold text-gray-800 truncate">
                     {user?.firstName} {user?.lastName}
                   </p>
-                  <p className="text-sm text-white/80 font-semibold truncate">
+                  <p className="text-sm text-gray-600 font-semibold truncate">
                     {user?.department?.name || "Department"}
                   </p>
-                  <p className="text-xs text-white/80 font-medium">
+                  <p className="text-xs text-gray-500 font-medium">
                     {typeof roleInfo?.title === "string"
                       ? roleInfo.title
                       : "Staff"}
@@ -771,7 +781,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                         onClick={(e) =>
                           toggleSectionCollapse("Module Features", e)
                         }
-                        className="w-full px-4 text-sm font-bold text-white uppercase tracking-wider mb-3 py-3 rounded-lg flex items-center justify-between transition-all duration-200 cursor-pointer hover:bg-white/20"
+                        className="w-full px-4 text-sm font-bold text-[var(--elra-primary)] uppercase tracking-wider mb-3 py-3 rounded-lg flex items-center justify-between transition-all duration-200 cursor-pointer hover:bg-gray-100"
                       >
                         <span>Module Features</span>
                         <div className="flex items-center space-x-2">
@@ -802,7 +812,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                                 onClick={(e) =>
                                   toggleSectionCollapse(section.title, e)
                                 }
-                                className="w-full px-4 text-xs font-semibold text-white uppercase tracking-wider mb-2 py-2 rounded-lg flex items-center justify-between transition-all duration-200 cursor-pointer hover:bg-white/20"
+                                className="w-full px-4 text-xs font-semibold text-[var(--elra-primary)] uppercase tracking-wider mb-2 py-2 rounded-lg flex items-center justify-between transition-all duration-200 cursor-pointer hover:bg-gray-100"
                               >
                                 <span>{section.title}</span>
                                 {section.collapsible && (
@@ -829,8 +839,8 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                                           to={item.path}
                                           className={`group flex items-center px-4 py-2 text-xs font-medium rounded-lg transition-all duration-300 cursor-pointer ${
                                             isItemActive
-                                              ? "bg-white text-[var(--elra-primary)] font-semibold"
-                                              : "text-white hover:bg-white/20"
+                                              ? "bg-[var(--elra-primary)] text-white font-semibold shadow-lg"
+                                              : "text-gray-700 hover:bg-gray-100 hover:text-[var(--elra-primary)]"
                                           } ${
                                             !shouldShowExpanded &&
                                             "justify-center"
@@ -840,8 +850,8 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                                             <IconComponent
                                               className={`h-4 w-4 ${
                                                 isItemActive
-                                                  ? "text-[var(--elra-primary)]"
-                                                  : "text-white"
+                                                  ? "text-white"
+                                                  : "text-gray-600 group-hover:text-[var(--elra-primary)]"
                                               } ${
                                                 !shouldShowExpanded && "mx-auto"
                                               } transition-transform duration-200 group-hover:scale-110`}
@@ -872,7 +882,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                 {/* Pinned Items */}
                 {pinnedItems.length > 0 && (
                   <div className="mb-6">
-                    <h3 className="px-4 text-xs font-bold text-white uppercase tracking-wider mb-3 py-2 rounded-lg">
+                    <h3 className="px-4 text-xs font-bold text-[var(--elra-primary)] uppercase tracking-wider mb-3 py-2 rounded-lg">
                       Pinned
                     </h3>
                     {pinnedItems.map((itemLabel) => {

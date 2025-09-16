@@ -126,7 +126,7 @@ export const sendPasswordResetEmail = async (email, resetToken, userName) => {
     const htmlContent = createEmailTemplate(
       "Reset Your ELRA Password",
       `
-        <p>Hello <strong>${userName}</strong>,</p>
+        <p>Hello,</p>
                   <p>🔐 We received a request to reset your ELRA account password.</p>
         <p>Click the button below to create a new secure password. This link will expire in 1 hour for your security.</p>
         <p>If you didn't request this password reset, please ignore this email and your password will remain unchanged.</p>
@@ -166,7 +166,7 @@ export const sendWelcomeEmail = async (email, userName) => {
     const htmlContent = createEmailTemplate(
       "Welcome to ELRA!",
       `
-        <p>Hello <strong>${userName}</strong>,</p>
+        <p>Hello,</p>
         <p>🎉 Congratulations! Your ELRA account has been successfully activated.</p>
         <p>You now have full access to our comprehensive platform with advanced features including HR management, payroll processing, procurement, finance, inventory management, and secure document workflows.</p>
         <p>Ready to transform your business operations? Click the button below to get started!</p>
@@ -207,7 +207,7 @@ export const sendAccountActivationEmail = async (
     const htmlContent = createEmailTemplate(
       "Activate Your ELRA Account",
       `
-        <p>Hello <strong>${userName}</strong>,</p>
+        <p>Hello,</p>
         <p>🎉 Welcome to ELRA! We're excited to have you join our comprehensive platform.</p>
         <p>To complete your account setup and unlock all the powerful business management features, please click the button below to activate your account.</p>
         <p>Once activated, you'll have full access to HR management, payroll processing, procurement, finance, inventory management, and secure document workflows.</p>
@@ -242,7 +242,7 @@ export const sendPasswordChangeSuccessEmail = async (email, userName) => {
     const htmlContent = createEmailTemplate(
       "Password Changed Successfully",
       `
-        <p>Hello <strong>${userName}</strong>,</p>
+        <p>Hello,</p>
         <p>✅ Your ELRA account password has been successfully updated.</p>
         <p>You can now log in to your account with your new secure password.</p>
         <p>If you did not make this change, please contact your system administrator immediately for security assistance.</p>
@@ -309,7 +309,7 @@ export const sendIndustryInstanceInvitation = async (
     const htmlContent = createEmailTemplate(
       `Welcome to ${companyName} - ELRA Platform`,
       `
-        <p>Hello <strong>${userName}</strong>,</p>
+        <p>Hello,</p>
         <p>🎉 Welcome to the <strong>${companyName}</strong> ELRA platform!</p>
         <p>Your account has been created as a <strong>Super Administrator</strong> for the ${industryType.replace(
           "_",
@@ -362,7 +362,7 @@ export const sendInvitationEmail = async (
     const htmlContent = createEmailTemplate(
       `You're Invited to Join ELRA`,
       `
-        <p>Hello <strong>${userName}</strong>,</p>
+        <p>Hello,</p>
         <p>You've been invited to join ELRA's comprehensive platform.</p>
         
         <div class="info-box">
@@ -758,7 +758,7 @@ export const sendUserRenewalEmail = async (
     const htmlContent = createEmailTemplate(
       "🔄 Your Subscription Has Been Renewed!",
       `
-        <p>Hello <strong>${userName}</strong>,</p>
+        <p>Hello,</p>
         <p>✅ <strong>Great news!</strong> Your ELRA subscription has been successfully renewed!</p>
         
         <p>📋 <strong>Renewal Confirmation:</strong></p>
@@ -808,7 +808,7 @@ export const sendUserCancellationEmail = async (
     const htmlContent = createEmailTemplate(
       "⚠️ Your Subscription Has Been Cancelled",
       `
-        <p>Hello <strong>${userName}</strong>,</p>
+        <p>Hello,</p>
         <p>⚠️ <strong>Important Notice:</strong> Your ELRA subscription has been cancelled.</p>
         
         <p>📋 <strong>Cancellation Details:</strong></p>
@@ -863,7 +863,7 @@ export const sendUserPaymentFailureEmail = async (
     const htmlContent = createEmailTemplate(
       "❌ Payment Failed - Action Required",
       `
-        <p>Hello <strong>${userName}</strong>,</p>
+        <p>Hello,</p>
         <p>❌ <strong>Important:</strong> We were unable to process your subscription payment.</p>
         
         <p>📋 <strong>Payment Failure Details:</strong></p>
@@ -933,7 +933,7 @@ export const sendInventoryCompletionEmail = async (
     const htmlContent = createEmailTemplate(
       title,
       `
-        <p>Hello <strong>${userName}</strong>,</p>
+        <p>Hello,</p>
         <p>📦 An inventory item has been ${statusText} in the ELRA system.</p>
         
         <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">

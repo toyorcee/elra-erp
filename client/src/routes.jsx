@@ -58,11 +58,16 @@ import TaskList from "./pages/user/modules/tasks/TaskList";
 import TaskAnalytics from "./pages/user/modules/tasks/TaskAnalytics";
 import TaskAssignments from "./pages/user/modules/tasks/TaskAssignments";
 import TaskReports from "./pages/user/modules/tasks/TaskReports";
-import FinancialTransactions from "./pages/user/modules/finance/FinancialTransactions";
-import RevenueManagement from "./pages/user/modules/finance/RevenueManagement";
-import ExpenseManagement from "./pages/user/modules/finance/ExpenseManagement";
-import FinancialReports from "./pages/user/modules/finance/FinancialReports";
+import ELRAWalletManagement from "./pages/user/modules/finance/ELRAWalletManagement";
+import TransactionHistoryAndReports from "./pages/user/modules/finance/TransactionHistoryAndReports";
 import BudgetAllocation from "./pages/user/modules/finance/BudgetAllocation";
+import PayrollApprovals from "./pages/user/modules/finance/PayrollApprovals";
+import {
+  SalesMarketingDashboard,
+  SalesMarketingTransactions,
+  SalesMarketingApprovals,
+  SalesMarketingReports,
+} from "./pages/user/modules/sales-marketing";
 import ProcurementManagement from "./pages/user/modules/procurement/ProcurementManagement";
 import { PendingReviews, ComplianceHistory } from "./pages/user/modules/legal";
 import SystemSetupOnboarding from "./pages/shared/SystemSetupOnboarding";
@@ -150,6 +155,14 @@ const AppRoutes = () => {
         <Route path="notifications" element={<Notifications />} />
         <Route path="settings" element={<Settings />} />
         <Route path="profile" element={<Profile />} />
+
+        {/* Sales & Marketing Module Routes - MUST come before generic module route */}
+        <Route path="modules/sales">
+          <Route index element={<SalesMarketingDashboard />} />
+          <Route path="transactions" element={<SalesMarketingTransactions />} />
+          <Route path="approvals" element={<SalesMarketingApprovals />} />
+          <Route path="reports" element={<SalesMarketingReports />} />
+        </Route>
 
         {/* Module routes - dynamic module dashboards */}
         <Route path="modules/:module" element={<Dashboard />} />
@@ -282,18 +295,20 @@ const AppRoutes = () => {
         <Route path="modules/tasks/reports" element={<TaskReports />} />
 
         <Route
-          path="modules/finance/transactions"
-          element={<FinancialTransactions />}
+          path="modules/finance/elra-wallet"
+          element={<ELRAWalletManagement />}
         />
-        <Route path="modules/finance/revenue" element={<RevenueManagement />} />
         <Route
-          path="modules/finance/expenses"
-          element={<ExpenseManagement />}
+          path="modules/finance/transaction-history"
+          element={<TransactionHistoryAndReports />}
         />
-        <Route path="modules/finance/reports" element={<FinancialReports />} />
         <Route
           path="modules/finance/budget-allocation"
           element={<BudgetAllocation />}
+        />
+        <Route
+          path="modules/finance/payroll-approvals"
+          element={<PayrollApprovals />}
         />
 
         {/* Procurement Module Routes */}

@@ -14,7 +14,6 @@ class PayrollApprovalService {
    */
   async createApprovalRequest(payrollData, requestedBy) {
     try {
-      // Calculate total tax from payroll data
       const totalTax = payrollData.totalPAYE || 0;
 
       console.log(
@@ -264,7 +263,6 @@ class PayrollApprovalService {
           `✅ [PAYROLL_SERVICE] Generated payroll records for ${payrollResult.processingSummary.successful} employees`
         );
 
-        // Update approval status (within transaction)
         approval.approvalStatus = "processed";
         approval.processedAt = new Date();
         approval.processedBy = processedBy;
@@ -302,10 +300,8 @@ class PayrollApprovalService {
       let errorCount = 0;
       const errors = [];
 
-      // Process each employee's payroll
       for (const payroll of approval.payrollData.payrolls) {
         try {
-          // Prepare employee data
           const employeeData = {
             _id: payroll.employee.id,
             firstName: payroll.employee.name.split(" ")[0] || "",
@@ -313,9 +309,11 @@ class PayrollApprovalService {
             employeeId: payroll.employee.employeeId,
             email: payroll.employee.email,
             department: payroll.employee.department,
+            role: payroll.employee.role,
+            position: payroll.employee.role,
+            jobTitle: payroll.employee.role,
           };
 
-          // Prepare payroll data for payslip generation
           const payslipPayrollData = {
             period: approval.period,
             scope: approval.scope,
@@ -323,13 +321,11 @@ class PayrollApprovalService {
             payrollId: approval._id,
           };
 
-          // Generate payslip PDF
           const payslipFile = await payslipService.generatePayslipPDF(
             payslipPayrollData,
             employeeData
           );
 
-          // Save payslip to database
           await payslipService.savePayslipToDatabase(
             payslipPayrollData,
             employeeData,
@@ -337,7 +333,6 @@ class PayrollApprovalService {
             processedBy
           );
 
-          // Send payslip notification and email
           await payslipService.sendPayslipNotification(
             payslipPayrollData,
             employeeData,

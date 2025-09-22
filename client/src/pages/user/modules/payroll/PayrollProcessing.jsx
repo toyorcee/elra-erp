@@ -1217,14 +1217,17 @@ const PayrollProcessing = () => {
                                   <HiEye className="w-3 h-3" />
                                   <span>View</span>
                                 </button>
-                                <button
-                                  onClick={() => handleViewPayslip(payroll)}
-                                  className="group/btn px-2 py-1 text-xs font-semibold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-600 hover:text-white transition-all duration-200 flex items-center space-x-1"
-                                  title="View payslip"
-                                >
-                                  <HiEye className="w-3 h-3" />
-                                  <span>Payslip</span>
-                                </button>
+                                {/* Only show Payslip button for individual scope */}
+                                {payroll.scope === "individual" && (
+                                  <button
+                                    onClick={() => handleViewPayslip(payroll)}
+                                    className="group/btn px-2 py-1 text-xs font-semibold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-600 hover:text-white transition-all duration-200 flex items-center space-x-1"
+                                    title="View payslip"
+                                  >
+                                    <HiEye className="w-3 h-3" />
+                                    <span>Payslip</span>
+                                  </button>
+                                )}
                               </div>
                               <div className="flex justify-center">
                                 <button
@@ -1284,19 +1287,6 @@ const PayrollProcessing = () => {
                 </p>
               </div>
               <div className="flex items-center space-x-3">
-                <button
-                  onClick={() => handleResendPayslips(selectedPayroll._id)}
-                  disabled={resendingPayslips}
-                  className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title="Resend payslips"
-                >
-                  <HiRefresh
-                    className={`w-4 h-4 mr-2 ${
-                      resendingPayslips ? "animate-spin" : ""
-                    }`}
-                  />
-                  {resendingPayslips ? "Sending..." : "Resend Payslips"}
-                </button>
                 <button
                   onClick={() => {
                     setIsDetailModalOpen(false);
@@ -1466,6 +1456,9 @@ const PayrollProcessing = () => {
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Net Pay
                               </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions
+                              </th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
@@ -1518,6 +1511,28 @@ const PayrollProcessing = () => {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-purple-600">
                                   {formatCurrency(payroll.netSalary || 0)}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const employeeId =
+                                        payroll.employee?.id ||
+                                        payroll.employee?._id;
+                                      if (employeeId) {
+                                        const payrollId = selectedPayroll._id;
+                                        const payslipUrl = `/api/payroll/payslips/${payrollId}/view/${employeeId}`;
+                                        const fullUrl = `${
+                                          window.location.origin
+                                        }${payslipUrl}?t=${Date.now()}`;
+                                        window.open(fullUrl, "_blank");
+                                      }
+                                    }}
+                                    className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-600 hover:text-white transition-colors flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <HiEye className="w-3 h-3" />
+                                    View Payslip
+                                  </button>
                                 </td>
                               </tr>
                             ))}
@@ -2380,16 +2395,37 @@ const PayrollProcessing = () => {
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <button
-                                onClick={() => {
-                                  setSelectedEmployeeData(payroll);
-                                  setShowEmployeeDetailModal(true);
-                                }}
-                                className="px-3 py-1 text-xs font-medium text-[var(--elra-primary)] bg-[var(--elra-primary)]/10 rounded-lg hover:bg-[var(--elra-primary)] hover:text-white transition-colors flex items-center gap-1"
-                              >
-                                <HiEye className="w-3 h-3" />
-                                View Details
-                              </button>
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={() => {
+                                    setSelectedEmployeeData(payroll);
+                                    setShowEmployeeDetailModal(true);
+                                  }}
+                                  className="px-3 py-1 text-xs font-medium text-[var(--elra-primary)] bg-[var(--elra-primary)]/10 rounded-lg hover:bg-[var(--elra-primary)] hover:text-white transition-colors flex items-center gap-1"
+                                >
+                                  <HiEye className="w-3 h-3" />
+                                  View Details
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const employeeId =
+                                      payroll.employee?.id ||
+                                      payroll.employee?._id;
+                                    if (employeeId) {
+                                      const payrollId = selectedPayroll._id;
+                                      const payslipUrl = `/api/payroll/payslips/${payrollId}/view/${employeeId}`;
+                                      const fullUrl = `${
+                                        window.location.origin
+                                      }${payslipUrl}?t=${Date.now()}`;
+                                      window.open(fullUrl, "_blank");
+                                    }
+                                  }}
+                                  className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-600 hover:text-white transition-colors flex items-center gap-1"
+                                >
+                                  <HiEye className="w-3 h-3" />
+                                  Payslip
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}

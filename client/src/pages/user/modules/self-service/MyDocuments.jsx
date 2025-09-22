@@ -4,48 +4,34 @@ import {
   HiArrowDownTray,
   HiXMark,
   HiFolder,
-  HiChevronDown,
-  HiCurrencyDollar,
-  HiCog,
-  HiUserGroup,
-  HiShieldCheck,
+  HiChartBar,
+  HiClock,
+  HiCheckCircle,
+  HiExclamationTriangle,
 } from "react-icons/hi2";
+import { HiArchive } from "react-icons/hi";
 import { toast } from "react-toastify";
+import { useNavigate } from "react-router-dom";
 import DataTable from "../../../../components/common/DataTable";
 import { useAuth } from "../../../../context/AuthContext";
 import {
   getUserDocuments,
   getDocumentStatusColor,
+  archiveDocument,
 } from "../../../../services/documents";
 import { downloadDocumentPDF } from "../../../../utils/documentUtils";
 import ELRALogo from "../../../../components/ELRALogo";
 
 const MyDocuments = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filterType, setFilterType] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  // Removed sortBy and sortOrder - now using automatic date sorting
 
   const [showProjectDocumentsModal, setShowProjectDocumentsModal] =
     useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
-
-  const filterOptions = [
-    { value: "all", label: "All Documents", icon: HiDocument },
-    { value: "project", label: "Project Documents", icon: HiFolder },
-    {
-      value: "financial",
-      label: "Financial Documents",
-      icon: HiCurrencyDollar,
-    },
-    { value: "technical", label: "Technical Documents", icon: HiCog },
-    { value: "legal", label: "Legal Documents", icon: HiDocument },
-    { value: "hr", label: "HR Documents", icon: HiUserGroup },
-    { value: "compliance", label: "Compliance Documents", icon: HiShieldCheck },
-    { value: "other", label: "Other Documents", icon: HiDocument },
-  ];
 
   useEffect(() => {
     fetchDocuments();
@@ -81,7 +67,6 @@ const MyDocuments = () => {
         }
         projectGroups[projectId].documents.push(doc);
         projectGroups[projectId].totalDocuments++;
-        // Check for completed documents (approved status)
         if (doc.status === "approved" || doc.status === "APPROVED") {
           projectGroups[projectId].completedDocuments++;
         }
@@ -97,59 +82,45 @@ const MyDocuments = () => {
     return Object.values(projectGroups);
   };
 
-  // Get standalone documents (not associated with projects)
   const getStandaloneDocuments = () => {
     return documents.filter((doc) => !doc.project);
   };
 
-  // Removed date search functionality - keeping it simple with text search only
-
-  // Filter and sort data based on current filter with REAL-TIME search
   const getFilteredData = () => {
     let data = [];
 
-    if (filterType === "all" || filterType === "project") {
-      data = [...groupDocumentsByProject()];
+    data = [...groupDocumentsByProject()];
+
+    const standaloneDocs = getStandaloneDocuments();
+    if (standaloneDocs.length > 0) {
+      data.push({
+        project: null,
+        documents: standaloneDocs,
+        totalDocuments: standaloneDocs.length,
+        completedDocuments: standaloneDocs.filter(
+          (d) => d.status === "approved" || d.status === "APPROVED"
+        ).length,
+        lastUpdated: standaloneDocs[0]?.updatedAt,
+        isStandalone: true,
+      });
     }
 
-    if (filterType === "all" || filterType !== "project") {
-      const standaloneDocs = getStandaloneDocuments();
-      if (standaloneDocs.length > 0) {
-        data.push({
-          project: null,
-          documents: standaloneDocs,
-          totalDocuments: standaloneDocs.length,
-          completedDocuments: standaloneDocs.filter(
-            (d) => d.status === "approved" || d.status === "APPROVED"
-          ).length,
-          lastUpdated: standaloneDocs[0]?.updatedAt,
-          isStandalone: true,
-        });
-      }
-    }
-
-    // Apply REAL-TIME search filter with enhanced search capabilities
     if (searchTerm && searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase().trim();
       data = data.filter((item) => {
         if (item.isStandalone) {
           return item.documents.some(
             (doc) =>
-              // Document title and description
               doc.title?.toLowerCase().includes(searchLower) ||
               doc.description?.toLowerCase().includes(searchLower) ||
-              // Document category and type
               doc.category?.toLowerCase().includes(searchLower) ||
               doc.documentType?.toLowerCase().includes(searchLower) ||
-              // Document status
               doc.status?.toLowerCase().includes(searchLower) ||
-              // File name matching
               doc.fileName?.toLowerCase().includes(searchLower) ||
               doc.originalFileName?.toLowerCase().includes(searchLower)
           );
         }
 
-        // For project documents, search in multiple fields
         const projectMatch =
           item.project.name?.toLowerCase().includes(searchLower) ||
           item.project.code?.toLowerCase().includes(searchLower) ||
@@ -173,19 +144,10 @@ const MyDocuments = () => {
       });
     }
 
-    if (filterType !== "all") {
-      data = data.filter((item) => {
-        if (item.isStandalone) {
-          return item.documents.some((doc) => doc.category === filterType);
-        }
-        return item.documents.some((doc) => doc.category === filterType);
-      });
-    }
-
     data.sort((a, b) => {
       const aValue = new Date(a.lastUpdated);
       const bValue = new Date(b.lastUpdated);
-      return bValue - aValue; // Descending order (newest first)
+      return bValue - aValue;
     });
 
     return data;
@@ -213,6 +175,17 @@ const MyDocuments = () => {
     }
   };
 
+  const handleArchiveDocument = async (documentId) => {
+    try {
+      await archiveDocument(documentId);
+      toast.success("Document archived successfully");
+      fetchDocuments();
+    } catch (error) {
+      console.error("Archive error:", error);
+      toast.error("Failed to archive document");
+    }
+  };
+
   const getProjectStatusColor = (projectData) => {
     const completionRate =
       projectData.completedDocuments / projectData.totalDocuments;
@@ -228,6 +201,37 @@ const MyDocuments = () => {
     if (completionRate >= 0.5) return "In Progress";
     return "Pending";
   };
+
+  // Calculate statistics
+  const getDocumentStats = () => {
+    const totalDocuments = documents.length;
+    const approvedDocuments = documents.filter(
+      (doc) => doc.status === "approved" || doc.status === "APPROVED"
+    ).length;
+    const pendingDocuments = documents.filter(
+      (doc) => doc.status === "pending" || doc.status === "PENDING"
+    ).length;
+    const rejectedDocuments = documents.filter(
+      (doc) => doc.status === "rejected" || doc.status === "REJECTED"
+    ).length;
+
+    const projectGroups = groupDocumentsByProject();
+    const totalProjects = Object.keys(projectGroups).length;
+
+    return {
+      totalDocuments,
+      approvedDocuments,
+      pendingDocuments,
+      rejectedDocuments,
+      totalProjects,
+      completionRate:
+        totalDocuments > 0
+          ? Math.round((approvedDocuments / totalDocuments) * 100)
+          : 0,
+    };
+  };
+
+  const stats = getDocumentStats();
 
   const columns = [
     {
@@ -335,32 +339,148 @@ const MyDocuments = () => {
   ];
 
   return (
-    <div className="space-y-6 p-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">My Documents</h1>
-          <p className="text-gray-600 mt-1">
-            Manage your documents and project files
-          </p>
-        </div>
-        <div className="flex items-center space-x-3">
-          {/* Upload functionality will be implemented later */}
+    <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
+      {/* Enhanced Header */}
+      <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-2xl p-8 text-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">My Documents</h1>
+            <p className="text-white text-opacity-90 text-lg">
+              Documents from your personal projects and active files
+            </p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() =>
+                navigate("/dashboard/modules/self-service/my-archive")
+              }
+              className="bg-white text-[var(--elra-primary)] px-6 py-3 rounded-xl hover:bg-gray-50 transition-all duration-300 flex items-center space-x-3 font-semibold shadow-lg border border-white border-opacity-20"
+            >
+              <HiArchive className="w-5 h-5" />
+              <span>View Archive</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Total Documents */}
+        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 mb-1">
+                Total Documents
+              </p>
+              <p className="text-3xl font-bold text-gray-900">
+                {stats.totalDocuments}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+              <HiDocument className="w-6 h-6 text-blue-600" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center text-sm">
+            <span className="text-gray-500">
+              Across {stats.totalProjects} projects
+            </span>
+          </div>
+        </div>
+
+        {/* Approved Documents */}
+        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 mb-1">Approved</p>
+              <p className="text-3xl font-bold text-green-600">
+                {stats.approvedDocuments}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+              <HiCheckCircle className="w-6 h-6 text-green-600" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center text-sm">
+            <span className="text-green-600 font-medium">
+              {stats.completionRate}% completion rate
+            </span>
+          </div>
+        </div>
+
+        {/* Pending Documents */}
+        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 mb-1">Pending</p>
+              <p className="text-3xl font-bold text-yellow-600">
+                {stats.pendingDocuments}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
+              <HiClock className="w-6 h-6 text-yellow-600" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center text-sm">
+            <span className="text-gray-500">Awaiting review</span>
+          </div>
+        </div>
+
+        {/* Rejected Documents */}
+        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 mb-1">Rejected</p>
+              <p className="text-3xl font-bold text-red-600">
+                {stats.rejectedDocuments}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+              <HiExclamationTriangle className="w-6 h-6 text-red-600" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center text-sm">
+            <span className="text-gray-500">Need attention</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Information Card */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+        <div className="flex items-start space-x-3">
+          <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+            <HiDocument className="w-3 h-3 text-white" />
+          </div>
+          <div>
+            <h4 className="text-sm font-semibold text-blue-900 mb-1">
+              About My Documents
+            </h4>
+            <p className="text-sm text-blue-700">
+              This page shows documents from your{" "}
+              <strong>personal projects</strong> and active files. For archived
+              documents and general file storage, visit your{" "}
+              <strong>Archive</strong>.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Enhanced Search Section */}
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
         <div className="flex items-center space-x-4">
           {/* Smart Search */}
           <div className="flex-1">
-            <input
-              type="text"
-              placeholder="Search by project name, code, document title, category, or budget (e.g., 'Office Building', 'INF20250003', 'financial', '700000')..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search by project name, code, document title, category, or budget..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-6 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent focus:bg-white transition-all duration-300"
+              />
+              <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                <HiDocument className="w-5 h-5 text-gray-400" />
+              </div>
+            </div>
           </div>
 
           {/* Search Button */}
@@ -378,74 +498,92 @@ const MyDocuments = () => {
                 toast.info("Showing all documents");
               }
             }}
-            className="bg-[var(--elra-primary)] text-white px-6 py-3 rounded-lg hover:bg-[var(--elra-primary-dark)] transition-all duration-300 font-semibold cursor-pointer flex items-center space-x-2"
+            className="bg-[var(--elra-primary)] text-white px-8 py-4 rounded-xl hover:bg-[var(--elra-primary-dark)] transition-all duration-300 font-semibold cursor-pointer flex items-center space-x-3 shadow-lg hover:shadow-xl"
           >
-            <HiDocument className="w-4 h-4" />
+            <HiChartBar className="w-5 h-5" />
             <span>Search</span>
             {searchTerm.trim() && (
-              <span className="bg-white bg-opacity-20 px-2 py-1 rounded-full text-xs">
+              <span className="bg-white bg-opacity-20 px-3 py-1 rounded-full text-xs font-bold">
                 {getFilteredData().length}
               </span>
             )}
           </button>
-
-          {/* Filter Dropdown (Simplified) */}
-          <div className="relative">
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-            >
-              {filterOptions.map((option) => {
-                const Icon = option.icon;
-                return (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                );
-              })}
-            </select>
-            <HiChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-          </div>
         </div>
 
         {/* Search Help Text */}
-        <div className="mt-3 text-xs text-gray-500">
-          💡 <strong>Search Tips:</strong> You can search by project name,
-          project code, document title, category, budget amount, or document
-          status.
+        <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100">
+          <div className="flex items-start space-x-3">
+            <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="text-blue-600 text-sm">💡</span>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-blue-900 mb-1">
+                Search Tips
+              </p>
+              <p className="text-sm text-blue-700">
+                You can search by project name, project code, document title,
+                category, budget amount, or document status.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Results Count */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+      {/* Enhanced Results Count */}
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
         <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-600">
-            {searchTerm.trim() ? (
-              <span>
-                Found <strong>{getFilteredData().length}</strong> result
-                {getFilteredData().length !== 1 ? "s" : ""} for "
-                <strong>{searchTerm}</strong>"
-              </span>
-            ) : (
-              <span>
-                <strong>{getFilteredData().length}</strong> total items
-              </span>
-            )}
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-[var(--elra-primary)] rounded-lg flex items-center justify-center">
+                <HiFolder className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                {searchTerm.trim() ? (
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      Found{" "}
+                      <span className="text-[var(--elra-primary)] font-bold">
+                        {getFilteredData().length}
+                      </span>{" "}
+                      result
+                      {getFilteredData().length !== 1 ? "s" : ""} for "
+                      <span className="text-[var(--elra-primary)] font-semibold">
+                        {searchTerm}
+                      </span>
+                      "
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Search results</p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      <span className="text-[var(--elra-primary)] font-bold">
+                        {getFilteredData().length}
+                      </span>{" "}
+                      total projects
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      All your document projects
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
           {searchTerm.trim() && (
             <button
               onClick={() => setSearchTerm("")}
-              className="text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] text-sm font-medium"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center space-x-2"
             >
-              Clear search
+              <HiXMark className="w-4 h-4" />
+              <span>Clear search</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Projects Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      {/* Enhanced Projects Table */}
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
         <DataTable
           data={getFilteredData()}
           columns={columns}
@@ -454,6 +592,35 @@ const MyDocuments = () => {
             searchTerm.trim()
               ? `No results found for "${searchTerm}"`
               : "No projects or documents found"
+          }
+          emptyStateComponent={
+            !searchTerm.trim() && getFilteredData().length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <HiDocument className="w-12 h-12 text-gray-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  No Documents Yet
+                </h3>
+                <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                  You haven't uploaded any documents to your projects yet. Start
+                  by creating a project or uploading documents to existing
+                  projects.
+                </p>
+                <div className="flex items-center justify-center space-x-4">
+                  <button
+                    onClick={() =>
+                      (window.location.href =
+                        "/dashboard/modules/self-service/my-archive")
+                    }
+                    className="bg-[var(--elra-primary)] text-white px-6 py-3 rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors flex items-center space-x-2"
+                  >
+                    <HiArchive className="w-4 h-4" />
+                    <span>View Archive</span>
+                  </button>
+                </div>
+              </div>
+            ) : null
           }
           actions={{
             showEdit: false,
@@ -466,10 +633,10 @@ const MyDocuments = () => {
                     e.stopPropagation();
                     handleViewProjectDocuments(row);
                   }}
-                  className="p-2 text-[var(--elra-primary)] hover:bg-[var(--elra-primary)] hover:text-white rounded-lg transition-colors"
+                  className="p-3 text-[var(--elra-primary)] hover:bg-[var(--elra-primary)] hover:text-white rounded-xl transition-all duration-300 shadow-sm hover:shadow-md"
                   title="View Documents"
                 >
-                  <HiDocument className="w-4 h-4" />
+                  <HiDocument className="w-5 h-5" />
                 </button>
               </div>
             ),
@@ -561,6 +728,13 @@ const MyDocuments = () => {
                           title="Download Document"
                         >
                           <HiArrowDownTray className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleArchiveDocument(document.id)}
+                          className="p-2 text-orange-600 hover:bg-orange-600 hover:text-white rounded-lg transition-colors cursor-pointer"
+                          title="Archive Document"
+                        >
+                          <HiArchive className="w-4 h-4" />
                         </button>
                       </div>
                     </div>

@@ -27,7 +27,7 @@ const DataTable = ({
   skeletonRows = 5,
   onRowClick = null,
   rowClassName = "",
-  pagination = false,
+  pagination = true,
   itemsPerPage = 10,
   searchable = false,
   sortable = false,
@@ -117,8 +117,8 @@ const DataTable = ({
   if (loading) {
     return (
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div className="overflow-x-auto max-w-full">
+          <table className="w-full table-fixed min-w-0">
             <thead className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white">
               <tr>
                 {columns.map((column, index) => (
@@ -126,7 +126,7 @@ const DataTable = ({
                     key={index}
                     className={`px-6 py-4 text-left font-semibold ${
                       column.align === "center" ? "text-center" : ""
-                    }`}
+                    } ${column.width || "w-auto"}`}
                   >
                     {column.header}
                   </th>
@@ -135,7 +135,7 @@ const DataTable = ({
                 actions.showDelete ||
                 actions.showToggle ||
                 actions.customActions ? (
-                  <th className="px-6 py-4 text-center font-semibold">
+                  <th className="px-6 py-4 text-center font-semibold w-24">
                     Actions
                   </th>
                 ) : null}
@@ -149,7 +149,11 @@ const DataTable = ({
                       {column.skeletonRenderer ? (
                         column.skeletonRenderer()
                       ) : (
-                        <div className="h-4 bg-gray-200 rounded w-32"></div>
+                        <div
+                          className={`h-4 bg-gray-200 rounded ${
+                            column.width || "w-24"
+                          }`}
+                        ></div>
                       )}
                     </td>
                   ))}
@@ -280,8 +284,8 @@ const DataTable = ({
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full">
+      <div className="overflow-x-auto max-w-full">
+        <table className="w-full table-fixed min-w-0">
           <thead className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white">
             <tr>
               {columns.map((column, index) => (
@@ -293,7 +297,7 @@ const DataTable = ({
                     sortable
                       ? "cursor-pointer hover:bg-[var(--elra-primary-dark)]"
                       : ""
-                  }`}
+                  } ${column.width || "w-auto"}`}
                   onClick={
                     sortable ? () => handleSort(column.accessor) : undefined
                   }
@@ -312,7 +316,9 @@ const DataTable = ({
               actions.showDelete ||
               actions.showToggle ||
               actions.customActions ? (
-                <th className="px-6 py-4 text-center font-semibold">Actions</th>
+                <th className="px-6 py-4 text-center font-semibold w-24">
+                  Actions
+                </th>
               ) : null}
             </tr>
           </thead>

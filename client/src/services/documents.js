@@ -255,10 +255,15 @@ export const getSharedDocuments = async () => {
   }
 };
 
-// Archive document
-export const archiveDocument = async (documentId) => {
+// Archive document with category
+export const archiveDocument = async (
+  documentId,
+  archiveCategory = "other"
+) => {
   try {
-    const response = await api.post(`/documents/${documentId}/archive`);
+    const response = await api.post(`/documents/${documentId}/archive`, {
+      archiveCategory,
+    });
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
@@ -275,7 +280,86 @@ export const restoreDocument = async (documentId) => {
   }
 };
 
-// Get archived documents
+// Upload document to personal archive
+export const uploadToArchive = async (formData) => {
+  try {
+    const response = await api.post("/documents/upload-archive", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+// Get user's archived documents
+export const getMyArchivedDocuments = async (filters = {}) => {
+  try {
+    const response = await api.get("/documents/my-archived", {
+      params: filters,
+    });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+// Get single archived document
+export const getArchivedDocument = async (documentId) => {
+  try {
+    const response = await api.get(`/documents/${documentId}/archive`);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+// Update archived document (metadata and/or file replacement)
+export const updateArchivedDocument = async (documentId, updateData) => {
+  try {
+    const response = await api.put(
+      `/documents/${documentId}/archive`,
+      updateData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+// Delete archived document
+export const deleteArchivedDocument = async (documentId) => {
+  try {
+    const response = await api.delete(`/documents/${documentId}/archive`);
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+// Update archive category only
+export const updateArchiveCategory = async (documentId, archiveCategory) => {
+  try {
+    const response = await api.put(
+      `/documents/${documentId}/archive-category`,
+      {
+        archiveCategory,
+      }
+    );
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+// Get archived documents (legacy)
 export const getArchivedDocuments = async (filters = {}) => {
   try {
     const response = await api.get("/documents/archived", {

@@ -45,6 +45,20 @@ const Analytics = () => {
       withAllocation: 0,
       withoutAllocation: 0,
     },
+    userAnalytics: {
+      totalUsers: 0,
+      activeUsers: 0,
+      inactiveUsers: 0,
+      pendingRegistration: 0,
+      suspendedUsers: 0,
+      pendingOffboarding: 0,
+      roleDistribution: {
+        hod: 0,
+        manager: 0,
+        staff: 0,
+        viewer: 0,
+      },
+    },
   });
 
   useEffect(() => {
@@ -63,32 +77,89 @@ const Analytics = () => {
         return;
       }
 
-      const response = await fetch(
-        `/api/analytics/department/${user.department._id}?period=${period}`,
-        {
+      // Fetch both analytics and user data
+      const [analyticsResponse, usersResponse] = await Promise.all([
+        fetch(
+          `/api/analytics/department/${user.department._id}?period=${period}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+            credentials: "include",
+          }
+        ),
+        fetch("/api/users/department", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           credentials: "include",
-        }
-      );
+        }),
+      ]);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!analyticsResponse.ok) {
+        throw new Error(`HTTP error! status: ${analyticsResponse.status}`);
       }
 
-      const result = await response.json();
+      const analyticsResult = await analyticsResponse.json();
+      let userAnalytics = {
+        totalUsers: 0,
+        activeUsers: 0,
+        inactiveUsers: 0,
+        pendingRegistration: 0,
+        suspendedUsers: 0,
+        pendingOffboarding: 0,
+        roleDistribution: {
+          hod: 0,
+          manager: 0,
+          staff: 0,
+          viewer: 0,
+        },
+      };
 
-      if (result.success) {
+      // Process user data if available
+      if (usersResponse.ok) {
+        const usersResult = await usersResponse.json();
+        if (usersResult.success && usersResult.data) {
+          const users = usersResult.data;
+          userAnalytics = {
+            totalUsers: users.length,
+            activeUsers: users.filter((u) => u.status === "ACTIVE").length,
+            inactiveUsers: users.filter((u) => u.status === "INACTIVE").length,
+            pendingRegistration: users.filter(
+              (u) => u.status === "PENDING_REGISTRATION"
+            ).length,
+            suspendedUsers: users.filter((u) => u.status === "SUSPENDED")
+              .length,
+            pendingOffboarding: users.filter(
+              (u) => u.status === "PENDING_OFFBOARDING"
+            ).length,
+            roleDistribution: {
+              hod: users.filter((u) => u.role?.level === 700).length,
+              manager: users.filter((u) => u.role?.level === 600).length,
+              staff: users.filter((u) => u.role?.level === 300).length,
+              viewer: users.filter((u) => u.role?.level === 100).length,
+            },
+          };
+        }
+      }
+
+      if (analyticsResult.success) {
         console.log(
           "✅ [Analytics] Successfully fetched analytics data:",
-          result.data
+          analyticsResult.data
         );
-        setAnalyticsData(result.data);
+        setAnalyticsData({
+          ...analyticsResult.data,
+          userAnalytics,
+        });
       } else {
-        throw new Error(result.message || "Failed to fetch analytics data");
+        throw new Error(
+          analyticsResult.message || "Failed to fetch analytics data"
+        );
       }
     } catch (error) {
       console.error("❌ [Analytics] Error fetching analytics:", error);
@@ -120,6 +191,20 @@ const Analytics = () => {
         budgetAllocationBreakdown: {
           withAllocation: 0,
           withoutAllocation: 0,
+        },
+        userAnalytics: {
+          totalUsers: 0,
+          activeUsers: 0,
+          inactiveUsers: 0,
+          pendingRegistration: 0,
+          suspendedUsers: 0,
+          pendingOffboarding: 0,
+          roleDistribution: {
+            hod: 0,
+            manager: 0,
+            staff: 0,
+            viewer: 0,
+          },
         },
       });
     } finally {
@@ -195,8 +280,8 @@ const Analytics = () => {
           <div className="animate-pulse">
             <div className="h-8 bg-gray-200 rounded w-64 mb-4"></div>
             <div className="h-4 bg-gray-200 rounded w-96 mb-8"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {[...Array(4)].map((_, i) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+              {[...Array(5)].map((_, i) => (
                 <div key={i} className="bg-white rounded-lg shadow p-6">
                   <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
                   <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
@@ -256,13 +341,20 @@ const Analytics = () => {
         </div>
 
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <StatCard
             title="Team Size"
             value={analyticsData.teamSize}
             icon={HiOutlineUsers}
             color="bg-blue-500"
             trend={analyticsData.trends?.teamSize}
+          />
+          <StatCard
+            title="Active Users"
+            value={analyticsData.userAnalytics?.activeUsers || 0}
+            icon={HiOutlineUser}
+            color="bg-emerald-500"
+            trend={analyticsData.trends?.activeUsers}
           />
           <StatCard
             title="Active Projects"
@@ -812,6 +904,275 @@ const Analytics = () => {
                   {analyticsData.payrollAnalytics?.totalPayrollCost?.toLocaleString() ||
                     0}
                 </span>
+              </div>
+            </div>
+          </ChartCard>
+        </div>
+
+        {/* User Analytics Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* User Status Distribution */}
+          <ChartCard title="User Status Distribution">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-green-500 mr-3"></div>
+                  <span className="text-sm text-gray-700">Active</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-900 min-w-[20px]">
+                    {analyticsData.userAnalytics?.activeUsers || 0}
+                  </span>
+                  <div className="w-20 bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-2 rounded-full bg-green-500 transition-all duration-300"
+                      style={{
+                        width: `${Math.min(
+                          ((analyticsData.userAnalytics?.activeUsers || 0) /
+                            Math.max(
+                              analyticsData.userAnalytics?.totalUsers || 1,
+                              1
+                            )) *
+                            100,
+                          100
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500 mr-3"></div>
+                  <span className="text-sm text-gray-700">
+                    Pending Registration
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-900 min-w-[20px]">
+                    {analyticsData.userAnalytics?.pendingRegistration || 0}
+                  </span>
+                  <div className="w-20 bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-2 rounded-full bg-yellow-500 transition-all duration-300"
+                      style={{
+                        width: `${Math.min(
+                          ((analyticsData.userAnalytics?.pendingRegistration ||
+                            0) /
+                            Math.max(
+                              analyticsData.userAnalytics?.totalUsers || 1,
+                              1
+                            )) *
+                            100,
+                          100
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-red-500 mr-3"></div>
+                  <span className="text-sm text-gray-700">Inactive</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-900 min-w-[20px]">
+                    {analyticsData.userAnalytics?.inactiveUsers || 0}
+                  </span>
+                  <div className="w-20 bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-2 rounded-full bg-red-500 transition-all duration-300"
+                      style={{
+                        width: `${Math.min(
+                          ((analyticsData.userAnalytics?.inactiveUsers || 0) /
+                            Math.max(
+                              analyticsData.userAnalytics?.totalUsers || 1,
+                              1
+                            )) *
+                            100,
+                          100
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-orange-500 mr-3"></div>
+                  <span className="text-sm text-gray-700">Suspended</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-900 min-w-[20px]">
+                    {analyticsData.userAnalytics?.suspendedUsers || 0}
+                  </span>
+                  <div className="w-20 bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-2 rounded-full bg-orange-500 transition-all duration-300"
+                      style={{
+                        width: `${Math.min(
+                          ((analyticsData.userAnalytics?.suspendedUsers || 0) /
+                            Math.max(
+                              analyticsData.userAnalytics?.totalUsers || 1,
+                              1
+                            )) *
+                            100,
+                          100
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-gray-500 mr-3"></div>
+                  <span className="text-sm text-gray-700">
+                    Pending Offboarding
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-900 min-w-[20px]">
+                    {analyticsData.userAnalytics?.pendingOffboarding || 0}
+                  </span>
+                  <div className="w-20 bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-2 rounded-full bg-gray-500 transition-all duration-300"
+                      style={{
+                        width: `${Math.min(
+                          ((analyticsData.userAnalytics?.pendingOffboarding ||
+                            0) /
+                            Math.max(
+                              analyticsData.userAnalytics?.totalUsers || 1,
+                              1
+                            )) *
+                            100,
+                          100
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ChartCard>
+
+          {/* Role Distribution */}
+          <ChartCard title="Role Distribution">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-blue-500 mr-3"></div>
+                  <span className="text-sm text-gray-700">HOD</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-900 min-w-[20px]">
+                    {analyticsData.userAnalytics?.roleDistribution?.hod || 0}
+                  </span>
+                  <div className="w-20 bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-2 rounded-full bg-blue-500 transition-all duration-300"
+                      style={{
+                        width: `${Math.min(
+                          ((analyticsData.userAnalytics?.roleDistribution
+                            ?.hod || 0) /
+                            Math.max(
+                              analyticsData.userAnalytics?.totalUsers || 1,
+                              1
+                            )) *
+                            100,
+                          100
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-green-500 mr-3"></div>
+                  <span className="text-sm text-gray-700">Manager</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-900 min-w-[20px]">
+                    {analyticsData.userAnalytics?.roleDistribution?.manager ||
+                      0}
+                  </span>
+                  <div className="w-20 bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-2 rounded-full bg-green-500 transition-all duration-300"
+                      style={{
+                        width: `${Math.min(
+                          ((analyticsData.userAnalytics?.roleDistribution
+                            ?.manager || 0) /
+                            Math.max(
+                              analyticsData.userAnalytics?.totalUsers || 1,
+                              1
+                            )) *
+                            100,
+                          100
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-purple-500 mr-3"></div>
+                  <span className="text-sm text-gray-700">Staff</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-900 min-w-[20px]">
+                    {analyticsData.userAnalytics?.roleDistribution?.staff || 0}
+                  </span>
+                  <div className="w-20 bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-2 rounded-full bg-purple-500 transition-all duration-300"
+                      style={{
+                        width: `${Math.min(
+                          ((analyticsData.userAnalytics?.roleDistribution
+                            ?.staff || 0) /
+                            Math.max(
+                              analyticsData.userAnalytics?.totalUsers || 1,
+                              1
+                            )) *
+                            100,
+                          100
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-gray-500 mr-3"></div>
+                  <span className="text-sm text-gray-700">Viewer</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-900 min-w-[20px]">
+                    {analyticsData.userAnalytics?.roleDistribution?.viewer || 0}
+                  </span>
+                  <div className="w-20 bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-2 rounded-full bg-gray-500 transition-all duration-300"
+                      style={{
+                        width: `${Math.min(
+                          ((analyticsData.userAnalytics?.roleDistribution
+                            ?.viewer || 0) /
+                            Math.max(
+                              analyticsData.userAnalytics?.totalUsers || 1,
+                              1
+                            )) *
+                            100,
+                          100
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
               </div>
             </div>
           </ChartCard>

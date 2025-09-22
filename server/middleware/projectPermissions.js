@@ -16,23 +16,22 @@ export const checkExternalProjectAccess = async (req, res, next) => {
       });
     }
 
-    // If it's an external project, check HR HOD permissions
+    // If it's an external project, check Project Management HOD permissions
     if (project.projectScope === "external") {
-      const isHRHOD =
-        currentUser.department?.name === "Human Resources" ||
-        currentUser.department?.name === "HR" ||
-        currentUser.department?.name === "Human Resource Management";
+      const isProjectManagementHOD =
+        currentUser.department?.name === "Project Management";
 
-      // Only HR HOD and SUPER_ADMIN can access external projects
+      // Only Project Management HOD and SUPER_ADMIN can access external projects
       if (
         !(
           currentUser.role.level >= 1000 ||
-          (currentUser.role.level >= 700 && isHRHOD)
+          (currentUser.role.level >= 700 && isProjectManagementHOD)
         )
       ) {
         return res.status(403).json({
           success: false,
-          message: "Access denied. Only HR HOD can access external projects.",
+          message:
+            "Access denied. Only Project Management HOD can access external projects.",
         });
       }
     }
@@ -65,23 +64,22 @@ export const checkExternalProjectEdit = async (req, res, next) => {
       });
     }
 
-    // If it's an external project, only HR HOD can edit
+    // If it's an external project, only Project Management HOD can edit
     if (project.projectScope === "external") {
-      const isHRHOD =
-        currentUser.department?.name === "Human Resources" ||
-        currentUser.department?.name === "HR" ||
-        currentUser.department?.name === "Human Resource Management";
+      const isProjectManagementHOD =
+        currentUser.department?.name === "Project Management";
 
-      // Only HR HOD and SUPER_ADMIN can edit external projects
+      // Only Project Management HOD and SUPER_ADMIN can edit external projects
       if (
         !(
           currentUser.role.level >= 1000 ||
-          (currentUser.role.level >= 700 && isHRHOD)
+          (currentUser.role.level >= 700 && isProjectManagementHOD)
         )
       ) {
         return res.status(403).json({
           success: false,
-          message: "Access denied. Only HR HOD can edit external projects.",
+          message:
+            "Access denied. Only Project Management HOD can edit external projects.",
         });
       }
     }
@@ -114,23 +112,22 @@ export const checkExternalProjectDelete = async (req, res, next) => {
       });
     }
 
-    // If it's an external project, only HR HOD can delete
+    // If it's an external project, only Project Management HOD can delete
     if (project.projectScope === "external") {
-      const isHRHOD =
-        currentUser.department?.name === "Human Resources" ||
-        currentUser.department?.name === "HR" ||
-        currentUser.department?.name === "Human Resource Management";
+      const isProjectManagementHOD =
+        currentUser.department?.name === "Project Management";
 
-      // Only HR HOD and SUPER_ADMIN can delete external projects
+      // Only Project Management HOD and SUPER_ADMIN can delete external projects
       if (
         !(
           currentUser.role.level >= 1000 ||
-          (currentUser.role.level >= 700 && isHRHOD)
+          (currentUser.role.level >= 700 && isProjectManagementHOD)
         )
       ) {
         return res.status(403).json({
           success: false,
-          message: "Access denied. Only HR HOD can delete external projects.",
+          message:
+            "Access denied. Only Project Management HOD can delete external projects.",
         });
       }
     }
@@ -153,23 +150,22 @@ export const checkExternalProjectCreate = async (req, res, next) => {
     const currentUser = req.user;
     const { projectScope } = req.body;
 
-    // If trying to create an external project, check HR HOD permissions
+    // If trying to create an external project, check Project Management HOD permissions
     if (projectScope === "external") {
-      const isHRHOD =
-        currentUser.department?.name === "Human Resources" ||
-        currentUser.department?.name === "HR" ||
-        currentUser.department?.name === "Human Resource Management";
+      const isProjectManagementHOD =
+        currentUser.department?.name === "Project Management";
 
-      // Only HR HOD and SUPER_ADMIN can create external projects
+      // Only Project Management HOD and SUPER_ADMIN can create external projects
       if (
         !(
           currentUser.role.level >= 1000 ||
-          (currentUser.role.level >= 700 && isHRHOD)
+          (currentUser.role.level >= 700 && isProjectManagementHOD)
         )
       ) {
         return res.status(403).json({
           success: false,
-          message: "Access denied. Only HR HOD can create external projects.",
+          message:
+            "Access denied. Only Project Management HOD can create external projects.",
         });
       }
     }

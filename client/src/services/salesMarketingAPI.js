@@ -11,6 +11,17 @@ export const getSalesMarketingDashboard = async () => {
   }
 };
 
+// ===== BUDGET API =====
+export const getOperationalBudget = async () => {
+  try {
+    const response = await api.get("/sales-marketing/operational-budget");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching operational budget:", error);
+    throw error;
+  }
+};
+
 // ===== TRANSACTIONS API =====
 export const createSalesMarketingTransaction = async (transactionData) => {
   try {

@@ -15,6 +15,12 @@ import {
   addPayment,
   addNote,
 } from "../controllers/financeController.js";
+import {
+  getSalesMarketingApprovals,
+  getSalesMarketingApprovalHistory,
+  approveSalesMarketingTransaction,
+  rejectSalesMarketingTransaction,
+} from "../controllers/salesMarketingFinancialController.js";
 import { protect, checkRole } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -144,5 +150,27 @@ router.post("/:id/payments", checkRole(700), validatePayment, addPayment);
 
 // Notes routes - HOD+
 router.post("/:id/notes", checkRole(700), validateNote, addNote);
+
+// Sales & Marketing Approval routes - Finance HOD only
+router.get(
+  "/sales-marketing/pending-approvals",
+  checkRole(700),
+  getSalesMarketingApprovals
+);
+router.get(
+  "/sales-marketing/approval-history",
+  checkRole(700),
+  getSalesMarketingApprovalHistory
+);
+router.post(
+  "/sales-marketing/:id/approve",
+  checkRole(700),
+  approveSalesMarketingTransaction
+);
+router.post(
+  "/sales-marketing/:id/reject",
+  checkRole(700),
+  rejectSalesMarketingTransaction
+);
 
 export default router;

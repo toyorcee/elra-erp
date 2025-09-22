@@ -18,19 +18,16 @@ import { toast } from "react-toastify";
 const SalesMarketingReports = () => {
   const [reportsData, setReportsData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState("30"); 
-  const [departmentFilter, setDepartmentFilter] = useState("all");
-
   useEffect(() => {
     fetchReportsData();
-  }, [dateRange, departmentFilter]);
+  }, []);
 
   const fetchReportsData = async () => {
     try {
       setLoading(true);
       const response = await getSalesMarketingReports({
-        dateRange,
-        departmentFilter,
+        dateRange: "30", 
+        departmentFilter: "all", 
       });
 
       if (response.success) {
@@ -46,30 +43,42 @@ const SalesMarketingReports = () => {
     }
   };
 
-  const exportReport = async (format) => {
+  const handleExportPDF = async () => {
     try {
-      const response = await exportSalesMarketingReport(format, {
-        dateRange,
-        departmentFilter,
+      await exportSalesMarketingReport("PDF", {
+        dateRange: "30",
+        departmentFilter: "all",
       });
-
-      // Create download link
-      const url = window.URL.createObjectURL(new Blob([response]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute(
-        "download",
-        `sales-marketing-report.${format.toLowerCase()}`
-      );
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-
-      toast.success(`Report exported as ${format.toUpperCase()}`);
+      toast.success("PDF report exported successfully!");
     } catch (error) {
-      console.error("Error exporting report:", error);
-      toast.error("Failed to export report");
+      console.error("Error exporting PDF:", error);
+      toast.error("Failed to export PDF report");
+    }
+  };
+
+  const handleExportWord = async () => {
+    try {
+      await exportSalesMarketingReport("Word", {
+        dateRange: "30",
+        departmentFilter: "all",
+      });
+      toast.success("Word report exported successfully!");
+    } catch (error) {
+      console.error("Error exporting Word report:", error);
+      toast.error("Failed to export Word report");
+    }
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      await exportSalesMarketingReport("CSV", {
+        dateRange: "30",
+        departmentFilter: "all",
+      });
+      toast.success("CSV report exported successfully!");
+    } catch (error) {
+      console.error("Error exporting CSV report:", error);
+      toast.error("Failed to export CSV report");
     }
   };
 
@@ -89,6 +98,23 @@ const SalesMarketingReports = () => {
     );
   }
 
+  const recent = reportsData.recentTransactions || [];
+  const aggregateByCategory = (referenceType) => {
+    const map = new Map();
+    for (const t of recent) {
+      if (t.status !== "approved" || t.type !== "deposit") continue;
+      if (t.referenceType !== referenceType) continue;
+      const key = (t.category || "other").replace(/_/g, " ");
+      map.set(key, (map.get(key) || 0) + (t.amount || 0));
+    }
+    return Array.from(map.entries()).map(([category, amount]) => ({
+      category,
+      amount,
+    }));
+  };
+  const salesCategories = aggregateByCategory("sales");
+  const marketingCategories = aggregateByCategory("marketing");
+
   return (
     <div className="space-y-6 p-4">
       {/* Header */}
@@ -101,56 +127,31 @@ const SalesMarketingReports = () => {
             Comprehensive analytics and performance insights
           </p>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex flex-wrap gap-3">
           <button
-            onClick={() => exportReport("PDF")}
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl font-semibold flex items-center space-x-2 transition-colors"
+            onClick={handleExportPDF}
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl font-semibold flex items-center space-x-2 transition-colors cursor-pointer"
+            title="Export Sales report as PDF"
           >
             <ArrowDownTrayIcon className="h-5 w-5" />
             <span>Export PDF</span>
           </button>
           <button
-            onClick={() => exportReport("Excel")}
-            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-semibold flex items-center space-x-2 transition-colors"
+            onClick={handleExportWord}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl font-semibold flex items-center space-x-2 transition-colors cursor-pointer"
+            title="Export Sales report as Word/HTML"
           >
             <ArrowDownTrayIcon className="h-5 w-5" />
-            <span>Export Excel</span>
+            <span>Export Word</span>
           </button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-        <div className="flex flex-wrap gap-4">
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Date Range
-            </label>
-            <select
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
-              className="px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
-            >
-              <option value="7">Last 7 days</option>
-              <option value="30">Last 30 days</option>
-              <option value="90">Last 90 days</option>
-              <option value="365">Last year</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Department
-            </label>
-            <select
-              value={departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
-            >
-              <option value="all">All Departments</option>
-              <option value="sales">Sales Only</option>
-              <option value="marketing">Marketing Only</option>
-            </select>
-          </div>
+          <button
+            onClick={handleExportCSV}
+            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-semibold flex items-center space-x-2 transition-colors cursor-pointer"
+            title="Export Sales report as CSV"
+          >
+            <ArrowDownTrayIcon className="h-5 w-5" />
+            <span>Export CSV</span>
+          </button>
         </div>
       </div>
 
@@ -168,7 +169,7 @@ const SalesMarketingReports = () => {
                 Total Revenue
               </p>
               <p className="text-2xl sm:text-3xl font-bold text-green-900 mt-2 break-all leading-tight">
-                {formatCurrency(reportsData.summary.totalRevenue)}
+                {formatCurrency(reportsData.summary?.totalRevenue || 0)}
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
@@ -189,7 +190,7 @@ const SalesMarketingReports = () => {
                 Total Expenses
               </p>
               <p className="text-2xl sm:text-3xl font-bold text-red-900 mt-2 break-all leading-tight">
-                {formatCurrency(reportsData.summary.totalExpenses)}
+                {formatCurrency(reportsData.summary?.totalExpenses || 0)}
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-lg">
@@ -210,7 +211,7 @@ const SalesMarketingReports = () => {
                 Net Profit
               </p>
               <p className="text-2xl sm:text-3xl font-bold text-blue-900 mt-2 break-all leading-tight">
-                {formatCurrency(reportsData.summary.netProfit)}
+                {formatCurrency(reportsData.summary?.netProfit || 0)}
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
@@ -231,7 +232,7 @@ const SalesMarketingReports = () => {
                 Total Transactions
               </p>
               <p className="text-2xl sm:text-3xl font-bold text-purple-900 mt-2 break-all leading-tight">
-                {reportsData.summary.totalTransactions}
+                {reportsData.summary?.totalTransactions || 0}
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
@@ -241,12 +242,11 @@ const SalesMarketingReports = () => {
         </motion.div>
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Monthly Performance Line Chart */}
+      {/* Monthly Performance - full width line chart */}
+      <div className="grid grid-cols-1 gap-6">
         <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
           className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
         >
@@ -255,39 +255,39 @@ const SalesMarketingReports = () => {
           </h3>
           <LineChart
             data={{
-              labels: reportsData.monthlyData.map((d) => d.month),
+              labels: (reportsData.monthlyTrends || []).map((d) => d.month),
               datasets: [
                 {
-                  label: "Sales Revenue",
-                  data: reportsData.monthlyData.map((d) => d.sales),
-                  borderColor: "#3B82F6",
-                  backgroundColor: "rgba(59, 130, 246, 0.1)",
-                },
-                {
-                  label: "Marketing Revenue",
-                  data: reportsData.monthlyData.map((d) => d.marketing),
-                  borderColor: "#8B5CF6",
-                  backgroundColor: "rgba(139, 92, 246, 0.1)",
+                  label: "Total Revenue",
+                  data: (reportsData.monthlyTrends || []).map(
+                    (d) => d.revenue || 0
+                  ),
+                  borderColor: "#10B981",
+                  backgroundColor: "rgba(16, 185, 129, 0.12)",
                 },
                 {
                   label: "Total Expenses",
-                  data: reportsData.monthlyData.map((d) => d.expenses),
+                  data: (reportsData.monthlyTrends || []).map(
+                    (d) => d.expenses || 0
+                  ),
                   borderColor: "#EF4444",
                   backgroundColor: "rgba(239, 68, 68, 0.1)",
                 },
               ],
             }}
             title="Revenue vs Expenses Trend"
-            height={300}
+            height={320}
             showArea={true}
           />
         </motion.div>
+      </div>
 
-        {/* Department Revenue Pie Chart */}
+      {/* Department splits - two pies side-by-side (stack on mobile) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.6 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.55 }}
           className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
         >
           <h3 className="text-xl font-bold text-gray-900 mb-6">
@@ -299,8 +299,8 @@ const SalesMarketingReports = () => {
               datasets: [
                 {
                   data: [
-                    reportsData.summary.salesRevenue,
-                    reportsData.summary.marketingRevenue,
+                    reportsData.summary?.salesRevenue || 0,
+                    reportsData.summary?.marketingRevenue || 0,
                   ],
                 },
               ],
@@ -308,6 +308,33 @@ const SalesMarketingReports = () => {
             title="Revenue Distribution"
             height={300}
             colors={["#3B82F6", "#8B5CF6"]}
+          />
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+        >
+          <h3 className="text-xl font-bold text-gray-900 mb-6">
+            Department Expenses
+          </h3>
+          <PieChart
+            data={{
+              labels: ["Sales Expenses", "Marketing Expenses"],
+              datasets: [
+                {
+                  data: [
+                    reportsData.summary?.salesExpenses || 0,
+                    reportsData.summary?.marketingExpenses || 0,
+                  ],
+                },
+              ],
+            }}
+            title="Expenses Distribution"
+            height={300}
+            colors={["#F59E0B", "#EF4444"]}
           />
         </motion.div>
       </div>
@@ -326,15 +353,11 @@ const SalesMarketingReports = () => {
           </h3>
           <BarChart
             data={{
-              labels: reportsData.categoryBreakdown.sales.map(
-                (c) => c.category
-              ),
+              labels: (salesCategories || []).map((c) => c.category),
               datasets: [
                 {
                   label: "Revenue (₦)",
-                  data: reportsData.categoryBreakdown.sales.map(
-                    (c) => c.amount
-                  ),
+                  data: (salesCategories || []).map((c) => c.amount),
                 },
               ],
             }}
@@ -356,15 +379,11 @@ const SalesMarketingReports = () => {
           </h3>
           <BarChart
             data={{
-              labels: reportsData.categoryBreakdown.marketing.map(
-                (c) => c.category
-              ),
+              labels: (marketingCategories || []).map((c) => c.category),
               datasets: [
                 {
                   label: "Revenue (₦)",
-                  data: reportsData.categoryBreakdown.marketing.map(
-                    (c) => c.amount
-                  ),
+                  data: (marketingCategories || []).map((c) => c.amount),
                 },
               ],
             }}
@@ -375,44 +394,7 @@ const SalesMarketingReports = () => {
         </motion.div>
       </div>
 
-      {/* Top Performers */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.9 }}
-        className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
-      >
-        <h3 className="text-xl font-bold text-gray-900 mb-6">Top Performers</h3>
-        <div className="space-y-4">
-          {reportsData.topPerformers.map((performer, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <div className="flex items-center space-x-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-full flex items-center justify-center text-white font-bold">
-                  {index + 1}
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-900">
-                    {performer.name}
-                  </p>
-                  <p className="text-sm text-gray-500 capitalize">
-                    {performer.department} • {performer.transactions}{" "}
-                    transactions
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="font-semibold text-green-600">
-                  {formatCurrency(performer.revenue)}
-                </p>
-                <p className="text-sm text-gray-500">Revenue Generated</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </motion.div>
+      {/* Removed Top Performers due to lack of underlying data */}
     </div>
   );
 };

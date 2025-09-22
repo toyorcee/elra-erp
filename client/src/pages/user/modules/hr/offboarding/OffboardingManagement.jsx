@@ -103,6 +103,11 @@ const OffboardingManagement = () => {
     if (!allLifecycles.length) return [];
 
     return allLifecycles.filter((lifecycle) => {
+      // Skip if employee is null or undefined
+      if (!lifecycle.employee) {
+        return false;
+      }
+
       const employee = lifecycle.employee;
       const department = lifecycle.department;
 
@@ -233,6 +238,15 @@ const OffboardingManagement = () => {
     const grouped = {};
 
     lifecyclesData.forEach((lifecycle) => {
+      // Skip if employee is null or undefined
+      if (!lifecycle.employee) {
+        console.warn(
+          "⚠️ [OffboardingManagement] Skipping lifecycle with null employee:",
+          lifecycle
+        );
+        return;
+      }
+
       const userId = lifecycle.employee._id;
       const userName = `${lifecycle.employee.firstName} ${lifecycle.employee.lastName}`;
 

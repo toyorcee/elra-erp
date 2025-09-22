@@ -66,6 +66,17 @@ export const getNextProjectCode = async () => {
   }
 };
 
+// Get next external project code
+export const getNextExternalProjectCode = async () => {
+  try {
+    const response = await api.get("/projects/next-external-code");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching next external project code:", error);
+    throw error;
+  }
+};
+
 // Get project by ID
 export const getProjectById = async (id) => {
   try {
@@ -223,6 +234,17 @@ export const fetchCrossDepartmentalApprovalHistory = async () => {
   }
 };
 
+// Get project approval reports for approvers
+export const getProjectApprovalReports = async (params = {}) => {
+  try {
+    const response = await api.get("/projects/approval-reports", { params });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching project approval reports:", error);
+    throw error;
+  }
+};
+
 // Approve project
 export const approveProject = async (projectId, approvalData) => {
   try {
@@ -350,6 +372,28 @@ export const fetchProjectAnalytics = async () => {
   }
 };
 
+// Get project dashboard data
+export const getProjectDashboard = async () => {
+  try {
+    const response = await api.get("/projects/dashboard");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching project dashboard data:", error);
+    throw error;
+  }
+};
+
+// Get project budget info
+export const getProjectBudget = async () => {
+  try {
+    const response = await api.get("/projects/budget");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching project budget:", error);
+    throw error;
+  }
+};
+
 // Get regulatory compliance status for a project
 export const getRegulatoryComplianceStatus = async (projectId) => {
   try {
@@ -430,6 +474,51 @@ export const fetchProjectCategories = async () => {
     return response.data;
   } catch (error) {
     console.error("Error fetching project categories:", error);
+    throw error;
+  }
+};
+
+export const addVendorToProject = async (projectId, vendorData) => {
+  try {
+    const response = await api.post(
+      `/projects/${projectId}/add-vendor`,
+      vendorData
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error adding vendor to project:", error);
+    throw error;
+  }
+};
+
+export const exportProjectApprovalReport = async (format, params = {}) => {
+  try {
+    const response = await api.get("/projects/approval-reports/export", {
+      params: {
+        format,
+        ...params,
+      },
+      responseType: "blob",
+    });
+
+    // Create download link
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+
+    // Set filename based on format
+    const timestamp = new Date().toISOString().split("T")[0];
+    const filename = `project-approval-reports-${timestamp}.${format.toLowerCase()}`;
+    link.setAttribute("download", filename);
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+
+    return response.data;
+  } catch (error) {
+    console.error("Error exporting project approval report:", error);
     throw error;
   }
 };

@@ -10,13 +10,22 @@ import {
   MegaphoneIcon,
   ClockIcon,
 } from "@heroicons/react/24/outline";
-import { BarChart, PieChart, LineChart } from "../../../../components/graphs";
+import {
+  BarChart,
+  PieChart,
+  LineChart,
+  RadialProgress,
+} from "../../../../components/graphs";
 import { formatCurrency } from "../../../../utils/formatters";
-import { getSalesMarketingDashboard } from "../../../../services/salesMarketingAPI";
+import {
+  getSalesMarketingDashboard,
+  getOperationalBudget,
+} from "../../../../services/salesMarketingAPI";
 import { toast } from "react-toastify";
 
 const SalesMarketingDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
+  const [operationalBudget, setOperationalBudget] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,12 +35,26 @@ const SalesMarketingDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await getSalesMarketingDashboard();
+      const [dashboardResponse, budgetResponse] = await Promise.all([
+        getSalesMarketingDashboard(),
+        getOperationalBudget(),
+      ]);
 
-      if (response.success) {
-        setDashboardData(response.data);
+      if (dashboardResponse.success) {
+        setDashboardData(dashboardResponse.data);
       } else {
-        toast.error(response.message || "Failed to load dashboard data");
+        toast.error(
+          dashboardResponse.message || "Failed to load dashboard data"
+        );
+      }
+
+      if (budgetResponse.success) {
+        setOperationalBudget(budgetResponse.data);
+      } else {
+        console.warn(
+          "Failed to load operational budget:",
+          budgetResponse.message
+        );
       }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
@@ -82,7 +105,7 @@ const SalesMarketingDashboard = () => {
                 Total Revenue
               </p>
               <p className="text-2xl sm:text-3xl font-bold text-green-900 mt-2 break-all leading-tight">
-                {formatCurrency(dashboardData.combined.totalRevenue)}
+                {formatCurrency(dashboardData.combined?.totalRevenue || 0)}
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
@@ -104,7 +127,7 @@ const SalesMarketingDashboard = () => {
                 Total Expenses
               </p>
               <p className="text-2xl sm:text-3xl font-bold text-red-900 mt-2 break-all leading-tight">
-                {formatCurrency(dashboardData.combined.totalExpenses)}
+                {formatCurrency(dashboardData.combined?.totalExpenses || 0)}
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-lg">
@@ -126,7 +149,7 @@ const SalesMarketingDashboard = () => {
                 Net Profit
               </p>
               <p className="text-2xl sm:text-3xl font-bold text-blue-900 mt-2 break-all leading-tight">
-                {formatCurrency(dashboardData.combined.netProfit)}
+                {formatCurrency(dashboardData.combined?.netProfit || 0)}
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
@@ -148,7 +171,7 @@ const SalesMarketingDashboard = () => {
                 Total Transactions
               </p>
               <p className="text-2xl sm:text-3xl font-bold text-purple-900 mt-2 break-all leading-tight">
-                {dashboardData.combined.totalTransactions}
+                {dashboardData.combined?.totalTransactions || 0}
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
@@ -157,6 +180,137 @@ const SalesMarketingDashboard = () => {
           </div>
         </motion.div>
       </div>
+
+      {/* Operational Budget Status */}
+      {operationalBudget && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className={`rounded-xl shadow-lg border p-6 ${
+            operationalBudget.isVeryLow
+              ? "bg-gradient-to-br from-red-50 to-red-100 border-red-200"
+              : operationalBudget.isLow
+              ? "bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200"
+              : "bg-gradient-to-br from-green-50 to-green-100 border-green-200"
+          }`}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <div
+                className={`p-3 rounded-xl ${
+                  operationalBudget.isVeryLow
+                    ? "bg-gradient-to-br from-red-500 to-red-600"
+                    : operationalBudget.isLow
+                    ? "bg-gradient-to-br from-yellow-500 to-yellow-600"
+                    : "bg-gradient-to-br from-green-500 to-green-600"
+                }`}
+              >
+                <CurrencyDollarIcon className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  Operational Budget Status
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Available funds for Sales & Marketing expenses
+                </p>
+              </div>
+            </div>
+            <div
+              className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                operationalBudget.isVeryLow
+                  ? "bg-red-100 text-red-800"
+                  : operationalBudget.isLow
+                  ? "bg-yellow-100 text-yellow-800"
+                  : "bg-green-100 text-green-800"
+              }`}
+            >
+              {operationalBudget.isVeryLow
+                ? "Very Low"
+                : operationalBudget.isLow
+                ? "Low"
+                : "Healthy"}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-center">
+            {/* Center radial progress - Used % of allocated */}
+            <div className="lg:col-span-2 order-last lg:order-none flex items-center justify-center">
+              <RadialProgress
+                percentage={
+                  operationalBudget.total > 0
+                    ? (operationalBudget.used / operationalBudget.total) * 100
+                    : 0
+                }
+                size={160}
+                strokeWidth={14}
+                progressColor={
+                  operationalBudget.isVeryLow
+                    ? "#DC2626"
+                    : operationalBudget.isLow
+                    ? "#D97706"
+                    : "#0d6449"
+                }
+                label={`of allocated budget used`}
+              />
+            </div>
+
+            {/* Stats */}
+            <div className="text-center">
+              <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                Available
+              </p>
+              <p
+                className={`text-2xl font-bold mt-1 ${
+                  operationalBudget.isVeryLow
+                    ? "text-red-600"
+                    : operationalBudget.isLow
+                    ? "text-yellow-600"
+                    : "text-green-600"
+                }`}
+              >
+                {formatCurrency(operationalBudget.available)}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                Used
+              </p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {formatCurrency(operationalBudget.used)}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                Reserved
+              </p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {formatCurrency(operationalBudget.reserved)}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                Total
+              </p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {formatCurrency(operationalBudget.total)}
+              </p>
+            </div>
+          </div>
+
+          {operationalBudget.isLow && (
+            <div className="mt-4 p-3 bg-white bg-opacity-50 rounded-lg">
+              <p className="text-sm text-gray-700">
+                <span className="font-semibold">⚠️ Low Budget Alert:</span>{" "}
+                Available funds are below{" "}
+                {formatCurrency(operationalBudget.threshold)}. Contact Finance
+                HOD to add funds before creating large expenses.
+              </p>
+            </div>
+          )}
+        </motion.div>
+      )}
 
       {/* Department Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -180,25 +334,25 @@ const SalesMarketingDashboard = () => {
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Revenue</span>
               <span className="font-semibold text-green-600">
-                {formatCurrency(dashboardData.sales.totalRevenue)}
+                {formatCurrency(dashboardData.sales?.totalRevenue || 0)}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Expenses</span>
               <span className="font-semibold text-red-600">
-                {formatCurrency(dashboardData.sales.totalExpenses)}
+                {formatCurrency(dashboardData.sales?.totalExpenses || 0)}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Pending</span>
               <span className="font-semibold text-orange-600">
-                {dashboardData.sales.pendingTransactions}
+                {dashboardData.sales?.pendingTransactions || 0}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Completed</span>
               <span className="font-semibold text-green-600">
-                {dashboardData.sales.completedTransactions}
+                {dashboardData.sales?.completedTransactions || 0}
               </span>
             </div>
           </div>
@@ -224,25 +378,25 @@ const SalesMarketingDashboard = () => {
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Revenue</span>
               <span className="font-semibold text-green-600">
-                {formatCurrency(dashboardData.marketing.totalRevenue)}
+                {formatCurrency(dashboardData.marketing?.totalRevenue || 0)}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Expenses</span>
               <span className="font-semibold text-red-600">
-                {formatCurrency(dashboardData.marketing.totalExpenses)}
+                {formatCurrency(dashboardData.marketing?.totalExpenses || 0)}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Pending</span>
               <span className="font-semibold text-orange-600">
-                {dashboardData.marketing.pendingTransactions}
+                {dashboardData.marketing?.pendingTransactions || 0}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Completed</span>
               <span className="font-semibold text-green-600">
-                {dashboardData.marketing.completedTransactions}
+                {dashboardData.marketing?.completedTransactions || 0}
               </span>
             </div>
           </div>
@@ -269,8 +423,8 @@ const SalesMarketingDashboard = () => {
                 datasets: [
                   {
                     data: [
-                      dashboardData.combined.totalRevenue,
-                      dashboardData.combined.totalExpenses,
+                      dashboardData.combined?.totalRevenue || 0,
+                      dashboardData.combined?.totalExpenses || 0,
                     ],
                   },
                 ],
@@ -295,10 +449,10 @@ const SalesMarketingDashboard = () => {
                   {
                     label: "Amount (₦)",
                     data: [
-                      dashboardData.sales.totalRevenue,
-                      dashboardData.sales.totalExpenses,
-                      dashboardData.marketing.totalRevenue,
-                      dashboardData.marketing.totalExpenses,
+                      dashboardData.sales?.totalRevenue || 0,
+                      dashboardData.sales?.totalExpenses || 0,
+                      dashboardData.marketing?.totalRevenue || 0,
+                      dashboardData.marketing?.totalExpenses || 0,
                     ],
                   },
                 ],
@@ -332,12 +486,12 @@ const SalesMarketingDashboard = () => {
                 <div className="flex items-center space-x-4">
                   <div
                     className={`p-2 rounded-lg ${
-                      transaction.transactionType === "revenue"
+                      transaction.type === "deposit"
                         ? "bg-green-100 text-green-600"
                         : "bg-red-100 text-red-600"
                     }`}
                   >
-                    {transaction.transactionType === "revenue" ? (
+                    {transaction.type === "deposit" ? (
                       <ArrowTrendingUpIcon className="h-5 w-5" />
                     ) : (
                       <ArrowTrendingDownIcon className="h-5 w-5" />
@@ -355,12 +509,12 @@ const SalesMarketingDashboard = () => {
                 <div className="text-right">
                   <p
                     className={`font-semibold ${
-                      transaction.transactionType === "revenue"
+                      transaction.type === "deposit"
                         ? "text-green-600"
                         : "text-red-600"
                     }`}
                   >
-                    {transaction.transactionType === "revenue" ? "+" : "-"}
+                    {transaction.type === "deposit" ? "+" : "-"}
                     {formatCurrency(transaction.amount)}
                   </p>
                   <span

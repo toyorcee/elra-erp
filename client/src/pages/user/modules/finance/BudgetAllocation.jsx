@@ -171,13 +171,9 @@ const BudgetAllocation = () => {
     }
   };
 
-  // Stats are calculated from projects and allocations data
-  // No need for separate API call
-
   const filterProjects = () => {
     let filtered = [...projects];
 
-    // Filter by project status only (DataTable handles search)
     if (filters.status) {
       if (filters.status === "pending_budget_allocation") {
         filtered = filtered.filter(
@@ -205,7 +201,7 @@ const BudgetAllocation = () => {
 
       const allocationData = {
         ...formData,
-        allocatedAmount: 0, // No extra allocation allowed
+        allocatedAmount: 0,
       };
 
       console.log("🔄 [FRONTEND] Creating budget allocation...");
@@ -413,29 +409,6 @@ const BudgetAllocation = () => {
       ),
     },
     {
-      header: "Extra Funds Available",
-      accessor: "extraAllocatedFunds",
-      renderer: (project) => {
-        const itemsTotal = calculateProjectItemsTotal(project);
-        const extraFunds = project.budget - itemsTotal;
-
-        return (
-          <div className="text-sm">
-            <div
-              className={`font-medium ${
-                extraFunds > 0 ? "text-blue-600" : "text-gray-600"
-              }`}
-            >
-              {formatCurrency(extraFunds)}
-            </div>
-            <div className="text-xs text-gray-500">
-              Available for allocation
-            </div>
-          </div>
-        );
-      },
-    },
-    {
       header: "Status",
       accessor: "status",
       renderer: (project) => (
@@ -629,14 +602,27 @@ const BudgetAllocation = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white rounded-lg p-4 shadow-lg">
               <p className="text-sm font-bold text-[var(--elra-primary)] mb-1">
-                Total Project Items Cost
+                ELRA Wallet Balance
               </p>
               <p className="text-2xl font-black text-[var(--elra-primary)]">
+                {formatCurrency(stats.walletBalance?.projects?.available || 0)}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Available for Projects
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg p-4 shadow-lg">
+              <p className="text-sm font-bold text-blue-600 mb-1">
+                Total Project Items Cost
+              </p>
+              <p className="text-2xl font-black text-blue-600">
                 {formatCurrency(stats.totalProjectItemsCost || 0)}
               </p>
+              <p className="text-xs text-gray-500 mt-1">Pending Allocation</p>
             </div>
 
             <div className="bg-white rounded-lg p-4 shadow-lg">
@@ -646,6 +632,7 @@ const BudgetAllocation = () => {
               <p className="text-2xl font-black text-green-600">
                 {formatCurrency(stats.totalAllocated || 0)}
               </p>
+              <p className="text-xs text-gray-500 mt-1">Budget Distributed</p>
             </div>
           </div>
         </div>
@@ -1179,12 +1166,14 @@ const BudgetAllocation = () => {
                     </div>
                     <div>
                       <p className="text-sm text-blue-800 font-medium mb-1">
-                        Simplified Allocation
+                        Budget Allocation
                       </p>
                       <p className="text-sm text-blue-700">
-                        This will allocate the exact project items cost. Extra
-                        funds will be saved in the employee's wallet for future
-                        requests.
+                        This will allocate the exact project items cost for
+                        procurement. Current ELRA wallet balance:{" "}
+                        {formatCurrency(
+                          stats.walletBalance?.projects?.available || 0
+                        )}
                       </p>
                     </div>
                   </div>
@@ -1206,6 +1195,16 @@ const BudgetAllocation = () => {
                           <div className="space-y-3 text-sm">
                             <div className="flex justify-between items-center p-2 bg-white rounded border">
                               <span className="text-gray-600">
+                                ELRA Wallet Balance:
+                              </span>
+                              <span className="font-medium text-green-600">
+                                {formatCurrency(
+                                  stats.walletBalance?.projects?.available || 0
+                                )}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center p-2 bg-white rounded border">
+                              <span className="text-gray-600">
                                 Project Items Cost:
                               </span>
                               <span className="font-medium">
@@ -1218,6 +1217,17 @@ const BudgetAllocation = () => {
                               </span>
                               <span className="text-green-800 font-bold text-lg">
                                 {formatCurrency(baseAmount)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center p-2 bg-blue-50 rounded border border-blue-200">
+                              <span className="text-blue-700 font-medium">
+                                Remaining Balance After:
+                              </span>
+                              <span className="text-blue-700 font-bold">
+                                {formatCurrency(
+                                  (stats.walletBalance?.projects?.available ||
+                                    0) - baseAmount
+                                )}
                               </span>
                             </div>
                           </div>
@@ -1285,7 +1295,7 @@ Finance HOD`}
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg font-medium hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg font-medium hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {isSubmitting ? (
                     <>
@@ -1539,7 +1549,7 @@ Finance HOD`}
                 )}
               </div>
 
-              {/* Extra Wallet Information */}
+              {/* Budget Allocation Information */}
               {selectedProject.requiresBudgetAllocation && (
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
                   <div className="flex items-center mb-4">
@@ -1547,11 +1557,25 @@ Finance HOD`}
                       <span className="text-blue-600 text-lg">💳</span>
                     </div>
                     <h3 className="text-xl font-semibold text-gray-900">
-                      Extra Wallet Information
+                      Budget Allocation Information
                     </h3>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white rounded-lg p-4 border border-blue-100">
+                      <div className="text-sm font-medium text-gray-600 mb-1">
+                        ELRA Wallet Balance
+                      </div>
+                      <div className="text-lg font-bold text-green-600">
+                        {formatCurrency(
+                          stats.walletBalance?.projects?.available || 0
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Available for Projects
+                      </div>
+                    </div>
+
                     <div className="bg-white rounded-lg p-4 border border-blue-100">
                       <div className="text-sm font-medium text-gray-600 mb-1">
                         Project Budget
@@ -1559,13 +1583,16 @@ Finance HOD`}
                       <div className="text-lg font-bold text-gray-900">
                         {formatCurrency(selectedProject.budget)}
                       </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        Total Project Budget
+                      </div>
                     </div>
 
                     <div className="bg-white rounded-lg p-4 border border-blue-100">
                       <div className="text-sm font-medium text-gray-600 mb-1">
-                        Items Cost
+                        Items Cost (To Allocate)
                       </div>
-                      <div className="text-lg font-bold text-gray-900">
+                      <div className="text-lg font-bold text-blue-600">
                         {formatCurrency(
                           selectedProject.projectItems?.reduce(
                             (sum, item) => sum + (item.totalPrice || 0),
@@ -1573,38 +1600,31 @@ Finance HOD`}
                           ) || 0
                         )}
                       </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg p-4 border border-blue-100">
-                      <div className="text-sm font-medium text-gray-600 mb-1">
-                        Extra Funds Available
-                      </div>
-                      <div className="text-lg font-bold text-blue-600">
-                        {formatCurrency(
-                          selectedProject.budget -
-                            (selectedProject.projectItems?.reduce(
-                              (sum, item) => sum + (item.totalPrice || 0),
-                              0
-                            ) || 0)
-                        )}
+                      <div className="text-xs text-gray-500 mt-1">
+                        Required for Procurement
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
                     <div className="flex items-start">
-                      <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mr-3 mt-0.5">
-                        <span className="text-blue-600 text-sm">💡</span>
+                      <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mr-3 mt-0.5">
+                        <span className="text-green-600 text-sm">💰</span>
                       </div>
                       <div>
-                        <p className="text-sm text-blue-800 font-medium mb-1">
-                          Budget Allocation Tip
+                        <p className="text-sm text-green-800 font-medium mb-1">
+                          Allocation Summary
                         </p>
-                        <p className="text-sm text-blue-700">
-                          After approving this budget allocation, procurement
-                          will be automatically triggered. The extra funds will
-                          be saved in the employee's wallet for future project
-                          requests.
+                        <p className="text-sm text-green-700">
+                          This allocation will reserve ₦
+                          {formatNumberWithCommas(
+                            selectedProject.projectItems?.reduce(
+                              (sum, item) => sum + (item.totalPrice || 0),
+                              0
+                            ) || 0
+                          )}{" "}
+                          from the ELRA wallet for project procurement. After
+                          approval, procurement will be automatically triggered.
                         </p>
                       </div>
                     </div>
@@ -1810,17 +1830,6 @@ Finance HOD`}
                     <span className="font-medium">
                       {formatCurrency(
                         calculateProjectItemsTotal(selectedProject)
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-yellow-100 rounded border-2 border-yellow-300">
-                    <span className="text-yellow-800 font-semibold">
-                      Extra Funds Available:
-                    </span>
-                    <span className="text-yellow-800 font-bold text-lg">
-                      {formatCurrency(
-                        selectedProject.budget -
-                          calculateProjectItemsTotal(selectedProject)
                       )}
                     </span>
                   </div>

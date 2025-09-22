@@ -2,10 +2,12 @@ import express from "express";
 import {
   processPayroll,
   processPayrollWithData,
+  submitForApproval,
   calculateEmployeePayroll,
   getPayrollPreview,
   getPendingApprovals,
   getApprovalDetails,
+  getPayrollPreviewForHR,
   approvePayroll,
   rejectPayroll,
   processApprovedPayroll,
@@ -22,6 +24,7 @@ import {
   getPersonalPayslips,
   calculateFinalPayroll,
   getFinalPayrollData,
+  resendToFinance,
 } from "../controllers/payrollController.js";
 import {
   protect,
@@ -44,6 +47,7 @@ router.use(checkPayrollAccess);
 // Payroll processing routes
 router.post("/process", processPayroll);
 router.post("/process-with-data", processPayrollWithData);
+router.post("/submit-for-approval", submitForApproval);
 router.post("/calculate/:employeeId", calculateEmployeePayroll);
 router.post("/preview", getPayrollPreview);
 router.get("/summary", getPayrollSummary);
@@ -61,6 +65,11 @@ router.get(
   checkPayrollApprovalAccess,
   getApprovalDetails
 );
+router.get(
+  "/preview/:approvalId",
+  checkPayrollApprovalAccess,
+  getPayrollPreviewForHR
+);
 router.post(
   "/approvals/:approvalId/approve",
   checkPayrollApprovalAccess,
@@ -70,6 +79,11 @@ router.post(
   "/approvals/:approvalId/reject",
   checkPayrollApprovalAccess,
   rejectPayroll
+);
+router.post(
+  "/approvals/:approvalId/resend",
+  checkPayrollAccess,
+  resendToFinance
 );
 router.post("/process-approved/:approvalId", processApprovedPayroll);
 

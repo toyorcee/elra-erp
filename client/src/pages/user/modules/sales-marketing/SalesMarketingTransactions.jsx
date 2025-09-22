@@ -7,18 +7,27 @@ import {
   XMarkIcon,
   CurrencyDollarIcon,
   DocumentTextIcon,
+  SparklesIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-toastify";
 import DataTable from "../../../../components/common/DataTable";
 import { useAuth } from "../../../../context/AuthContext";
-import { formatCurrency } from "../../../../utils/formatters";
+import {
+  formatCurrency,
+  formatNumberWithCommas,
+  parseFormattedNumber,
+} from "../../../../utils/formatters";
 import AnimatedBubbles from "../../../../components/ui/AnimatedBubbles";
+import ELRALogo from "../../../../components/ELRALogo";
 import {
   getSalesMarketingTransactions,
   createSalesMarketingTransaction,
-  getSalesCategories,
-  getMarketingCategories,
 } from "../../../../services/salesMarketingAPI";
+import {
+  getCategories,
+  getAllCategories,
+  DEPARTMENT_CONFIG,
+} from "../../../../constants/salesMarketingCategories";
 
 const SalesMarketingTransactions = () => {
   const { user } = useAuth();
@@ -26,7 +35,7 @@ const SalesMarketingTransactions = () => {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showBubbles, setShowBubbles] = useState(false);
-  const [transactionType, setTransactionType] = useState("sales");
+  const [selectedDepartment, setSelectedDepartment] = useState("sales");
   const [transactionData, setTransactionData] = useState({
     type: "expense",
     title: "",
@@ -34,16 +43,14 @@ const SalesMarketingTransactions = () => {
     amount: "",
     category: "",
     budgetCategory: "operational",
-    approvalLevel: "department",
-    priority: "medium",
   });
+  const [customCategory, setCustomCategory] = useState("");
   const [creating, setCreating] = useState(false);
-  const [salesCategories, setSalesCategories] = useState([]);
-  const [marketingCategories, setMarketingCategories] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filteredTransactions, setFilteredTransactions] = useState([]);
 
   useEffect(() => {
     fetchTransactions();
-    fetchCategories();
   }, []);
 
   const fetchTransactions = async () => {
@@ -52,7 +59,8 @@ const SalesMarketingTransactions = () => {
       const response = await getSalesMarketingTransactions();
 
       if (response.success) {
-        setTransactions(response.data.transactions || []);
+        setTransactions(response.data || []);
+        setFilteredTransactions(response.data || []);
       } else {
         toast.error(response.message || "Failed to load transactions");
       }
@@ -64,28 +72,41 @@ const SalesMarketingTransactions = () => {
     }
   };
 
-  const fetchCategories = async () => {
-    try {
-      const [salesResponse, marketingResponse] = await Promise.all([
-        getSalesCategories(),
-        getMarketingCategories(),
-      ]);
-
-      if (salesResponse.success) {
-        setSalesCategories(salesResponse.data.categories || []);
-      }
-      if (marketingResponse.success) {
-        setMarketingCategories(marketingResponse.data.categories || []);
-      }
-    } catch (error) {
-      console.error("Error fetching categories:", error);
+  // Real-time search filter
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredTransactions(transactions);
+      return;
     }
-  };
+
+    const searchLower = searchTerm.toLowerCase();
+    const filtered = transactions.filter(
+      (t) =>
+        t.reference?.toLowerCase().includes(searchLower) ||
+        t.description?.toLowerCase().includes(searchLower) ||
+        t.title?.toLowerCase().includes(searchLower) ||
+        t.type?.toLowerCase().includes(searchLower) ||
+        (t.type === "deposit" && "revenue".includes(searchLower)) ||
+        (t.type === "withdrawal" && "expense".includes(searchLower)) ||
+        t.category?.toLowerCase().includes(searchLower) ||
+        t.status?.toLowerCase().includes(searchLower)
+    );
+    setFilteredTransactions(filtered);
+  }, [searchTerm, transactions]);
 
   const handleCreateTransaction = async (e) => {
     e.preventDefault();
-    if (!transactionData.title || !transactionData.amount) {
+    if (
+      !transactionData.title ||
+      !transactionData.amount ||
+      !transactionData.category
+    ) {
       toast.error("Please fill in all required fields");
+      return;
+    }
+
+    if (transactionData.category === "other" && !customCategory.trim()) {
+      toast.error("Please enter a custom category name");
       return;
     }
 
@@ -95,8 +116,12 @@ const SalesMarketingTransactions = () => {
 
       const response = await createSalesMarketingTransaction({
         ...transactionData,
-        transactionType: transactionType,
-        amount: parseFloat(transactionData.amount),
+        module: selectedDepartment,
+        amount: transactionData.amount,
+        category:
+          transactionData.category === "other"
+            ? customCategory
+            : transactionData.category,
       });
 
       if (response.success) {
@@ -109,16 +134,32 @@ const SalesMarketingTransactions = () => {
           amount: "",
           category: "",
           budgetCategory: "operational",
-          approvalLevel: "department",
-          priority: "medium",
         });
+        setCustomCategory("");
         fetchTransactions();
       } else {
         toast.error(response.message || "Failed to create transaction");
       }
     } catch (error) {
       console.error("Error creating transaction:", error);
-      toast.error("Failed to create transaction");
+
+      const errorMessage = error.response?.data?.message || error.message;
+
+      if (errorMessage && errorMessage.includes("Insufficient funds")) {
+        toast.error(
+          "Insufficient funds in operational budget. Please contact the Finance HOD to add funds to the operational budget.",
+          {
+            autoClose: 8000,
+            style: {
+              background: "#fef2f2",
+              color: "#dc2626",
+              border: "1px solid #fecaca",
+            },
+          }
+        );
+      } else {
+        toast.error(errorMessage || "Failed to create transaction");
+      }
     } finally {
       setCreating(false);
       setShowBubbles(false);
@@ -142,30 +183,13 @@ const SalesMarketingTransactions = () => {
     );
   };
 
-  const getPriorityBadge = (priority) => {
-    const priorityConfig = {
-      low: "bg-gray-100 text-gray-800",
-      medium: "bg-blue-100 text-blue-800",
-      high: "bg-orange-100 text-orange-800",
-      urgent: "bg-red-100 text-red-800",
-    };
-
-    return (
-      <span
-        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${priorityConfig[priority]}`}
-      >
-        {priority}
-      </span>
-    );
-  };
-
   const transactionColumns = [
     {
-      header: "Transaction ID",
-      accessor: "transactionId",
+      header: "Reference",
+      accessor: "reference",
       renderer: (transaction) => (
         <div className="font-mono text-sm text-gray-900">
-          {transaction.transactionId}
+          {transaction.reference}
         </div>
       ),
     },
@@ -173,51 +197,59 @@ const SalesMarketingTransactions = () => {
       header: "Type",
       accessor: "type",
       renderer: (transaction) => (
-        <div className="flex items-center space-x-2">
-          <span
-            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-              transaction.type === "sales"
-                ? "bg-blue-100 text-blue-800"
-                : "bg-purple-100 text-purple-800"
-            }`}
-          >
-            {transaction.type}
-          </span>
-          <span
-            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-              transaction.transactionType === "revenue"
-                ? "bg-green-100 text-green-800"
-                : "bg-red-100 text-red-800"
-            }`}
-          >
-            {transaction.transactionType}
-          </span>
-        </div>
+        <span
+          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+            transaction.type === "deposit"
+              ? "bg-green-100 text-green-800"
+              : "bg-red-100 text-red-800"
+          }`}
+        >
+          {transaction.type === "deposit" ? "revenue" : "expense"}
+        </span>
       ),
     },
     {
-      header: "Title",
-      accessor: "title",
-      renderer: (transaction) => (
-        <div>
-          <div className="font-semibold text-gray-900">{transaction.title}</div>
-          <div className="text-sm text-gray-500">{transaction.description}</div>
-        </div>
-      ),
+      header: "Description",
+      accessor: "description",
+      renderer: (transaction) => {
+        const formatCategory = (category) => {
+          return category
+            .split("_")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
+        };
+
+        return (
+          <div>
+            <div className="font-semibold text-gray-900">
+              {transaction.description}
+            </div>
+            <div className="text-sm text-gray-500">
+              Category: {formatCategory(transaction.category)}
+            </div>
+          </div>
+        );
+      },
     },
     {
       header: "Amount",
       accessor: "amount",
       renderer: (transaction) => (
-        <div
-          className={`font-semibold ${
-            transaction.transactionType === "revenue"
-              ? "text-green-600"
-              : "text-red-600"
-          }`}
-        >
-          {transaction.transactionType === "revenue" ? "+" : "-"}
-          {formatCurrency(transaction.amount)}
+        <div className="flex items-center space-x-1">
+          <span
+            className={`text-lg font-bold ${
+              transaction.type === "deposit" ? "text-green-600" : "text-red-600"
+            }`}
+          >
+            {transaction.type === "deposit" ? "+" : "-"}
+          </span>
+          <span
+            className={`font-semibold ${
+              transaction.type === "deposit" ? "text-green-600" : "text-red-600"
+            }`}
+          >
+            {formatCurrency(transaction.amount)}
+          </span>
         </div>
       ),
     },
@@ -225,18 +257,6 @@ const SalesMarketingTransactions = () => {
       header: "Status",
       accessor: "status",
       renderer: (transaction) => getStatusBadge(transaction.status),
-    },
-    {
-      header: "Priority",
-      accessor: "priority",
-      renderer: (transaction) => getPriorityBadge(transaction.priority),
-    },
-    {
-      header: "Requested By",
-      accessor: "requestedBy",
-      renderer: (transaction) => (
-        <div className="text-sm text-gray-900">{transaction.requestedBy}</div>
-      ),
     },
     {
       header: "Date",
@@ -274,13 +294,56 @@ const SalesMarketingTransactions = () => {
 
       {/* Transactions Table */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-200">
+        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <FunnelIcon className="h-5 w-5 text-gray-400" />
+            <h3 className="text-lg font-semibold text-gray-900">
+              Transactions
+            </h3>
+          </div>
+          <div className="relative w-full max-w-xs">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by description, reference, type..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                title="Clear search"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
         <DataTable
-          data={transactions}
+          data={filteredTransactions}
           columns={transactionColumns}
           loading={loading}
-          searchable={true}
+          searchable={false}
           pagination={true}
           pageSize={10}
+          actions={{
+            showEdit: false,
+            showDelete: false,
+          }}
         />
       </div>
 
@@ -291,7 +354,7 @@ const SalesMarketingTransactions = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4"
             onClick={() => !creating && setShowCreateModal(false)}
           >
             <motion.div
@@ -306,13 +369,21 @@ const SalesMarketingTransactions = () => {
 
               {/* Modal Header */}
               <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Create New Transaction
-                  </h2>
-                  <p className="text-gray-600 mt-1">
-                    Add a new sales or marketing transaction
-                  </p>
+                <div className="flex items-center space-x-4">
+                  {/* ELRA Logo */}
+                  <div className="flex-shrink-0">
+                    <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                      <ELRALogo variant="dark" size="md" />
+                    </div>
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">
+                      Create New Transaction
+                    </h2>
+                    <p className="text-gray-600 mt-1">
+                      Add a new sales or marketing transaction
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={() => setShowCreateModal(false)}
@@ -326,78 +397,136 @@ const SalesMarketingTransactions = () => {
               {/* Modal Content */}
               <div className="p-6 flex-1 overflow-y-auto">
                 <form onSubmit={handleCreateTransaction} className="space-y-6">
-                  {/* Transaction Type Selection */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Department <span className="text-red-500">*</span>
-                      </label>
-                      <div className="flex space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => setTransactionType("sales")}
-                          className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-colors ${
-                            transactionType === "sales"
-                              ? "bg-blue-500 text-white"
-                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          }`}
-                        >
-                          Sales
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTransactionType("marketing")}
-                          className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-colors ${
-                            transactionType === "marketing"
-                              ? "bg-purple-500 text-white"
-                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          }`}
-                        >
-                          Marketing
-                        </button>
-                      </div>
+                  {/* Department Selection */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      Department <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {Object.entries(DEPARTMENT_CONFIG).map(
+                        ([key, config]) => (
+                          <motion.button
+                            key={key}
+                            type="button"
+                            onClick={() => {
+                              setSelectedDepartment(key);
+                              setTransactionData({
+                                ...transactionData,
+                                category: "", // Reset category when switching departments
+                              });
+                              setShowBubbles(true);
+                              setTimeout(() => setShowBubbles(false), 2000);
+                            }}
+                            className={`relative p-4 rounded-xl border-2 transition-all duration-300 ${
+                              selectedDepartment === key
+                                ? `border-[var(--elra-primary)] bg-[var(--elra-primary)]/10 shadow-lg`
+                                : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-md"
+                            }`}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <span className="text-2xl">{config.icon}</span>
+                              <div className="text-left">
+                                <div
+                                  className={`font-semibold ${
+                                    selectedDepartment === key
+                                      ? "text-[var(--elra-primary)]"
+                                      : "text-gray-900"
+                                  }`}
+                                >
+                                  {config.name}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {config.description}
+                                </div>
+                              </div>
+                            </div>
+                            {selectedDepartment === key && (
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                className="absolute top-2 right-2"
+                              >
+                                <SparklesIcon className="h-5 w-5 text-[var(--elra-primary)]" />
+                              </motion.div>
+                            )}
+                          </motion.button>
+                        )
+                      )}
                     </div>
+                  </motion.div>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Transaction Type <span className="text-red-500">*</span>
-                      </label>
-                      <div className="flex space-x-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setTransactionData({
-                              ...transactionData,
-                              type: "expense",
-                            })
-                          }
-                          className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-colors ${
-                            transactionData.type === "expense"
-                              ? "bg-red-500 text-white"
-                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          }`}
-                        >
-                          Expense
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setTransactionData({
-                              ...transactionData,
-                              type: "revenue",
-                            })
-                          }
-                          className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-colors ${
-                            transactionData.type === "revenue"
-                              ? "bg-green-500 text-white"
-                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          }`}
-                        >
-                          Revenue
-                        </button>
-                      </div>
+                  {/* Transaction Type Selection */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: 0.1 }}
+                  >
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      Transaction Type <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex space-x-3">
+                      <motion.button
+                        type="button"
+                        onClick={() =>
+                          setTransactionData({
+                            ...transactionData,
+                            type: "revenue",
+                            category: "",
+                          })
+                        }
+                        className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all duration-300 ${
+                          transactionData.type === "revenue"
+                            ? "bg-green-500 text-white shadow-lg"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <div className="flex items-center justify-center space-x-2">
+                          <span>💰</span>
+                          <span>Revenue</span>
+                        </div>
+                      </motion.button>
+                      <motion.button
+                        type="button"
+                        onClick={() =>
+                          setTransactionData({
+                            ...transactionData,
+                            type: "expense",
+                            category: "", // Reset category when switching types
+                          })
+                        }
+                        className={`flex-1 py-4 px-6 rounded-xl font-semibold transition-all duration-300 ${
+                          transactionData.type === "expense"
+                            ? "bg-red-500 text-white shadow-lg"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <div className="flex items-center justify-center space-x-2">
+                          <span>💸</span>
+                          <span>Expense</span>
+                        </div>
+                      </motion.button>
                     </div>
-                  </div>
+                    <motion.p
+                      className="text-sm text-gray-500 mt-2"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.2 }}
+                    >
+                      {transactionData.type === "revenue"
+                        ? "✅ Revenue is auto-approved and adds to wallet immediately"
+                        : "⏳ Expenses need Finance approval (Finance HOD or Super Admin can approve)"}
+                    </motion.p>
+                  </motion.div>
 
                   {/* Title */}
                   <div>
@@ -439,23 +568,40 @@ const SalesMarketingTransactions = () => {
                     />
                   </div>
 
+                  {/* Budget Category */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Budget Category
+                    </label>
+                    <div className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-700 flex items-center space-x-2">
+                      <span>🏢</span>
+                      <span>Operational</span>
+                      <span className="text-sm text-gray-500">
+                        (Sales & Marketing transactions use operational budget)
+                      </span>
+                    </div>
+                  </div>
+
                   {/* Amount */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Amount (₦) <span className="text-red-500">*</span>
                     </label>
                     <input
-                      type="number"
+                      type="text"
                       required
-                      value={transactionData.amount}
-                      onChange={(e) =>
+                      value={formatNumberWithCommas(transactionData.amount)}
+                      onChange={(e) => {
+                        const numericValue = parseFormattedNumber(
+                          e.target.value
+                        );
                         setTransactionData({
                           ...transactionData,
-                          amount: e.target.value,
-                        })
-                      }
+                          amount: numericValue,
+                        });
+                      }}
                       className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
-                      placeholder="Enter amount"
+                      placeholder="Enter amount (e.g., 1,000,000)"
                     />
                   </div>
 
@@ -476,85 +622,53 @@ const SalesMarketingTransactions = () => {
                       className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
                     >
                       <option value="">Select category</option>
-                      {(transactionType === "sales"
-                        ? salesCategories
-                        : marketingCategories
-                      ).map((category) => (
-                        <option key={category} value={category}>
-                          {category
-                            .replace(/_/g, " ")
-                            .replace(/\b\w/g, (l) => l.toUpperCase())}
-                        </option>
-                      ))}
+                      <AnimatePresence mode="wait">
+                        {getCategories(
+                          selectedDepartment,
+                          transactionData.type
+                        ).map((category, index) => (
+                          <motion.option
+                            key={category.value}
+                            value={category.value}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                          >
+                            {category.icon} {category.label}
+                          </motion.option>
+                        ))}
+                      </AnimatePresence>
                     </select>
                   </div>
 
-                  {/* Budget Category (for expenses only) */}
-                  {transactionData.type === "expense" && (
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Budget Category <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        required
-                        value={transactionData.budgetCategory}
-                        onChange={(e) =>
-                          setTransactionData({
-                            ...transactionData,
-                            budgetCategory: e.target.value,
-                          })
-                        }
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
+                  {/* Custom Category Input - Only show when "Other" is selected */}
+                  <AnimatePresence>
+                    {transactionData.category === "other" && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3 }}
                       >
-                        <option value="operational">Operational</option>
-                        <option value="projects">Projects</option>
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Approval Level */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Approval Level <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      required
-                      value={transactionData.approvalLevel}
-                      onChange={(e) =>
-                        setTransactionData({
-                          ...transactionData,
-                          approvalLevel: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
-                    >
-                      <option value="department">Department HOD</option>
-                      <option value="finance">Finance HOD</option>
-                      <option value="executive">Executive</option>
-                    </select>
-                  </div>
-
-                  {/* Priority */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Priority
-                    </label>
-                    <select
-                      value={transactionData.priority}
-                      onChange={(e) =>
-                        setTransactionData({
-                          ...transactionData,
-                          priority: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                      <option value="urgent">Urgent</option>
-                    </select>
-                  </div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          Custom Category Name{" "}
+                          <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required={transactionData.category === "other"}
+                          value={customCategory}
+                          onChange={(e) => setCustomCategory(e.target.value)}
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
+                          placeholder="Enter custom category name (e.g., Property Maintenance)"
+                        />
+                        <p className="text-sm text-gray-500 mt-1">
+                          This will be saved as the category for this
+                          transaction
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </form>
               </div>
 
@@ -564,7 +678,7 @@ const SalesMarketingTransactions = () => {
                   type="button"
                   onClick={() => setShowCreateModal(false)}
                   disabled={creating}
-                  className="flex-1 px-6 py-3 border-2 border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-6 py-3 border-2 border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -572,7 +686,7 @@ const SalesMarketingTransactions = () => {
                   type="submit"
                   onClick={handleCreateTransaction}
                   disabled={creating}
-                  className="flex-1 px-6 py-3 bg-[var(--elra-primary)] text-white rounded-xl font-semibold hover:bg-[var(--elra-primary-dark)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  className="flex-1 px-6 py-3 bg-[var(--elra-primary)] text-white rounded-xl font-semibold hover:bg-[var(--elra-primary-dark)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 cursor-pointer"
                 >
                   {creating ? (
                     <>

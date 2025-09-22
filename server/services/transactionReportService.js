@@ -154,13 +154,11 @@ class TransactionReportService {
     // Summary statistics
     const totalTransactions = transactions.length;
     const totalDeposits = transactions
-      .filter((t) => t.amount > 0)
+      .filter((t) => t.type === "deposit")
       .reduce((sum, t) => sum + t.amount, 0);
-    const totalWithdrawals = Math.abs(
-      transactions
-        .filter((t) => t.amount < 0)
-        .reduce((sum, t) => sum + t.amount, 0)
-    );
+    const totalWithdrawals = transactions
+      .filter((t) => t.type === "withdrawal")
+      .reduce((sum, t) => sum + t.amount, 0);
     const currentBalance =
       transactions.length > 0 ? transactions[0].balanceAfter : 0;
 
@@ -174,19 +172,19 @@ class TransactionReportService {
     doc.text(`• Total Transactions: ${totalTransactions}`, 25, yPosition);
     yPosition += 5;
     doc.text(
-      `• Total Deposits: ₦${this.formatCurrency(totalDeposits)}`,
+      `• Total Deposits: NGN ${this.formatCurrency(totalDeposits)}`,
       25,
       yPosition
     );
     yPosition += 5;
     doc.text(
-      `• Total Withdrawals: ₦${this.formatCurrency(totalWithdrawals)}`,
+      `• Total Withdrawals: NGN ${this.formatCurrency(totalWithdrawals)}`,
       25,
       yPosition
     );
     yPosition += 5;
     doc.text(
-      `• Current Balance: ₦${this.formatCurrency(currentBalance)}`,
+      `• Current Balance: NGN ${this.formatCurrency(currentBalance)}`,
       25,
       yPosition
     );
@@ -203,12 +201,15 @@ class TransactionReportService {
         new Date(transaction.date).toLocaleDateString("en-NG"),
         new Date(transaction.date).toLocaleTimeString("en-NG"),
         transaction.type.toUpperCase(),
-        transaction.description || "N/A",
-        transaction.reference || "N/A",
-        transaction.amount > 0
-          ? `+₦${this.formatCurrency(transaction.amount)}`
-          : `-₦${this.formatCurrency(Math.abs(transaction.amount))}`,
-        `₦${this.formatCurrency(transaction.balanceAfter)}`,
+        this.truncateText(
+          (transaction.description || "N/A")
+            .replace(/_/g, " ")
+            .replace(/-/g, " "),
+          30
+        ),
+        this.truncateText(transaction.reference || "N/A", 20),
+        this.formatTransactionAmount(transaction),
+        `NGN ${this.formatCurrency(transaction.balanceAfter)}`,
       ]);
 
       autoTable(doc, {
@@ -241,8 +242,8 @@ class TransactionReportService {
           0: { cellWidth: 20 }, // Date
           1: { cellWidth: 15 }, // Time
           2: { cellWidth: 20 }, // Type
-          3: { cellWidth: 35 }, // Description
-          4: { cellWidth: 20 }, // Reference
+          3: { cellWidth: 40 }, // Description
+          4: { cellWidth: 25 }, // Reference
           5: { cellWidth: 25 }, // Amount
           6: { cellWidth: 25 }, // Balance
         },
@@ -271,9 +272,8 @@ class TransactionReportService {
       footerY,
       { align: "center" }
     );
-    doc.text(`Page 1 of 1`, pageWidth - 20, footerY, { align: "right" });
 
-    // Add page numbers if needed
+    // Add page numbers only once
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
@@ -290,8 +290,37 @@ class TransactionReportService {
   formatCurrency(amount) {
     return new Intl.NumberFormat("en-NG", {
       minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 0,
     }).format(amount || 0);
+  }
+
+  /**
+   * Format transaction amount with proper signs
+   */
+  formatTransactionAmount(transaction) {
+    const amount = Math.abs(transaction.amount);
+    const formattedAmount = this.formatCurrency(amount);
+
+    switch (transaction.type) {
+      case "deposit":
+        return `+NGN ${formattedAmount}`;
+      case "withdrawal":
+        return `-NGN ${formattedAmount}`;
+      case "allocation":
+        return `NGN ${formattedAmount}`;
+      default:
+        return `NGN ${formattedAmount}`;
+    }
+  }
+
+  /**
+   * Truncate text to specified length
+   */
+  truncateText(text, maxLength) {
+    if (!text || text.length <= maxLength) {
+      return text;
+    }
+    return text.substring(0, maxLength - 3) + "...";
   }
 
   /**
@@ -335,13 +364,11 @@ class TransactionReportService {
   generateWordReportHTML(transactions, filters, userInfo) {
     const totalTransactions = transactions.length;
     const totalDeposits = transactions
-      .filter((t) => t.amount > 0)
+      .filter((t) => t.type === "deposit")
       .reduce((sum, t) => sum + t.amount, 0);
-    const totalWithdrawals = Math.abs(
-      transactions
-        .filter((t) => t.amount < 0)
-        .reduce((sum, t) => sum + t.amount, 0)
-    );
+    const totalWithdrawals = transactions
+      .filter((t) => t.type === "withdrawal")
+      .reduce((sum, t) => sum + t.amount, 0);
     const currentBalance =
       transactions.length > 0 ? transactions[0].balanceAfter : 0;
 
@@ -417,13 +444,13 @@ class TransactionReportService {
         <h3>Summary Statistics:</h3>
         <ul>
             <li><strong>Total Transactions:</strong> ${totalTransactions}</li>
-            <li><strong>Total Deposits:</strong> ₦${this.formatCurrency(
+            <li><strong>Total Deposits:</strong> NGN ${this.formatCurrency(
               totalDeposits
             )}</li>
-            <li><strong>Total Withdrawals:</strong> ₦${this.formatCurrency(
+            <li><strong>Total Withdrawals:</strong> NGN ${this.formatCurrency(
               totalWithdrawals
             )}</li>
-            <li><strong>Current Balance:</strong> ₦${this.formatCurrency(
+            <li><strong>Current Balance:</strong> NGN ${this.formatCurrency(
               currentBalance
             )}</li>
         </ul>
@@ -457,22 +484,22 @@ class TransactionReportService {
                       "en-NG"
                     )}</td>
                     <td>${transaction.type.toUpperCase()}</td>
-                    <td>${transaction.description || "N/A"}</td>
+                    <td>${(transaction.description || "N/A")
+                      .replace(/_/g, " ")
+                      .replace(/-/g, " ")}</td>
                     <td>${transaction.reference || "N/A"}</td>
                     <td class="${
-                      transaction.amount > 0
+                      transaction.type === "deposit"
                         ? "amount-positive"
-                        : "amount-negative"
+                        : transaction.type === "withdrawal"
+                        ? "amount-negative"
+                        : ""
                     }">
-                        ${
-                          transaction.amount > 0
-                            ? `+₦${this.formatCurrency(transaction.amount)}`
-                            : `-₦${this.formatCurrency(
-                                Math.abs(transaction.amount)
-                              )}`
-                        }
+                        ${this.formatTransactionAmount(transaction)}
                     </td>
-                    <td>₦${this.formatCurrency(transaction.balanceAfter)}</td>
+                    <td>NGN ${this.formatCurrency(
+                      transaction.balanceAfter
+                    )}</td>
                 </tr>
             `
               )
@@ -490,6 +517,71 @@ class TransactionReportService {
 </body>
 </html>
     `;
+  }
+
+  /**
+   * Generate CSV report
+   */
+  async generateTransactionCSVReport(
+    transactions,
+    filters = {},
+    userInfo = {}
+  ) {
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const fileName = `transaction_report_${timestamp}.csv`;
+      const filePath = path.join(this.reportsDir, fileName);
+
+      const csvContent = this.generateCSVContent(
+        transactions,
+        filters,
+        userInfo
+      );
+      fs.writeFileSync(filePath, csvContent);
+
+      return {
+        fileName,
+        filePath,
+        url: `/uploads/transaction-reports/${fileName}`,
+        csvContent,
+      };
+    } catch (error) {
+      console.error(
+        "❌ [TRANSACTION REPORT SERVICE] Error generating CSV report:",
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Generate CSV content
+   */
+  generateCSVContent(transactions, filters, userInfo) {
+    const headers = [
+      "Date",
+      "Time",
+      "Type",
+      "Description",
+      "Reference",
+      "Amount",
+      "Balance",
+    ];
+
+    const rows = transactions.map((transaction) => [
+      new Date(transaction.date).toLocaleDateString("en-NG"),
+      new Date(transaction.date).toLocaleTimeString("en-NG"),
+      transaction.type.toUpperCase(),
+      `"${(transaction.description || "N/A")
+        .replace(/_/g, " ")
+        .replace(/-/g, " ")}"`,
+      transaction.reference || "N/A",
+      this.formatTransactionAmount(transaction),
+      `NGN ${this.formatCurrency(transaction.balanceAfter)}`,
+    ]);
+
+    const csvRows = [headers, ...rows];
+    return csvRows.map((row) => row.join(",")).join("\n");
   }
 }
 

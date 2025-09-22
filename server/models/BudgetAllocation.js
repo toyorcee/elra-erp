@@ -93,6 +93,18 @@ const budgetAllocationSchema = new mongoose.Schema(
       default: "project_budget",
       required: true,
     },
+    budgetCategory: {
+      type: String,
+      enum: ["projects", "payroll", "operational"],
+      default: function () {
+        // Auto-determine budget category based on allocation type
+        if (this.allocationType === "project_budget") return "projects";
+        if (this.allocationType === "payroll_funding") return "payroll";
+        if (this.allocationType === "operational_funding") return "operational";
+        return "operational"; // fallback
+      },
+      required: true,
+    },
     allocatedAmount: {
       type: Number,
       required: false,

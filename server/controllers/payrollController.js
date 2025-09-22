@@ -147,6 +147,296 @@ const processPayroll = async (req, res) => {
   }
 };
 
+const checkForEmployeeOverlap = async (payrollData) => {
+  try {
+    const { period, payrolls, scope } = payrollData;
+    const currentEmployeeIds = payrolls
+      .map((p) => p.employee?.id)
+      .filter(Boolean);
+
+    console.log("🔍 [BACKEND_VALIDATION] Checking for employee overlaps...");
+    console.log(
+      "🔍 [BACKEND_VALIDATION] Current employee IDs:",
+      currentEmployeeIds
+    );
+
+    // Check pending approvals
+    const PayrollApproval = (await import("../models/PayrollApproval.js"))
+      .default;
+    const existingPreviews = await PayrollApproval.find({
+      "period.month": period.month,
+      "period.year": period.year,
+      "metadata.frequency": payrollData.frequency || "monthly",
+    });
+
+    for (const preview of existingPreviews) {
+      if (preview.payrollData?.payrolls) {
+        const existingEmployeeIds = preview.payrollData.payrolls
+          .map((p) => p.employee?.id)
+          .filter(Boolean);
+        const overlap = currentEmployeeIds.filter((id) =>
+          existingEmployeeIds.includes(id)
+        );
+
+        if (overlap.length > 0) {
+          console.log("🔍 [BACKEND_VALIDATION] Found overlap in preview:", {
+            previewId: preview.approvalId,
+            overlap: overlap,
+            status: preview.approvalStatus,
+          });
+
+          return {
+            found: true,
+            message: `Cannot create payroll preview: Some employees have already been included in a payroll preview for ${period.monthName} ${period.year}.`,
+            details: {
+              type: "preview_overlap",
+              approvalId: preview.approvalId,
+              status: preview.approvalStatus,
+              overlappingEmployees: overlap,
+              period: `${period.monthName} ${period.year}`,
+            },
+          };
+        }
+      }
+    }
+
+    const Payroll = (await import("../models/Payroll.js")).default;
+    const existingPayrolls = await Payroll.find({
+      "period.month": period.month,
+      "period.year": period.year,
+      frequency: payrollData.frequency || "monthly",
+    });
+
+    for (const payroll of existingPayrolls) {
+      let existingEmployeeIds = [];
+
+      if (payroll.payrolls && Array.isArray(payroll.payrolls)) {
+        existingEmployeeIds = payroll.payrolls
+          .map((p) => p.employee)
+          .filter(Boolean);
+      } else if (payroll.employee) {
+        existingEmployeeIds = [payroll.employee];
+      }
+
+      const overlap = currentEmployeeIds.filter((id) =>
+        existingEmployeeIds.includes(id)
+      );
+
+      if (overlap.length > 0) {
+        console.log("🔍 [BACKEND_VALIDATION] Found overlap in payroll:", {
+          payrollId: payroll._id,
+          overlap: overlap,
+        });
+
+        return {
+          found: true,
+          message: `Cannot create payroll preview: Some employees have already been processed in a payroll for ${period.monthName} ${period.year}.`,
+          details: {
+            type: "payroll_overlap",
+            payrollId: payroll._id,
+            overlappingEmployees: overlap,
+            period: `${period.monthName} ${period.year}`,
+          },
+        };
+      }
+    }
+
+    console.log("✅ [BACKEND_VALIDATION] No employee overlaps found");
+    return { found: false };
+  } catch (error) {
+    console.error(
+      "❌ [BACKEND_VALIDATION] Error checking for overlaps:",
+      error
+    );
+    // Don't block on validation errors, but log them
+    return { found: false };
+  }
+};
+
+// @desc    Submit payroll for finance approval
+// @route   POST /api/payroll/submit-for-approval
+// @access  Private (Super Admin, HOD)
+const submitForApproval = async (req, res) => {
+  try {
+    const { payrollData } = req.body;
+
+    // Validate that payroll data is provided
+    if (!payrollData) {
+      return res.status(400).json({
+        success: false,
+        message: "Payroll data is required",
+      });
+    }
+
+    if (!payrollData.period || !payrollData.payrolls || !payrollData.scope) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payroll data structure",
+      });
+    }
+
+    const hasOverlap = await checkForEmployeeOverlap(payrollData);
+    if (hasOverlap.found) {
+      return res.status(409).json({
+        success: false,
+        message: hasOverlap.message,
+        details: hasOverlap.details,
+      });
+    }
+
+    const approvalRequest = await PayrollApprovalService.createApprovalRequest(
+      payrollData,
+      req.user._id
+    );
+
+    console.log(
+      `📋 [PAYROLL_SUBMISSION] Created approval with ID: ${approvalRequest.approvalId}`
+    );
+
+    // Send notification to Finance HOD
+    try {
+      const NotificationService = (
+        await import("../services/notificationService.js")
+      ).default;
+      const notificationService = new NotificationService();
+
+      // Find Finance HOD user
+      const User = (await import("../models/User.js")).default;
+      const Department = (await import("../models/Department.js")).default;
+
+      const financeDept = await Department.findOne({
+        name: "Finance & Accounting",
+      });
+
+      if (!financeDept) {
+        console.error(
+          "❌ [NOTIFICATION] Finance & Accounting department not found"
+        );
+        return;
+      }
+
+      console.log(
+        `🏢 [NOTIFICATION] Found Finance department: ${financeDept._id}`
+      );
+
+      // Find Finance HOD using the same logic as project controller
+      const Role = (await import("../models/Role.js")).default;
+      const hodRole = await Role.findOne({ name: "HOD" });
+
+      let financeHOD = null;
+
+      if (hodRole) {
+        financeHOD = await User.findOne({
+          role: hodRole._id,
+          department: financeDept._id,
+        });
+
+        console.log(
+          `👥 [NOTIFICATION] Found Finance HOD by role ID: ${
+            financeHOD ? "Yes" : "No"
+          }`
+        );
+      }
+
+      if (!financeHOD) {
+        console.log(
+          `🔄 [NOTIFICATION] No HOD found by role ID, trying role level fallback...`
+        );
+        financeHOD = await User.findOne({
+          department: financeDept._id,
+          "role.level": { $gte: 700 },
+        });
+        console.log(
+          `👥 [NOTIFICATION] Found Finance HOD by role level: ${
+            financeHOD ? "Yes" : "No"
+          }`
+        );
+      }
+
+      if (financeHOD) {
+        await notificationService.createNotification({
+          recipient: financeHOD._id,
+          type: "PAYROLL_APPROVAL_REQUEST",
+          title: "New Payroll Approval Request",
+          message: `New payroll approval request for ${
+            payrollData.period?.monthName
+          } ${payrollData.period?.year}. Total amount: ₦${
+            payrollData.totalNetPay?.toLocaleString() || 0
+          }`,
+          priority: "high",
+          data: {
+            approvalId: approvalRequest.approvalId,
+            period: payrollData.period,
+            scope: payrollData.scope,
+            totalNetPay: payrollData.totalNetPay,
+            totalEmployees: payrollData.totalEmployees,
+          },
+        });
+        console.log(
+          `📧 [NOTIFICATION] Sent payroll approval notification to Finance HOD: ${financeHOD.firstName} ${financeHOD.lastName}`
+        );
+      } else {
+        console.warn(
+          "⚠️ [NOTIFICATION] Finance HOD not found - skipping notification"
+        );
+      }
+    } catch (notificationError) {
+      console.error("Error sending notification:", notificationError);
+    }
+
+    try {
+      await notificationService.createNotification({
+        recipient: req.user._id,
+        type: "PAYROLL_SUBMISSION_SUCCESS",
+        title: "Payroll Submitted Successfully",
+        message: `Payroll for ${payrollData.period?.monthName} ${payrollData.period?.year} has been submitted for finance approval. Approval ID: ${approvalRequest.approvalId}`,
+        priority: "medium",
+        data: {
+          approvalId: approvalRequest.approvalId,
+          period: payrollData.period,
+          scope: payrollData.scope,
+          totalNetPay: payrollData.totalNetPay,
+          totalEmployees: payrollData.totalEmployees,
+        },
+      });
+      console.log(
+        `📧 [NOTIFICATION] Sent submission confirmation to requester: ${req.user.firstName} ${req.user.lastName}`
+      );
+    } catch (senderNotificationError) {
+      console.error(
+        "Error sending notification to sender:",
+        senderNotificationError
+      );
+      // Don't fail the request if notification fails
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Payroll submitted for finance approval successfully",
+      data: {
+        approval: {
+          approvalId: approvalRequest.approvalId,
+          status: approvalRequest.approvalStatus,
+          requestedAt: approvalRequest.requestedAt,
+        },
+        payroll: {
+          period: payrollData.period,
+          totalEmployees: payrollData.totalEmployees,
+          totalNetPay: payrollData.totalNetPay,
+          scope: payrollData.scope,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error submitting payroll for approval:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error submitting payroll for approval",
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Process payroll using preview data
 // @route   POST /api/payroll/process-with-data
 // @access  Private (Super Admin, HOD)
@@ -332,6 +622,169 @@ const calculateEmployeePayroll = async (req, res) => {
   }
 };
 
+// Helper function to check for employee overlaps in preview requests
+const checkForEmployeeOverlapInPreview = async (
+  month,
+  year,
+  frequency,
+  scope,
+  scopeId
+) => {
+  try {
+    console.log(
+      "🔍 [BACKEND_PREVIEW_VALIDATION] Checking for employee overlaps..."
+    );
+
+    const currentEmployeeIds = await getEmployeeIdsForScope(scope, scopeId);
+    console.log(
+      "🔍 [BACKEND_PREVIEW_VALIDATION] Current scope employee IDs:",
+      currentEmployeeIds
+    );
+
+    if (currentEmployeeIds.length === 0) {
+      console.log(
+        "⚠️ [BACKEND_PREVIEW_VALIDATION] No employees found for scope"
+      );
+      return { found: false };
+    }
+
+    const PayrollApproval = (await import("../models/PayrollApproval.js"))
+      .default;
+    const existingPreviews = await PayrollApproval.find({
+      "period.month": month,
+      "period.year": year,
+      "metadata.frequency": frequency,
+    });
+
+    for (const preview of existingPreviews) {
+      if (preview.payrollData?.payrolls) {
+        const existingEmployeeIds = preview.payrollData.payrolls
+          .map((p) => p.employee?.id)
+          .filter(Boolean);
+        const overlap = currentEmployeeIds.filter((id) =>
+          existingEmployeeIds.includes(id)
+        );
+
+        if (overlap.length > 0) {
+          console.log(
+            "🔍 [BACKEND_PREVIEW_VALIDATION] Found overlap in preview:",
+            {
+              previewId: preview.approvalId,
+              overlap: overlap,
+              status: preview.approvalStatus,
+            }
+          );
+
+          return {
+            found: true,
+            message: `Cannot create payroll preview: Some employees have already been included in a payroll preview for ${month}/${year} (${frequency}).`,
+            details: {
+              type: "preview_overlap",
+              approvalId: preview.approvalId,
+              status: preview.approvalStatus,
+              overlappingEmployees: overlap,
+              period: `${month}/${year}`,
+            },
+          };
+        }
+      }
+    }
+
+    const Payroll = (await import("../models/Payroll.js")).default;
+    const existingPayrolls = await Payroll.find({
+      "period.month": month,
+      "period.year": year,
+      frequency: frequency,
+    });
+
+    for (const payroll of existingPayrolls) {
+      let existingEmployeeIds = [];
+
+      if (payroll.payrolls && Array.isArray(payroll.payrolls)) {
+        existingEmployeeIds = payroll.payrolls
+          .map((p) => p.employee)
+          .filter(Boolean);
+      } else if (payroll.employee) {
+        existingEmployeeIds = [payroll.employee];
+      }
+
+      const overlap = currentEmployeeIds.filter((id) =>
+        existingEmployeeIds.includes(id)
+      );
+
+      if (overlap.length > 0) {
+        console.log(
+          "🔍 [BACKEND_PREVIEW_VALIDATION] Found overlap in payroll:",
+          {
+            payrollId: payroll._id,
+            overlap: overlap,
+          }
+        );
+
+        return {
+          found: true,
+          message: `Cannot create payroll preview: Some employees have already been processed in a payroll for ${month}/${year} (${frequency}).`,
+          details: {
+            type: "payroll_overlap",
+            payrollId: payroll._id,
+            overlappingEmployees: overlap,
+            period: `${month}/${year}`,
+          },
+        };
+      }
+    }
+
+    console.log("✅ [BACKEND_PREVIEW_VALIDATION] No employee overlaps found");
+    return { found: false };
+  } catch (error) {
+    console.error(
+      "❌ [BACKEND_PREVIEW_VALIDATION] Error checking for overlaps:",
+      error
+    );
+    // Don't block on validation errors, but log them
+    return { found: false };
+  }
+};
+
+// Helper function to get employee IDs for a given scope
+const getEmployeeIdsForScope = async (scope, scopeId) => {
+  try {
+    const User = (await import("../models/User.js")).default;
+    const Department = (await import("../models/Department.js")).default;
+
+    switch (scope) {
+      case "company":
+        // For company scope, get all active employees
+        const allEmployees = await User.find({
+          isActive: true,
+          status: "ACTIVE",
+        }).select("_id");
+        return allEmployees.map((emp) => emp._id.toString());
+
+      case "department":
+        // For department scope, get employees in that department
+        const deptEmployees = await User.find({
+          department: scopeId,
+          isActive: true,
+          status: "ACTIVE",
+        }).select("_id");
+        return deptEmployees.map((emp) => emp._id.toString());
+
+      case "individual":
+        // For individual scope, scopeId is already the employee IDs
+        return Array.isArray(scopeId)
+          ? scopeId.map((id) => id.toString())
+          : [scopeId.toString()];
+
+      default:
+        return [];
+    }
+  } catch (error) {
+    console.error("Error getting employee IDs for scope:", error);
+    return [];
+  }
+};
+
 // @desc    Get payroll preview
 // @route   POST /api/payroll/preview
 // @access  Private (Super Admin, HOD)
@@ -407,6 +860,22 @@ const getPayrollPreview = async (req, res) => {
       });
     }
 
+    // Backend validation: Check for employee overlaps before calculating preview
+    const overlapCheck = await checkForEmployeeOverlapInPreview(
+      month,
+      year,
+      frequency,
+      scope,
+      scopeId
+    );
+    if (overlapCheck.found) {
+      return res.status(409).json({
+        success: false,
+        message: overlapCheck.message,
+        details: overlapCheck.details,
+      });
+    }
+
     const previewResult = await PayrollService.calculatePayroll(
       month,
       year,
@@ -424,9 +893,9 @@ const getPayrollPreview = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Payroll approval request created successfully",
+      message: "Payroll preview generated successfully",
       data: {
-        preview: previewResult,
+        ...previewResult,
         approval: {
           approvalId: approvalRequest.approvalId,
           status: approvalRequest.approvalStatus,
@@ -496,6 +965,74 @@ const getApprovalDetails = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error getting approval details",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get payroll preview data for HR HOD
+// @route   GET /api/payroll/preview/:approvalId
+// @access  Private (HR HOD, Super Admin)
+const getPayrollPreviewForHR = async (req, res) => {
+  try {
+    const { approvalId } = req.params;
+
+    // Check if user is HR HOD or Super Admin
+    const user = req.user;
+    const isHRHOD =
+      user.department?.name === "Human Resources" && user.role?.level >= 700;
+    const isSuperAdmin = user.role?.level >= 1000;
+
+    if (!isHRHOD && !isSuperAdmin) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Only HR HOD and Super Admin can access payroll preview data.",
+      });
+    }
+
+    // Get approval details with payroll data
+    const approvalDetails = await PayrollApprovalService.getApprovalDetails(
+      approvalId
+    );
+
+    if (!approvalDetails) {
+      return res.status(404).json({
+        success: false,
+        message: "Payroll approval not found",
+      });
+    }
+
+    // Check if the approval is in the correct status for HR review
+    if (approvalDetails.approvalStatus !== "approved_finance") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Payroll is not ready for HR review. Finance approval is required first.",
+      });
+    }
+
+    // Return the payroll preview data
+    res.status(200).json({
+      success: true,
+      message: "Payroll preview data retrieved successfully",
+      data: {
+        approvalId: approvalDetails.approvalId,
+        period: approvalDetails.period,
+        scope: approvalDetails.scope,
+        financialSummary: approvalDetails.financialSummary,
+        payrollData: approvalDetails.payrollData,
+        approvalStatus: approvalDetails.approvalStatus,
+        requestedBy: approvalDetails.requestedBy,
+        requestedAt: approvalDetails.requestedAt,
+        financeApproval: approvalDetails.financeApproval,
+      },
+    });
+  } catch (error) {
+    console.error("Error getting payroll preview for HR:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error getting payroll preview data",
       error: error.message,
     });
   }
@@ -2071,13 +2608,169 @@ const getPersonalPayslips = async (req, res) => {
   }
 };
 
+// @desc    Resend payroll preview to Finance HOD
+// @route   POST /api/payroll/approvals/:approvalId/resend
+// @access  Private (HR HOD, Super Admin)
+const resendToFinance = async (req, res) => {
+  try {
+    const { approvalId } = req.params;
+
+    // Get the existing approval
+    const PayrollApproval = (await import("../models/PayrollApproval.js"))
+      .default;
+    const existingApproval = await PayrollApproval.findOne({ approvalId });
+
+    if (!existingApproval) {
+      return res.status(404).json({
+        success: false,
+        message: "Payroll approval not found",
+      });
+    }
+
+    if (existingApproval.approvalStatus !== "pending_finance") {
+      return res.status(400).json({
+        success: false,
+        message: "Can only resend pending finance approvals",
+      });
+    }
+
+    // Send notification to Finance HOD using the same logic as submitForApproval
+    try {
+      const NotificationService = (
+        await import("../services/notificationService.js")
+      ).default;
+      const notificationService = new NotificationService();
+
+      const User = (await import("../models/User.js")).default;
+      const Department = (await import("../models/Department.js")).default;
+      const Role = (await import("../models/Role.js")).default;
+
+      const financeDept = await Department.findOne({
+        name: "Finance & Accounting",
+      });
+
+      if (!financeDept) {
+        console.error(
+          "❌ [NOTIFICATION] Finance & Accounting department not found"
+        );
+        return res.status(500).json({
+          success: false,
+          message: "Finance department not found",
+        });
+      }
+
+      console.log(
+        `🏢 [NOTIFICATION] Found Finance department: ${financeDept._id}`
+      );
+
+      const hodRole = await Role.findOne({ name: "HOD" });
+
+      let financeHOD = null;
+
+      if (hodRole) {
+        financeHOD = await User.findOne({
+          role: hodRole._id,
+          department: financeDept._id,
+        });
+
+        console.log(
+          `👥 [NOTIFICATION] Found Finance HOD by role ID: ${
+            financeHOD ? "Yes" : "No"
+          }`
+        );
+      }
+
+      if (!financeHOD) {
+        console.log(
+          `🔄 [NOTIFICATION] No HOD found by role ID, trying role level fallback...`
+        );
+        financeHOD = await User.findOne({
+          department: financeDept._id,
+          "role.level": { $gte: 700 },
+        });
+        console.log(
+          `👥 [NOTIFICATION] Found Finance HOD by role level: ${
+            financeHOD ? "Yes" : "No"
+          }`
+        );
+      }
+
+      if (financeHOD) {
+        await notificationService.createNotification({
+          recipient: financeHOD._id,
+          type: "PAYROLL_APPROVAL_REQUEST",
+          title: "Payroll Approval Request (Resent)",
+          message: `A payroll preview has been resent for your approval. Approval ID: ${approvalId}`,
+          data: {
+            approvalId: approvalId,
+            requesterId: req.user._id,
+            requesterName: `${req.user.firstName} ${req.user.lastName}`,
+            period: existingApproval.period,
+            totalEmployees: existingApproval.financialSummary?.totalEmployees,
+            totalNetPay: existingApproval.financialSummary?.totalNetPay,
+            isResend: true,
+          },
+        });
+
+        console.log(
+          `📧 [NOTIFICATION] Sent resend notification to Finance HOD: ${financeHOD.firstName} ${financeHOD.lastName}`
+        );
+      } else {
+        console.log(
+          "⚠️ [NOTIFICATION] Finance HOD not found - skipping notification"
+        );
+      }
+
+      await notificationService.createNotification({
+        recipient: req.user._id,
+        type: "PAYROLL_RESEND_CONFIRMATION",
+        title: "Payroll Resent to Finance",
+        message: `Your payroll preview has been resent to Finance HOD for approval. Approval ID: ${approvalId}`,
+        data: {
+          approvalId: approvalId,
+          resentAt: new Date(),
+        },
+      });
+
+      console.log(
+        `📧 [NOTIFICATION] Sent resend confirmation to requester: ${req.user.firstName} ${req.user.lastName}`
+      );
+    } catch (notificationError) {
+      console.error(
+        "❌ [NOTIFICATION] Error sending notifications:",
+        notificationError
+      );
+      // Don't fail the request if notification fails
+    }
+
+    res.json({
+      success: true,
+      message: "Payroll preview resent to Finance HOD successfully",
+      data: {
+        approvalId: approvalId,
+        status: "resent",
+        resentAt: new Date(),
+      },
+    });
+  } catch (error) {
+    console.error("❌ [PAYROLL_RESEND] Error resending to finance:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error resending payroll to finance",
+      error: error.message,
+    });
+  }
+};
+
 export {
   processPayroll,
   processPayrollWithData,
+  submitForApproval,
   calculateEmployeePayroll,
   getPayrollPreview,
   getPendingApprovals,
   getApprovalDetails,
+  getPayrollPreviewForHR,
   approvePayroll,
   rejectPayroll,
   processApprovedPayroll,
@@ -2094,6 +2787,7 @@ export {
   downloadPayslip,
   calculateFinalPayroll,
   getFinalPayrollData,
+  resendToFinance,
 };
 
 // @desc    Calculate final payroll for offboarding employee

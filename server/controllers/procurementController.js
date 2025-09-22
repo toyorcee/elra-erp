@@ -1152,6 +1152,137 @@ export const markAsPaid = async (req, res) => {
 
     await procurement.save();
 
+    // Move funds from reserved to used when procurement is marked as paid (ATOMIC)
+    if (procurement.relatedProject) {
+      const session = await mongoose.startSession();
+      try {
+        await session.withTransaction(async () => {
+          console.log(
+            `💰 [PROCUREMENT] Moving funds from reserved to used for project ${
+              procurement.relatedProject
+            } - Amount: ₦${procurement.totalAmount.toLocaleString()}`
+          );
+
+          const ELRAWallet = (await import("../models/ELRAWallet.js")).default;
+          const wallet = await ELRAWallet.findOne({
+            elraInstance: "ELRA_MAIN",
+          }).session(session);
+
+          if (wallet) {
+            // Find the project transaction in reserved funds
+            const projectTransaction = wallet.transactions.find(
+              (t) =>
+                t.referenceId?.toString() ===
+                  procurement.relatedProject.toString() &&
+                t.referenceType === "project" &&
+                t.type === "allocation"
+            );
+
+            if (projectTransaction) {
+              const category = wallet.budgetCategories.projects;
+              const amountToMove = Math.min(
+                procurement.totalAmount,
+                projectTransaction.amount
+              );
+
+              console.log(
+                `💰 [PROCUREMENT] BEFORE: Available ₦${category.available.toLocaleString()}, Reserved ₦${category.reserved.toLocaleString()}, Used ₦${category.used.toLocaleString()}`
+              );
+
+              // Atomic fund movement
+              category.reserved -= amountToMove;
+              category.used += amountToMove;
+
+              console.log(
+                `💰 [PROCUREMENT] AFTER: Available ₦${category.available.toLocaleString()}, Reserved ₦${category.reserved.toLocaleString()}, Used ₦${category.used.toLocaleString()}`
+              );
+
+              // Add transaction record
+              wallet.transactions.push({
+                type: "expense",
+                amount: amountToMove,
+                description: `Procurement Payment: ${procurement.poNumber} - Funds moved from reserved to used`,
+                reference: procurement.poNumber,
+                referenceId: procurement._id,
+                referenceType: "procurement",
+                createdBy: currentUser._id,
+                balanceAfter: wallet.availableFunds,
+                date: new Date(),
+              });
+
+              await wallet.save({ session });
+              console.log(
+                `✅ [PROCUREMENT] Successfully moved ₦${amountToMove.toLocaleString()} from reserved to used for PO ${
+                  procurement.poNumber
+                }`
+              );
+
+              // Notify Finance HOD about fund movement
+              try {
+                const NotificationService = (
+                  await import("../services/notificationService.js")
+                ).default;
+                const notification = new NotificationService();
+
+                // Find Finance HOD
+                const User = (await import("../models/User.js")).default;
+                const financeHOD = await User.findOne({
+                  "department.name": "Finance & Accounting",
+                  "role.level": { $gte: 700 },
+                }).populate("role department");
+
+                if (financeHOD) {
+                  await notification.createNotification({
+                    recipient: financeHOD._id,
+                    type: "FUNDS_MOVED_TO_USED",
+                    title: "Funds Moved from Reserved to Used",
+                    message: `₦${amountToMove.toLocaleString()} has been moved from reserved to used for Procurement Order ${
+                      procurement.poNumber
+                    } (Project: ${procurement.relatedProject})`,
+                    priority: "medium",
+                    data: {
+                      procurementId: procurement._id,
+                      poNumber: procurement.poNumber,
+                      projectId: procurement.relatedProject,
+                      amount: amountToMove,
+                      movedBy: currentUser._id,
+                      movedAt: new Date(),
+                    },
+                  });
+
+                  console.log(
+                    `📧 [PROCUREMENT] Finance HOD notified about fund movement: ${financeHOD.firstName} ${financeHOD.lastName}`
+                  );
+                } else {
+                  console.log(
+                    `⚠️ [PROCUREMENT] Finance HOD not found to notify about fund movement`
+                  );
+                }
+              } catch (notificationError) {
+                console.error(
+                  `❌ [PROCUREMENT] Error notifying Finance HOD:`,
+                  notificationError
+                );
+                // Don't throw error to avoid breaking the transaction
+              }
+            } else {
+              console.log(
+                `⚠️ [PROCUREMENT] No reserved funds found for project ${procurement.relatedProject}`
+              );
+            }
+          }
+        });
+      } catch (walletError) {
+        console.error(
+          `❌ [PROCUREMENT] Error moving funds from reserved to used:`,
+          walletError
+        );
+        // Don't throw error to avoid breaking the payment process
+      } finally {
+        await session.endSession();
+      }
+    }
+
     // Create transaction record for audit trail
     try {
       const paymentData = {
@@ -1193,7 +1324,8 @@ export const markAsPaid = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Procurement order marked as paid successfully",
+      message:
+        "Procurement order marked as paid successfully. Funds have been moved from reserved to used in the ELRA wallet.",
       data: updatedProcurement,
     });
   } catch (error) {

@@ -33,9 +33,9 @@ import ITSupport from "./pages/user/modules/self-service/ITSupport";
 import EquipmentRequests from "./pages/user/modules/self-service/EquipmentRequests";
 import MyLeaveRequests from "./pages/user/modules/self-service/MyLeaveRequests";
 import MyDocuments from "./pages/user/modules/self-service/MyDocuments";
+import MyArchive from "./pages/user/modules/self-service/MyArchive";
 import MyProjectTasks from "./pages/user/modules/self-service/MyProjectTasks";
 import MyProjects from "./pages/user/modules/self-service/MyProjects";
-
 import {
   DepartmentManagement as DeptManagement,
   LeaveManagement as DeptLeaveManagement,
@@ -43,7 +43,17 @@ import {
   ApprovalHistory,
   TeamManagement,
   Analytics,
+  UserManagement,
+  CreateDepartmentProject,
 } from "./pages/user/modules/department-management";
+import {
+  Communication,
+  InternalMessages,
+  TeamChats,
+  FileSharing,
+  Announcements,
+  EventsCalendar,
+} from "./pages/user/modules/communication";
 import PayrollReports from "./pages/user/modules/payroll/PayrollReports";
 import Notifications from "./pages/shared/Notifications";
 import Settings from "./pages/shared/Settings";
@@ -54,6 +64,7 @@ import ProjectReports from "./pages/user/modules/projects/ProjectReports";
 import ProjectProgress from "./pages/user/modules/projects/ProjectProgress";
 import ProjectResources from "./pages/user/modules/projects/ProjectResources";
 import ApprovalDashboard from "./pages/user/modules/projects/ApprovalDashboard";
+import ExternalProjectManagement from "./pages/user/modules/projects/ExternalProjectManagement";
 import TaskList from "./pages/user/modules/tasks/TaskList";
 import TaskAnalytics from "./pages/user/modules/tasks/TaskAnalytics";
 import TaskAssignments from "./pages/user/modules/tasks/TaskAssignments";
@@ -62,10 +73,10 @@ import ELRAWalletManagement from "./pages/user/modules/finance/ELRAWalletManagem
 import TransactionHistoryAndReports from "./pages/user/modules/finance/TransactionHistoryAndReports";
 import BudgetAllocation from "./pages/user/modules/finance/BudgetAllocation";
 import PayrollApprovals from "./pages/user/modules/finance/PayrollApprovals";
+import SalesMarketingApprovals from "./pages/user/modules/finance/SalesMarketingApprovals";
 import {
   SalesMarketingDashboard,
   SalesMarketingTransactions,
-  SalesMarketingApprovals,
   SalesMarketingReports,
 } from "./pages/user/modules/sales-marketing";
 import ProcurementManagement from "./pages/user/modules/procurement/ProcurementManagement";
@@ -231,6 +242,11 @@ const AppRoutes = () => {
           path="modules/self-service/documents"
           element={<MyDocuments />}
         />
+        <Route
+          path="modules/self-service/my-documents"
+          element={<MyDocuments />}
+        />
+        <Route path="modules/self-service/my-archive" element={<MyArchive />} />
         <Route path="modules/self-service/tickets" element={<SubmitTicket />} />
         <Route path="modules/self-service/my-tickets" element={<MyTickets />} />
         <Route path="modules/self-service/it-support" element={<ITSupport />} />
@@ -268,6 +284,30 @@ const AppRoutes = () => {
           path="modules/department-management/analytics"
           element={<Analytics />}
         />
+        <Route
+          path="modules/department-management/users"
+          element={<UserManagement />}
+        />
+        <Route
+          path="modules/department-management/create-department-project"
+          element={<CreateDepartmentProject />}
+        />
+
+        <Route path="modules/communication" element={<Communication />} />
+        <Route
+          path="modules/communication/messages"
+          element={<InternalMessages />}
+        />
+        <Route path="modules/communication/teams" element={<TeamChats />} />
+        <Route path="modules/communication/files" element={<FileSharing />} />
+        <Route
+          path="modules/communication/announcements"
+          element={<Announcements />}
+        />
+        <Route
+          path="modules/communication/events"
+          element={<EventsCalendar />}
+        />
 
         <Route path="modules/payroll/reports" element={<PayrollReports />} />
 
@@ -276,6 +316,10 @@ const AppRoutes = () => {
         <Route
           path="modules/projects/analytics"
           element={<ProjectAnalytics />}
+        />
+        <Route
+          path="modules/projects/external"
+          element={<ExternalProjectManagement />}
         />
         <Route path="modules/projects/teams" element={<ProjectTeams />} />
         <Route path="modules/projects/reports" element={<ProjectReports />} />
@@ -309,6 +353,10 @@ const AppRoutes = () => {
         <Route
           path="modules/finance/payroll-approvals"
           element={<PayrollApprovals />}
+        />
+        <Route
+          path="modules/finance/sales-marketing-approvals"
+          element={<SalesMarketingApprovals />}
         />
 
         {/* Procurement Module Routes */}

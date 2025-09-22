@@ -1157,6 +1157,102 @@ export const userModulesAPI = {
       }
     },
 
+    submitForApproval: async (payrollData) => {
+      try {
+        console.log(
+          "📋 [payrollAPI] Submitting payroll for approval:",
+          payrollData
+        );
+        const response = await api.post("/payroll/submit-for-approval", {
+          payrollData,
+        });
+        console.log(
+          "✅ [payrollAPI] Submit for approval response:",
+          response.data
+        );
+        return response.data;
+      } catch (error) {
+        console.error("❌ [payrollAPI] Error submitting for approval:", error);
+        throw error;
+      }
+    },
+
+    getPayrollPreviewForHR: async (approvalId) => {
+      try {
+        console.log(
+          "📋 [payrollAPI] Getting payroll preview for HR:",
+          approvalId
+        );
+        const response = await api.get(`/payroll/preview/${approvalId}`);
+        console.log(
+          "✅ [payrollAPI] Payroll preview for HR response:",
+          response.data
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [payrollAPI] Error getting payroll preview for HR:",
+          error
+        );
+        throw error;
+      }
+    },
+
+    getPendingApprovals: async () => {
+      try {
+        console.log("📋 [payrollAPI] Getting pending payroll approvals...");
+        const response = await api.get("/payroll/approvals/pending");
+        console.log(
+          "✅ [payrollAPI] Pending approvals response:",
+          response.data
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [payrollAPI] Error getting pending approvals:",
+          error
+        );
+        throw error;
+      }
+    },
+
+    resendToFinance: async (approvalId) => {
+      try {
+        console.log("📋 [payrollAPI] Resending to finance:", approvalId);
+        const response = await api.post(
+          `/payroll/approvals/${approvalId}/resend`
+        );
+        console.log(
+          "✅ [payrollAPI] Resend to finance response:",
+          response.data
+        );
+        return response.data;
+      } catch (error) {
+        console.error("❌ [payrollAPI] Error resending to finance:", error);
+        throw error;
+      }
+    },
+
+    processApprovedPayroll: async (approvalId) => {
+      try {
+        console.log("📋 [payrollAPI] Processing approved payroll:", approvalId);
+        const response = await api.post(
+          `/payroll/process-approved/${approvalId}`
+        );
+        console.log(
+          "✅ [payrollAPI] Process approved payroll response:",
+          response.data
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [payrollAPI] Error processing approved payroll:",
+          error
+        );
+        throw error;
+      }
+    },
+
     getPayrollSummary: async (month, year) => {
       try {
         console.log("📋 [payrollAPI] Getting payroll summary:", {

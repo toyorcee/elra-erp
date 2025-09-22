@@ -7,6 +7,7 @@ import {
   updateProject,
   deleteProject,
   getNextProjectCode,
+  getNextExternalProjectCode,
   getProjectStats,
   getComprehensiveProjectData,
   getProjectsAvailableForTeams,
@@ -23,9 +24,13 @@ import {
   getProjectManagementPendingApprovalProjects,
   getHODApprovalHistory,
   getCrossDepartmentalApprovalHistory,
+  getProjectApprovalReports,
+  exportProjectApprovalReport,
   getProjectAuditTrail,
   getMyProjects,
   getProjectAnalytics,
+  getProjectDashboard,
+  getProjectBudget,
   getProjectProgress,
   completeRegulatoryCompliance,
   getRegulatoryComplianceStatus,
@@ -36,6 +41,7 @@ import {
   getProjectCategories,
   processProjectReimbursement,
   completeDepartmentalProjectImplementation,
+  addVendorToProject,
 } from "../controllers/projectController.js";
 import { protect, checkRole } from "../middleware/auth.js";
 import {
@@ -187,6 +193,9 @@ router.get("/categories", protect, getProjectCategories);
 // Get next project code - STAFF+ (300+)
 router.get("/next-code", checkRole(300), getNextProjectCode);
 
+// Get next external project code - Project Management HOD only
+router.get("/next-external-code", checkRole(700), getNextExternalProjectCode);
+
 // Get project statistics - Manager+
 router.get("/stats", checkRole(600), getProjectStats);
 
@@ -230,8 +239,17 @@ router.get(
   getCrossDepartmentalApprovalHistory
 );
 
+// Project approval reports - HOD+ only
+router.get("/approval-reports", checkRole(700), getProjectApprovalReports);
+
 // Analytics route - HOD+ only
 router.get("/analytics", checkRole(700), getProjectAnalytics);
+
+// Dashboard route - HOD+ only
+router.get("/dashboard", checkRole(700), getProjectDashboard);
+
+// Budget route - HOD+ only
+router.get("/budget", checkRole(700), getProjectBudget);
 
 // Inventory workflow route - Operations HOD only
 router.get("/inventory-workflow", checkRole(700), getProjectsNeedingInventory);
@@ -300,6 +318,9 @@ router.delete(
 router.post("/:id/team", checkRole(600), validateTeamMember, addTeamMember);
 router.delete("/:id/team/:userId", checkRole(600), removeTeamMember);
 
+// Add vendor to project - Project Management HOD or Super Admin
+router.post("/:projectId/add-vendor", checkRole(700), addVendorToProject);
+
 // Notes routes - STAFF+ (300+) - All staff can add notes to projects they're involved in
 router.post("/:id/notes", checkRole(300), validateNote, addProjectNote);
 
@@ -328,5 +349,12 @@ router.post(
 
 // Process project reimbursement - Finance HOD+
 router.post("/:id/reimburse", checkRole(700), processProjectReimbursement);
+
+// Export routes
+router.get(
+  "/approval-reports/export",
+  checkRole(700),
+  exportProjectApprovalReport
+);
 
 export default router;

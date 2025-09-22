@@ -99,6 +99,15 @@ export const sidebarConfig = [
     departments: ["all"],
   },
   {
+    label: "Communication",
+    icon: "HiOutlineChatBubbleLeftRight",
+    path: "/dashboard/modules/communication",
+    required: { minLevel: 100 },
+    section: "erp",
+    badge: "Chat",
+    departments: ["all"], // Universal access for all departments
+  },
+  {
     label: "Payroll Management",
     icon: "HiOutlineCurrencyDollar",
     path: "/dashboard/modules/payroll",
@@ -143,7 +152,7 @@ export const sidebarConfig = [
     required: { minLevel: 600 },
     section: "erp",
     badge: "Inv",
-    departments: ["Operations"], 
+    departments: ["Operations"],
   },
 
   // ===== SYSTEM MANAGEMENT =====

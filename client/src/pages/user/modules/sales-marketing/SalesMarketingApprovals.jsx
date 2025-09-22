@@ -331,7 +331,7 @@ const SalesMarketingApprovals = () => {
           data={approvals}
           columns={approvalColumns}
           loading={loading}
-          searchable={true}
+          searchable={false}
           pagination={true}
           pageSize={10}
         />

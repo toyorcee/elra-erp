@@ -92,7 +92,9 @@ departmentSchema.pre("save", async function (next) {
       const Module = mongoose.model("Module");
 
       const universalModules = await Module.find({
-        code: { $in: ["SELF_SERVICE", "CUSTOMER_CARE", "PROJECTS"] },
+        code: {
+          $in: ["SELF_SERVICE", "CUSTOMER_CARE", "PROJECTS", "COMMUNICATION"],
+        },
         isActive: true,
       });
 

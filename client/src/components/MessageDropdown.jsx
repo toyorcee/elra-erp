@@ -60,7 +60,11 @@ const MessageDropdown = ({ isOpen, onClose }) => {
   const [showChat, setShowChat] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [availableUsers, setAvailableUsers] = useState([]);
+  const [recentConversations, setRecentConversations] = useState([]);
+  const [allRecentConversations, setAllRecentConversations] = useState([]);
+  const [userRole, setUserRole] = useState(null);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [showAllRecent, setShowAllRecent] = useState(false);
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -221,13 +225,22 @@ const MessageDropdown = ({ isOpen, onClose }) => {
       const response = await messageService.getAvailableUsers(searchTerm);
       if (response.success) {
         setAvailableUsers(response.data || []);
+        const recentConvs = response.recentConversations || [];
+        setAllRecentConversations(recentConvs);
+        setRecentConversations(recentConvs.slice(0, 5));
+        setUserRole(response.userRole || null);
       } else {
         console.error("❌ Failed to get available users:", response);
         setAvailableUsers([]);
+        setRecentConversations([]);
+        setAllRecentConversations([]);
+        setUserRole(null);
       }
     } catch (error) {
       console.error("Error fetching available users:", error);
       setAvailableUsers([]);
+      setRecentConversations([]);
+      setUserRole(null);
     } finally {
       setIsLoadingUsers(false);
     }
@@ -250,6 +263,63 @@ const MessageDropdown = ({ isOpen, onClose }) => {
       })
       .slice(0, 10);
     return result;
+  };
+
+  // Get role-based access information
+  const getRoleBasedInfo = () => {
+    if (!userRole)
+      return { title: "Loading...", description: "Please wait..." };
+
+    const roleLevel = userRole.level;
+
+    if (roleLevel >= 1000) {
+      return {
+        title: "Chat with Everyone",
+        description:
+          "As a Super Admin, you can chat with anyone in the organization.",
+        icon: "👑",
+      };
+    } else if (roleLevel >= 700) {
+      return {
+        title: "Department & HOD Access",
+        description:
+          "You can chat with anyone in your department and fellow HODs.",
+        icon: "👔",
+      };
+    } else if (roleLevel >= 600) {
+      return {
+        title: "Manager Access",
+        description:
+          "You can chat with HODs and higher roles in your department.",
+        icon: "📋",
+      };
+    } else if (roleLevel >= 300) {
+      return {
+        title: "Staff Access",
+        description:
+          "You can chat with HODs and higher roles in your department.",
+        icon: "👤",
+      };
+    } else {
+      return {
+        title: "Viewer Access",
+        description:
+          "You can chat with HODs and higher roles in your department.",
+        icon: "👁️",
+      };
+    }
+  };
+
+  const roleInfo = getRoleBasedInfo();
+
+  // Toggle showing all recent conversations
+  const toggleShowAllRecent = () => {
+    setShowAllRecent(!showAllRecent);
+    if (!showAllRecent) {
+      setRecentConversations(allRecentConversations);
+    } else {
+      setRecentConversations(allRecentConversations.slice(0, 5));
+    }
   };
 
   // Load conversations and available users on mount
@@ -335,7 +405,13 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                     <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-[var(--elra-text-muted)]" />
                     <input
                       type="text"
-                      placeholder="Search users to start a conversation..."
+                      placeholder={
+                        userRole?.level >= 1000
+                          ? "Search anyone in the organization..."
+                          : userRole?.level >= 700
+                          ? "Search department users or fellow HODs..."
+                          : "Search HODs and higher roles in your department..."
+                      }
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-full pl-10 pr-4 py-2 border border-[var(--elra-border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-border-focus)] text-sm bg-white"
@@ -427,6 +503,81 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                         Start a new conversation with someone:
                       </p>
 
+                      {/* Role-based Access Info */}
+                      {userRole && (
+                        <div className="w-full mb-6 p-4 bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-secondary-2)] rounded-lg text-white">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-lg">{roleInfo.icon}</span>
+                            <h4 className="font-semibold text-sm">
+                              {roleInfo.title}
+                            </h4>
+                          </div>
+                          <p className="text-xs opacity-90">
+                            {roleInfo.description}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Recent Conversations for ALL users (like WhatsApp) */}
+                      {recentConversations.length > 0 && (
+                        <div className="w-full mb-6">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="text-sm font-medium text-[var(--elra-text-primary)]">
+                              Recent Conversations:
+                            </div>
+                            {allRecentConversations.length > 5 && (
+                              <button
+                                onClick={toggleShowAllRecent}
+                                className="text-xs text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] font-medium transition-colors"
+                              >
+                                {showAllRecent
+                                  ? "Show Less"
+                                  : `Show All (${allRecentConversations.length})`}
+                              </button>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            {recentConversations.map((user) => (
+                              <div
+                                key={user._id}
+                                onClick={() => handleStartNewConversation(user)}
+                                className="flex items-center gap-3 p-3 bg-[var(--elra-secondary-3)] rounded-lg cursor-pointer transition-colors border border-[var(--elra-border-primary)] hover:border-[var(--elra-primary)] hover:shadow-sm"
+                              >
+                                <div className="relative">
+                                  <div className="w-8 h-8 rounded-full overflow-hidden">
+                                    {getAvatarDisplay(user)}
+                                  </div>
+                                  <div
+                                    className={`absolute -bottom-1 -right-1 w-2 h-2 rounded-full border border-white ${
+                                      onlineUsers.has(user._id)
+                                        ? "bg-green-500"
+                                        : "bg-gray-400"
+                                    }`}
+                                  ></div>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-medium text-[var(--elra-text-primary)] text-sm truncate">
+                                    {getDisplayName(user)}
+                                  </h4>
+                                  <p className="text-xs text-[var(--elra-text-secondary)] truncate">
+                                    {user.email}
+                                  </p>
+                                  <p className="text-xs text-[var(--elra-text-muted)] truncate">
+                                    {user.department?.name} {user.role?.name}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <ChatBubbleLeftRightIcon className="h-4 w-4 text-[var(--elra-primary)]" />
+                                  <span className="text-xs text-[var(--elra-primary)] font-medium">
+                                    Continue
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Available Users */}
                       <div className="w-full space-y-2">
                         {isLoadingUsers ? (
@@ -475,7 +626,7 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                                 </div>
                               </div>
                             ))}
-                            <div className="mt-12 p-3 bg-[var(--elra-primary)] rounded-lg">
+                            <div className="mt-6 p-3 bg-[var(--elra-primary)] rounded-lg">
                               <p className="text-xs text-white">
                                 💡 <strong>Tip:</strong> Click on any user above
                                 to start a conversation, or use the search bar

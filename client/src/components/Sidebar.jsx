@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import ProfileMenu from "./ProfileMenu";
 import {
   HomeIcon,
   UsersIcon,
@@ -60,7 +59,6 @@ import {
   getNavigationForRole,
   getRoleInfo,
   hasSectionAccess,
-  getModulesForUser,
 } from "../config/sidebarConfig";
 import { userModulesAPI } from "../services/userModules.js";
 import { useAuth } from "../context/AuthContext";

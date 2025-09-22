@@ -73,6 +73,478 @@ export const generatePDF = async (
  * @param {Object} projectData - Project information
  * @returns {Buffer}
  */
+// Generate client project details PDF
+export const generateClientProjectPDF = async (clientData, projectData) => {
+  try {
+    console.log("🔍 [CLIENT PDF DEBUG] Generating PDF with data:");
+    console.log("  - Project Name:", projectData.name);
+    console.log("  - Client Name:", clientData.clientName);
+    console.log("  - Project Items:", projectData.projectItems?.length || 0);
+    console.log("  - Budget Percentage:", projectData.budgetPercentage);
+    console.log("  - Budget:", projectData.budget);
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    // Helper function to add new page if needed
+    const addPageIfNeeded = (requiredSpace) => {
+      let currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 55;
+
+      const pageHeight = doc.internal.pageSize.height;
+      const margin = 60;
+
+      if (currentY + requiredSpace > pageHeight - margin) {
+        doc.addPage();
+
+        doc.setGState(new doc.GState({ opacity: 0.05 }));
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(100);
+        const pageWidth = doc.internal.pageSize.width;
+        const newPageHeight = doc.internal.pageSize.height;
+        doc.text("ELRA", pageWidth / 2, newPageHeight / 2, {
+          align: "center",
+          angle: 30,
+          renderingMode: "fill",
+        });
+        doc.setGState(new doc.GState({ opacity: 1 }));
+
+        return 30; // Start further down on new page
+      }
+      return currentY;
+    };
+
+    // Set watermark with reduced opacity and size
+    doc.setGState(new doc.GState({ opacity: 0.05 }));
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(100);
+
+    // Calculate the center of the page
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+
+    // Position watermark
+    doc.text("ELRA", pageWidth / 2, pageHeight / 2, {
+      align: "center",
+      angle: 30,
+      renderingMode: "fill",
+    });
+
+    // Reset opacity for rest of the content
+    doc.setGState(new doc.GState({ opacity: 1 }));
+
+    // Header (same branding as vendor receipt)
+    const elraGreen = [13, 100, 73];
+    doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+    doc.setFontSize(32);
+    doc.setFont("helvetica", "bold");
+    doc.text("ELRA", 105, 25, { align: "center" });
+
+    // Reset to black for other text
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "normal");
+    doc.text("Project Partnership Agreement", 105, 35, {
+      align: "center",
+    });
+
+    // Add date
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 45);
+
+    let yPosition = 55;
+
+    // Project Information Section
+    yPosition = addPageIfNeeded(50); // Check if we need a new page
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Project Information", 20, yPosition);
+    yPosition += 15;
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Project Name: ${projectData.name}`, 20, yPosition);
+    yPosition += 10;
+    doc.text(`Project Code: ${projectData.code || "TBD"}`, 20, yPosition);
+    yPosition += 10;
+    doc.text(
+      `Category: ${projectData.category || "Not specified"}`,
+      20,
+      yPosition
+    );
+    yPosition += 10;
+    doc.text(
+      `Priority: ${
+        projectData.priority ? projectData.priority.toUpperCase() : "Medium"
+      }`,
+      20,
+      yPosition
+    );
+    yPosition += 10;
+    doc.text(
+      `Start Date: ${new Date(projectData.startDate).toLocaleDateString()}`,
+      20,
+      yPosition
+    );
+    yPosition += 10;
+    doc.text(
+      `End Date: ${new Date(projectData.endDate).toLocaleDateString()}`,
+      20,
+      yPosition
+    );
+    yPosition += 10;
+    doc.text(
+      `Total Budget: ₦${new Intl.NumberFormat().format(projectData.budget)}`,
+      20,
+      yPosition
+    );
+    yPosition += 20;
+
+    // Client Information Section
+    yPosition = addPageIfNeeded(50); // Check if we need a new page
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Client Information", 20, yPosition);
+    yPosition += 15;
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Client Name: ${clientData.clientName}`, 20, yPosition);
+    yPosition += 10;
+    doc.text(`Company: ${clientData.clientCompany}`, 20, yPosition);
+    yPosition += 10;
+    doc.text(`Email: ${clientData.clientEmail}`, 20, yPosition);
+    yPosition += 10;
+    if (clientData.clientPhone) {
+      doc.text(`Phone: ${clientData.clientPhone}`, 20, yPosition);
+      yPosition += 10;
+    }
+    if (clientData.clientAddress) {
+      doc.text(`Address: ${clientData.clientAddress}`, 20, yPosition);
+      yPosition += 10;
+    }
+    yPosition += 20;
+
+    // Budget Allocation Section
+    yPosition = addPageIfNeeded(80);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Budget Allocation Agreement", 20, yPosition);
+    yPosition += 15;
+
+    // Calculate budget allocation
+    const elraPercentage = parseFloat(projectData.budgetPercentage) || 100;
+    const clientPercentage = 100 - elraPercentage;
+    const elraAmount = (parseFloat(projectData.budget) * elraPercentage) / 100;
+    const clientAmount =
+      (parseFloat(projectData.budget) * clientPercentage) / 100;
+
+    console.log("🔍 [CLIENT PDF BUDGET DEBUG]:");
+    console.log("  - Raw budgetPercentage:", projectData.budgetPercentage);
+    console.log("  - Parsed elraPercentage:", elraPercentage);
+    console.log("  - clientPercentage:", clientPercentage);
+    console.log("  - elraAmount:", elraAmount);
+    console.log("  - clientAmount:", clientAmount);
+
+    // Create budget allocation table
+    const budgetData = [
+      [
+        "Total Project Budget",
+        `₦${new Intl.NumberFormat().format(projectData.budget)}`,
+      ],
+      [
+        "ELRA Handles",
+        `${elraPercentage}% (₦${new Intl.NumberFormat().format(elraAmount)})`,
+      ],
+    ];
+
+    if (clientPercentage > 0) {
+      budgetData.push([
+        "Client Handles",
+        `${clientPercentage}% (₦${new Intl.NumberFormat().format(
+          clientAmount
+        )})`,
+      ]);
+    }
+
+    budgetData.push([
+      "Budget Allocation",
+      projectData.requiresBudgetAllocation ? "✅ Required" : "❌ Not Required",
+    ]);
+
+    autoTable(doc, {
+      head: [["Item", "Amount"]],
+      body: budgetData,
+      startY: yPosition,
+      theme: "grid",
+      headStyles: {
+        fillColor: [13, 100, 73],
+        fontSize: 12,
+        fontStyle: "bold",
+        textColor: [255, 255, 255],
+        cellPadding: 6,
+      },
+      styles: {
+        fontSize: 11,
+        cellPadding: 6,
+        lineWidth: 0.5,
+        lineColor: [50, 50, 50],
+      },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 80 },
+        1: { cellWidth: "auto", halign: "right" },
+      },
+      alternateRowStyles: {
+        fillColor: [248, 249, 250],
+      },
+      margin: { left: 20, right: 20 },
+      tableWidth: "auto",
+      pageBreak: "auto",
+    });
+
+    yPosition = doc.lastAutoTable.finalY + 20;
+
+    // Project Items Section
+    if (projectData.projectItems && projectData.projectItems.length > 0) {
+      yPosition = addPageIfNeeded(100);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("Project Items & Deliverables", 20, yPosition);
+      yPosition += 15;
+
+      // Helper function to parse formatted numbers
+      const parseFormattedNumber = (value) => {
+        if (typeof value === "string") {
+          return parseFloat(value.replace(/,/g, "")) || 0;
+        }
+        return parseFloat(value) || 0;
+      };
+
+      // Prepare table data
+      const tableData = projectData.projectItems.map((item, index) => {
+        const unitPrice = parseFormattedNumber(item.unitPrice);
+        const quantity = parseInt(item.quantity) || 1;
+        const total = unitPrice * quantity;
+
+        return [
+          index + 1,
+          item.name,
+          quantity,
+          `₦${new Intl.NumberFormat().format(unitPrice)}`,
+          `₦${new Intl.NumberFormat().format(total)}`,
+          item.deliveryTimeline || "TBD",
+        ];
+      });
+
+      // Add table with better formatting and wider columns
+      autoTable(doc, {
+        head: [["#", "Item Name", "Qty", "Unit Price", "Total", "Timeline"]],
+        body: tableData,
+        startY: yPosition,
+        styles: {
+          fontSize: 12,
+          cellPadding: 6,
+          lineWidth: 0.5,
+          lineColor: [50, 50, 50],
+          halign: "left",
+          valign: "middle",
+        },
+        headStyles: {
+          fillColor: [13, 100, 73],
+          textColor: 255,
+          fontSize: 13,
+          fontStyle: "bold",
+          halign: "center",
+          cellPadding: 7,
+        },
+        alternateRowStyles: {
+          fillColor: [248, 249, 250],
+        },
+        columnStyles: {
+          0: { cellWidth: 18, halign: "center" }, // #
+          1: { cellWidth: 85 }, // Item Name - much wider
+          2: { cellWidth: 25, halign: "center" }, // Qty
+          3: { cellWidth: 40, halign: "right" }, // Unit Price
+          4: { cellWidth: 40, halign: "right" }, // Total
+          5: { cellWidth: 45 }, // Timeline - wider
+        },
+        margin: { left: 15, right: 15 },
+        tableWidth: "wrap",
+        showHead: "everyPage",
+        pageBreak: "auto",
+        didDrawPage: function (data) {
+          // Add page number
+          doc.setFontSize(10);
+          doc.setTextColor(128, 128, 128);
+          const pageCount = doc.internal.getNumberOfPages();
+          const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+          doc.text(
+            `Page ${currentPage} of ${pageCount}`,
+            doc.internal.pageSize.width - 20,
+            doc.internal.pageSize.height - 10,
+            { align: "right" }
+          );
+        },
+      });
+
+      yPosition = doc.lastAutoTable.finalY + 10;
+
+      // Calculate and display total
+      const grandTotal = projectData.projectItems.reduce((sum, item) => {
+        const unitPrice = parseFormattedNumber(item.unitPrice);
+        const quantity = parseInt(item.quantity) || 1;
+        return sum + unitPrice * quantity;
+      }, 0);
+
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text(
+        `Total Project Cost: ₦${new Intl.NumberFormat().format(grandTotal)}`,
+        20,
+        yPosition
+      );
+      yPosition += 15;
+    }
+
+    // Vendor Information Section (if vendor exists)
+    if (projectData.hasVendor && projectData.vendorName) {
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("Vendor Information", 20, yPosition);
+      yPosition += 10;
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Vendor Name: ${projectData.vendorName}`, 20, yPosition);
+      yPosition += 7;
+      if (projectData.vendorEmail) {
+        doc.text(`Vendor Email: ${projectData.vendorEmail}`, 20, yPosition);
+        yPosition += 7;
+      }
+      if (projectData.vendorPhone) {
+        doc.text(`Vendor Phone: ${projectData.vendorPhone}`, 20, yPosition);
+        yPosition += 7;
+      }
+      if (projectData.vendorAddress) {
+        doc.text(`Vendor Address: ${projectData.vendorAddress}`, 20, yPosition);
+        yPosition += 7;
+      }
+      if (projectData.deliveryAddress) {
+        doc.text(
+          `Delivery Address: ${projectData.deliveryAddress}`,
+          20,
+          yPosition
+        );
+        yPosition += 7;
+      }
+      yPosition += 10;
+    }
+
+    // Approval Process Section
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Approval Process", 20, yPosition);
+    yPosition += 10;
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    const approvalFlow =
+      projectData.requiresBudgetAllocation === "true"
+        ? "Legal → Finance Review → Executive → Budget Allocation"
+        : "Legal → Executive (using existing budget)";
+
+    doc.text(`Approval Flow: ${approvalFlow}`, 20, yPosition);
+    yPosition += 7;
+    doc.text(`Status: Project submitted and pending approval`, 20, yPosition);
+    yPosition += 7;
+    doc.text(
+      `Next Steps: Our team will review and process your project request`,
+      20,
+      yPosition
+    );
+    yPosition += 15;
+
+    yPosition = addPageIfNeeded(80);
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("CLIENT ACKNOWLEDGMENT", 20, yPosition);
+    yPosition += 20;
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("Client Name: _________________________", 20, yPosition);
+    yPosition += 12;
+
+    doc.text("Authorized Signature: _________________________", 20, yPosition);
+    yPosition += 12;
+
+    doc.text("Date: _________________________", 20, yPosition);
+    yPosition += 12;
+    doc.text("Company Stamp/Seal:", 20, yPosition);
+    yPosition += 20;
+
+    // Signature box
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    doc.rect(20, yPosition, 80, 30);
+    doc.text("Please sign and stamp here", 25, yPosition + 20);
+    yPosition += 40;
+
+    // Acknowledgment text
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "italic");
+    doc.text(
+      "By signing above, I acknowledge receipt of this project proposal and agree to the terms outlined.",
+      20,
+      yPosition
+    );
+    yPosition += 15;
+
+    // Footer
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      "This document serves as confirmation of your project partnership with ELRA.",
+      20,
+      yPosition
+    );
+    yPosition += 7;
+    doc.text("Please keep this document for your records.", 20, yPosition);
+
+    // Add page numbers
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text(
+        `Page ${i} of ${pageCount}`,
+        105,
+        doc.internal.pageSize.height - 10,
+        { align: "center" }
+      );
+    }
+
+    // Add metadata
+    doc.setProperties({
+      title: "Project Partnership Agreement",
+      subject: "ELRA Project Partnership",
+      author: "ELRA System",
+      creator: "ELRA PDF Generator",
+    });
+
+    return Buffer.from(doc.output("arraybuffer"));
+  } catch (error) {
+    console.error("Client project PDF generation error:", error);
+    throw new Error("Failed to generate client project PDF");
+  }
+};
+
 export const generateVendorReceiptPDF = async (vendorData, projectData) => {
   try {
     // Debug logging for PDF generation
@@ -92,15 +564,10 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
     // Helper function to add new page if needed
     const addPageIfNeeded = (requiredSpace) => {
       // Get current Y position more accurately
-      let currentY = 45;
-      if (doc.lastAutoTable && doc.lastAutoTable.finalY) {
-        currentY = doc.lastAutoTable.finalY;
-      } else {
-        currentY = doc.internal.getCurrentPageInfo().pageNumber > 1 ? 20 : 45;
-      }
+      let currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 55;
 
       const pageHeight = doc.internal.pageSize.height;
-      const margin = 30;
+      const margin = 60; // Increased margin for better spacing
 
       if (currentY + requiredSpace > pageHeight - margin) {
         doc.addPage();
@@ -118,7 +585,7 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
         });
         doc.setGState(new doc.GState({ opacity: 1 }));
 
-        return 20;
+        return 30; // Start further down on new page
       }
       return currentY;
     };
@@ -165,26 +632,37 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
     let yPosition = 55;
 
     // Vendor Information Section
+    yPosition = addPageIfNeeded(80);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("Vendor Information", 20, yPosition);
-    yPosition += 10;
+    yPosition += 20;
 
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
     doc.text(`Company Name: ${vendorData.name}`, 20, yPosition);
-    yPosition += 7;
+    yPosition += 12;
 
     // Add email if available
     if (vendorData.email) {
       doc.text(`Email: ${vendorData.email}`, 20, yPosition);
-      yPosition += 7;
+      yPosition += 12;
     }
 
     // Add phone if available
     if (vendorData.phone) {
       doc.text(`Phone: ${vendorData.phone}`, 20, yPosition);
-      yPosition += 7;
+      yPosition += 12;
+    }
+
+    // Add delivery address if available
+    if (projectData.deliveryAddress) {
+      doc.text(
+        `Delivery Address: ${projectData.deliveryAddress}`,
+        20,
+        yPosition
+      );
+      yPosition += 12;
     }
 
     doc.text(
@@ -192,7 +670,7 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
       20,
       yPosition
     );
-    yPosition += 7;
+    yPosition += 12;
 
     if (
       projectData.vendorCategory &&
@@ -203,34 +681,35 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
         " "
       );
       doc.text(`Category: ${formattedVendorCategory}`, 20, yPosition);
-      yPosition += 7;
+      yPosition += 10;
     }
 
     doc.text(`Status: Pending Approval`, 20, yPosition);
-    yPosition += 7;
+    yPosition += 10;
     doc.text(
       `Registration Date: ${new Date().toLocaleDateString()}`,
       20,
       yPosition
     );
-    yPosition += 15;
+    yPosition += 20;
 
     // Project Information Section
+    yPosition = addPageIfNeeded(100); // Check if we need a new page
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("Project Information", 20, yPosition);
-    yPosition += 10;
+    yPosition += 20;
 
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
     doc.text(`Project Name: ${projectData.name}`, 20, yPosition);
-    yPosition += 7;
+    yPosition += 12;
 
     // Add project category if available
     if (projectData.category && projectData.category !== "Not specified") {
       const formattedCategory = projectData.category.replace(/_/g, " ");
       doc.text(`Category: ${formattedCategory}`, 20, yPosition);
-      yPosition += 7;
+      yPosition += 12;
     }
 
     // Add project manager if available
@@ -239,7 +718,7 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
       projectData.projectManager !== "Not assigned"
     ) {
       doc.text(`Project Manager: ${projectData.projectManager}`, 20, yPosition);
-      yPosition += 7;
+      yPosition += 12;
     }
 
     // Add project priority if available
@@ -248,15 +727,16 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
         projectData.priority.charAt(0).toUpperCase() +
         projectData.priority.slice(1);
       doc.text(`Priority: ${priorityText}`, 20, yPosition);
-      yPosition += 7;
+      yPosition += 12;
     }
 
     // Add project scope
-    const projectScopeText =
-      projectData.projectScope.charAt(0).toUpperCase() +
-      projectData.projectScope.slice(1);
+    const projectScopeText = projectData.projectScope
+      ? projectData.projectScope.charAt(0).toUpperCase() +
+        projectData.projectScope.slice(1)
+      : "External";
     doc.text(`Scope: ${projectScopeText}`, 20, yPosition);
-    yPosition += 7;
+    yPosition += 12;
 
     doc.text(
       `Budget: NGN ${projectData.budget.toLocaleString("en-NG", {
@@ -266,19 +746,19 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
       20,
       yPosition
     );
-    yPosition += 7;
+    yPosition += 10;
     doc.text(
       `Start Date: ${new Date(projectData.startDate).toLocaleDateString()}`,
       20,
       yPosition
     );
-    yPosition += 7;
+    yPosition += 10;
     doc.text(
       `End Date: ${new Date(projectData.endDate).toLocaleDateString()}`,
       20,
       yPosition
     );
-    yPosition += 7;
+    yPosition += 10;
 
     // Add budget allocation information only if requested
     if (
@@ -286,17 +766,17 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
       projectData.requiresBudgetAllocation === true
     ) {
       doc.text(`Budget Allocation: Requested`, 20, yPosition);
-      yPosition += 7;
+      yPosition += 10;
     }
 
-    yPosition += 8;
+    yPosition += 15;
 
-    // Project Items Table
     if (projectData.projectItems && projectData.projectItems.length > 0) {
+      yPosition = addPageIfNeeded(120);
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
       doc.text("Project Items", 20, yPosition);
-      yPosition += 10;
+      yPosition += 20;
 
       const headers = [
         "Item",
@@ -305,22 +785,33 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
         "Unit Price",
         "Total",
       ];
-      const rows = projectData.projectItems.map((item) => [
-        item.name || "N/A",
-        item.description || "N/A",
-        item.quantity || 0,
-        `NGN ${(item.unitPrice || 0).toLocaleString("en-NG", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}`,
-        `NGN ${((item.quantity || 0) * (item.unitPrice || 0)).toLocaleString(
-          "en-NG",
-          {
+      // Helper function to parse formatted numbers
+      const parseFormattedNumber = (value) => {
+        if (typeof value === "string") {
+          return parseFloat(value.replace(/,/g, "")) || 0;
+        }
+        return parseFloat(value) || 0;
+      };
+
+      const rows = projectData.projectItems.map((item) => {
+        const unitPrice = parseFormattedNumber(item.unitPrice);
+        const quantity = parseInt(item.quantity) || 0;
+        const total = unitPrice * quantity;
+
+        return [
+          item.name || "N/A",
+          item.description || "N/A",
+          quantity,
+          `NGN ${unitPrice.toLocaleString("en-NG", {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
-          }
-        )}`,
-      ]);
+          })}`,
+          `NGN ${total.toLocaleString("en-NG", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}`,
+        ];
+      });
 
       autoTable(doc, {
         head: [headers],
@@ -329,35 +820,50 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
         theme: "grid",
         headStyles: {
           fillColor: [13, 100, 73],
-          fontSize: 10,
+          fontSize: 12,
           fontStyle: "bold",
           textColor: [255, 255, 255],
-          cellPadding: 5,
+          cellPadding: 6,
         },
         styles: {
-          fontSize: 9,
-          cellPadding: 5,
-          lineWidth: 0.1,
+          fontSize: 11,
+          cellPadding: 6,
+          lineWidth: 0.5,
+          lineColor: [50, 50, 50],
         },
         columnStyles: {
-          0: { fontStyle: "bold", cellWidth: "auto", cellPadding: 5 }, // Item
-          1: { cellWidth: "auto", cellPadding: 5 }, // Description
-          2: { halign: "center", cellWidth: "auto", cellPadding: 5 }, // Quantity
-          3: { halign: "right", cellWidth: "auto", cellPadding: 5 }, // Unit Price
-          4: { halign: "right", cellWidth: "auto", cellPadding: 5 }, // Total
+          0: { fontStyle: "bold", cellWidth: 60, cellPadding: 6 },
+          1: { cellWidth: 80, cellPadding: 6 },
+          2: { halign: "center", cellWidth: 30, cellPadding: 6 },
+          3: { halign: "right", cellWidth: 40, cellPadding: 6 },
+          4: { halign: "right", cellWidth: 40, cellPadding: 6 },
         },
         alternateRowStyles: {
-          fillColor: [245, 245, 245],
+          fillColor: [248, 249, 250],
         },
         margin: { left: 20, right: 20 },
         tableWidth: "auto",
         pageBreak: "auto",
+        showHead: "everyPage",
         showFoot: "lastPage",
+        didDrawPage: function (data) {
+          // Add page number
+          doc.setFontSize(10);
+          doc.setTextColor(128, 128, 128);
+          const pageCount = doc.internal.getNumberOfPages();
+          const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+          doc.text(
+            `Page ${currentPage} of ${pageCount}`,
+            doc.internal.pageSize.width - 20,
+            doc.internal.pageSize.height - 10,
+            { align: "right" }
+          );
+        },
         didParseCell: function (data) {
           if (data.column.index === 1) {
             const text = data.cell.text.join(" ");
             const words = text.split(" ");
-            const maxWordsPerLine = 6;
+            const maxWordsPerLine = 8; // Increased for wider column
             const lines = [];
 
             for (let i = 0; i < words.length; i += maxWordsPerLine) {
@@ -409,9 +915,10 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
     doc.setFont("helvetica", "normal");
 
     // Add project scope information
-    const scopeText =
-      projectData.projectScope.charAt(0).toUpperCase() +
-      projectData.projectScope.slice(1);
+    const scopeText = projectData.projectScope
+      ? projectData.projectScope.charAt(0).toUpperCase() +
+        projectData.projectScope.slice(1)
+      : "External";
     doc.text(`Project Type: ${scopeText} Project`, 20, yPosition);
     yPosition += 6;
 
@@ -1794,12 +2301,20 @@ export const generateProcurementOrderPDF = async (
     doc.text("Company Stamp/Seal:", 20, yPosition);
     yPosition += 20;
 
-    // Signature box
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.5);
     doc.rect(20, yPosition, 80, 30);
     doc.text("Please sign and stamp here", 25, yPosition + 20);
     yPosition += 40;
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "italic");
+    doc.text(
+      "By signing above, I confirm that we can deliver the items listed above according to the specified timelines and quality standards.",
+      20,
+      yPosition
+    );
+    yPosition += 15;
 
     // Final closing section - Check if we need a new page
     yPosition = addPageIfNeeded(50); // Increased space for both sections

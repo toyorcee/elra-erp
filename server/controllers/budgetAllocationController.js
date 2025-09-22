@@ -4,54 +4,10 @@ import Project from "../models/Project.js";
 import User from "../models/User.js";
 import Notification from "../models/Notification.js";
 
-const notifyEmployeeAboutWallet = async (project, wallet, extraFunds) => {
-  try {
-    console.log(
-      `📧 [WALLET NOTIFICATION] Notifying employee about wallet creation...`
-    );
-
-    const employee = await User.findById(project.createdBy);
-    if (!employee) {
-      console.log("⚠️ [WALLET NOTIFICATION] Employee not found");
-      return;
-    }
-
-    const notification = new Notification({
-      recipient: project.createdBy,
-      type: "WALLET_CREATED",
-      title: "Extra Funds Wallet Created",
-      message: `Your project "${
-        project.name
-      }" has been allocated ₦${extraFunds.toLocaleString()} in extra funds. These funds have been saved in your wallet for future project requests.`,
-      data: {
-        walletId: wallet._id,
-        projectId: project._id,
-        projectName: project.name,
-        projectCode: project.code,
-        extraFunds: extraFunds,
-        walletBalance: wallet.balance,
-        budgetAllocationId: wallet.metadata.createdFromBudgetAllocation,
-      },
-      priority: "medium",
-    });
-
-    await notification.save();
-    console.log(
-      `✅ [WALLET NOTIFICATION] Notification sent to employee: ${employee.email}`
-    );
-  } catch (error) {
-    console.error(
-      "❌ [WALLET NOTIFICATION] Error sending notification:",
-      error
-    );
-  }
-};
-
 // Helper function to notify employee about budget allocation
 const notifyEmployeeAboutBudgetAllocation = async (
   project,
-  budgetAllocation,
-  extraFundsAvailable = 0
+  budgetAllocation
 ) => {
   try {
     console.log(
@@ -65,14 +21,9 @@ const notifyEmployeeAboutBudgetAllocation = async (
       return;
     }
 
-    // Create smart message based on extra funds availability
-    let message = `Your project "${
+    const message = `Your project "${
       project.name
     }" has been allocated ₦${budgetAllocation.allocatedAmount.toLocaleString()}. The procurement process will now begin automatically.`;
-
-    if (extraFundsAvailable > 0) {
-      message += ` Additionally, ₦${extraFundsAvailable.toLocaleString()} in extra funds has been saved in your wallet for future project requests.`;
-    }
 
     const notificationData = {
       budgetAllocationId: budgetAllocation._id,
@@ -82,13 +33,6 @@ const notifyEmployeeAboutBudgetAllocation = async (
       allocatedAmount: budgetAllocation.allocatedAmount,
       projectStatus: project.status,
     };
-
-    if (extraFundsAvailable > 0) {
-      notificationData.extraFundsAvailable = extraFundsAvailable;
-      notificationData.hasExtraFunds = true;
-    } else {
-      notificationData.hasExtraFunds = false;
-    }
 
     const notification = new Notification({
       recipient: project.createdBy,
@@ -214,7 +158,6 @@ export const createBudgetAllocation = async (req, res) => {
     const previousBudget = project ? project.budget : 0;
 
     const baseAmount = projectItemsTotal;
-    const extraFundsAvailable = previousBudget - projectItemsTotal;
     const newBudget = baseAmount;
 
     console.log(`💰 [BUDGET ALLOCATION] Allocation breakdown:`);
@@ -223,9 +166,8 @@ export const createBudgetAllocation = async (req, res) => {
     );
     console.log(`   - Total Allocation: ₦${newBudget.toLocaleString()}`);
 
-    // Check company wallet availability
     try {
-      const ELRAWallet = await import("../models/CompanyWallet.js");
+      const ELRAWallet = await import("../models/ELRAWallet.js");
       const elraWallet = await ELRAWallet.default.getOrCreateWallet(
         "ELRA_MAIN",
         allocatedBy
@@ -256,8 +198,6 @@ export const createBudgetAllocation = async (req, res) => {
       allocationType,
       allocatedAmount: newBudget,
       baseAmount: baseAmount,
-      extraFundsAvailable: 0, // No extra funds - exact cost only
-      extraFundsAllocated: 0, // No extra allocation allowed
       previousBudget: baseAmount,
       newBudget,
       allocatedBy,
@@ -276,7 +216,7 @@ export const createBudgetAllocation = async (req, res) => {
 
     // Reserve funds in ELRA wallet
     try {
-      const ELRAWallet = await import("../models/CompanyWallet.js");
+      const ELRAWallet = await import("../models/ELRAWallet.js");
       const elraWallet = await ELRAWallet.default.getOrCreateWallet(
         "ELRA_MAIN",
         allocatedBy
@@ -299,11 +239,7 @@ export const createBudgetAllocation = async (req, res) => {
     }
 
     // Always notify employee about budget allocation
-    await notifyEmployeeAboutBudgetAllocation(
-      project,
-      budgetAllocation,
-      0 // No extra funds - exact cost only
-    );
+    await notifyEmployeeAboutBudgetAllocation(project, budgetAllocation);
 
     // Auto-approve the budget allocation for project_budget type
     if (allocationType === "project_budget" && project) {
@@ -719,7 +655,7 @@ export const approveBudgetAllocation = async (req, res) => {
 
     // Approve allocation in ELRA wallet
     try {
-      const ELRAWallet = await import("../models/CompanyWallet.js");
+      const ELRAWallet = await import("../models/ELRAWallet.js");
       const elraWallet = await ELRAWallet.default.getOrCreateWallet(
         "ELRA_MAIN",
         approverId
@@ -735,6 +671,74 @@ export const approveBudgetAllocation = async (req, res) => {
         "❌ [ELRA WALLET] Error approving allocation:",
         walletError
       );
+    }
+
+    // Reserve funds for personal and departmental projects after Finance HOD approval
+    if (
+      budgetAllocation.allocationType === "project_budget" &&
+      budgetAllocation.project &&
+      (budgetAllocation.project.projectScope === "personal" ||
+        budgetAllocation.project.projectScope === "departmental")
+    ) {
+      console.log(
+        `💰 [ELRA WALLET] Reserving funds for ${budgetAllocation.project.projectScope} project after Finance HOD approval...`
+      );
+
+      try {
+        const ELRAWallet = await import("../models/ELRAWallet.js");
+        const wallet = await ELRAWallet.default.findOne({
+          elraInstance: "ELRA_MAIN",
+        });
+
+        if (!wallet) {
+          throw new Error("ELRA wallet not found");
+        }
+
+        // Calculate the amount to reserve (full project budget for personal/departmental projects)
+        const amountToReserve = budgetAllocation.project.budget;
+
+        console.log(
+          `💰 [ELRA WALLET] BEFORE RESERVATION - Projects budget: Available ₦${wallet.budgetCategories.projects.available.toLocaleString()}, Reserved ₦${wallet.budgetCategories.projects.reserved.toLocaleString()}`
+        );
+
+        console.log(
+          `💰 [ELRA WALLET] Reserving ₦${amountToReserve.toLocaleString()} for ${
+            budgetAllocation.project.projectScope
+          } project: ${budgetAllocation.project.name} (${
+            budgetAllocation.project.code
+          })`
+        );
+
+        // Reserve funds from projects budget category
+        await wallet.reserveFromCategory(
+          "projects",
+          amountToReserve,
+          `${
+            budgetAllocation.project.projectScope === "personal"
+              ? "Personal"
+              : "Departmental"
+          } Project: ${budgetAllocation.project.name} (${
+            budgetAllocation.project.code
+          }) - ELRA Contribution (Approved by Finance HOD)`,
+          budgetAllocation.project.code,
+          budgetAllocation.project._id,
+          "project",
+          approverId
+        );
+
+        console.log(
+          `✅ [ELRA WALLET] Successfully reserved ₦${amountToReserve.toLocaleString()} for ${
+            budgetAllocation.project.projectScope
+          } project ${budgetAllocation.project.code} after Finance HOD approval`
+        );
+      } catch (walletError) {
+        console.error(
+          `❌ [ELRA WALLET] Error reserving funds for ${budgetAllocation.project.projectScope} project:`,
+          walletError
+        );
+        // Don't throw error here to avoid breaking the approval process
+        // The funds reservation is important but shouldn't block the approval
+      }
     }
 
     // Update project budget if it's a project allocation
@@ -826,7 +830,7 @@ export const rejectBudgetAllocation = async (req, res) => {
 
     // Reject allocation in ELRA wallet
     try {
-      const ELRAWallet = await import("../models/CompanyWallet.js");
+      const ELRAWallet = await import("../models/ELRAWallet.js");
       const elraWallet = await ELRAWallet.default.getOrCreateWallet(
         "ELRA_MAIN",
         rejectorId
@@ -938,24 +942,65 @@ export const getBudgetAllocationStats = async (req, res) => {
       totalProjectItemsCost: 0,
     };
 
-    if (wallet && wallet.budgetCategories) {
-      const categoriesWithAllocations = [
-        wallet.budgetCategories.payroll?.allocated > 0,
-        wallet.budgetCategories.projects?.allocated > 0,
-        wallet.budgetCategories.operational?.allocated > 0,
-      ].filter(Boolean).length;
+    // Get actual project data for accurate stats
+    const pendingProjects = await Project.find({
+      requiresBudgetAllocation: true,
+      status: "pending_budget_allocation",
+    });
 
-      stats = {
-        pendingAllocations: 0,
-        allocatedAllocations: categoriesWithAllocations, 
-        totalAllocated:
-          (wallet.budgetCategories.payroll?.allocated || 0) +
-          (wallet.budgetCategories.projects?.allocated || 0) +
-          (wallet.budgetCategories.operational?.allocated || 0),
-        pendingProjects: 0,
-        allocatedProjects:
-          wallet.budgetCategories.projects?.allocated > 0 ? 1 : 0, 
-        totalProjectItemsCost: wallet.budgetCategories.projects?.allocated || 0,
+    const allocatedProjects = await Project.find({
+      requiresBudgetAllocation: true,
+      status: { $in: ["approved", "pending_procurement", "implementation"] },
+    });
+
+    // Get budget allocations for projects
+    const projectAllocations = await BudgetAllocation.find({
+      allocationType: "project_budget",
+      status: "allocated",
+    });
+
+    const pendingAllocations = await BudgetAllocation.find({
+      allocationType: "project_budget",
+      status: "pending",
+    });
+
+    // Calculate total project items cost
+    const totalProjectItemsCost = allocatedProjects.reduce((sum, project) => {
+      return (
+        sum +
+        (project.projectItems?.reduce(
+          (itemSum, item) => itemSum + (item.totalPrice || 0),
+          0
+        ) || 0)
+      );
+    }, 0);
+
+    // Calculate total allocated amount for projects
+    const totalAllocatedForProjects = projectAllocations.reduce(
+      (sum, allocation) => {
+        return sum + (allocation.allocatedAmount || 0);
+      },
+      0
+    );
+
+    stats = {
+      pendingAllocations: pendingAllocations.length,
+      allocatedAllocations: projectAllocations.length,
+      totalAllocated: totalAllocatedForProjects,
+      pendingProjects: pendingProjects.length,
+      allocatedProjects: allocatedProjects.length,
+      totalProjectItemsCost: totalProjectItemsCost,
+    };
+
+    // Add wallet balance information if available
+    if (wallet && wallet.budgetCategories) {
+      stats.walletBalance = {
+        projects: {
+          allocated: wallet.budgetCategories.projects?.allocated || 0,
+          available: wallet.budgetCategories.projects?.available || 0,
+          reserved: wallet.budgetCategories.projects?.reserved || 0,
+          used: wallet.budgetCategories.projects?.used || 0,
+        },
       };
     }
 

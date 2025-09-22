@@ -455,6 +455,7 @@ export const uploadDocument = async (req, res) => {
         department,
         projectId,
         projectName,
+        customCategory,
       } = req.body;
 
       console.log("[documentController] Incoming req.body:", req.body);
@@ -511,12 +512,13 @@ export const uploadDocument = async (req, res) => {
         createdBy: currentUser._id,
         reference: reference,
         project: projectId || null,
+        archiveCategory: "project",
+        customCategory: customCategory || null,
         status: await determineDocumentStatus(
           currentUser,
           category,
           department
         ),
-        // Simplified metadata for project documents
         metadata: {
           uploadedBy: currentUser.username,
           uploadDate: new Date(),
@@ -621,11 +623,17 @@ export const uploadDocument = async (req, res) => {
                   }/${project.requiredDocuments.length} submitted`
                 );
 
-                await project.updateTwoPhaseProgress();
-
-                console.log(
-                  `✅ [DOCUMENT] Progress update completed for project ${project.code}`
-                );
+                try {
+                  await project.updateTwoPhaseProgress();
+                  console.log(
+                    `✅ [DOCUMENT] Progress update completed for project ${project.code}`
+                  );
+                } catch (progressError) {
+                  console.warn(
+                    `⚠️ [DOCUMENT] Progress update failed for project ${project.code}:`,
+                    progressError.message
+                  );
+                }
                 console.log(
                   `📊 [DOCUMENT] New project progress after update: ${project.progress}%`
                 );
@@ -790,6 +798,48 @@ export const uploadDocument = async (req, res) => {
                     });
                     console.log(
                       `📧 [documentController] Fallback notification sent to SUPER_ADMIN: ${admin.email}`
+                    );
+                  }
+                }
+
+                // Notify the creator when all documents are submitted
+                if (allDocsSubmitted) {
+                  try {
+                    console.log(
+                      `📧 [CREATOR] Sending document completion notification to creator`
+                    );
+
+                    const nextApproverDept = await mongoose
+                      .model("Department")
+                      .findById(nextApprover.department);
+                    const nextApproverDeptName =
+                      nextApproverDept?.name || "the next approver";
+
+                    await notification.createNotification({
+                      recipient: currentUser._id,
+                      type: "ALL_DOCUMENTS_SUBMITTED",
+                      title: "All Documents Submitted Successfully",
+                      message: `All required documents have been successfully uploaded for project "${project.name}". Your project is now pending approval from ${nextApproverDeptName}.`,
+                      data: {
+                        projectId: project._id,
+                        projectName: project.name,
+                        projectCode: project.code,
+                        nextApprover: nextApproverDeptName,
+                        nextApprovalLevel: nextApprover.level,
+                        documentsSubmitted: totalUploadedDocs,
+                        totalRequired: requiredDocsCount,
+                        actionUrl: `/dashboard/modules/self-service/my-projects`,
+                        priority: "medium",
+                      },
+                    });
+
+                    console.log(
+                      `✅ [CREATOR] Document completion notification sent to creator: ${currentUser.firstName} ${currentUser.lastName}`
+                    );
+                  } catch (creatorNotificationError) {
+                    console.error(
+                      "❌ [CREATOR] Error sending document completion notification to creator:",
+                      creatorNotificationError
                     );
                   }
                 }
@@ -999,33 +1049,51 @@ export const getMyDocuments = async (req, res) => {
 
     let query = {
       isActive: true,
-      $or: [
-        { createdBy: currentUser._id },
-        { uploadedBy: currentUser._id },
-        { isPublic: true },
-      ],
+      status: { $ne: "archived" },
+      $or: [{ createdBy: currentUser._id }, { uploadedBy: currentUser._id }],
     };
 
+    const userPersonalProjects = await Project.find({
+      createdBy: currentUser._id,
+      projectScope: "personal",
+    }).select("_id");
+
+    if (userPersonalProjects.length > 0) {
+      const personalProjectIds = userPersonalProjects.map((p) => p._id);
+      query.$or = [
+        { project: { $in: personalProjectIds } },
+        { createdBy: currentUser._id },
+        { uploadedBy: currentUser._id },
+      ];
+      console.log(
+        `📄 [getMyDocuments] Found ${userPersonalProjects.length} personal projects:`,
+        personalProjectIds
+      );
+    }
+
+    // For higher-level users, also include documents from projects they manage or are part of
     if (currentUser.role.level >= 600) {
-      const userProjects = await Project.find({
+      const userManagedProjects = await Project.find({
         $or: [
           { projectManager: currentUser._id },
           { "teamMembers.user": currentUser._id },
-          { createdBy: currentUser._id },
         ],
+        projectScope: { $ne: "personal" }, // Exclude personal projects (already handled above)
       }).select("_id");
 
-      if (userProjects.length > 0) {
-        const projectIds = userProjects.map((p) => p._id);
-        query.$or.push({ project: { $in: projectIds } });
+      if (userManagedProjects.length > 0) {
+        const managedProjectIds = userManagedProjects.map((p) => p._id);
+        query.$or.push({ project: { $in: managedProjectIds } });
         console.log(
-          `📄 [getMyDocuments] Found ${userProjects.length} user projects:`,
-          projectIds
+          `📄 [getMyDocuments] Found ${userManagedProjects.length} managed projects:`,
+          managedProjectIds
         );
       }
-
-      console.log(`📄 [getMyDocuments] User ID: ${currentUser._id}`);
     }
+
+    console.log(
+      `📄 [getMyDocuments] User ID: ${currentUser._id}, Role Level: ${currentUser.role.level}`
+    );
 
     // Apply filters
     if (status && status !== "all") {
@@ -1082,6 +1150,7 @@ export const getMyDocuments = async (req, res) => {
       mimeType: doc.mimeType,
       documentType: doc.documentType,
       category: doc.category,
+      archiveCategory: doc.archiveCategory,
       status: doc.status,
       isRequired: doc.isRequired,
       isPublic: doc.isPublic,
@@ -1136,6 +1205,709 @@ export const getMyDocuments = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch your documents",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get user's archived documents
+// @route   GET /api/documents/my-archived
+// @access  Private
+export const getMyArchivedDocuments = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const {
+      category,
+      search,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+      page = 1,
+      limit = 20,
+    } = req.query;
+
+    console.log(
+      "📄 [getMyArchivedDocuments] Fetching archived documents for user:",
+      currentUser._id
+    );
+
+    let query = {
+      isActive: true,
+      status: "archived",
+      $or: [{ createdBy: currentUser._id }, { uploadedBy: currentUser._id }],
+    };
+
+    // Apply filters
+    if (category && category !== "all") {
+      query.archiveCategory = category;
+    }
+
+    // Apply search
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { "metadata.generatedContent": { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // Build sort object
+    const sortObject = {};
+    sortObject[sortBy] = sortOrder === "desc" ? -1 : 1;
+
+    const skip = (page - 1) * limit;
+
+    const documents = await Document.find(query)
+      .populate("uploadedBy", "firstName lastName email")
+      .populate("createdBy", "firstName lastName email")
+      .populate("project", "name code category budget status")
+      .populate("department", "name")
+      .sort(sortObject)
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Document.countDocuments(query);
+
+    console.log(
+      `📄 [getMyArchivedDocuments] Found ${documents.length} archived documents out of ${total} total`
+    );
+
+    // Transform documents for frontend
+    const transformedDocuments = documents.map((doc) => ({
+      id: doc._id,
+      title: doc.title,
+      description: doc.description,
+      fileName: doc.fileName,
+      originalFileName: doc.originalFileName,
+      fileSize: doc.fileSize,
+      mimeType: doc.mimeType,
+      documentType: doc.documentType,
+      category: doc.category,
+      archiveCategory: doc.archiveCategory,
+      status: doc.status,
+      isRequired: doc.isRequired,
+      isPublic: doc.isPublic,
+      version: doc.version,
+      project: doc.project
+        ? {
+            id: doc.project._id,
+            name: doc.project.name,
+            code: doc.project.code,
+            category: doc.project.category,
+            budget: doc.project.budget,
+            status: doc.project.status,
+          }
+        : null,
+      department: doc.department
+        ? {
+            id: doc.department._id,
+            name: doc.department.name,
+          }
+        : null,
+      uploadedBy: doc.uploadedBy
+        ? {
+            id: doc.uploadedBy._id,
+            name: `${doc.uploadedBy.firstName} ${doc.uploadedBy.lastName}`,
+            email: doc.uploadedBy.email,
+          }
+        : null,
+      createdBy: doc.createdBy
+        ? {
+            id: doc.createdBy._id,
+            name: `${doc.createdBy.firstName} ${doc.createdBy.lastName}`,
+            email: doc.createdBy.email,
+          }
+        : null,
+      metadata: doc.metadata,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
+    }));
+
+    res.json({
+      success: true,
+      data: transformedDocuments,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("❌ [getMyArchivedDocuments] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch your archived documents",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Archive a document for personal reference
+// @route   POST /api/documents/:id/archive
+// @access  Private
+export const archiveDocument = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { archiveCategory } = req.body;
+    const currentUser = req.user;
+
+    console.log(
+      `📄 [archiveDocument] Archiving document ${id} for user ${currentUser._id} with category: ${archiveCategory}`
+    );
+
+    const document = await Document.findById(id);
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found",
+      });
+    }
+
+    // Check if user has permission to archive this document
+    const canArchive =
+      document.createdBy.toString() === currentUser._id.toString() ||
+      document.uploadedBy.toString() === currentUser._id.toString() ||
+      currentUser.role.level >= 1000; // Super Admin can archive any document
+
+    if (!canArchive) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to archive this document",
+      });
+    }
+
+    // Update document status to archived with category
+    document.status = "archived";
+    document.archivedAt = new Date();
+    document.archivedBy = currentUser._id;
+    document.archiveCategory = archiveCategory || "other";
+    await document.save();
+
+    console.log(
+      `📄 [archiveDocument] Successfully archived document ${id} with category ${document.archiveCategory}`
+    );
+
+    res.json({
+      success: true,
+      message: "Document archived successfully",
+      data: {
+        id: document._id,
+        status: document.status,
+        archivedAt: document.archivedAt,
+        archiveCategory: document.archiveCategory,
+      },
+    });
+  } catch (error) {
+    console.error("❌ [archiveDocument] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to archive document",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Restore an archived document
+// @route   POST /api/documents/:id/restore
+// @access  Private
+export const restoreDocument = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUser = req.user;
+
+    console.log(
+      `📄 [restoreDocument] Restoring document ${id} for user ${currentUser._id}`
+    );
+
+    const document = await Document.findById(id);
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found",
+      });
+    }
+
+    // Check if user has permission to restore this document
+    const canRestore =
+      document.createdBy.toString() === currentUser._id.toString() ||
+      document.uploadedBy.toString() === currentUser._id.toString() ||
+      currentUser.role.level >= 1000; // Super Admin can restore any document
+
+    if (!canRestore) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to restore this document",
+      });
+    }
+
+    // Update document status back to draft
+    document.status = "draft";
+    document.archivedAt = undefined;
+    document.archivedBy = undefined;
+    document.archiveCategory = undefined;
+    await document.save();
+
+    console.log(`📄 [restoreDocument] Successfully restored document ${id}`);
+
+    res.json({
+      success: true,
+      message: "Document restored successfully",
+      data: {
+        id: document._id,
+        status: document.status,
+      },
+    });
+  } catch (error) {
+    console.error("❌ [restoreDocument] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to restore document",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Upload document to personal archive
+// @route   POST /api/documents/upload-archive
+// @access  Private
+export const uploadToArchive = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    console.log(
+      `📄 [uploadToArchive] Starting upload to archive for user ${currentUser._id}`
+    );
+
+    // Use multer upload middleware
+    upload.single("file")(req, res, async (err) => {
+      if (err) {
+        console.error("❌ [uploadToArchive] Multer error:", err);
+        return res.status(400).json({
+          success: false,
+          message: err.message,
+        });
+      }
+
+      const { title, description, archiveCategory, customCategory, tags } =
+        req.body;
+
+      console.log(
+        `📄 [uploadToArchive] Uploading document to archive for user ${currentUser._id} with category: ${archiveCategory}`
+      );
+
+      if (!req.file) {
+        console.log("❌ [uploadToArchive] No file found in request");
+        return res.status(400).json({
+          success: false,
+          message: "No file uploaded",
+        });
+      }
+
+      const file = req.file;
+
+      try {
+        // Create document record
+        const document = new Document({
+          title: title || file.originalname,
+          description: description || "Personal archive document",
+          fileName: file.filename,
+          originalFileName: file.originalname,
+          fileUrl: file.path.replace(/\\/g, "/"),
+          fileSize: file.size,
+          mimeType: file.mimetype,
+          documentType: "other",
+          category: "other",
+          archiveCategory: archiveCategory || "other",
+          customCategory:
+            archiveCategory === "other" ? customCategory : undefined,
+          status: "archived",
+          isRequired: false,
+          isPublic: false,
+          uploadedBy: currentUser._id,
+          createdBy: currentUser._id,
+          department: currentUser.department,
+          tags: tags
+            ? tags.split(",").map((tag) => tag.trim())
+            : ["personal-archive"],
+          archivedAt: new Date(),
+          archivedBy: currentUser._id,
+          metadata: {
+            uploadedFor: "personal-archive",
+            purpose: "future-reference",
+          },
+        });
+
+        await document.save();
+
+        console.log(
+          `📄 [uploadToArchive] Successfully uploaded document to archive: ${document._id} with category ${document.archiveCategory}`
+        );
+
+        res.status(201).json({
+          success: true,
+          message: "Document uploaded to archive successfully",
+          data: {
+            id: document._id,
+            title: document.title,
+            fileName: document.fileName,
+            status: document.status,
+            archiveCategory: document.archiveCategory,
+          },
+        });
+      } catch (error) {
+        console.error("❌ [uploadToArchive] Error:", error);
+        res.status(500).json({
+          success: false,
+          message: "Failed to upload document to archive",
+          error: error.message,
+        });
+      }
+    });
+  } catch (error) {
+    console.error("❌ [uploadToArchive] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to upload document to archive",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Update archive category of a document
+// @route   PUT /api/documents/:id/archive-category
+// @access  Private
+export const updateArchiveCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { archiveCategory } = req.body;
+    const currentUser = req.user;
+
+    console.log(
+      `📄 [updateArchiveCategory] Updating archive category for document ${id} to ${archiveCategory}`
+    );
+
+    const document = await Document.findById(id);
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found",
+      });
+    }
+
+    // Check if user has permission to update this document
+    const canUpdate =
+      document.createdBy.toString() === currentUser._id.toString() ||
+      document.uploadedBy.toString() === currentUser._id.toString() ||
+      currentUser.role.level >= 1000;
+
+    if (!canUpdate) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to update this document",
+      });
+    }
+
+    // Update archive category
+    document.archiveCategory = archiveCategory;
+    await document.save();
+
+    console.log(
+      `📄 [updateArchiveCategory] Successfully updated archive category for document ${id}`
+    );
+
+    res.json({
+      success: true,
+      message: "Archive category updated successfully",
+      data: {
+        id: document._id,
+        archiveCategory: document.archiveCategory,
+      },
+    });
+  } catch (error) {
+    console.error("❌ [updateArchiveCategory] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update archive category",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Delete archived document
+// @route   DELETE /api/documents/:id/archive
+// @access  Private
+export const deleteArchivedDocument = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUser = req.user;
+
+    console.log(
+      `📄 [deleteArchivedDocument] Deleting archived document ${id} for user ${currentUser._id}`
+    );
+
+    const document = await Document.findById(id);
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found",
+      });
+    }
+
+    // Check if document is archived
+    if (document.status !== "archived") {
+      return res.status(400).json({
+        success: false,
+        message: "Document is not archived",
+      });
+    }
+
+    // Check if user has permission to delete this document
+    const canDelete =
+      document.createdBy.toString() === currentUser._id.toString() ||
+      document.uploadedBy.toString() === currentUser._id.toString() ||
+      currentUser.role.level >= 1000;
+
+    if (!canDelete) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to delete this document",
+      });
+    }
+
+    // Soft delete by setting isActive to false
+    document.isActive = false;
+    document.deletedAt = new Date();
+    document.deletedBy = currentUser._id;
+    await document.save();
+
+    console.log(
+      `📄 [deleteArchivedDocument] Successfully deleted archived document ${id}`
+    );
+
+    res.json({
+      success: true,
+      message: "Archived document deleted successfully",
+    });
+  } catch (error) {
+    console.error("❌ [deleteArchivedDocument] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete archived document",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Update archived document (metadata and/or file replacement)
+// @route   PUT /api/documents/:id/archive
+// @access  Private
+export const updateArchivedDocument = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, archiveCategory, customCategory, tags } =
+      req.body;
+    const currentUser = req.user;
+
+    console.log(
+      `📄 [updateArchivedDocument] Updating archived document ${id} for user ${currentUser._id}`
+    );
+
+    const document = await Document.findById(id);
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found",
+      });
+    }
+
+    // Check if document is archived
+    if (document.status !== "archived") {
+      return res.status(400).json({
+        success: false,
+        message: "Document is not archived",
+      });
+    }
+
+    // Check if user has permission to update this document
+    const canUpdate =
+      document.createdBy.toString() === currentUser._id.toString() ||
+      document.uploadedBy.toString() === currentUser._id.toString() ||
+      currentUser.role.level >= 1000;
+
+    if (!canUpdate) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to update this document",
+      });
+    }
+
+    if (req.file) {
+      console.log(
+        `📄 [updateArchivedDocument] Replacing file for document ${id}`
+      );
+
+      document.fileName = req.file.filename;
+      document.originalFileName = req.file.originalname;
+      document.fileUrl = req.file.path.replace(/\\/g, "/");
+      document.fileSize = req.file.size;
+      document.mimeType = req.file.mimetype;
+
+      console.log(
+        `📄 [updateArchivedDocument] File replaced with normalized path: ${document.fileUrl}`
+      );
+    }
+
+    // Update metadata fields
+    if (title) document.title = title;
+    if (description) document.description = description;
+    if (archiveCategory) {
+      document.archiveCategory = archiveCategory;
+      document.customCategory =
+        archiveCategory === "other" ? customCategory : undefined;
+    }
+    if (tags) document.tags = tags.split(",").map((tag) => tag.trim());
+
+    document.updatedBy = currentUser._id;
+    await document.save();
+
+    console.log(
+      `📄 [updateArchivedDocument] Successfully updated archived document ${id}`
+    );
+
+    res.json({
+      success: true,
+      message: "Archived document updated successfully",
+      data: {
+        id: document._id,
+        title: document.title,
+        description: document.description,
+        archiveCategory: document.archiveCategory,
+        tags: document.tags,
+        fileName: document.fileName,
+        fileUrl: document.fileUrl,
+      },
+    });
+  } catch (error) {
+    console.error("❌ [updateArchivedDocument] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update archived document",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get single archived document
+// @route   GET /api/documents/:id/archive
+// @access  Private
+export const getArchivedDocument = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUser = req.user;
+
+    console.log(
+      `📄 [getArchivedDocument] Fetching archived document ${id} for user ${currentUser._id}`
+    );
+
+    const document = await Document.findById(id)
+      .populate("createdBy", "firstName lastName email")
+      .populate("uploadedBy", "firstName lastName email")
+      .populate("archivedBy", "firstName lastName email")
+      .populate("project", "name code category");
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found",
+      });
+    }
+
+    // Check if document is archived
+    if (document.status !== "archived") {
+      return res.status(400).json({
+        success: false,
+        message: "Document is not archived",
+      });
+    }
+
+    // Check if user has permission to view this document
+    const canView =
+      document.createdBy._id.toString() === currentUser._id.toString() ||
+      document.uploadedBy._id.toString() === currentUser._id.toString() ||
+      currentUser.role.level >= 1000;
+
+    if (!canView) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to view this document",
+      });
+    }
+
+    // Transform document for frontend
+    const transformedDocument = {
+      id: document._id,
+      title: document.title,
+      description: document.description,
+      fileName: document.fileName,
+      originalFileName: document.originalFileName,
+      fileSize: document.fileSize,
+      mimeType: document.mimeType,
+      documentType: document.documentType,
+      category: document.category,
+      archiveCategory: document.archiveCategory,
+      status: document.status,
+      tags: document.tags,
+      archivedAt: document.archivedAt,
+      createdAt: document.createdAt,
+      updatedAt: document.updatedAt,
+      createdBy: {
+        id: document.createdBy._id,
+        name: `${document.createdBy.firstName} ${document.createdBy.lastName}`,
+        email: document.createdBy.email,
+      },
+      uploadedBy: document.uploadedBy
+        ? {
+            id: document.uploadedBy._id,
+            name: `${document.uploadedBy.firstName} ${document.uploadedBy.lastName}`,
+            email: document.uploadedBy.email,
+          }
+        : null,
+      archivedBy: document.archivedBy
+        ? {
+            id: document.archivedBy._id,
+            name: `${document.archivedBy.firstName} ${document.archivedBy.lastName}`,
+            email: document.archivedBy.email,
+          }
+        : null,
+      project: document.project
+        ? {
+            id: document.project._id,
+            name: document.project.name,
+            code: document.project.code,
+            category: document.project.category,
+          }
+        : null,
+    };
+
+    console.log(
+      `📄 [getArchivedDocument] Successfully fetched archived document ${id}`
+    );
+
+    res.json({
+      success: true,
+      message: "Archived document fetched successfully",
+      data: transformedDocument,
+    });
+  } catch (error) {
+    console.error("❌ [getArchivedDocument] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch archived document",
       error: error.message,
     });
   }
@@ -1482,13 +2254,28 @@ export const updateDocument = async (req, res) => {
     // Check if user can edit this document
     const canEdit =
       document.createdBy.toString() === currentUser._id.toString() ||
-      currentUser.role.level >= 1000; // SUPER_ADMIN
+      currentUser.role.level >= 1000;
 
     if (!canEdit) {
       return res.status(403).json({
         success: false,
         message: "You don't have permission to edit this document",
       });
+    }
+
+    // Check if document is from a personal project (cannot be edited)
+    if (document.project) {
+      const project = await Project.findById(document.project);
+      if (
+        project &&
+        project.projectScope === "personal" &&
+        project.createdBy.toString() !== currentUser._id.toString()
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Personal project documents cannot be edited",
+        });
+      }
     }
 
     // Update document
@@ -1542,13 +2329,27 @@ export const deleteDocument = async (req, res) => {
     // Check if user can delete this document
     const canDelete =
       document.createdBy.toString() === currentUser._id.toString() ||
-      currentUser.role.level >= 1000; // SUPER_ADMIN
+      currentUser.role.level >= 1000;
 
     if (!canDelete) {
       return res.status(403).json({
         success: false,
         message: "You don't have permission to delete this document",
       });
+    }
+
+    if (document.project) {
+      const project = await Project.findById(document.project);
+      if (
+        project &&
+        project.projectScope === "personal" &&
+        project.createdBy.toString() !== currentUser._id.toString()
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Personal project documents cannot be deleted",
+        });
+      }
     }
 
     // Soft delete

@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import mongoose from "mongoose";
 
 // Create transporter
 const createTransporter = () => {
@@ -9,6 +10,57 @@ const createTransporter = () => {
       pass: process.env.EMAIL_PASSWORD,
     },
   });
+};
+
+// Fetch admin emails from system
+const fetchAdminEmails = async () => {
+  try {
+    const User = mongoose.model("User");
+    const Department = mongoose.model("Department");
+
+    const hrDept = await Department.findOne({ name: "Human Resources" });
+    const projectDept = await Department.findOne({
+      name: "Project Management",
+    });
+
+    const adminEmails = [];
+
+    if (hrDept) {
+      // Find ALL users with role level 700 in HR department
+      const hrHods = await User.find({
+        department: hrDept._id,
+        "role.level": 700,
+      }).populate("role");
+
+      hrHods.forEach((hod) => {
+        if (hod && hod.email) {
+          adminEmails.push({ name: "HR HOD", email: hod.email });
+        }
+      });
+    }
+
+    if (projectDept) {
+      // Find ALL users with role level 700 in Project Management department
+      const projectHods = await User.find({
+        department: projectDept._id,
+        "role.level": 700,
+      }).populate("role");
+
+      projectHods.forEach((hod) => {
+        if (hod && hod.email) {
+          adminEmails.push({
+            name: "Project Management HOD",
+            email: hod.email,
+          });
+        }
+      });
+    }
+
+    return adminEmails;
+  } catch (error) {
+    console.error("Error fetching admin emails:", error);
+    return [];
+  }
 };
 
 const createEmailTemplate = (
@@ -1646,24 +1698,163 @@ export const sendVendorNotificationEmail = async (
   try {
     const transporter = createTransporter();
 
+    // Fetch admin emails dynamically
+    const adminEmails = await fetchAdminEmails();
+
+    // Generate project items table for vendor
+    const generateVendorItemsTable = (items) => {
+      if (!items || items.length === 0) return "";
+
+      let tableHtml = `
+        <div class="info-box">
+          <div class="info-title">📦 What You Need to Deliver - Project Items & Coordination</div>
+          <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+            <thead>
+              <tr style="background-color: #f8f9fa;">
+                <th style="padding: 8px; border: 1px solid #dee2e6; text-align: left;">Item</th>
+                <th style="padding: 8px; border: 1px solid #dee2e6; text-align: center;">Qty</th>
+                <th style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">Unit Price</th>
+                <th style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      items.forEach((item, index) => {
+        const unitPrice = parseFloat(item.unitPrice) || 0;
+        const quantity = parseInt(item.quantity) || 0;
+        const total = unitPrice * quantity;
+
+        tableHtml += `
+          <tr>
+            <td style="padding: 8px; border: 1px solid #dee2e6;">
+              <strong>${item.name}</strong>
+              ${
+                item.description
+                  ? `<br><small style="color: #666;">${item.description}</small>`
+                  : ""
+              }
+              ${
+                item.deliveryTimeline
+                  ? `<br><small style="color: #0d6449;">📅 ${item.deliveryTimeline}</small>`
+                  : ""
+              }
+            </td>
+            <td style="padding: 8px; border: 1px solid #dee2e6; text-align: center;">${quantity}</td>
+            <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${formatCurrency(
+              unitPrice
+            )}</td>
+            <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;"><strong>${formatCurrency(
+              total
+            )}</strong></td>
+          </tr>
+        `;
+      });
+
+      const grandTotal = items.reduce((sum, item) => {
+        const unitPrice = parseFloat(item.unitPrice) || 0;
+        const quantity = parseInt(item.quantity) || 0;
+        return sum + unitPrice * quantity;
+      }, 0);
+
+      tableHtml += `
+            </tbody>
+            <tfoot>
+              <tr style="background-color: #e8f4fd; font-weight: bold;">
+                <td colspan="3" style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">Total Project Cost:</td>
+                <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${formatCurrency(
+                  grandTotal
+                )}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      `;
+
+      return tableHtml;
+    };
+
+    // Format currency
+    const formatCurrency = (amount) => {
+      return new Intl.NumberFormat("en-NG", {
+        style: "currency",
+        currency: "NGN",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amount);
+    };
+
     const htmlContent = createEmailTemplate(
-      "Thank You for Partnering with ELRA!",
+      "Project Items Review Required - ELRA",
       `
         <p>Hello <strong>${vendorData.name}</strong>,</p>
-        <p>🎉 Thank you for trusting ELRA with your business partnership!</p>
-        <p>We're excited to work with you on our upcoming project and look forward to a successful collaboration.</p>
-        <p>Your vendor registration has been received and is currently being processed. We'll be in touch soon with next steps.</p>
-        <p>If you have any questions, please don't hesitate to reach out to our procurement team.</p>
+        
+        <p>We have a new project that requires your expertise and we need you to review the project items and revert back to us with your feedback and availability.</p>
+        
+        <div class="info-box">
+          <div class="info-title">📋 Project Details</div>
+          <div class="info-item"><strong>Project Name:</strong> ${
+            projectData.name
+          }</div>
+          <div class="info-item"><strong>Project Code:</strong> ${
+            projectData.code
+          }</div>
+          <div class="info-item"><strong>Total Budget:</strong> ${formatCurrency(
+            projectData.budget
+          )}</div>
+          <div class="info-item"><strong>Start Date:</strong> ${new Date(
+            projectData.startDate
+          ).toLocaleDateString()}</div>
+          <div class="info-item"><strong>End Date:</strong> ${new Date(
+            projectData.endDate
+          ).toLocaleDateString()}</div>
+        </div>
+
+        <div class="info-box">
+          <div class="info-title">📦 Project Items Review Required</div>
+          <p>We have attached a detailed PDF document containing all project items, quantities, pricing, and delivery timelines. Please review the attached PDF and revert back to us with:</p>
+          <ul>
+            <li>✅ Your availability for this project</li>
+            <li>📋 Confirmation of your ability to deliver the specified items</li>
+            <li>⏰ Any timeline adjustments or concerns</li>
+            <li>💰 Pricing confirmation or negotiations</li>
+            <li>📞 Your preferred communication method for project coordination</li>
+          </ul>
+        </div>
+
+        <p><strong>What we need from you:</strong></p>
+        <ul>
+          <li>📧 Please review the attached project details PDF</li>
+          <li>🔄 Revert back to us within 48 hours with your response</li>
+          <li>📞 Contact us if you have any questions about the project requirements</li>
+          <li>✅ Confirm your availability and delivery capabilities</li>
+          <li>🤝 Let us know if you're interested in partnering on this project</li>
+        </ul>
+
+        <p>We value your partnership and look forward to your response regarding this project opportunity.</p>
+        <p>Please get in touch with us as soon as possible to discuss the project details and next steps.</p>
+        
+        <div class="contact-info">
+          <div class="info-title">📞 Contact Information</div>
+          <p>For any questions or clarifications, please contact our team:</p>
+          ${adminEmails
+            .map(
+              (admin) =>
+                `<div class="info-item"><strong>${admin.name}:</strong> ${admin.email}</div>`
+            )
+            .join("")}
+          <p><em>Our team will be in touch with you shortly to discuss the project details and next steps.</em></p>
+        </div>
       `,
       null, // No action button needed
       null,
-      "Thank you for choosing ELRA as your business partner"
+      "Thank you for your continued partnership with ELRA"
     );
 
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: vendorData.email,
-      subject: "Welcome to ELRA - Vendor Registration Confirmation",
+      subject: `Project Items Review Required - ${projectData.code} - ${projectData.name}`,
       html: htmlContent,
     };
 
@@ -1671,10 +1862,9 @@ export const sendVendorNotificationEmail = async (
     if (pdfBuffer) {
       mailOptions.attachments = [
         {
-          filename: `vendor_receipt_${vendorData.name.replace(
-            /\s+/g,
-            "_"
-          )}.pdf`,
+          filename: `project_details_${
+            projectData.code
+          }_${projectData.name.replace(/\s+/g, "_")}.pdf`,
           content: pdfBuffer,
           contentType: "application/pdf",
         },
@@ -1687,6 +1877,290 @@ export const sendVendorNotificationEmail = async (
   } catch (error) {
     console.error(
       `❌ Error sending vendor notification email to ${vendorData.email}:`,
+      error.message
+    );
+    return { success: false, error: error.message };
+  }
+};
+
+// Send client notification email for external project creation
+export const sendClientNotificationEmail = async (
+  clientData,
+  projectData,
+  pdfBuffer = null
+) => {
+  try {
+    const transporter = createTransporter();
+
+    const adminEmails = await fetchAdminEmails();
+
+    // Calculate budget allocation details based on actual items cost
+    const totalBudget = parseFloat(projectData.budget) || 0;
+    const elraPercentage = parseFloat(projectData.budgetPercentage) || 100;
+    const clientPercentage = 100 - elraPercentage;
+
+    // Calculate actual items cost
+    const actualItemsCost = (projectData.projectItems || []).reduce(
+      (sum, item) => {
+        const unitPrice = parseFloat(item.unitPrice) || 0;
+        const quantity = parseInt(item.quantity) || 1;
+        return sum + unitPrice * quantity;
+      },
+      0
+    );
+
+    const elraAmount = (actualItemsCost * elraPercentage) / 100;
+    const clientAmount = actualItemsCost - elraAmount;
+
+    // Format currency
+    const formatCurrency = (amount) => {
+      return new Intl.NumberFormat("en-NG", {
+        style: "currency",
+        currency: "NGN",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amount);
+    };
+
+    // Determine approval flow message
+    const approvalFlow =
+      projectData.requiresBudgetAllocation === "true"
+        ? "Legal → Finance Review → Executive → Budget Allocation"
+        : "Legal → Executive (using existing budget)";
+
+    // Generate project items table for client
+    const generateItemsTable = (items) => {
+      if (!items || items.length === 0) return "";
+
+      let tableHtml = `
+        <div class="info-box">
+          <div class="info-title">📦 What You'll Receive - Project Items & Deliverables</div>
+          <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+            <thead>
+              <tr style="background-color: #f8f9fa;">
+                <th style="padding: 8px; border: 1px solid #dee2e6; text-align: left;">Item</th>
+                <th style="padding: 8px; border: 1px solid #dee2e6; text-align: center;">Qty</th>
+                <th style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">Unit Price</th>
+                <th style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      items.forEach((item, index) => {
+        const unitPrice = parseFloat(item.unitPrice) || 0;
+        const quantity = parseInt(item.quantity) || 0;
+        const total = unitPrice * quantity;
+
+        tableHtml += `
+          <tr>
+            <td style="padding: 8px; border: 1px solid #dee2e6;">
+              <strong>${item.name}</strong>
+              ${
+                item.description
+                  ? `<br><small style="color: #666;">${item.description}</small>`
+                  : ""
+              }
+              ${
+                item.deliveryTimeline
+                  ? `<br><small style="color: #0d6449;">📅 ${item.deliveryTimeline}</small>`
+                  : ""
+              }
+            </td>
+            <td style="padding: 8px; border: 1px solid #dee2e6; text-align: center;">${quantity}</td>
+            <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${formatCurrency(
+              unitPrice
+            )}</td>
+            <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;"><strong>${formatCurrency(
+              total
+            )}</strong></td>
+          </tr>
+        `;
+      });
+
+      const grandTotal = items.reduce((sum, item) => {
+        const unitPrice = parseFloat(item.unitPrice) || 0;
+        const quantity = parseInt(item.quantity) || 0;
+        return sum + unitPrice * quantity;
+      }, 0);
+
+      tableHtml += `
+            </tbody>
+            <tfoot>
+              <tr style="background-color: #e8f4fd; font-weight: bold;">
+                <td colspan="3" style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">Total Project Cost:</td>
+                <td style="padding: 8px; border: 1px solid #dee2e6; text-align: right;">${formatCurrency(
+                  grandTotal
+                )}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      `;
+
+      return tableHtml;
+    };
+
+    const htmlContent = createEmailTemplate(
+      "Thank You for Partnering with ELRA!",
+      `
+        <p>Hello <strong>${clientData.clientName}</strong>,</p>
+        
+        <p>🎉 <strong>Thank you for choosing ELRA!</strong> We're excited to partner with <strong>${
+          clientData.clientCompany
+        }</strong> and look forward to a successful collaboration on your project.</p>
+        
+        <div class="info-box">
+          <div class="info-title">📋 Project Details</div>
+          <div class="info-item"><strong>Project Name:</strong> ${
+            projectData.name
+          }</div>
+          <div class="info-item"><strong>Project Code:</strong> ${
+            projectData.code || "TBD"
+          }</div>
+          <div class="info-item"><strong>Category:</strong> ${
+            projectData.category
+          }</div>
+          <div class="info-item"><strong>Priority:</strong> <span class="priority-${
+            projectData.priority
+          }">${projectData.priority.toUpperCase()}</span></div>
+          <div class="info-item"><strong>Start Date:</strong> ${new Date(
+            projectData.startDate
+          ).toLocaleDateString()}</div>
+          <div class="info-item"><strong>End Date:</strong> ${new Date(
+            projectData.endDate
+          ).toLocaleDateString()}</div>
+        </div>
+
+        <div class="info-box">
+          <div class="info-title">📦 What You'll Receive</div>
+          <p>We have attached a detailed PDF document containing all project items, quantities, pricing, and delivery timelines. Please refer to the attached PDF for complete project specifications and deliverables.</p>
+        </div>
+
+        <p><strong>What this partnership means for you:</strong></p>
+        <ul>
+          <li>✅ You'll receive all the items listed in the attached PDF</li>
+          <li>📅 Each item has a specific delivery timeline that we'll coordinate</li>
+          <li>💰 The total cost is included in your project budget allocation</li>
+          <li>🔄 We'll keep you updated on the progress of each deliverable</li>
+          <li>🤝 We're committed to delivering exceptional results for your project</li>
+        </ul>
+
+        <div class="info-box">
+          <div class="info-title">💰 Budget Allocation Agreement</div>
+          <div class="info-item"><strong>Total Project Budget:</strong> ${formatCurrency(
+            totalBudget
+          )}</div>
+          <div class="info-item"><strong>Actual Items Cost:</strong> ${formatCurrency(
+            actualItemsCost
+          )}</div>
+          <div class="info-item"><strong>ELRA Handles:</strong> ${elraPercentage}% (${formatCurrency(
+        elraAmount
+      )})</div>
+          ${
+            clientPercentage > 0
+              ? `<div class="info-item"><strong>Client Handles:</strong> ${clientPercentage}% (${formatCurrency(
+                  clientAmount
+                )})</div>`
+              : ""
+          }
+          <div class="info-item"><strong>Budget Allocation:</strong> ${
+            projectData.requiresBudgetAllocation === "true"
+              ? "✅ Requested"
+              : "❌ Not Required"
+          }</div>
+        </div>
+
+        ${
+          projectData.vendor
+            ? `
+        <div class="info-box">
+          <div class="info-title">🏢 Vendor Information</div>
+          <div class="info-item"><strong>Vendor Name:</strong> ${
+            projectData.vendor.name
+          }</div>
+          ${
+            projectData.vendor.email
+              ? `<div class="info-item"><strong>Vendor Email:</strong> ${projectData.vendor.email}</div>`
+              : ""
+          }
+          ${
+            projectData.vendor.phone
+              ? `<div class="info-item"><strong>Vendor Phone:</strong> ${projectData.vendor.phone}</div>`
+              : ""
+          }
+          ${
+            projectData.vendor.address
+              ? `<div class="info-item"><strong>Vendor Address:</strong> ${projectData.vendor.address}</div>`
+              : ""
+          }
+          <div class="info-item"><strong>Note:</strong> This vendor has been selected for your project and will be involved in the procurement and delivery process.</div>
+        </div>
+        `
+            : ""
+        }
+
+        <p><strong>What happens next?</strong></p>
+        <ul>
+          <li>✅ Your project has been successfully submitted to our system</li>
+          <li>🔄 It will go through our internal approval process</li>
+          <li>📧 You'll receive updates on the approval status</li>
+          <li>🚀 Once approved, we'll begin project implementation</li>
+          <li>📦 Project implementation and delivery processes will be initiated</li>
+          ${
+            projectData.vendor
+              ? "<li>🏢 Our selected vendor will coordinate with you for project delivery and support</li>"
+              : ""
+          }
+        </ul>
+
+        <p>We're committed to delivering exceptional results for your project. Our team of experts will work closely with you to ensure success and we hope for a long-lasting partnership.</p>
+        
+        <div class="contact-info">
+          <div class="info-title">📞 Contact Information</div>
+          <p>If you have any questions or need to discuss any aspect of the project, please don't hesitate to get in touch with us:</p>
+          ${adminEmails
+            .map(
+              (admin) =>
+                `<div class="info-item"><strong>${admin.name}:</strong> ${admin.email}</div>`
+            )
+            .join("")}
+          <p><em>Our team will be in touch with you shortly to discuss the project details and next steps.</em></p>
+        </div>
+      `,
+      "View Project Portal",
+      `${process.env.CLIENT_URL}/dashboard/modules/projects`,
+      "Thank you for choosing ELRA as your trusted project partner"
+    );
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM,
+      to: clientData.clientEmail,
+      subject: `Thank You for Partnering with ELRA - ${projectData.code} - ${projectData.name}`,
+      html: htmlContent,
+    };
+
+    // Add PDF attachment if provided (project details PDF)
+    if (pdfBuffer) {
+      mailOptions.attachments = [
+        {
+          filename: `project_details_${
+            projectData.code
+          }_${projectData.name.replace(/\s+/g, "_")}.pdf`,
+          content: pdfBuffer,
+          contentType: "application/pdf",
+        },
+      ];
+    }
+
+    const result = await transporter.sendMail(mailOptions);
+    console.log(
+      `✅ Client notification email sent to: ${clientData.clientEmail}`
+    );
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    console.error(
+      `❌ Error sending client notification email to ${clientData.clientEmail}:`,
       error.message
     );
     return { success: false, error: error.message };
@@ -1712,4 +2186,5 @@ export default {
   sendUserPaymentFailureEmail,
   sendPayslipEmail,
   sendVendorNotificationEmail,
+  sendClientNotificationEmail,
 };

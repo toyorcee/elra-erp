@@ -41,6 +41,8 @@ const PayrollApprovals = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [approvalComment, setApprovalComment] = useState("");
   const [filter, setFilter] = useState("all");
   const [financeStats, setFinanceStats] = useState({
     totalBudget: 0,
@@ -167,14 +169,16 @@ const PayrollApprovals = () => {
 
       const response =
         action === "approve"
-          ? await approvePayroll(approvalId)
+          ? await approvePayroll(approvalId, { comments: approvalComment })
           : await rejectPayroll(approvalId, { reason: rejectionReason });
 
       if (response.success) {
         toast.success(response.message || `Payroll ${action}ed successfully`);
         setShowModal(false);
         setShowRejectModal(false);
+        setShowApproveModal(false);
         setRejectionReason("");
+        setApprovalComment("");
         fetchApprovals(); // Refresh the list
       } else {
         throw new Error(response.message || `Failed to ${action} payroll`);
@@ -497,11 +501,24 @@ const PayrollApprovals = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-lg p-4 shadow-lg">
               <p className="text-sm font-bold text-[var(--elra-primary)] mb-1">
-                Total Payroll Budget
+                ELRA Wallet Balance
               </p>
               <p className="text-2xl font-black text-[var(--elra-primary)]">
+                {formatCurrency(financeStats.remainingBudget)}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Available for Payroll
+              </p>
+            </div>
+
+            <div className="bg-white rounded-lg p-4 shadow-lg">
+              <p className="text-sm font-bold text-blue-600 mb-1">
+                Total Payroll Budget
+              </p>
+              <p className="text-2xl font-black text-blue-600">
                 {formatCurrency(financeStats.totalBudget)}
               </p>
+              <p className="text-xs text-gray-500 mt-1">Allocated to Payroll</p>
             </div>
 
             <div className="bg-white rounded-lg p-4 shadow-lg">
@@ -511,15 +528,7 @@ const PayrollApprovals = () => {
               <p className="text-2xl font-black text-green-600">
                 {formatCurrency(financeStats.allocatedAmount)}
               </p>
-            </div>
-
-            <div className="bg-white rounded-lg p-4 shadow-lg">
-              <p className="text-sm font-bold text-blue-600 mb-1">
-                Available Payroll Budget
-              </p>
-              <p className="text-2xl font-black text-blue-600">
-                {formatCurrency(financeStats.remainingBudget)}
-              </p>
+              <p className="text-xs text-gray-500 mt-1">Processed & Reserved</p>
             </div>
 
             <div className="bg-white rounded-lg p-4 shadow-lg">
@@ -529,6 +538,7 @@ const PayrollApprovals = () => {
               <p className="text-2xl font-black text-amber-600">
                 {formatCurrency(financeStats.pendingAllocations)}
               </p>
+              <p className="text-xs text-gray-500 mt-1">Awaiting Approval</p>
             </div>
           </div>
 
@@ -622,17 +632,17 @@ const PayrollApprovals = () => {
               showDelete: false,
               showToggle: false,
               customActions: (approval) => (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 w-24">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedApproval(approval);
                       setShowModal(true);
                     }}
-                    title="View Details"
-                    className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-lg transition-colors cursor-pointer"
+                    title="View Payroll Details"
+                    className="bg-white text-[var(--elra-primary)] p-2 rounded-lg transition-colors duration-300 cursor-pointer shadow-sm hover:bg-[var(--elra-primary)] hover:text-white border border-[var(--elra-primary)]"
                   >
-                    <EyeIcon className="w-4 h-4" />
+                    <EyeIcon className="w-5 h-5" />
                   </button>
                   {approval.approvalStatus === "pending_finance" &&
                     canApprove() && (
@@ -640,13 +650,14 @@ const PayrollApprovals = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleApproval(approval._id, "approve");
+                            setSelectedApproval(approval);
+                            setShowApproveModal(true);
                           }}
-                          title="Approve"
+                          title="Approve Payroll"
                           disabled={actionLoading}
-                          className="bg-green-500 hover:bg-green-600 text-white p-2 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                          className="bg-white text-green-600 p-2 rounded-lg transition-colors duration-300 cursor-pointer disabled:opacity-50 shadow-sm hover:bg-green-600 hover:text-white border border-green-600"
                         >
-                          <CheckCircleIcon className="w-4 h-4" />
+                          <CheckCircleIcon className="w-5 h-5" />
                         </button>
                         <button
                           onClick={(e) => {
@@ -654,10 +665,10 @@ const PayrollApprovals = () => {
                             setSelectedApproval(approval);
                             setShowRejectModal(true);
                           }}
-                          title="Reject"
-                          className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-lg transition-colors cursor-pointer"
+                          title="Reject Payroll"
+                          className="bg-white text-red-600 p-2 rounded-lg transition-colors duration-300 cursor-pointer shadow-sm hover:bg-red-600 hover:text-white border border-red-600"
                         >
-                          <XCircleIcon className="w-4 h-4" />
+                          <XCircleIcon className="w-5 h-5" />
                         </button>
                       </>
                     )}
@@ -674,122 +685,395 @@ const PayrollApprovals = () => {
 
       {/* Approval Details Modal */}
       {showModal && selectedApproval && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-slate-200">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-slate-900">
-                  Payroll Approval Details
-                </h2>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                >
-                  <XMarkIcon className="w-5 h-5 text-slate-500" />
-                </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop Overlay */}
+          <div className="absolute inset-0 bg-gray-900/75 backdrop-blur-sm"></div>
+          <div className="bg-white rounded-2xl modal-shadow-enhanced max-w-5xl w-full max-h-[95vh] flex flex-col border border-gray-100 relative z-10">
+            {/* ELRA Branded Header */}
+            <div className="bg-gradient-to-br from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] text-white p-8 rounded-t-2xl flex-shrink-0 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                      <DocumentTextIcon className="w-10 h-10 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">
+                        Payroll Approval Details
+                      </h2>
+                      <p className="text-white/80 text-sm mt-1">
+                        {selectedApproval.period?.monthName}{" "}
+                        {selectedApproval.period?.year} -{" "}
+                        {selectedApproval.financialSummary?.totalEmployees || 0}{" "}
+                        employees
+                      </p>
+                      <p className="text-white/70 text-xs mt-1 font-mono">
+                        Approval ID: {selectedApproval.approvalId}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => setShowModal(false)}
+                      className="bg-white/20 text-white px-4 py-2 rounded-lg hover:bg-white/30 transition-all duration-300 font-medium border border-white/30 backdrop-blur-sm"
+                    >
+                      Close
+                    </button>
+                    <button
+                      onClick={() => setShowModal(false)}
+                      className="text-white/80 hover:text-white transition-colors p-2 rounded-full hover:bg-white/20"
+                    >
+                      <XMarkIcon className="h-6 w-6" />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Period
-                    </label>
-                    <p className="text-lg font-semibold text-slate-900">
-                      {selectedApproval.period.monthName}{" "}
-                      {selectedApproval.period.year}
-                    </p>
+            {/* Modal Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-8 space-y-8">
+              {/* Basic Information Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
+                      <CalendarDaysIcon className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="text-sm font-semibold text-blue-800">
+                      Payroll Period
+                    </span>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Status
-                    </label>
-                    {getStatusBadge(selectedApproval.approvalStatus)}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Requested By
-                    </label>
-                    <p className="text-slate-900">
-                      {selectedApproval.requestedBy?.firstName}{" "}
-                      {selectedApproval.requestedBy?.lastName}
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {selectedApproval.requestedBy?.department?.name}
-                    </p>
+                  <div className="text-2xl font-bold text-blue-900">
+                    {selectedApproval.period?.monthName}{" "}
+                    {selectedApproval.period?.year}
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center shadow-lg">
+                      <CurrencyDollarIcon className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="text-sm font-semibold text-green-800">
                       Total Net Pay
-                    </label>
-                    <p className="text-2xl font-bold text-green-600">
-                      {formatCurrency(
-                        selectedApproval.financialSummary?.totalNetPay || 0
-                      )}
-                    </p>
+                    </span>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Number of Employees
-                    </label>
-                    <p className="text-xl font-semibold text-slate-900">
-                      {selectedApproval.financialSummary?.totalEmployees || 0}
-                    </p>
+                  <div className="text-2xl font-bold text-green-900">
+                    {formatCurrency(
+                      selectedApproval.financialSummary?.totalNetPay || 0
+                    )}
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200 shadow-sm">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                      <UsersIcon className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="text-sm font-semibold text-purple-800">
+                      Total Employees
+                    </span>
+                  </div>
+                  <div className="text-2xl font-bold text-purple-900">
+                    {selectedApproval.financialSummary?.totalEmployees || 0}
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-6 border border-amber-200 shadow-sm">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center shadow-lg">
+                      <ClockIcon className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="text-sm font-semibold text-amber-800">
                       Request Date
-                    </label>
-                    <p className="text-slate-900">
-                      {formatDate(selectedApproval.createdAt)}
-                    </p>
+                    </span>
+                  </div>
+                  <div className="text-sm font-bold text-amber-900">
+                    {formatDate(selectedApproval.createdAt)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Status and Requester Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <CheckBadgeIcon className="w-5 h-5 text-[var(--elra-primary)]" />
+                    Approval Status
+                  </h3>
+                  <div className="flex items-center gap-3">
+                    {getStatusBadge(selectedApproval.approvalStatus)}
+                  </div>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <UsersIcon className="w-5 h-5 text-[var(--elra-primary)]" />
+                    Requested By
+                  </h3>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-md">
+                      {selectedApproval.requestedBy?.firstName?.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {selectedApproval.requestedBy?.firstName}{" "}
+                        {selectedApproval.requestedBy?.lastName}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {selectedApproval.requestedBy?.department?.name}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Financial Summary */}
               {selectedApproval.financialSummary && (
-                <div className="bg-slate-50 rounded-lg p-4 mb-6">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                <div className="space-y-4">
+                  <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <CurrencyDollarIcon className="w-6 h-6 text-[var(--elra-primary)]" />
                     Financial Summary
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="text-center">
-                      <p className="text-sm text-slate-600">Total Gross Pay</p>
-                      <p className="text-lg font-semibold text-slate-900">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
+                          <CurrencyDollarIcon className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-sm font-semibold text-blue-800">
+                          Total Gross Pay
+                        </span>
+                      </div>
+                      <div className="text-2xl font-bold text-blue-900">
                         {formatCurrency(
                           selectedApproval.financialSummary.totalGrossPay || 0
                         )}
-                      </p>
+                      </div>
                     </div>
-                    <div className="text-center">
-                      <p className="text-sm text-slate-600">Total Deductions</p>
-                      <p className="text-lg font-semibold text-red-600">
+
+                    <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200 shadow-sm">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center shadow-lg">
+                          <XCircleIcon className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-sm font-semibold text-red-800">
+                          Total Deductions
+                        </span>
+                      </div>
+                      <div className="text-2xl font-bold text-red-900">
                         {formatCurrency(
                           selectedApproval.financialSummary.totalDeductions || 0
                         )}
-                      </p>
+                      </div>
                     </div>
-                    <div className="text-center">
-                      <p className="text-sm text-slate-600">Total Net Pay</p>
-                      <p className="text-lg font-semibold text-green-600">
+
+                    <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center shadow-lg">
+                          <CheckCircleIcon className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-sm font-semibold text-green-800">
+                          Net Pay
+                        </span>
+                      </div>
+                      <div className="text-2xl font-bold text-green-900">
                         {formatCurrency(
                           selectedApproval.financialSummary.totalNetPay || 0
                         )}
-                      </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200 shadow-sm">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                          <CurrencyDollarIcon className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-sm font-semibold text-purple-800">
+                          Available Budget
+                        </span>
+                      </div>
+                      <div className="text-2xl font-bold text-purple-900">
+                        {formatCurrency(financeStats.remainingBudget)}
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
+
+              {/* Payroll Data Details */}
+              {selectedApproval.payrollData &&
+                selectedApproval.payrollData.payrolls && (
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                      <UsersIcon className="w-6 h-6 text-[var(--elra-primary)]" />
+                      Employee Payroll Details (
+                      {selectedApproval.payrollData.payrolls.length} employees)
+                    </h3>
+                    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                            <tr>
+                              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                Employee
+                              </th>
+                              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                Department
+                              </th>
+                              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                Gross Pay
+                              </th>
+                              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                Deductions
+                              </th>
+                              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                Net Pay
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {selectedApproval.payrollData.payrolls.map(
+                              (payroll, index) => (
+                                <tr
+                                  key={index}
+                                  className="hover:bg-gray-50 transition-colors"
+                                >
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="flex items-center">
+                                      <div className="w-10 h-10 bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-md">
+                                        {payroll.employee.name.charAt(0)}
+                                      </div>
+                                      <div className="ml-4">
+                                        <div className="text-sm font-medium text-gray-900">
+                                          {payroll.employee.name}
+                                        </div>
+                                        <div className="text-sm text-gray-500">
+                                          {payroll.employee.employeeId}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-gray-900">
+                                      {payroll.employee.department?.name ||
+                                        "N/A"}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-medium text-green-600">
+                                      {formatCurrency(
+                                        payroll.summary?.grossPay || 0
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-medium text-red-600">
+                                      {formatCurrency(
+                                        payroll.summary?.totalDeductions || 0
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-bold text-[var(--elra-primary)]">
+                                      {formatCurrency(
+                                        payroll.summary?.netPay || 0
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              {/* Budget Impact Analysis */}
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <CurrencyDollarIcon className="w-6 h-6 text-[var(--elra-primary)]" />
+                  Budget Impact Analysis
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
+                        <CurrencyDollarIcon className="w-6 h-6 text-white" />
+                      </div>
+                      <h4 className="text-lg font-bold text-blue-800">
+                        Budget Impact
+                      </h4>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-blue-700">
+                          Required Amount:
+                        </span>
+                        <span className="text-sm font-bold text-blue-900">
+                          {formatCurrency(
+                            selectedApproval.financialSummary?.totalNetPay || 0
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-blue-700">
+                          Available Budget:
+                        </span>
+                        <span className="text-sm font-bold text-blue-900">
+                          {formatCurrency(financeStats.remainingBudget)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-blue-700">
+                          Remaining After Approval:
+                        </span>
+                        <span className="text-sm font-bold text-blue-900">
+                          {formatCurrency(
+                            financeStats.remainingBudget -
+                              (selectedApproval.financialSummary?.totalNetPay ||
+                                0)
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center shadow-lg">
+                        <CheckCircleIcon className="w-6 h-6 text-white" />
+                      </div>
+                      <h4 className="text-lg font-bold text-green-800">
+                        Allocation Impact
+                      </h4>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="text-sm text-green-700">
+                        <p className="mb-2">
+                          This approval will <strong>reserve</strong> the
+                          required amount from the ELRA wallet for payroll
+                          processing.
+                        </p>
+                        <p className="mb-2">
+                          Funds will move from <strong>available</strong> to{" "}
+                          <strong>reserved</strong> in the payroll budget
+                          category.
+                        </p>
+                        <p>
+                          After approval, the payroll will be ready for HR
+                          review and final processing.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Approval History */}
               {selectedApproval.financeApproval && (
@@ -853,39 +1137,97 @@ const PayrollApprovals = () => {
               )}
             </div>
 
-            <div className="p-6 border-t border-slate-200 bg-slate-50">
-              <div className="flex justify-end gap-3">
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
+              <div className="flex justify-end gap-4">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="px-6 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors"
+                  className="px-6 py-3 bg-white text-gray-700 rounded-xl hover:bg-gray-50 transition-all duration-300 font-medium border border-gray-300 shadow-sm"
                 >
                   Close
                 </button>
 
-                {selectedApproval.approvalStatus === "pending_finance" && (
-                  <>
-                    <button
-                      onClick={() => {
-                        setShowModal(false);
-                        handleApproval(selectedApproval._id, "approve");
-                      }}
-                      disabled={actionLoading}
-                      className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                    >
-                      Approve Payroll
-                    </button>
+                {/* Removed redundant approve/reject buttons as they exist in the main UI */}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-                    <button
-                      onClick={() => {
-                        setShowModal(false);
-                        setShowRejectModal(true);
-                      }}
-                      className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                    >
-                      Reject Payroll
-                    </button>
-                  </>
-                )}
+      {/* Approval Modal */}
+      {showApproveModal && selectedApproval && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop Overlay */}
+          <div className="absolute inset-0 bg-gray-900/75 backdrop-blur-sm"></div>
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full relative z-10">
+            <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-green-50 to-green-100">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-500 rounded-lg shadow-md">
+                  <CheckCircleIcon className="w-6 h-6 text-white" />
+                </div>
+                <h2 className="text-xl font-bold text-green-900">
+                  Approve Payroll Request
+                </h2>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="bg-green-50 rounded-lg p-4 mb-4 border border-green-200">
+                <div className="flex items-start gap-3">
+                  <CheckBadgeIcon className="w-5 h-5 text-green-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-green-800 mb-1">Approval Confirmation</h4>
+                    <p className="text-green-700 text-sm">
+                      You are about to approve a payroll request for {formatCurrency(selectedApproval.financialSummary?.totalNetPay || 0)}.
+                      This will allocate funds from the ELRA wallet for payroll processing.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Approval Comments (Optional)
+                </label>
+                <textarea
+                  value={approvalComment}
+                  onChange={(e) => setApprovalComment(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="Add any comments about this approval..."
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100">
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowApproveModal(false);
+                    setApprovalComment("");
+                  }}
+                  className="px-6 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={() => handleApproval(selectedApproval._id, "approve")}
+                  disabled={actionLoading}
+                  className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-colors shadow-md hover:shadow-lg disabled:opacity-50 flex items-center gap-2"
+                >
+                  {actionLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircleIcon className="w-5 h-5" />
+                      <span>Confirm Approval</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
@@ -894,24 +1236,34 @@ const PayrollApprovals = () => {
 
       {/* Rejection Modal */}
       {showRejectModal && selectedApproval && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
-            <div className="p-6 border-b border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop Overlay */}
+          <div className="absolute inset-0 bg-gray-900/75 backdrop-blur-sm"></div>
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full relative z-10">
+            <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-red-50 to-red-100">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <ExclamationTriangleIcon className="w-6 h-6 text-red-600" />
+                <div className="p-2 bg-red-500 rounded-lg shadow-md">
+                  <ExclamationTriangleIcon className="w-6 h-6 text-white" />
                 </div>
-                <h2 className="text-xl font-bold text-slate-900">
+                <h2 className="text-xl font-bold text-red-900">
                   Reject Payroll Approval
                 </h2>
               </div>
             </div>
 
             <div className="p-6">
-              <p className="text-slate-600 mb-4">
-                Please provide a reason for rejecting this payroll approval
-                request.
-              </p>
+              <div className="bg-red-50 rounded-lg p-4 mb-4 border border-red-200">
+                <div className="flex items-start gap-3">
+                  <XCircleIcon className="w-5 h-5 text-red-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-red-800 mb-1">Rejection Notice</h4>
+                    <p className="text-red-700 text-sm">
+                      You are about to reject a payroll request for {formatCurrency(selectedApproval.financialSummary?.totalNetPay || 0)}.
+                      Please provide a clear reason for the rejection.
+                    </p>
+                  </div>
+                </div>
+              </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -921,14 +1273,14 @@ const PayrollApprovals = () => {
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   rows={4}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   placeholder="Enter the reason for rejection..."
                   required
                 />
               </div>
             </div>
 
-            <div className="p-6 border-t border-slate-200 bg-slate-50">
+            <div className="p-6 border-t border-slate-200 bg-gradient-to-r from-slate-50 to-slate-100">
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => {
@@ -943,9 +1295,19 @@ const PayrollApprovals = () => {
                 <button
                   onClick={() => handleApproval(selectedApproval._id, "reject")}
                   disabled={actionLoading || !rejectionReason.trim()}
-                  className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                  className="px-6 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-colors shadow-md hover:shadow-lg disabled:opacity-50 flex items-center gap-2"
                 >
-                  Reject Payroll
+                  {actionLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircleIcon className="w-5 h-5" />
+                      <span>Confirm Rejection</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>

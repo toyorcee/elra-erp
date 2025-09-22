@@ -5,7 +5,6 @@ const payrollApprovalSchema = new mongoose.Schema(
     // Basic approval info
     approvalId: {
       type: String,
-      required: true,
       unique: true,
     },
 
@@ -273,7 +272,11 @@ payrollApprovalSchema.statics.getPendingApprovals = async function (
   }
 
   return await this.find(query)
-    .populate("requestedBy", "firstName lastName email employeeId")
+    .populate({
+      path: "requestedBy",
+      select: "firstName lastName email employeeId department",
+      populate: { path: "department", select: "name" }
+    })
     .populate("financeApproval.approvedBy", "firstName lastName email")
     .populate("hrApproval.approvedBy", "firstName lastName email")
     .sort({ createdAt: -1 });

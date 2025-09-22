@@ -208,6 +208,8 @@ export const addFunds = async (req, res) => {
       // Simple direct budget allocation
       allocateToBudget = false,
       budgetCategory = null,
+      flexibleAllocation = false,
+      allocations = [],
     } = req.body;
     const userId = req.user._id;
 
@@ -353,6 +355,27 @@ export const addFunds = async (req, res) => {
           reference: finalReference,
         }
       );
+    } else if (flexibleAllocation && allocations.length > 0) {
+      // New flexible allocation system
+      console.log("🔄 [FUND_ADDITION] Using flexible allocation system:", {
+        totalAmount: amount,
+        allocations,
+      });
+
+      await wallet.addFundsWithAllocation(
+        amount,
+        allocations,
+        description,
+        finalReference,
+        userId
+      );
+
+      console.log("✅ [FUND_ADDITION] Funds added with flexible allocation:", {
+        totalAmount: amount,
+        allocations,
+        remainingInGeneralPool: wallet.availableFunds,
+        reference: finalReference,
+      });
     } else {
       // Traditional fund addition (to general pool)
       await wallet.addFunds(
@@ -394,7 +417,9 @@ export const addFunds = async (req, res) => {
       amount,
       description,
       finalReference,
-      wallet.availableFunds
+      wallet.availableFunds,
+      flexibleAllocation,
+      allocations
     );
     console.log("✅ [FUND_ADDITION] Notification process completed");
 
@@ -698,7 +723,9 @@ const sendFundAdditionNotifications = async (
   amount,
   description,
   reference,
-  newBalance
+  newBalance,
+  flexibleAllocation = false,
+  allocations = []
 ) => {
   try {
     console.log(
@@ -740,8 +767,17 @@ const sendFundAdditionNotifications = async (
       formattedBalance,
     });
 
-    console.log(
-      "ℹ️ [FUND_ADDITION] Skipping Finance HOD notification for fund allocation operations"
+    // Always notify Finance HOD when funds are added
+    console.log("📧 [FUND_ADDITION] Notifying Finance HOD about fund addition");
+    await notifyFinanceHOD(
+      addedByUserName,
+      addedByDepartment,
+      formattedAmount,
+      description,
+      reference,
+      formattedBalance,
+      flexibleAllocation,
+      allocations
     );
 
     // If Super Admin added funds, notify Executive HOD
@@ -754,7 +790,8 @@ const sendFundAdditionNotifications = async (
         formattedAmount,
         description,
         reference,
-        formattedBalance
+        formattedBalance,
+        flexibleAllocation ? allocations : null
       );
     } else {
       console.log(
@@ -775,7 +812,8 @@ const sendFundAdditionNotifications = async (
         formattedAmount,
         description,
         reference,
-        formattedBalance
+        formattedBalance,
+        flexibleAllocation ? allocations : null
       );
     } else {
       console.log(
@@ -815,7 +853,9 @@ const notifyFinanceHOD = async (
   formattedAmount,
   description,
   reference,
-  formattedBalance
+  formattedBalance,
+  flexibleAllocation = false,
+  allocations = []
 ) => {
   try {
     console.log("🔍 [FUND_ADDITION] Finding Finance & Accounting department");
@@ -860,17 +900,34 @@ const notifyFinanceHOD = async (
       `📧 [FUND_ADDITION] Notifying Finance HOD: ${financeHOD.firstName} ${financeHOD.lastName}`
     );
 
+    let allocationMessage = "";
+    if (flexibleAllocation && allocations.length > 0) {
+      const allocationDetails = allocations
+        .map((alloc) => {
+          const formattedAmount = new Intl.NumberFormat("en-NG", {
+            style: "currency",
+            currency: "NGN",
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+          }).format(alloc.amount);
+          return `${formattedAmount} to ${alloc.category}`;
+        })
+        .join(", ");
+      allocationMessage = ` Allocated: ${allocationDetails}.`;
+    }
+
     // Create notification directly like other controllers
     const notification = new Notification({
       recipient: financeHOD._id,
       type: "FUND_ADDITION",
       title: "Funds Added to ELRA Wallet",
-      message: `${addedByUserName} (${addedByDepartment}) added ${formattedAmount} to the ELRA wallet. New balance: ${formattedBalance}`,
+      message: `${addedByUserName} (${addedByDepartment}) added ${formattedAmount} to the ELRA wallet.${allocationMessage} New balance: ${formattedBalance}`,
       priority: "high",
       data: {
         addedBy: addedByUserName,
         addedByDepartment,
         amount: formattedAmount,
+        allocations: allocations,
         description,
         reference,
         newBalance: formattedBalance,
@@ -895,7 +952,8 @@ const notifyExecutiveHOD = async (
   formattedAmount,
   description,
   reference,
-  formattedBalance
+  formattedBalance,
+  allocations = null
 ) => {
   try {
     // Find Executive Office department
@@ -931,16 +989,34 @@ const notifyExecutiveHOD = async (
       `📧 [FUND_ADDITION] Notifying Executive HOD: ${executiveHOD.firstName} ${executiveHOD.lastName}`
     );
 
+    // Build allocation details message
+    let allocationMessage = "";
+    if (allocations && allocations.length > 0) {
+      const allocationDetails = allocations
+        .map((alloc) => {
+          const formattedAmount = new Intl.NumberFormat("en-NG", {
+            style: "currency",
+            currency: "NGN",
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+          }).format(alloc.amount);
+          return `${formattedAmount} to ${alloc.category}`;
+        })
+        .join(", ");
+      allocationMessage = ` Allocated: ${allocationDetails}.`;
+    }
+
     const notification = new Notification({
       recipient: executiveHOD._id,
       type: "FUND_ADDITION",
       title: "Funds Added to ELRA Wallet (Super Admin)",
-      message: `Super Admin (${addedByUserName}) added ${formattedAmount} to the ELRA wallet. New balance: ${formattedBalance}`,
+      message: `Super Admin (${addedByUserName}) added ${formattedAmount} to the ELRA wallet.${allocationMessage} New balance: ${formattedBalance}`,
       priority: "high",
       data: {
         addedBy: addedByUserName,
         addedByRole: "Super Admin",
         amount: formattedAmount,
+        allocations: allocations,
         description,
         reference,
         newBalance: formattedBalance,
@@ -965,7 +1041,8 @@ const notifySuperAdmin = async (
   formattedAmount,
   description,
   reference,
-  formattedBalance
+  formattedBalance,
+  allocations = null
 ) => {
   try {
     // Find Super Admin user
@@ -985,16 +1062,34 @@ const notifySuperAdmin = async (
       `📧 [FUND_ADDITION] Notifying Super Admin: ${superAdmin.firstName} ${superAdmin.lastName}`
     );
 
+    // Build allocation details message
+    let allocationMessage = "";
+    if (allocations && allocations.length > 0) {
+      const allocationDetails = allocations
+        .map((alloc) => {
+          const formattedAmount = new Intl.NumberFormat("en-NG", {
+            style: "currency",
+            currency: "NGN",
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+          }).format(alloc.amount);
+          return `${formattedAmount} to ${alloc.category}`;
+        })
+        .join(", ");
+      allocationMessage = ` Allocated: ${allocationDetails}.`;
+    }
+
     const notification = new Notification({
       recipient: superAdmin._id,
       type: "FUND_ADDITION",
       title: "Funds Added to ELRA Wallet (Executive HOD)",
-      message: `Executive HOD (${addedByUserName}) added ${formattedAmount} to the ELRA wallet. New balance: ${formattedBalance}`,
+      message: `Executive HOD (${addedByUserName}) added ${formattedAmount} to the ELRA wallet.${allocationMessage} New balance: ${formattedBalance}`,
       priority: "high",
       data: {
         addedBy: addedByUserName,
         addedByRole: "Executive HOD",
         amount: formattedAmount,
+        allocations: allocations,
         description,
         reference,
         newBalance: formattedBalance,
@@ -1282,6 +1377,94 @@ export const exportTransactionHistoryPDF = async (req, res) => {
   }
 };
 
+// @desc    Generate CSV report for transaction history
+// @route   POST /api/elra-wallet/transactions/export/csv
+// @access  Private (Finance HOD, Executive HOD, Super Admin)
+export const exportTransactionHistoryCSV = async (req, res) => {
+  try {
+    const { filters = {} } = req.body;
+    const userId = req.user._id;
+
+    // Populate user with role and department for report metadata
+    const user = await User.findById(userId)
+      .populate("role", "name level")
+      .populate("department", "name");
+
+    const userDepartment = user?.department?.name;
+    const isSuperAdmin = user?.role?.level === 1000;
+    const isExecutive =
+      user?.role?.level === 700 && userDepartment === "Executive Office";
+    const isFinanceHOD =
+      user?.role?.level === 700 && userDepartment === "Finance & Accounting";
+
+    if (!isSuperAdmin && !isExecutive && !isFinanceHOD) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Only Finance HOD, Executive HOD, or Super Admin can export transaction reports.",
+      });
+    }
+
+    // Get wallet and transactions
+    const wallet = await ELRAWallet.getOrCreateWallet("ELRA_MAIN", userId);
+
+    // Apply filters to transactions
+    let filteredTransactions = wallet.transactions || [];
+
+    if (filters.type) {
+      filteredTransactions = filteredTransactions.filter(
+        (t) => t.type === filters.type
+      );
+    }
+
+    if (filters.startDate) {
+      const startDate = new Date(filters.startDate);
+      filteredTransactions = filteredTransactions.filter(
+        (t) => new Date(t.date) >= startDate
+      );
+    }
+
+    if (filters.endDate) {
+      const endDate = new Date(filters.endDate);
+      endDate.setHours(23, 59, 59, 999); // End of day
+      filteredTransactions = filteredTransactions.filter(
+        (t) => new Date(t.date) <= endDate
+      );
+    }
+
+    // Sort by date (newest first)
+    filteredTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Generate CSV report
+    const reportService = new TransactionReportService();
+    const result = await reportService.generateTransactionCSVReport(
+      filteredTransactions,
+      filters,
+      {
+        name: `${user.firstName} ${user.lastName}`,
+        department: userDepartment,
+        role: user.role?.name,
+      }
+    );
+
+    // Set headers for CSV download
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${result.fileName}"`
+    );
+
+    res.status(200).send(result.csvContent);
+  } catch (error) {
+    console.error("Export Transaction History CSV Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to export transaction history CSV",
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Generate Word/HTML report for transaction history
 // @route   POST /api/elra-wallet/transactions/export/word
 // @access  Private (Finance HOD, Executive HOD, Super Admin)
@@ -1331,7 +1514,7 @@ export const exportTransactionHistoryWord = async (req, res) => {
 
     if (filters.endDate) {
       const endDate = new Date(filters.endDate);
-      endDate.setHours(23, 59, 59, 999); // End of day
+      endDate.setHours(23, 59, 59, 999); 
       filteredTransactions = filteredTransactions.filter(
         (t) => new Date(t.date) <= endDate
       );

@@ -497,7 +497,7 @@ export const updateTypingStatus = async (req, res) => {
   }
 };
 
-// Get available users based on approval hierarchy
+// Get available users based on role-based chat access
 export const getAvailableUsers = async (req, res) => {
   try {
     const currentUser = req.user;
@@ -516,7 +516,11 @@ export const getAvailableUsers = async (req, res) => {
       });
     }
 
-    // Build query based on user's role and approval hierarchy
+    console.log(
+      `🔍 [MESSAGES] Getting available users for ${userWithDetails.role?.name} (Level: ${userWithDetails.role?.level})`
+    );
+
+    // Build base query
     let query = {
       _id: { $ne: currentUser._id }, // Exclude current user
       isActive: true,
@@ -528,57 +532,145 @@ export const getAvailableUsers = async (req, res) => {
         { firstName: { $regex: search, $options: "i" } },
         { lastName: { $regex: search, $options: "i" } },
         { email: { $regex: search, $options: "i" } },
-        { name: { $regex: search, $options: "i" } },
       ];
     }
 
-    // Get users based on approval hierarchy from database
-    let users;
+    let users = [];
+    const userRoleLevel = userWithDetails.role?.level || 0;
 
-    if (userWithDetails.role?.level >= 1000) {
-      // Super Admin and Platform Admin can message anyone in the company
+    if (userRoleLevel >= 1000) {
+      // SUPER ADMIN: Can chat with everyone
+      console.log("🔍 [MESSAGES] Super Admin - showing all users");
       users = await User.find(query)
         .select(
-          "firstName lastName email name avatar department role lastSeen isOnline"
+          "firstName lastName email avatar department role lastSeen isOnline"
         )
         .populate("department", "name")
         .populate("role", "name level")
-        .limit(50);
-    } else if (userWithDetails.role?.level >= 50) {
-      // Department Admin can message within their department and superiors
+        .sort({ "role.level": -1, firstName: 1 })
+        .limit(100);
+    } else if (userRoleLevel >= 700) {
+      // HOD: Can chat with anyone in their department + fellow HODs
+      console.log("🔍 [MESSAGES] HOD - showing department users + fellow HODs");
       users = await User.find({
         ...query,
         $or: [
+          // Users in same department
           { department: userWithDetails.department?._id },
-          { "role.level": { $gte: userWithDetails.role?.level } },
+          // Fellow HODs (level 700) from other departments
+          { "role.level": 700 },
         ],
       })
         .select(
-          "firstName lastName email name avatar department role lastSeen isOnline"
+          "firstName lastName email avatar department role lastSeen isOnline"
         )
         .populate("department", "name")
         .populate("role", "name level")
+        .sort({ "role.level": -1, firstName: 1 })
         .limit(50);
-    } else {
-      // Regular users can message within their department and superiors
+    } else if (userRoleLevel >= 600) {
+      // MANAGER: Can chat with HODs and higher roles in their department
+      console.log(
+        "🔍 [MESSAGES] Manager - showing HODs and higher in department"
+      );
       users = await User.find({
         ...query,
-        $or: [
+        $and: [
           { department: userWithDetails.department?._id },
-          { "role.level": { $gte: userWithDetails.role?.level } },
+          { "role.level": { $gte: 700 } }, // HODs and above
         ],
       })
         .select(
-          "firstName lastName email name avatar department role lastSeen isOnline"
+          "firstName lastName email avatar department role lastSeen isOnline"
         )
         .populate("department", "name")
         .populate("role", "name level")
+        .sort({ "role.level": -1, firstName: 1 })
         .limit(30);
+    } else if (userRoleLevel >= 300) {
+      console.log(
+        "🔍 [MESSAGES] Staff - showing HODs and higher in department"
+      );
+      users = await User.find({
+        ...query,
+        $and: [
+          { department: userWithDetails.department?._id },
+          { "role.level": { $gte: 700 } },
+        ],
+      })
+        .select(
+          "firstName lastName email avatar department role lastSeen isOnline"
+        )
+        .populate("department", "name")
+        .populate("role", "name level")
+        .sort({ "role.level": -1, firstName: 1 })
+        .limit(20);
+    } else {
+      console.log(
+        "🔍 [MESSAGES] Viewer - showing HODs and higher in department"
+      );
+      users = await User.find({
+        ...query,
+        $and: [
+          { department: userWithDetails.department?._id },
+          { "role.level": { $gte: 700 } },
+        ],
+      })
+        .select(
+          "firstName lastName email avatar department role lastSeen isOnline"
+        )
+        .populate("department", "name")
+        .populate("role", "name level")
+        .sort({ "role.level": -1, firstName: 1 })
+        .limit(15);
+    }
+
+    let recentConversations = [];
+    try {
+      const recentMessages = await Message.find({
+        $or: [{ sender: currentUser._id }, { recipient: currentUser._id }],
+      })
+        .populate("sender", "firstName lastName email avatar department role")
+        .populate(
+          "recipient",
+          "firstName lastName email avatar department role"
+        )
+        .populate("sender.department", "name")
+        .populate("recipient.department", "name")
+        .populate("sender.role", "name level")
+        .populate("recipient.role", "name level")
+        .sort({ createdAt: -1 })
+        .limit(50);
+
+      const recentUserIds = new Set();
+      recentMessages.forEach((message) => {
+        const otherUser =
+          message.sender._id.toString() === currentUser._id.toString()
+            ? message.recipient
+            : message.sender;
+
+        if (!recentUserIds.has(otherUser._id.toString())) {
+          recentUserIds.add(otherUser._id.toString());
+          recentConversations.push(otherUser);
+        }
+      });
+
+      console.log(
+        `🔍 [MESSAGES] Found ${recentConversations.length} recent conversations for user`
+      );
+    } catch (error) {
+      console.error("Error fetching recent conversations:", error);
     }
 
     res.json({
       success: true,
       data: users,
+      recentConversations: recentConversations,
+      userRole: {
+        name: userWithDetails.role?.name,
+        level: userWithDetails.role?.level,
+        department: userWithDetails.department?.name,
+      },
     });
   } catch (error) {
     console.error("❌ Get available users error:", error);

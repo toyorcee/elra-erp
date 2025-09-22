@@ -733,11 +733,11 @@ export const checkFinanceAccess = async (req, res, next) => {
 // Specific middleware for payroll approval access
 export const checkPayrollApprovalAccess = async (req, res, next) => {
   try {
-    const user = req.user;
+      const user = req.user;
 
     if (!user) {
       return res.status(401).json({
-        success: false,
+          success: false,
         message: "Authentication required",
       });
     }
@@ -798,11 +798,11 @@ export const checkSalesMarketingAccess = async (req, res, next) => {
       user.role?.level === 700;
 
     if (!isSalesMarketing && !isFinanceHOD) {
-      return res.status(403).json({
-        success: false,
-        message:
+    return res.status(403).json({
+      success: false,
+      message:
           "Access denied. Sales & Marketing department or Finance HOD access required.",
-      });
+    });
     }
 
     next();
@@ -853,7 +853,7 @@ export const checkSalesMarketingApprovalAccess = async (req, res, next) => {
     console.error("Sales & Marketing approval access check error:", error);
     return res.status(500).json({
       success: false,
-      message:
+        message:
         "Internal server error during sales & marketing approval access check",
     });
   }

@@ -993,3 +993,98 @@ export const updateUserSalary = async (req, res) => {
     });
   }
 };
+
+export const getDepartmentUsers = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    console.log(
+      "👥 [DEPARTMENT USERS] Fetching department users for:",
+      currentUser.name
+    );
+    console.log(
+      "👥 [DEPARTMENT USERS] User department:",
+      currentUser.department?.name
+    );
+    console.log(
+      "👥 [DEPARTMENT USERS] User role level:",
+      currentUser.role?.level
+    );
+
+    // Check if user is HOD or Super Admin
+    if (currentUser.role.level < 700) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Only HODs and Super Admins can view department users.",
+      });
+    }
+
+    let query = {};
+
+    // Super Admin can see all users
+    if (currentUser.role.level >= 1000) {
+      query = {
+        $or: [
+          { isActive: true },
+          { status: "PENDING_REGISTRATION" },
+          { status: "INVITED" },
+          { status: "ACTIVE" },
+        ],
+      };
+      console.log("👥 [DEPARTMENT USERS] Super Admin - showing all users");
+    }
+    // HODs can only see users in their department
+    else if (currentUser.role.level >= 700) {
+      if (!currentUser.department) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "You must be assigned to a department to view department users.",
+        });
+      }
+
+      query = {
+        department: currentUser.department._id,
+        $or: [
+          { isActive: true },
+          { status: "PENDING_REGISTRATION" },
+          { status: "INVITED" },
+          { status: "ACTIVE" },
+        ],
+      };
+      console.log(
+        "👥 [DEPARTMENT USERS] HOD - showing users from department:",
+        currentUser.department.name
+      );
+    }
+
+    // Fetch users with populated fields
+    const users = await User.find(query)
+      .populate("role", "name level")
+      .populate("department", "name")
+      .populate("supervisor", "firstName lastName")
+      .select(
+        "-password -refreshTokens -passwordResetToken -passwordResetExpires -emailVerificationToken -emailVerificationExpires"
+      )
+      .sort({ firstName: 1, lastName: 1 });
+
+    console.log(`👥 [DEPARTMENT USERS] Found ${users.length} users`);
+
+    res.status(200).json({
+      success: true,
+      data: users,
+      count: users.length,
+    });
+  } catch (error) {
+    console.error(
+      "❌ [DEPARTMENT USERS] Error fetching department users:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch department users",
+      error: error.message,
+    });
+  }
+};

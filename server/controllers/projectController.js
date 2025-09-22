@@ -5,22 +5,46 @@ import Department from "../models/Department.js";
 import TeamMember from "../models/TeamMember.js";
 import Approval from "../models/Approval.js";
 import Vendor from "../models/Vendor.js";
+import Notification from "../models/Notification.js";
 import { checkDepartmentAccess } from "../middleware/auth.js";
 import NotificationService from "../services/notificationService.js";
 import ProjectAuditService from "../services/projectAuditService.js";
 import emailService from "../services/emailService.js";
-import { generateVendorReceiptPDF } from "../utils/pdfUtils.js";
+import {
+  generateVendorReceiptPDF,
+  generateClientProjectPDF,
+} from "../utils/pdfUtils.js";
+
+// ============================================================================
+// SPECIAL CASE HODS - HODs who can skip their own approval when creating projects in their department
+// ============================================================================
+const SPECIAL_CASE_HODS = [
+  "Project Management", // Project Management HOD
+  "Finance & Accounting", // Finance HOD
+  "Legal & Compliance", // Legal HOD
+  "Executive Office", // Executive HOD
+];
+
+// Helper function to check if a HOD is a special case
+const isSpecialCaseHOD = (departmentName, userRoleLevel) => {
+  return userRoleLevel >= 700 && SPECIAL_CASE_HODS.includes(departmentName);
+};
+
+// Helper function to check if creator is HOD of any department
+const isCreatorHOD = (userRoleLevel) => {
+  return userRoleLevel >= 700;
+};
 
 // Create notification service instance
 const notificationService = new NotificationService();
 
-// Helper function to format currency
-const formatCurrency = (amount, currency = "NGN") => {
+// Helper function to format currency (always Nigerian Naira)
+const formatCurrency = (amount) => {
   if (!amount) return "₦0";
 
   return new Intl.NumberFormat("en-NG", {
     style: "currency",
-    currency: currency,
+    currency: "NGN",
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(amount);
@@ -169,6 +193,80 @@ export const getNextProjectCode = async (req, res) => {
   }
 };
 
+// Helper function to get next external project code
+const generateNextExternalProjectCode = async () => {
+  try {
+    const currentYear = new Date().getFullYear();
+    const prefix = "EXT"; // External project prefix
+
+    // Count external projects in current year
+    const count = await Project.countDocuments({
+      projectScope: "external",
+      createdAt: {
+        $gte: new Date(currentYear, 0, 1),
+        $lt: new Date(currentYear + 1, 0, 1),
+      },
+      isActive: true,
+    });
+
+    const nextCode = `${prefix}${currentYear}${String(count + 1).padStart(
+      4,
+      "0"
+    )}`;
+
+    return {
+      success: true,
+      data: {
+        code: nextCode,
+        count: count + 1,
+        year: currentYear,
+      },
+    };
+  } catch (error) {
+    console.error("Error generating external project code:", error);
+    return {
+      success: false,
+      message: "Failed to generate external project code",
+      error: error.message,
+    };
+  }
+};
+
+// @desc    Get next external project code
+// @route   GET /api/projects/next-external-code
+// @access  Private (Project Management HOD only)
+export const getNextExternalProjectCode = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    // Check if user is Project Management HOD
+    if (
+      currentUser.role.level < 700 ||
+      currentUser.department?.name !== "Project Management"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Only Project Management HOD can create external projects.",
+      });
+    }
+
+    const result = await generateNextExternalProjectCode();
+
+    if (result.success) {
+      res.status(200).json(result);
+    } else {
+      res.status(400).json(result);
+    }
+  } catch (error) {
+    console.error("Error getting next external project code:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get next external project code",
+    });
+  }
+};
+
 // @desc    Get all projects (with role-based filtering)
 // @route   GET /api/projects
 // @access  Private (VIEWER+)
@@ -264,14 +362,13 @@ export const getAllProjects = async (req, res) => {
       .populate("teamMembers.user", "firstName lastName email")
       .populate("createdBy", "firstName lastName")
       .populate("department", "name code")
+      .populate("vendorId", "name email phone address")
       .sort({ createdAt: -1 });
 
-    // Enhance projects with team members from new TeamMember model
     const enhancedProjects = await Promise.all(
       projects.map(async (project) => {
         const projectObj = project.toObject();
 
-        // Get team members from new TeamMember model
         const teamMembers = await TeamMember.find({
           project: project._id,
           isActive: true,
@@ -363,12 +460,168 @@ export const getProjectById = async (req, res) => {
   }
 };
 
+// @desc    Add vendor to existing project
+// @route   POST /api/projects/:projectId/add-vendor
+// @access  Private (Project Management HOD)
+export const addVendorToProject = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const currentUser = req.user;
+
+    console.log("➕ [ADD VENDOR] ===== ADD VENDOR TO PROJECT STARTED =====");
+    console.log("➕ [ADD VENDOR] Project ID:", projectId);
+    console.log(
+      "➕ [ADD VENDOR] Current User:",
+      currentUser.name,
+      currentUser.department?.name
+    );
+    console.log("➕ [ADD VENDOR] Vendor Data:", req.body);
+
+    const isProjectManagementHOD =
+      currentUser.department?.name === "Project Management" &&
+      currentUser.role.level >= 700;
+    const isSuperAdmin = currentUser.role.level >= 1000;
+
+    if (!isProjectManagementHOD && !isSuperAdmin) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Only Project Management HOD or Super Admin can add vendors to projects.",
+      });
+    }
+
+    // Find the project
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found.",
+      });
+    }
+
+    // Check if project is in pending_vendor_assignment status
+    if (project.status !== "pending_vendor_assignment") {
+      return res.status(400).json({
+        success: false,
+        message: "Project is not in pending vendor assignment status.",
+      });
+    }
+
+    // Validate required vendor fields
+    const { name, email, phone, address, deliveryAddress } = req.body;
+    if (!name || !email) {
+      return res.status(400).json({
+        success: false,
+        message: "Vendor name and email are required.",
+      });
+    }
+
+    // Check if vendor already exists
+    let vendor = await Vendor.findOne({
+      name: { $regex: new RegExp(name, "i") },
+    });
+
+    if (!vendor) {
+      // Create new vendor
+      const vendorData = {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone?.trim() || "",
+        address: address?.trim() || "",
+        contactPerson: "To be updated",
+        servicesOffered: ["Project Services"],
+        status: "active",
+        createdBy: currentUser._id,
+      };
+
+      vendor = new Vendor(vendorData);
+      await vendor.save();
+      console.log("✅ [ADD VENDOR] New vendor created:", vendor.name);
+    } else {
+      console.log("✅ [ADD VENDOR] Using existing vendor:", vendor.name);
+    }
+
+    // Update project with vendor information
+    project.vendorId = vendor._id;
+    project.deliveryAddress = deliveryAddress?.trim() || "";
+    project.status = "pending_approval"; // Change status to allow approval chain
+
+    // Generate approval chain for the project
+    await project.generateApprovalChain();
+
+    // Save the updated project
+    await project.save();
+
+    console.log("✅ [ADD VENDOR] Project updated successfully");
+    console.log("➕ [ADD VENDOR] New project status:", project.status);
+
+    // Send notifications
+    try {
+      await sendProjectNotification(req, {
+        type: "project_updated",
+        projectId: project._id,
+        message: `Vendor added to project: ${project.name}`,
+        recipients: [currentUser._id],
+      });
+    } catch (notificationError) {
+      console.error(
+        "❌ [ADD VENDOR] Error sending notification:",
+        notificationError
+      );
+    }
+
+    res.status(200).json({
+      success: true,
+      message:
+        "Vendor added successfully. Project status updated to pending approval.",
+      data: {
+        project: {
+          _id: project._id,
+          name: project.name,
+          code: project.code,
+          status: project.status,
+          vendorId: project.vendorId,
+        },
+        vendor: {
+          _id: vendor._id,
+          name: vendor.name,
+          email: vendor.email,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("❌ [ADD VENDOR] Error adding vendor to project:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error while adding vendor to project.",
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Create new project
 // @route   POST /api/projects
 // @access  Private (STAFF+)
 export const createProject = async (req, res) => {
+  const session = await mongoose.startSession();
+
   try {
+    await session.startTransaction();
     const currentUser = req.user;
+
+    // Log full form data being sent to controller
+    console.log("📋 [PROJECT CREATE] Full form data received:");
+    console.log(
+      "📋 [PROJECT CREATE] req.body:",
+      JSON.stringify(req.body, null, 2)
+    );
+    console.log("📋 [PROJECT CREATE] Current user:", {
+      id: currentUser._id,
+      name: currentUser.firstName + " " + currentUser.lastName,
+      department: currentUser.department?.name,
+      role: currentUser.role?.name,
+      roleLevel: currentUser.role?.level,
+    });
 
     if (currentUser.role.level < 300) {
       return res.status(403).json({
@@ -424,8 +677,33 @@ export const createProject = async (req, res) => {
       }
     }
 
+    // Only HODs can create departmental projects
+    if (req.body.projectScope === "departmental") {
+      if (currentUser.role.level < 700) {
+        return res.status(403).json({
+          success: false,
+          message: "Access denied. Only HODs can create departmental projects.",
+          errors: ["Only HODs can create departmental projects"],
+        });
+      }
+    }
+
     // Add project items requirements for external projects
     if (req.body.projectScope === "external") {
+      // Only Project Management HOD can create external projects
+      const isProjectManagementHOD =
+        currentUser.department?.name === "Project Management" &&
+        currentUser.role.level >= 700;
+
+      if (!isProjectManagementHOD) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Access denied. Only Project Management HOD can create external projects.",
+          errors: ["Only Project Management HOD can create external projects"],
+        });
+      }
+
       // Validate project items
       if (
         !req.body.projectItems ||
@@ -467,19 +745,152 @@ export const createProject = async (req, res) => {
         }
       });
 
-      // Validate total items cost doesn't exceed budget
+      // Smart budget validation and allocation logic
       const totalItemsCost = req.body.projectItems.reduce(
         (sum, item) => sum + (item.totalPrice || 0),
         0
       );
       const projectBudget = parseFloat(req.body.budget) || 0;
-      if (totalItemsCost > projectBudget) {
-        return res.status(400).json({
-          success: false,
-          message: "Project items cost exceeds budget",
-          errors: ["Total project items cost cannot exceed project budget"],
-          fieldErrors: { projectItems: "Items cost exceeds budget" },
-        });
+      const requiresBudgetAllocation =
+        req.body.requiresBudgetAllocation === "true";
+      const budgetPercentage = parseFloat(req.body.budgetPercentage) || 100;
+
+      console.log(`💰 [BUDGET VALIDATION] Project: ${req.body.name}`);
+      console.log(
+        `💰 [BUDGET VALIDATION] Total Budget: ₦${projectBudget.toLocaleString()}`
+      );
+      console.log(
+        `💰 [BUDGET VALIDATION] Items Cost: ₦${totalItemsCost.toLocaleString()}`
+      );
+      console.log(
+        `💰 [BUDGET VALIDATION] Budget Allocation: ${requiresBudgetAllocation}`
+      );
+      console.log(
+        `💰 [BUDGET VALIDATION] ELRA Percentage: ${budgetPercentage}%`
+      );
+
+      const elraContribution = (totalItemsCost * budgetPercentage) / 100;
+      const clientContribution = totalItemsCost - elraContribution;
+
+      console.log(
+        `💰 [BUDGET VALIDATION] ELRA Pays: ₦${elraContribution.toLocaleString()}`
+      );
+      console.log(
+        `💰 [BUDGET VALIDATION] Client Pays: ₦${clientContribution.toLocaleString()}`
+      );
+
+      if (requiresBudgetAllocation) {
+        if (totalItemsCost > projectBudget) {
+          return res.status(400).json({
+            success: false,
+            message: "Project items cost exceeds total budget",
+            errors: [
+              `Total project items cost (₦${totalItemsCost.toLocaleString()}) cannot exceed total budget (₦${projectBudget.toLocaleString()})`,
+              `Please reduce items cost or increase the total budget`,
+            ],
+            fieldErrors: {
+              projectItems: "Items cost exceeds total budget",
+              budget: "Increase total budget or reduce items cost",
+            },
+            budgetBreakdown: {
+              totalBudget: projectBudget,
+              elraContribution,
+              clientContribution,
+              itemsCost: totalItemsCost,
+              elraPercentage: budgetPercentage,
+              clientPercentage: 100 - budgetPercentage,
+            },
+          });
+        }
+
+        // Check if ELRA wallet has sufficient funds in projects budget category
+        try {
+          const ELRAWallet = (await import("../models/ELRAWallet.js")).default;
+          const wallet = await ELRAWallet.findOne({
+            elraInstance: "ELRA_MAIN",
+          });
+
+          if (!wallet) {
+            return res.status(500).json({
+              success: false,
+              message: "ELRA wallet not found",
+              errors: ["Unable to verify budget allocation"],
+            });
+          }
+
+          const projectBudgetCategory = wallet.budgetCategories?.projects;
+          if (!projectBudgetCategory) {
+            return res.status(500).json({
+              success: false,
+              message: "Project budget category not initialized",
+              errors: ["Unable to verify budget allocation"],
+            });
+          }
+
+          if (projectBudgetCategory.available < elraContribution) {
+            return res.status(400).json({
+              success: false,
+              message: "Insufficient ELRA project budget",
+              errors: [
+                `ELRA project budget available: ₦${projectBudgetCategory.available.toLocaleString()}`,
+                `Required for this project: ₦${elraContribution.toLocaleString()}`,
+                `Shortfall: ₦${(
+                  elraContribution - projectBudgetCategory.available
+                ).toLocaleString()}`,
+              ],
+              fieldErrors: {
+                budgetPercentage:
+                  "Reduce ELRA percentage or contact Finance HOD to allocate more project budget",
+              },
+              budgetBreakdown: {
+                totalBudget: projectBudget,
+                elraContribution,
+                clientContribution,
+                itemsCost: totalItemsCost,
+                elraPercentage: budgetPercentage,
+                clientPercentage: 100 - budgetPercentage,
+                elraAvailable: projectBudgetCategory.available,
+                shortfall: elraContribution - projectBudgetCategory.available,
+              },
+            });
+          }
+
+          console.log(
+            `✅ [BUDGET VALIDATION] ELRA wallet has sufficient funds: ₦${projectBudgetCategory.available.toLocaleString()}`
+          );
+        } catch (walletError) {
+          console.error(
+            "❌ [BUDGET VALIDATION] Wallet check error:",
+            walletError
+          );
+          return res.status(500).json({
+            success: false,
+            message: "Error checking ELRA wallet",
+            errors: ["Unable to verify budget allocation"],
+          });
+        }
+      } else {
+        // When no budget allocation, items cost should not exceed total budget
+        if (totalItemsCost > projectBudget) {
+          return res.status(400).json({
+            success: false,
+            message: "Project items cost exceeds total budget",
+            errors: [
+              `Total project items cost (₦${totalItemsCost.toLocaleString()}) cannot exceed project budget (₦${projectBudget.toLocaleString()})`,
+              "Consider enabling budget allocation to allow ELRA to contribute",
+            ],
+            fieldErrors: {
+              projectItems: "Items cost exceeds total budget",
+              requiresBudgetAllocation:
+                "Enable budget allocation to allow ELRA contribution",
+            },
+            budgetBreakdown: {
+              totalBudget: projectBudget,
+              itemsCost: totalItemsCost,
+              shortfall: totalItemsCost - projectBudget,
+            },
+          });
+        }
       }
 
       // Validate vendor information for external projects
@@ -670,8 +1081,12 @@ export const createProject = async (req, res) => {
           projectStatus = "pending_approval";
         }
       } else {
-        // External projects always need approval
-        projectStatus = "pending_approval";
+        // External projects - check if vendor is assigned
+        if (req.body.hasVendor && req.body.vendorName) {
+          projectStatus = "pending_approval";
+        } else {
+          projectStatus = "pending_vendor_assignment";
+        }
       }
     } else {
       // For budgets >₦1M, also check budget allocation for personal/departmental projects
@@ -697,11 +1112,18 @@ export const createProject = async (req, res) => {
           );
         }
       } else {
-        // External projects always need approval
-        projectStatus = "pending_approval";
-        console.log(
-          `⏸️ [PROJECT STATUS] Pending approval: External project (budget: ${req.body.budget})`
-        );
+        // External projects - check if vendor is assigned
+        if (req.body.hasVendor && req.body.vendorName) {
+          projectStatus = "pending_approval";
+          console.log(
+            `⏸️ [PROJECT STATUS] Pending approval: External project with vendor (budget: ${req.body.budget})`
+          );
+        } else {
+          projectStatus = "pending_vendor_assignment";
+          console.log(
+            `⏸️ [PROJECT STATUS] Pending vendor assignment: External project without vendor (budget: ${req.body.budget})`
+          );
+        }
       }
     }
 
@@ -777,9 +1199,13 @@ export const createProject = async (req, res) => {
         const isUserFromProjectManagementDepartment =
           assignedManager.department?.name === "Project Management";
 
+        // Allow Project Management HOD to assign themselves
+        const isSelfAssignment =
+          assignedManager._id.toString() === currentUser._id.toString();
+
         // Project Management HOD can assign themselves or Project Management department users at levels 700, 600, 300
         if (isProjectManagementDepartment && currentUser.role.level === 700) {
-          if (!isUserFromProjectManagementDepartment) {
+          if (!isSelfAssignment && !isUserFromProjectManagementDepartment) {
             return res.status(403).json({
               success: false,
               message: "Access denied",
@@ -793,31 +1219,34 @@ export const createProject = async (req, res) => {
             });
           }
 
-          // Check if assigned manager has appropriate role level (700, 600, 300)
-          if (![700, 600, 300].includes(assignedManager.role.level)) {
+          // Check if assigned manager has appropriate role level (700, 600, 300) - skip for self-assignment
+          if (
+            !isSelfAssignment &&
+            ![700, 600, 300].includes(assignedManager.role.level)
+          ) {
             return res.status(403).json({
               success: false,
               message: "Access denied",
               errors: [
-                "For external projects, you can only assign HR department managers at levels 700, 600, or 300",
+                "For external projects, you can only assign Project Management department managers at levels 700, 600, or 300",
               ],
               fieldErrors: {
                 projectManager:
-                  "You can only assign HR managers at levels 700, 600, or 300",
+                  "You can only assign Project Management managers at levels 700, 600, or 300",
               },
             });
           }
         } else {
-          // Non-HR users cannot assign project managers for external projects
+          // Non-Project Management users cannot assign project managers for external projects
           return res.status(403).json({
             success: false,
             message: "Access denied",
             errors: [
-              "Only HR HOD can assign project managers for external projects",
+              "Only Project Management HOD can assign project managers for external projects",
             ],
             fieldErrors: {
               projectManager:
-                "Only HR HOD can assign project managers for external projects",
+                "Only Project Management HOD can assign project managers for external projects",
             },
           });
         }
@@ -854,18 +1283,18 @@ export const createProject = async (req, res) => {
           const vendorData = {
             name: req.body.vendorName,
             contactPerson: "To be updated",
-            address: {
-              street: "To be updated",
-              city: "To be updated",
-              state: "To be updated",
-              country: "Nigeria",
-            },
+            address: req.body.vendorAddress || "Address not provided",
             servicesOffered: [req.body.vendorCategory || "other"],
             status: "pending",
             createdBy: currentUser._id,
           };
 
-          // Add email and phone only if provided
+          console.log(
+            `📧 [VENDOR DEBUG] Form data vendorEmail: ${req.body.vendorEmail}`
+          );
+          console.log(
+            `📧 [VENDOR DEBUG] Form data clientEmail: ${req.body.clientEmail}`
+          );
           if (req.body.vendorEmail && req.body.vendorEmail.trim()) {
             vendorData.email = req.body.vendorEmail.trim().toLowerCase();
             console.log(`📧 [VENDOR] Email provided: ${vendorData.email}`);
@@ -927,7 +1356,14 @@ export const createProject = async (req, res) => {
             budget: parseFloat(req.body.budget),
             startDate: req.body.startDate,
             endDate: req.body.endDate,
-            projectItems: req.body.projectItems || [],
+            projectItems: (req.body.projectItems || []).map((item) => ({
+              ...item,
+              unitPrice:
+                parseFloat(item.unitPrice?.toString().replace(/,/g, "")) || 0,
+              totalPrice:
+                parseFloat(item.totalPrice?.toString().replace(/,/g, "")) || 0,
+              quantity: parseInt(item.quantity) || 1,
+            })),
             category: req.body.category || "Not specified",
             projectManager: projectManagerName,
             priority: req.body.priority || "medium",
@@ -935,51 +1371,8 @@ export const createProject = async (req, res) => {
             requiresBudgetAllocation:
               req.body.requiresBudgetAllocation || false,
             vendorCategory: req.body.vendorCategory || "Not specified",
+            code: req.body.code,
           };
-
-          // Debug logging for budget allocation
-          console.log("🔍 [PDF DEBUG] Budget allocation data:");
-          console.log(
-            "  - req.body.requiresBudgetAllocation:",
-            req.body.requiresBudgetAllocation
-          );
-          console.log(
-            "  - projectData.requiresBudgetAllocation:",
-            projectData.requiresBudgetAllocation
-          );
-          console.log("  - Type:", typeof projectData.requiresBudgetAllocation);
-
-          console.log(
-            `📄 [VENDOR PDF] Generating receipt for vendor: ${vendor.name}`
-          );
-          const pdfBuffer = await generateVendorReceiptPDF(vendor, projectData);
-          console.log(`📄 [VENDOR PDF] Receipt generated successfully`);
-
-          // Only send email if vendor has an email address
-          if (vendor.email && vendor.email.trim()) {
-            console.log(
-              `📧 [VENDOR EMAIL] Sending notification to: ${vendor.email}`
-            );
-            const emailResult = await emailService.sendVendorNotificationEmail(
-              vendor,
-              projectData,
-              pdfBuffer
-            );
-
-            if (emailResult.success) {
-              console.log(
-                `📧 [VENDOR EMAIL] ✅ Welcome email with PDF sent successfully to ${vendor.email}`
-              );
-            } else {
-              console.error(
-                `📧 [VENDOR EMAIL] ❌ Failed to send email to ${vendor.email}: ${emailResult.error}`
-              );
-            }
-          } else {
-            console.log(
-              `📧 [VENDOR EMAIL] ⚠️ No email address provided - skipping email notification`
-            );
-          }
         } catch (emailError) {
           console.error("❌ [VENDOR EMAIL] Failed to send email:", emailError);
         }
@@ -995,8 +1388,20 @@ export const createProject = async (req, res) => {
       }
     }
 
+    // Parse projectItems to ensure numeric values
+    const parsedProjectItems =
+      req.body.projectItems?.map((item) => ({
+        ...item,
+        unitPrice:
+          parseFloat(item.unitPrice?.toString().replace(/,/g, "")) || 0,
+        totalPrice:
+          parseFloat(item.totalPrice?.toString().replace(/,/g, "")) || 0,
+        quantity: parseInt(item.quantity) || 1,
+      })) || [];
+
     const projectData = {
       ...req.body,
+      projectItems: parsedProjectItems,
       projectManager,
       createdBy: currentUser._id,
       department: currentUser.department,
@@ -1006,17 +1411,67 @@ export const createProject = async (req, res) => {
       vendorId: vendorId, // Set the vendor ID for external projects
     };
 
+    // Debug log for budgetPercentage
+    console.log("🔍 [PROJECT DATA DEBUG] Budget Percentage:", {
+      fromReqBody: req.body.budgetPercentage,
+      inProjectData: projectData.budgetPercentage,
+      projectScope: projectData.projectScope,
+      requiresBudgetAllocation: projectData.requiresBudgetAllocation,
+    });
+
+    // Comprehensive debug log for all form data
+    console.log("🔍 [COMPLETE FORM DATA DEBUG]:");
+    console.log("  - Project Name:", req.body.name);
+    console.log("  - Budget Percentage:", req.body.budgetPercentage);
+    console.log(
+      "  - Requires Budget Allocation:",
+      req.body.requiresBudgetAllocation
+    );
+    console.log("  - Client Name:", req.body.clientName);
+    console.log("  - Client Email:", req.body.clientEmail);
+    console.log("  - Vendor Name:", req.body.vendorName);
+    console.log("  - Vendor Email:", req.body.vendorEmail);
+    console.log("  - Vendor Address:", req.body.vendorAddress);
+    console.log("  - Delivery Address:", req.body.deliveryAddress);
+    console.log("  - Project Items Count:", req.body.projectItems?.length || 0);
+
     const project = new Project(projectData);
     console.log(
       `🔍 [PROJECT CREATED] Scope: ${project.projectScope}, Status: ${project.status}`
     );
 
-    // Only generate approval chain if project needs approval
+    await project.save({ session });
+
+    // Debug log after saving
+    console.log("🔍 [PROJECT SAVED DEBUG] Budget Percentage:", {
+      savedBudgetPercentage: project.budgetPercentage,
+      projectCode: project.code,
+      projectScope: project.projectScope,
+    });
+
+    // Comprehensive debug log after saving
+    console.log("🔍 [SAVED PROJECT DEBUG]:");
+    console.log("  - Project Code:", project.code);
+    console.log("  - Budget Percentage:", project.budgetPercentage);
+    console.log("  - Client Name:", project.clientName);
+    console.log("  - Client Email:", project.clientEmail);
+    console.log("  - Vendor ID:", project.vendorId);
+    console.log("  - Project Items Count:", project.projectItems?.length || 0);
+    console.log(
+      "  - Total Project Items Cost:",
+      project.projectItems?.reduce((sum, item) => sum + item.totalPrice, 0) || 0
+    );
+
     if (projectStatus === "pending_approval") {
       await project.generateApprovalChain();
 
+      const creatorDepartment = currentUser.department?.name;
+      const isSpecialCase = isSpecialCaseHOD(
+        creatorDepartment,
+        currentUser.role.level
+      );
+
       if (project.approvalChain && project.approvalChain.length > 0) {
-        // Auto-approve steps where the creator is the approver
         let hasAutoApproved = false;
 
         for (let i = 0; i < project.approvalChain.length; i++) {
@@ -1025,82 +1480,67 @@ export const createProject = async (req, res) => {
           if (step.status === "pending") {
             let shouldAutoApprove = false;
 
-            // Auto-approve logic based on project scope and creator's department
-            const creatorDepartment = currentUser.department?.name;
-            const isCreatorHOD = currentUser.role.level === 700;
-
-            if (project.projectScope === "personal") {
-              // Personal projects: Auto-approve if creator is from approval department
+            // PRIORITY 1: Check if creator is HOD of their own department (for department HOD approval)
+            if (
+              isCreatorHOD(currentUser.role.level) &&
+              step.level === "hod" &&
+              creatorDepartment === project.department?.name
+            ) {
+              shouldAutoApprove = true;
+              console.log(
+                `✅ [AUTO-APPROVE] Department HOD approval - Creator is HOD of ${creatorDepartment}`
+              );
+            }
+            // PRIORITY 2: Check if creator is special case HOD (for cross-departmental approvals)
+            // Only check if not already auto-approved and creator is special case HOD
+            else if (isSpecialCase && !shouldAutoApprove) {
               if (
-                step.level === "finance" &&
-                creatorDepartment === "Finance & Accounting"
+                step.level === "project_management" &&
+                creatorDepartment === "Project Management"
               ) {
                 shouldAutoApprove = true;
-              } else if (
-                step.level === "executive" &&
-                creatorDepartment === "Executive Office"
-              ) {
-                shouldAutoApprove = true;
-              }
-            } else if (project.projectScope === "departmental") {
-              // Departmental projects: Auto-approve HOD step if creator is HOD of same department
-              if (step.level === "hod") {
-                shouldAutoApprove =
-                  isCreatorHOD &&
-                  currentUser.department &&
-                  (currentUser.department._id?.toString() ===
-                    step.department.toString() ||
-                    currentUser.department.toString() ===
-                      step.department.toString());
-              } else if (
-                step.level === "finance" &&
-                creatorDepartment === "Finance & Accounting"
-              ) {
-                shouldAutoApprove = true;
-              } else if (
-                step.level === "executive" &&
-                creatorDepartment === "Executive Office"
-              ) {
-                shouldAutoApprove = true;
-              }
-            } else if (project.projectScope === "external") {
-              // External projects: Auto-approve if creator is from approval department
-              const isProjectManagementDepartment =
-                currentUser.department?.name === "Project Management";
-
-              if (step.level === "hod") {
-                shouldAutoApprove =
-                  isCreatorHOD && isProjectManagementDepartment;
+                console.log(
+                  `✅ [AUTO-APPROVE] Project Management approval - Creator is Project Management HOD`
+                );
               } else if (
                 step.level === "legal_compliance" &&
                 creatorDepartment === "Legal & Compliance"
               ) {
                 shouldAutoApprove = true;
+                console.log(
+                  `✅ [AUTO-APPROVE] Legal Compliance approval - Creator is Legal HOD`
+                );
               } else if (
                 step.level === "finance" &&
                 creatorDepartment === "Finance & Accounting"
               ) {
                 shouldAutoApprove = true;
+                console.log(
+                  `✅ [AUTO-APPROVE] Finance approval - Creator is Finance HOD`
+                );
               } else if (
                 step.level === "executive" &&
                 creatorDepartment === "Executive Office"
               ) {
                 shouldAutoApprove = true;
+                console.log(
+                  `✅ [AUTO-APPROVE] Executive approval - Creator is Executive HOD`
+                );
               }
             }
 
             if (shouldAutoApprove) {
               step.status = "approved";
               step.approver = currentUser._id;
-              step.comments = `Auto-approved by project creator (${currentUser.department?.name} ${currentUser.role?.name})`;
+              step.comments = `Auto-approved by HOD (${creatorDepartment})`;
               step.approvedAt = new Date();
               hasAutoApproved = true;
               console.log(
-                `✅ [AUTO-APPROVE] Auto-approved ${step.level} step for ${currentUser.department?.name} ${currentUser.role?.name}`
+                `✅ [SPECIAL_CASE_AUTO-APPROVE] Auto-approved ${step.level} step for Special Case HOD (${creatorDepartment})`
               );
             } else {
               console.log(
-                `⏸️ [AUTO-APPROVE] Stopping auto-approval at ${step.level} step - requires manual approval`
+                `⏸️ [SPECIAL_CASE_AUTO-APPROVE] Stopping auto-approval at ${step.level} step - requires manual approval`
               );
               break;
             }
@@ -1247,6 +1687,35 @@ export const createProject = async (req, res) => {
                   )}`
                 );
               }
+            } else if (nextApproval.level === "project_management") {
+              console.log("🔍 [DEBUG] Looking for Project Management HOD...");
+
+              const pmDept = await mongoose
+                .model("Department")
+                .findOne({ name: "Project Management" });
+
+              const hodRole = await mongoose
+                .model("Role")
+                .findOne({ name: "HOD" });
+
+              if (pmDept && hodRole) {
+                approverQuery = {
+                  role: hodRole._id,
+                  department: pmDept._id,
+                };
+
+                console.log(
+                  `🔍 [DEBUG] Project Management HOD query: ${JSON.stringify(
+                    approverQuery
+                  )}`
+                );
+                console.log(`🔍 [DEBUG] PM Dept ID: ${pmDept._id}`);
+                console.log(`🔍 [DEBUG] HOD Role ID: ${hodRole._id}`);
+              } else {
+                console.log(
+                  `❌ [DEBUG] PM Dept found: ${!!pmDept}, HOD Role found: ${!!hodRole}`
+                );
+              }
             } else if (nextApproval.level === "legal_compliance") {
               // Find Legal & Compliance HOD
               console.log("🔍 [DEBUG] Looking for Legal & Compliance HOD...");
@@ -1364,6 +1833,108 @@ export const createProject = async (req, res) => {
     }
 
     await project.save();
+
+    // Reserve funds from ELRA wallet if budget allocation is required
+    // Only external projects reserve funds immediately during creation
+    // Personal and departmental projects reserve funds after Finance HOD approval
+    if (
+      (project.requiresBudgetAllocation === "true" ||
+        project.requiresBudgetAllocation === true) &&
+      project.projectScope === "external"
+    ) {
+      console.log(
+        `💰 [ELRA WALLET] Starting wallet reservation process for external project...`
+      );
+      console.log(
+        `💰 [ELRA WALLET] Project: ${project.name} (${project.code})`
+      );
+      console.log(
+        `💰 [ELRA WALLET] Budget allocation required: ${project.requiresBudgetAllocation}`
+      );
+
+      try {
+        const ELRAWallet = (await import("../models/ELRAWallet.js")).default;
+        const wallet = await ELRAWallet.findOne({ elraInstance: "ELRA_MAIN" });
+
+        if (!wallet) {
+          throw new Error("ELRA wallet not found");
+        }
+
+        console.log(`💰 [ELRA WALLET] Wallet found:`, {
+          id: wallet._id,
+          totalFunds: wallet.totalFunds,
+          availableFunds: wallet.availableFunds,
+          reservedFunds: wallet.reservedFunds,
+          projectsAvailable: wallet.budgetCategories.projects.available,
+          projectsReserved: wallet.budgetCategories.projects.reserved,
+        });
+
+        // Calculate ELRA contribution for external projects
+        const actualItemsCost = project.projectItems.reduce(
+          (total, item) => total + (item.totalPrice || 0),
+          0
+        );
+        const budgetPercentage = project.budgetPercentage || 100;
+        const elraContribution = (actualItemsCost * budgetPercentage) / 100;
+
+        console.log(`💰 [ELRA WALLET] External project - using items cost:`, {
+          actualItemsCost,
+          budgetPercentage,
+          elraContribution,
+        });
+
+        console.log(
+          `💰 [ELRA WALLET] Final calculation for external project:`,
+          {
+            projectScope: project.projectScope,
+            budgetPercentage: project.budgetPercentage || 100,
+            elraContribution,
+            projectItems: project.projectItems?.length || 0,
+          }
+        );
+
+        console.log(
+          `💰 [ELRA WALLET] BEFORE RESERVATION - Projects budget: Available ₦${wallet.budgetCategories.projects.available.toLocaleString()}, Reserved ₦${wallet.budgetCategories.projects.reserved.toLocaleString()}`
+        );
+
+        console.log(
+          `💰 [ELRA WALLET] Reserving ₦${elraContribution.toLocaleString()} from projects budget category for external project`
+        );
+
+        // Reserve funds from projects budget category for external projects
+        await wallet.reserveFromCategory(
+          "projects",
+          elraContribution,
+          `External Project: ${project.name} (${project.code}) - ELRA Contribution`,
+          project.code,
+          project._id,
+          "project",
+          currentUser._id,
+          session
+        );
+
+        console.log(
+          `✅ [ELRA WALLET] Successfully reserved ₦${elraContribution.toLocaleString()} for external project ${
+            project.code
+          }`
+        );
+      } catch (walletError) {
+        console.error(`❌ [ELRA WALLET] Error reserving funds:`, walletError);
+        throw walletError;
+      }
+    } else if (
+      (project.requiresBudgetAllocation === "true" ||
+        project.requiresBudgetAllocation === true) &&
+      (project.projectScope === "personal" ||
+        project.projectScope === "departmental")
+    ) {
+      console.log(
+        `💰 [ELRA WALLET] Personal/Departmental project with budget allocation - funds will be reserved after Finance HOD approval`
+      );
+      console.log(
+        `💰 [ELRA WALLET] Project: ${project.name} (${project.code}) - Status: ${project.status}`
+      );
+    }
 
     // Handle auto-approved projects (no budget allocation needed)
     if (projectStatus === "approved") {
@@ -1558,22 +2129,194 @@ export const createProject = async (req, res) => {
       }
     }
 
+    await session.commitTransaction();
+    console.log("✅ [TRANSACTION] Database transaction committed successfully");
+
+    console.log(
+      "📧 [EMAILS] Starting email notifications after successful transaction..."
+    );
+
+    if (project.projectScope === "external" && project.clientEmail) {
+      try {
+        console.log(
+          `📧 [CLIENT EMAIL] Sending notification to client: ${project.clientEmail}`
+        );
+
+        const clientData = {
+          clientName: project.clientName,
+          clientEmail: project.clientEmail,
+          clientCompany: project.clientCompany,
+          clientPhone: project.clientPhone,
+          clientAddress: project.clientAddress,
+        };
+
+        const projectData = {
+          name: project.name,
+          code: project.code,
+          budget: project.budget,
+          budgetPercentage: project.budgetPercentage || 100,
+          requiresBudgetAllocation: project.requiresBudgetAllocation,
+          startDate: project.startDate,
+          endDate: project.endDate,
+          category: project.category,
+          description: project.description,
+          projectItems: project.projectItems || [],
+          status: project.status,
+          priority: project.priority,
+          projectScope: project.projectScope,
+          deliveryAddress: project.deliveryAddress,
+          vendor: project.vendor
+            ? {
+                name: project.vendor.name,
+                email: project.vendor.email,
+                phone: project.vendor.phone,
+                address: project.vendor.address,
+              }
+            : null,
+        };
+
+        // Generate client project PDF
+        console.log(
+          `📄 [CLIENT PDF] Generating project details PDF for client`
+        );
+        const clientPdfBuffer = await generateClientProjectPDF(
+          clientData,
+          projectData
+        );
+        console.log(
+          `📄 [CLIENT PDF] Client project details PDF generated successfully`
+        );
+
+        const emailResult = await emailService.sendClientNotificationEmail(
+          clientData,
+          projectData,
+          clientPdfBuffer
+        );
+
+        if (emailResult.success) {
+          console.log(
+            `📧 [CLIENT EMAIL] ✅ Client notification sent successfully to ${project.clientEmail}`
+          );
+        } else {
+          console.error(
+            `📧 [CLIENT EMAIL] ❌ Failed to send email to ${project.clientEmail}: ${emailResult.error}`
+          );
+        }
+      } catch (clientEmailError) {
+        console.error(
+          "❌ [CLIENT EMAIL] Failed to send client email:",
+          clientEmailError
+        );
+      }
+    } else {
+      console.log(
+        "📧 [CLIENT EMAIL] ❌ Client email NOT sent - condition failed:",
+        {
+          projectScope: project.projectScope,
+          clientEmail: project.clientEmail,
+          reason:
+            !project.projectScope === "external"
+              ? "Not external project"
+              : "No client email",
+        }
+      );
+    }
+
+    // Send vendor email AFTER successful transaction
+    if (projectScope === "external" && vendorId) {
+      try {
+        const vendor = await Vendor.findById(vendorId);
+        console.log(`📧 [VENDOR DEBUG] Retrieved vendor from DB:`, {
+          id: vendor?._id,
+          name: vendor?.name,
+          email: vendor?.email,
+          phone: vendor?.phone,
+        });
+        if (vendor && vendor.email && vendor.email.trim()) {
+          console.log(
+            "📧 [VENDOR EMAIL] ===== VENDOR EMAIL TRIGGER CHECK ====="
+          );
+          console.log("📧 [VENDOR EMAIL] Vendor email check:", {
+            hasEmail: !!vendor.email,
+            emailValue: vendor.email,
+            emailTrimmed: vendor.email?.trim(),
+            willSendEmail: !!(vendor.email && vendor.email.trim()),
+          });
+
+          const projectData = {
+            name: project.name,
+            code: project.code,
+            budget: project.budget,
+            budgetPercentage: project.budgetPercentage || 100,
+            requiresBudgetAllocation: project.requiresBudgetAllocation,
+            startDate: project.startDate,
+            endDate: project.endDate,
+            category: project.category,
+            description: project.description,
+            projectItems: project.projectItems || [],
+            status: project.status,
+            priority: project.priority,
+            projectScope: project.projectScope,
+            deliveryAddress: project.deliveryAddress,
+          };
+
+          console.log(
+            `📄 [VENDOR PDF] Generating receipt for vendor: ${vendor.name}`
+          );
+          const pdfBuffer = await generateVendorReceiptPDF(vendor, projectData);
+          console.log(`📄 [VENDOR PDF] Receipt generated successfully`);
+
+          console.log(
+            `📧 [VENDOR EMAIL] Sending notification to: ${vendor.email}`
+          );
+          const emailResult = await emailService.sendVendorNotificationEmail(
+            vendor,
+            projectData,
+            pdfBuffer
+          );
+
+          if (emailResult.success) {
+            console.log(
+              `📧 [VENDOR EMAIL] ✅ Welcome email with PDF sent successfully to ${vendor.email}`
+            );
+          } else {
+            console.error(
+              `📧 [VENDOR EMAIL] ❌ Failed to send email to ${vendor.email}: ${emailResult.error}`
+            );
+          }
+        } else {
+          console.log(
+            `📧 [VENDOR EMAIL] ⚠️ No email address provided - skipping email notification`
+          );
+        }
+      } catch (vendorEmailError) {
+        console.error(
+          "❌ [VENDOR EMAIL] Failed to send email:",
+          vendorEmailError
+        );
+      }
+    }
+
     console.log(
       `✅ [PROJECT] Project created successfully: ${project.name} (${project.code})`
     );
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "Project created successfully",
       data: project,
     });
   } catch (error) {
+    await session.abortTransaction();
     console.error("❌ [PROJECT] Create project error:", error);
     res.status(500).json({
       success: false,
       message: "Error creating project",
       error: error.message,
     });
+  } finally {
+    // End the session
+    await session.endSession();
   }
 };
 
@@ -2764,6 +3507,12 @@ export const approveProject = async (req, res) => {
         "🎯 [APPROVAL] Final approval received - triggering post-approval workflow"
       );
 
+      // Note: Funds will be moved from reserved to used when procurement orders are marked as "paid"
+      // This ensures accurate tracking of actual spending vs. just project approval
+      console.log(
+        `💰 [PROJECT APPROVAL] Project ${project.code} approved - funds remain in reserved status until actual procurement spending occurs`
+      );
+
       try {
         await project.triggerPostApprovalWorkflow(currentUser);
         console.log(
@@ -2834,7 +3583,6 @@ export const approveProject = async (req, res) => {
 
     // Send notification to next approver if there is one
     if (project.status !== "approved") {
-      // Special case: Send budget allocation notification when status is pending_budget_allocation
       if (project.status === "pending_budget_allocation") {
         try {
           console.log(
@@ -4053,6 +4801,483 @@ export const getProjectManagementPendingApprovalProjects = async (req, res) => {
   }
 };
 
+// @desc    Get project approval reports for approvers
+// @route   GET /api/projects/approval-reports
+// @access  Private (HODs and above)
+export const getProjectApprovalReports = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const { period = "365", approverId } = req.query;
+
+    // Check access level
+    if (currentUser.role.level < 700) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. HOD level (700) or higher required for reports access.",
+      });
+    }
+
+    // Calculate date range based on period (allow up to 20 years)
+    const endDate = new Date();
+    const startDate = new Date();
+    const periodDays = Math.min(parseInt(period), 7300); // Max 20 years (20 * 365)
+    startDate.setDate(endDate.getDate() - periodDays);
+
+    console.log(
+      `📊 [PROJECT REPORTS] Generating reports for ${currentUser.firstName} ${currentUser.lastName}`
+    );
+    console.log(
+      `📊 [PROJECT REPORTS] Period: ${period} days (${startDate.toISOString()} to ${endDate.toISOString()})`
+    );
+
+    // STEP 1: Get PENDING projects using EXACT same logic as getPendingApprovalProjects
+    let pendingQuery = {
+      status: {
+        $in: [
+          "pending_project_management_approval",
+          "pending_legal_compliance_approval",
+          "pending_finance_approval",
+          "pending_executive_approval",
+          "pending_procurement",
+          "resubmitted",
+        ],
+      },
+      isActive: true,
+    };
+
+    // For HODs, exclude projects from their own department
+    if (currentUser.role.level < 1000) {
+      pendingQuery.department = { $ne: currentUser.department._id };
+    }
+
+    const allPendingProjects = await Project.find(pendingQuery)
+      .populate("createdBy", "firstName lastName email department")
+      .populate("department", "name")
+      .populate("approvalChain.approver", "firstName lastName email department")
+      .sort({ createdAt: -1 });
+
+    // Filter projects where current user is the next approver (EXACT same logic as getPendingApprovalProjects)
+    const pendingProjects = allPendingProjects.filter((project) => {
+      if (!project.approvalChain || project.approvalChain.length === 0) {
+        return false;
+      }
+
+      // Find the next pending approval step
+      const nextPendingStep = project.approvalChain.find(
+        (step) => step.status === "pending"
+      );
+
+      if (!nextPendingStep) {
+        return false;
+      }
+
+      // For Super Admins, show all cross-departmental approvals
+      if (currentUser.role.level >= 1000) {
+        return true;
+      }
+
+      // For HODs, check if they are responsible for the next approval step
+      const userDepartment = currentUser.department?.name;
+
+      // Project Management HOD approves project_management level
+      if (
+        nextPendingStep.level === "project_management" &&
+        userDepartment === "Project Management"
+      ) {
+        return true;
+      }
+
+      // Legal & Compliance HOD approves legal_compliance level
+      if (
+        nextPendingStep.level === "legal_compliance" &&
+        userDepartment === "Legal & Compliance"
+      ) {
+        return true;
+      }
+
+      // Finance HOD approves finance level
+      if (
+        nextPendingStep.level === "finance" &&
+        userDepartment === "Finance & Accounting"
+      ) {
+        return true;
+      }
+
+      // Executive approves executive level
+      if (
+        nextPendingStep.level === "executive" &&
+        userDepartment === "Executive"
+      ) {
+        return true;
+      }
+
+      // Procurement HOD approves procurement level
+      if (
+        nextPendingStep.level === "procurement" &&
+        userDepartment === "Operations"
+      ) {
+        return true;
+      }
+
+      return false;
+    });
+
+    // STEP 2: Get APPROVED/REJECTED projects using EXACT same logic as getCrossDepartmentalApprovalHistory
+    const allHistoryProjects = await Project.find({
+      $or: [
+        {
+          "approvalChain.status": "approved",
+          "approvalChain.approver": currentUser._id,
+          isActive: true,
+        },
+        {
+          "approvalChain.status": "approved",
+          "approvalChain.approver": currentUser._id,
+          status: "pending_budget_allocation",
+          isActive: true,
+        },
+        {
+          "approvalChain.status": "rejected",
+          "approvalChain.approver": currentUser._id,
+          isActive: true,
+        },
+      ],
+    })
+      .populate("createdBy", "firstName lastName email department")
+      .populate("department", "name")
+      .populate("approvalChain.approver", "firstName lastName email department")
+      .sort({ updatedAt: -1 });
+
+    // Process history projects the same way as getCrossDepartmentalApprovalHistory
+    const historyProjects = [];
+    for (const project of allHistoryProjects) {
+      const userApprovalStep = project.approvalChain.find(
+        (step) =>
+          (step.status === "approved" || step.status === "rejected") &&
+          step.approver &&
+          step.approver._id.toString() === currentUser._id.toString()
+      );
+
+      if (userApprovalStep) {
+        // Get document counts from requiredDocuments array
+        const totalDocuments = project.requiredDocuments?.length || 0;
+        const submittedDocuments =
+          project.requiredDocuments?.filter((doc) => doc.isSubmitted).length ||
+          0;
+
+        historyProjects.push({
+          _id: project._id,
+          name: project.name,
+          code: project.code,
+          description: project.description,
+          budget: project.budget,
+          startDate: project.startDate,
+          endDate: project.endDate,
+          priority: project.priority,
+          status: project.status,
+          projectScope: project.projectScope,
+          requiresBudgetAllocation: project.requiresBudgetAllocation,
+          createdBy: project.createdBy,
+          projectManager: project.projectManager,
+          department: project.department,
+          approvalLevel: userApprovalStep.level,
+          approvalComments: userApprovalStep.comments,
+          approvedAt: userApprovalStep.approvedAt,
+          approver: userApprovalStep.approver, // This is the key field!
+          requiredDocuments: project.requiredDocuments,
+          projectItems: project.projectItems,
+          approvalChain: project.approvalChain,
+          documentStats: {
+            submitted: submittedDocuments,
+            total: totalDocuments,
+            percentage:
+              totalDocuments > 0
+                ? Math.round((submittedDocuments / totalDocuments) * 100)
+                : 0,
+          },
+          createdAt: project.createdAt,
+          updatedAt: project.updatedAt,
+        });
+      }
+    }
+
+    // STEP 3: Calculate summary statistics (perfect mix of both APIs)
+    const filteredHistoryProjects = historyProjects.filter(
+      (p) => p.approvedAt >= startDate && p.approvedAt <= endDate
+    );
+    const totalProjects =
+      pendingProjects.length + filteredHistoryProjects.length;
+    const pendingCount = pendingProjects.length;
+
+    // Count approved and rejected using EXACT same logic as ApprovalDashboard
+    // Check the top-level approver field, not the approval chain
+
+    // Count approved and rejected - if user is the approver, they approved it regardless of project status
+    // Convert both to strings for proper comparison since they're MongoDB ObjectIds
+    // Also filter by date range for the selected period
+    const approvedCount = historyProjects.filter(
+      (p) =>
+        p.approver?._id?.toString() === currentUser._id.toString() &&
+        p.approvedAt >= startDate &&
+        p.approvedAt <= endDate
+    ).length;
+
+    const rejectedCount = historyProjects.filter(
+      (p) =>
+        p.approver?._id?.toString() === currentUser._id.toString() &&
+        p.status === "rejected" &&
+        p.approvedAt >= startDate &&
+        p.approvedAt <= endDate
+    ).length;
+
+    // Calculate budget impact from projects within the date range
+    const totalBudgetImpact = [
+      ...pendingProjects,
+      ...filteredHistoryProjects,
+    ].reduce((sum, p) => sum + (p.budget || 0), 0);
+
+    const summary = {
+      totalProjects,
+      approvedProjects: approvedCount,
+      rejectedProjects: rejectedCount,
+      pendingProjects: pendingCount,
+      totalBudgetImpact,
+      averageApprovalTime: 0,
+      approvalSuccessRate: 0,
+    };
+
+    // Calculate approval metrics
+    const approvalTimes = [];
+    const approvalCounts = { approved: 0, rejected: 0 };
+
+    historyProjects.forEach((project) => {
+      // Use the top-level approver field and approvedAt
+      if (
+        project.approver?._id?.toString() === currentUser._id.toString() &&
+        project.approvedAt
+      ) {
+        const submittedAt = project.createdAt;
+        const processingTime =
+          (project.approvedAt - submittedAt) / (1000 * 60 * 60 * 24);
+        approvalTimes.push(processingTime);
+
+        if (project.status === "rejected") {
+          approvalCounts.rejected++;
+        } else {
+          approvalCounts.approved++;
+        }
+      }
+    });
+
+    const averageApprovalTime =
+      approvalTimes.length > 0
+        ? Math.round(
+            (approvalTimes.reduce((sum, time) => sum + time, 0) /
+              approvalTimes.length) *
+              10
+          ) / 10
+        : 0;
+
+    const approvalSuccessRate =
+      approvalCounts.approved + approvalCounts.rejected > 0
+        ? Math.round(
+            (approvalCounts.approved /
+              (approvalCounts.approved + approvalCounts.rejected)) *
+              100 *
+              10
+          ) / 10
+        : 0;
+
+    summary.averageApprovalTime = averageApprovalTime;
+    summary.approvalSuccessRate = approvalSuccessRate;
+
+    // Generate monthly trends based on selected period
+    const monthlyTrends = [];
+
+    // Calculate how many months to show based on period
+    let monthsToShow = 3; // default
+    if (periodDays <= 30) {
+      monthsToShow = 1; // Show 1 month for 30 days or less
+    } else if (periodDays <= 90) {
+      monthsToShow = 3; // Show 3 months for 90 days or less
+    } else if (periodDays <= 365) {
+      monthsToShow = 6; // Show 6 months for 1 year or less
+    } else {
+      monthsToShow = 12; // Show 12 months for more than 1 year
+    }
+
+    for (let i = monthsToShow - 1; i >= 0; i--) {
+      const monthStart = new Date();
+      monthStart.setMonth(monthStart.getMonth() - i, 1);
+      const monthEnd = new Date(monthStart);
+      monthEnd.setMonth(monthEnd.getMonth() + 1, 0);
+
+      const monthPending = pendingProjects.filter(
+        (p) => p.createdAt >= monthStart && p.createdAt <= monthEnd
+      );
+
+      const monthHistory = historyProjects.filter(
+        (p) =>
+          p.approver?._id?.toString() === currentUser._id.toString() &&
+          p.approvedAt >= monthStart &&
+          p.approvedAt <= monthEnd
+      );
+
+      monthlyTrends.push({
+        month: monthStart.toLocaleDateString("en-US", { month: "short" }),
+        projects: monthPending.length + monthHistory.length,
+        approved: monthHistory.filter(
+          (p) => p.approver?._id?.toString() === currentUser._id.toString()
+        ).length,
+        pending: monthPending.length,
+        rejected: monthHistory.filter(
+          (p) =>
+            p.approver?._id?.toString() === currentUser._id.toString() &&
+            p.status === "rejected"
+        ).length,
+        budget: [...monthPending, ...monthHistory].reduce(
+          (sum, p) => sum + (p.budget || 0),
+          0
+        ),
+      });
+    }
+
+    // STEP 5: Department breakdown (only projects within the selected period)
+    const departmentMap = new Map();
+    [...pendingProjects, ...filteredHistoryProjects].forEach((project) => {
+      const deptName = project.department?.name || "Unknown";
+      if (!departmentMap.has(deptName)) {
+        departmentMap.set(deptName, {
+          department: deptName,
+          projects: 0,
+          budget: 0,
+          approved: 0,
+          rejected: 0,
+          pending: 0,
+        });
+      }
+
+      const deptData = departmentMap.get(deptName);
+      deptData.projects++;
+      deptData.budget += project.budget || 0;
+
+      // Check if this is a history project (has approver field) or pending project
+      if (project.approver) {
+        // This is a history project - check if current user is the approver
+        if (project.approver._id?.toString() === currentUser._id.toString()) {
+          if (project.status === "rejected") {
+            deptData.rejected++;
+          } else {
+            deptData.approved++;
+          }
+        }
+      } else {
+        // This is a pending project
+        deptData.pending++;
+      }
+    });
+
+    const departmentBreakdown = Array.from(departmentMap.values());
+
+    // STEP 6: Approval metrics (simplified - only keep what's useful)
+    const approvalMetrics = {
+      averageProcessingTime: averageApprovalTime,
+      approvalSuccessRate: approvalSuccessRate,
+    };
+
+    // STEP 7: Recent approvals (last 10 from history + pending projects)
+    const recentHistoryApprovals = filteredHistoryProjects
+      .slice(0, 10)
+      .map((project) => {
+        return {
+          id: project._id,
+          projectName: project.name,
+          department: project.department?.name || "Unknown",
+          budget: project.budget || 0,
+          status: project.status === "rejected" ? "rejected" : "approved",
+          approvedAt: project.approvedAt || project.createdAt,
+          processingTime: project.approvedAt
+            ? Math.round(
+                ((project.approvedAt - project.createdAt) /
+                  (1000 * 60 * 60 * 24)) *
+                  10
+              ) / 10
+            : 0,
+        };
+      });
+
+    const recentPendingApprovals = pendingProjects
+      .slice(0, 5)
+      .map((project) => {
+        return {
+          id: project._id,
+          projectName: project.name,
+          department: project.department?.name || "Unknown",
+          budget: project.budget || 0,
+          status: "pending",
+          approvedAt: null,
+          processingTime: 0,
+        };
+      });
+
+    // Combine and sort by date (most recent first)
+    const recentApprovals = [
+      ...recentHistoryApprovals,
+      ...recentPendingApprovals,
+    ]
+      .sort((a, b) => {
+        if (a.status === "pending" && b.status !== "pending") return -1;
+        if (a.status !== "pending" && b.status === "pending") return 1;
+        return (
+          new Date(b.approvedAt || b.createdAt) -
+          new Date(a.approvedAt || a.createdAt)
+        );
+      })
+      .slice(0, 15); // Show up to 15 total
+
+    const reportsData = {
+      summary,
+      monthlyTrends,
+      departmentBreakdown,
+      approvalMetrics,
+      recentApprovals,
+      period: parseInt(period),
+      generatedAt: new Date(),
+      approver: {
+        id: currentUser._id,
+        name: `${currentUser.firstName} ${currentUser.lastName}`,
+        department: currentUser.department?.name,
+        role: currentUser.role?.name,
+      },
+    };
+
+    console.log(
+      `✅ [PROJECT REPORTS] Generated reports for ${currentUser.firstName} ${currentUser.lastName}:`
+    );
+    console.log(`   - Total Projects: ${summary.totalProjects}`);
+    console.log(`   - Pending: ${summary.pendingProjects}`);
+    console.log(`   - Approved: ${summary.approvedProjects}`);
+    console.log(`   - Rejected: ${summary.rejectedProjects}`);
+    console.log(
+      `   - Budget Impact: ₦${summary.totalBudgetImpact.toLocaleString()}`
+    );
+
+    res.status(200).json({
+      success: true,
+      data: reportsData,
+      message: "Project approval reports generated successfully",
+    });
+  } catch (error) {
+    console.error("❌ [PROJECT REPORTS] Error generating reports:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate project approval reports",
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Get cross-departmental approval history (for Project Management HOD)
 // @route   GET /api/projects/cross-departmental-approval-history
 // @access  Private (Cross-departmental Approvers)
@@ -4068,8 +5293,6 @@ export const getCrossDepartmentalApprovalHistory = async (req, res) => {
       });
     }
 
-    // Find projects where the current user has approved at cross-departmental levels
-    // Include both fully approved projects and projects currently in budget allocation
     const projects = await Project.find({
       $or: [
         {
@@ -4081,6 +5304,11 @@ export const getCrossDepartmentalApprovalHistory = async (req, res) => {
           "approvalChain.status": "approved",
           "approvalChain.approver": currentUser._id,
           status: "pending_budget_allocation",
+          isActive: true,
+        },
+        {
+          "approvalChain.status": "rejected",
+          "approvalChain.approver": currentUser._id,
           isActive: true,
         },
       ],
@@ -4096,7 +5324,7 @@ export const getCrossDepartmentalApprovalHistory = async (req, res) => {
     for (const project of projects) {
       const userApprovalStep = project.approvalChain.find(
         (step) =>
-          step.status === "approved" &&
+          (step.status === "approved" || step.status === "rejected") &&
           step.approver &&
           step.approver._id.toString() === currentUser._id.toString()
       );
@@ -4214,7 +5442,7 @@ export const getHODApprovalHistory = async (req, res) => {
     for (const project of projects) {
       const userApprovalStep = project.approvalChain.find(
         (step) =>
-          step.status === "approved" &&
+          (step.status === "approved" || step.status === "rejected") &&
           step.approver &&
           step.approver._id.toString() === currentUser._id.toString()
       );
@@ -4381,7 +5609,7 @@ export const getMyProjects = async (req, res) => {
             },
           ];
           console.log(
-            `🔍 [MY PROJECTS] HR HOD - showing personal, departmental, and external projects from department: ${currentUser.department.name}`
+            `🔍 [MY PROJECTS] Project Management HOD - showing personal, departmental, and external projects from department: ${currentUser.department.name}`
           );
         } else {
           // ALL HODs can see personal and departmental projects from their department
@@ -4523,6 +5751,177 @@ export const getProjectAnalytics = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching project analytics",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get project dashboard data
+// @route   GET /api/projects/dashboard
+// @access  Private (Project Management HOD only)
+export const getProjectDashboard = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    // Check if user is Project Management HOD or Super Admin
+    const isProjectManagementHOD =
+      currentUser.department?.name === "Project Management" &&
+      currentUser.role.level >= 700;
+    const isSuperAdmin =
+      currentUser.role.level === 1000 || currentUser.isSuperadmin;
+
+    if (!isProjectManagementHOD && !isSuperAdmin) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Only Project Management HOD can access project dashboard.",
+      });
+    }
+
+    let query = { isActive: true };
+
+    // Get comprehensive project data
+    const projects = await Project.find(query)
+      .populate("department", "name")
+      .populate("projectManager", "firstName lastName")
+      .sort({ createdAt: -1 });
+
+    // Calculate statistics
+    const total = projects.length;
+    const totalBudget = projects.reduce(
+      (sum, project) => sum + (project.budget || 0),
+      0
+    );
+
+    // Group by status
+    const byStatus = projects.reduce((acc, project) => {
+      const status = project.status || "draft";
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Group by priority
+    const byPriority = projects.reduce((acc, project) => {
+      const priority = project.priority || "medium";
+      acc[priority] = (acc[priority] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Group by department
+    const departmentBreakdown = projects.reduce((acc, project) => {
+      const deptName = project.department?.name || "Unknown";
+      if (!acc[deptName]) {
+        acc[deptName] = {
+          total: 0,
+          byStatus: {},
+        };
+      }
+      acc[deptName].total += 1;
+      const status = project.status || "draft";
+      acc[deptName].byStatus[status] =
+        (acc[deptName].byStatus[status] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Get recent projects (last 10)
+    const recentProjects = projects.slice(0, 10).map((project) => ({
+      id: project._id,
+      name: project.name,
+      code: project.code,
+      status: project.status,
+      priority: project.priority,
+      budget: project.budget,
+      progress: project.progress || 0,
+      department: project.department?.name || "Unknown",
+      createdAt: project.createdAt,
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: {
+        total,
+        totalBudget,
+        byStatus,
+        byPriority,
+        departmentBreakdown,
+        recentProjects,
+      },
+    });
+  } catch (error) {
+    console.error("❌ [PROJECTS] Get dashboard error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching project dashboard",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get project budget info
+// @route   GET /api/projects/budget
+// @access  Private (Project Management HOD only)
+export const getProjectBudget = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    // Check if user is Project Management HOD or Super Admin
+    const isProjectManagementHOD =
+      currentUser.department?.name === "Project Management" &&
+      currentUser.role.level >= 700;
+    const isSuperAdmin =
+      currentUser.role.level === 1000 || currentUser.isSuperadmin;
+
+    if (!isProjectManagementHOD && !isSuperAdmin) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Only Project Management HOD can access project budget.",
+      });
+    }
+
+    // Get ELRA wallet to access project budget
+    const ELRAWallet = (await import("../models/ELRAWallet.js")).default;
+    const wallet = await ELRAWallet.findOne({ elraInstance: "ELRA_MAIN" });
+
+    if (!wallet) {
+      return res.status(404).json({
+        success: false,
+        message: "ELRA wallet not found",
+      });
+    }
+
+    const projectBudget = wallet.budgetCategories?.projects || {
+      allocated: 0,
+      used: 0,
+      available: 0,
+      reserved: 0,
+    };
+
+    // Calculate budget status with proper thresholds
+    const threshold = 5000000; // ₦5M threshold (same as sales/marketing)
+    const isLow = projectBudget.available < threshold;
+    const isVeryLow = projectBudget.available < threshold * 0.2; // ₦1M
+
+    // Check and notify if budget is low
+    if (isLow) {
+      await checkAndNotifyLowProjectBudget(wallet, projectBudget, threshold);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...projectBudget,
+        isLow,
+        isVeryLow,
+        threshold,
+        total: projectBudget.allocated,
+      },
+    });
+  } catch (error) {
+    console.error("❌ [PROJECTS] Get budget error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching project budget",
       error: error.message,
     });
   }
@@ -5075,4 +6474,602 @@ export const completeDepartmentalProjectImplementation = async (req, res) => {
     success: false,
     message: "Use /start-implementation endpoint instead",
   });
+};
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Check and notify about low project budget
+ */
+const checkAndNotifyLowProjectBudget = async (
+  wallet,
+  projectBudget,
+  threshold
+) => {
+  try {
+    console.log(
+      `💰 [PROJECT_BUDGET] Checking project budget: ₦${projectBudget.available.toLocaleString()} (threshold: ₦${threshold.toLocaleString()})`
+    );
+
+    if (projectBudget.available < threshold) {
+      const Notification = (await import("../models/Notification.js")).default;
+      const recentNotification = await Notification.findOne({
+        type: "LOW_BALANCE_ALERT",
+        "data.budgetCategory": "projects",
+        createdAt: {
+          $gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        },
+      });
+
+      if (recentNotification) {
+        console.log(
+          `ℹ️ [PROJECT_BUDGET] Low budget notification already sent recently (${recentNotification.createdAt.toISOString()}). Skipping duplicate notification.`
+        );
+        return;
+      }
+
+      console.log(
+        `🚨 [PROJECT_BUDGET] Project budget is low! Notifying Finance HOD and Project Management HOD...`
+      );
+
+      // Find Finance HOD
+      const financeDept = await Department.findOne({
+        name: "Finance & Accounting",
+      });
+
+      // Find Project Management HOD
+      const projectDept = await Department.findOne({
+        name: "Project Management",
+      });
+
+      const notifications = [];
+
+      // Notify Finance HOD
+      if (financeDept) {
+        const financeUsers = await User.find({
+          department: financeDept._id,
+          isActive: true,
+        })
+          .populate("role")
+          .populate("department");
+
+        const financeHOD = financeUsers.find(
+          (user) =>
+            user.role && (user.role.name === "HOD" || user.role.level >= 700)
+        );
+
+        if (financeHOD) {
+          console.log(
+            `📧 [PROJECT_BUDGET] Notifying Finance HOD: ${financeHOD.firstName} ${financeHOD.lastName}`
+          );
+          notifications.push(
+            new Notification({
+              recipient: financeHOD._id,
+              type: "LOW_BALANCE_ALERT",
+              title: "⚠️ Low Project Budget Alert",
+              message: `Project budget available (₦${projectBudget.available.toLocaleString()}) is below threshold (₦${threshold.toLocaleString()}). Please allocate more funds to the project budget category.`,
+              priority: "urgent",
+              data: {
+                currentBalance: `₦${projectBudget.available.toLocaleString()}`,
+                threshold: `₦${threshold.toLocaleString()}`,
+                budgetCategory: "projects",
+                actionUrl: "/dashboard/modules/finance/elra-wallet",
+              },
+            })
+          );
+        }
+      }
+
+      // Notify Project Management HOD
+      if (projectDept) {
+        const projectUsers = await User.find({
+          department: projectDept._id,
+          isActive: true,
+        })
+          .populate("role")
+          .populate("department");
+
+        const projectHOD = projectUsers.find(
+          (user) =>
+            user.role && (user.role.name === "HOD" || user.role.level >= 700)
+        );
+
+        if (projectHOD) {
+          console.log(
+            `📧 [PROJECT_BUDGET] Notifying Project Management HOD: ${projectHOD.firstName} ${projectHOD.lastName}`
+          );
+          notifications.push(
+            new Notification({
+              recipient: projectHOD._id,
+              type: "LOW_BALANCE_ALERT",
+              title: "⚠️ Low Project Budget Alert",
+              message: `Project budget available (₦${projectBudget.available.toLocaleString()}) is below threshold (₦${threshold.toLocaleString()}). Contact Finance HOD to allocate more funds.`,
+              priority: "urgent",
+              data: {
+                currentBalance: `₦${projectBudget.available.toLocaleString()}`,
+                threshold: `₦${threshold.toLocaleString()}`,
+                budgetCategory: "projects",
+                actionUrl: "/dashboard/modules/projects/analytics",
+              },
+            })
+          );
+        }
+      }
+
+      // Save all notifications
+      if (notifications.length > 0) {
+        await Notification.insertMany(notifications);
+        console.log(
+          `✅ [PROJECT_BUDGET] Sent ${notifications.length} low budget notifications`
+        );
+      }
+    }
+  } catch (error) {
+    console.error("❌ [PROJECT_BUDGET] Error checking low budget:", error);
+  }
+};
+
+// Export project approval reports
+export const exportProjectApprovalReport = async (req, res) => {
+  try {
+    const { format = "PDF", period = "365", approverId } = req.query;
+    const currentUser = req.user;
+
+    // Check access level
+    if (currentUser.role.level < 700) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. HOD level (700) or higher required for reports access.",
+      });
+    }
+
+    // Generate the report data (same logic as getProjectApprovalReports)
+    const endDate = new Date();
+    const startDate = new Date();
+    const periodDays = Math.min(parseInt(period), 7300);
+    startDate.setDate(endDate.getDate() - periodDays);
+
+    // Get pending projects
+    let pendingQuery = {
+      status: {
+        $in: [
+          "pending_project_management_approval",
+          "pending_legal_compliance_approval",
+          "pending_finance_approval",
+          "pending_executive_approval",
+          "pending_procurement",
+          "resubmitted",
+        ],
+      },
+      isActive: true,
+    };
+
+    if (currentUser.role.level < 1000) {
+      pendingQuery.department = { $ne: currentUser.department._id };
+    }
+
+    const allPendingProjects = await Project.find(pendingQuery)
+      .populate("createdBy", "firstName lastName email department")
+      .populate("department", "name")
+      .populate("approvalChain.approver", "firstName lastName email department")
+      .sort({ createdAt: -1 });
+
+    const pendingProjects = allPendingProjects.filter((project) => {
+      if (!project.approvalChain || project.approvalChain.length === 0) {
+        return false;
+      }
+
+      const nextPendingStep = project.approvalChain.find(
+        (step) => step.status === "pending"
+      );
+
+      if (!nextPendingStep) {
+        return false;
+      }
+
+      if (currentUser.role.level >= 1000) {
+        return true;
+      }
+
+      const userDepartment = currentUser.department?.name;
+
+      if (
+        nextPendingStep.level === "project_management" &&
+        userDepartment === "Project Management"
+      ) {
+        return true;
+      }
+
+      if (
+        nextPendingStep.level === "legal_compliance" &&
+        userDepartment === "Legal & Compliance"
+      ) {
+        return true;
+      }
+
+      if (
+        nextPendingStep.level === "finance" &&
+        userDepartment === "Finance & Accounting"
+      ) {
+        return true;
+      }
+
+      if (
+        nextPendingStep.level === "executive" &&
+        userDepartment === "Executive"
+      ) {
+        return true;
+      }
+
+      if (
+        nextPendingStep.level === "procurement" &&
+        userDepartment === "Operations"
+      ) {
+        return true;
+      }
+
+      return false;
+    });
+
+    // Get history projects
+    const allHistoryProjects = await Project.find({
+      $or: [
+        {
+          "approvalChain.status": "approved",
+          "approvalChain.approver": currentUser._id,
+          isActive: true,
+        },
+        {
+          "approvalChain.status": "approved",
+          "approvalChain.approver": currentUser._id,
+          status: "pending_budget_allocation",
+          isActive: true,
+        },
+        {
+          "approvalChain.status": "rejected",
+          "approvalChain.approver": currentUser._id,
+          isActive: true,
+        },
+      ],
+    })
+      .populate("createdBy", "firstName lastName email department")
+      .populate("department", "name")
+      .populate("approvalChain.approver", "firstName lastName email department")
+      .sort({ updatedAt: -1 });
+
+    const historyProjects = [];
+    for (const project of allHistoryProjects) {
+      const userApprovalStep = project.approvalChain.find(
+        (step) =>
+          (step.status === "approved" || step.status === "rejected") &&
+          step.approver &&
+          step.approver._id.toString() === currentUser._id.toString()
+      );
+
+      if (userApprovalStep) {
+        const totalDocuments = project.requiredDocuments?.length || 0;
+        const submittedDocuments =
+          project.requiredDocuments?.filter((doc) => doc.isSubmitted).length ||
+          0;
+
+        historyProjects.push({
+          _id: project._id,
+          name: project.name,
+          code: project.code,
+          description: project.description,
+          budget: project.budget,
+          startDate: project.startDate,
+          endDate: project.endDate,
+          priority: project.priority,
+          status: project.status,
+          projectScope: project.projectScope,
+          requiresBudgetAllocation: project.requiresBudgetAllocation,
+          createdBy: project.createdBy,
+          projectManager: project.projectManager,
+          department: project.department,
+          approvalLevel: userApprovalStep.level,
+          approvalComments: userApprovalStep.comments,
+          approvedAt: userApprovalStep.approvedAt,
+          approver: userApprovalStep.approver,
+          requiredDocuments: project.requiredDocuments,
+          projectItems: project.projectItems,
+          approvalChain: project.approvalChain,
+          documentStats: {
+            submitted: submittedDocuments,
+            total: totalDocuments,
+            percentage:
+              totalDocuments > 0
+                ? Math.round((submittedDocuments / totalDocuments) * 100)
+                : 0,
+          },
+          createdAt: project.createdAt,
+          updatedAt: project.updatedAt,
+        });
+      }
+    }
+
+    // Filter by date range
+    const filteredHistoryProjects = historyProjects.filter(
+      (p) => p.approvedAt >= startDate && p.approvedAt <= endDate
+    );
+
+    // Calculate summary
+    const totalProjects =
+      pendingProjects.length + filteredHistoryProjects.length;
+    const pendingCount = pendingProjects.length;
+    const approvedCount = filteredHistoryProjects.filter(
+      (p) => p.approver?._id?.toString() === currentUser._id.toString()
+    ).length;
+    const rejectedCount = filteredHistoryProjects.filter(
+      (p) =>
+        p.approver?._id?.toString() === currentUser._id.toString() &&
+        p.status === "rejected"
+    ).length;
+
+    const totalBudgetImpact = [
+      ...pendingProjects,
+      ...filteredHistoryProjects,
+    ].reduce((sum, p) => sum + (p.budget || 0), 0);
+
+    // Generate export content based on format
+    let content, filename, contentType;
+
+    if (format.toUpperCase() === "CSV") {
+      // Generate CSV content
+      let csvContent = "Project Approval Reports\n\n";
+      csvContent += `Generated for: ${currentUser.firstName} ${currentUser.lastName}\n`;
+      csvContent += `Department: ${currentUser.department?.name}\n`;
+      csvContent += `Period: Last ${period} days\n`;
+      csvContent += `Generated: ${new Date().toLocaleString()}\n\n`;
+
+      csvContent += "SUMMARY\n";
+      csvContent += "Metric,Value\n";
+      csvContent += `Total Projects,${totalProjects}\n`;
+      csvContent += `Approved Projects,${approvedCount}\n`;
+      csvContent += `Rejected Projects,${rejectedCount}\n`;
+      csvContent += `Pending Projects,${pendingCount}\n`;
+      csvContent += `Total Budget Impact,₦${totalBudgetImpact.toLocaleString()}\n\n`;
+
+      csvContent += "RECENT PROJECT ACTIVITY\n";
+      csvContent += "Project Name,Department,Budget,Status\n";
+      [
+        ...filteredHistoryProjects.slice(0, 10),
+        ...pendingProjects.slice(0, 5),
+      ].forEach((project) => {
+        const status = project.approver
+          ? project.status === "rejected"
+            ? "rejected"
+            : "approved"
+          : "pending";
+        csvContent += `${project.name},${
+          project.department?.name || "Unknown"
+        },₦${(project.budget || 0).toLocaleString()},${status}\n`;
+      });
+
+      content = csvContent;
+      filename = `project-approval-reports-${
+        new Date().toISOString().split("T")[0]
+      }.csv`;
+      contentType = "text/csv";
+    } else if (format.toUpperCase() === "PDF") {
+      // Generate branded PDF content
+      let pdfContent = `
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                              ELRA PROJECT REPORTS                           ║
+║                        Project Approval Analytics Report                     ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+REPORT DETAILS
+═══════════════════════════════════════════════════════════════════════════════
+Generated for: ${currentUser.firstName} ${currentUser.lastName}
+Department: ${currentUser.department?.name}
+Position: ${currentUser.role?.name}
+Report Period: Last ${period} days
+Generated on: ${new Date().toLocaleString()}
+Report ID: ELRA-PR-${Date.now()}
+
+EXECUTIVE SUMMARY
+═══════════════════════════════════════════════════════════════════════════════
+Total Projects in Period: ${totalProjects}
+├─ Approved Projects: ${approvedCount}
+├─ Rejected Projects: ${rejectedCount}
+└─ Pending Projects: ${pendingCount}
+
+Financial Impact: ₦${totalBudgetImpact.toLocaleString()}
+
+PROJECT BREAKDOWN
+═══════════════════════════════════════════════════════════════════════════════
+`;
+
+      // Add recent projects
+      const recentProjects = [
+        ...filteredHistoryProjects.slice(0, 10),
+        ...pendingProjects.slice(0, 5),
+      ];
+      recentProjects.forEach((project, index) => {
+        const status = project.approver
+          ? project.status === "rejected"
+            ? "REJECTED"
+            : "APPROVED"
+          : "PENDING";
+        const statusIcon = project.approver
+          ? project.status === "rejected"
+            ? "❌"
+            : "✅"
+          : "⏳";
+
+        pdfContent += `
+${index + 1}. ${project.name}
+   Code: ${project.code}
+   Department: ${project.department?.name || "Unknown"}
+   Budget: ₦${(project.budget || 0).toLocaleString()}
+   Status: ${statusIcon} ${status}
+   ${
+     project.approvedAt
+       ? `Approved: ${new Date(project.approvedAt).toLocaleDateString()}`
+       : `Created: ${new Date(project.createdAt).toLocaleDateString()}`
+   }
+`;
+      });
+
+      pdfContent += `
+═══════════════════════════════════════════════════════════════════════════════
+This report was generated by the ELRA Project Management System.
+For questions or clarifications, contact the Project Management Office.
+
+© ${new Date().getFullYear()} ELRA - All rights reserved.
+`;
+
+      content = pdfContent;
+      filename = `ELRA-Project-Reports-${
+        new Date().toISOString().split("T")[0]
+      }.pdf`;
+      contentType = "application/pdf";
+    } else {
+      // Word/HTML format with ELRA branding
+      let htmlContent = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>ELRA Project Approval Reports</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+              .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px; margin-bottom: 30px; }
+              .header h1 { margin: 0; font-size: 28px; }
+              .header h2 { margin: 5px 0 0 0; font-size: 16px; opacity: 0.9; }
+              .section { margin: 25px 0; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; }
+              .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+              .summary-card { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border-left: 4px solid #667eea; }
+              .summary-card h3 { margin: 0 0 10px 0; color: #333; }
+              .summary-card .value { font-size: 24px; font-weight: bold; color: #667eea; }
+              .project-item { background: #f8f9fa; margin: 10px 0; padding: 15px; border-radius: 6px; border-left: 4px solid #28a745; }
+              .project-item.rejected { border-left-color: #dc3545; }
+              .project-item.pending { border-left-color: #ffc107; }
+              .status { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+              .status.approved { background: #d4edda; color: #155724; }
+              .status.rejected { background: #f8d7da; color: #721c24; }
+              .status.pending { background: #fff3cd; color: #856404; }
+              .footer { margin-top: 40px; padding: 20px; background: #f8f9fa; border-radius: 8px; text-align: center; color: #666; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>ELRA PROJECT REPORTS</h1>
+              <h2>Project Approval Analytics Report</h2>
+            </div>
+            
+            <div class="section">
+              <h3>📋 Report Details</h3>
+              <p><strong>Generated for:</strong> ${currentUser.firstName} ${
+        currentUser.lastName
+      }</p>
+              <p><strong>Department:</strong> ${
+                currentUser.department?.name
+              }</p>
+              <p><strong>Position:</strong> ${currentUser.role?.name}</p>
+              <p><strong>Report Period:</strong> Last ${period} days</p>
+              <p><strong>Generated on:</strong> ${new Date().toLocaleString()}</p>
+              <p><strong>Report ID:</strong> ELRA-PR-${Date.now()}</p>
+            </div>
+            
+            <div class="section">
+              <h3>📊 Executive Summary</h3>
+              <div class="summary-grid">
+                <div class="summary-card">
+                  <h3>Total Projects</h3>
+                  <div class="value">${totalProjects}</div>
+                </div>
+                <div class="summary-card">
+                  <h3>Approved</h3>
+                  <div class="value" style="color: #28a745;">${approvedCount}</div>
+                </div>
+                <div class="summary-card">
+                  <h3>Rejected</h3>
+                  <div class="value" style="color: #dc3545;">${rejectedCount}</div>
+                </div>
+                <div class="summary-card">
+                  <h3>Pending</h3>
+                  <div class="value" style="color: #ffc107;">${pendingCount}</div>
+                </div>
+                <div class="summary-card">
+                  <h3>Budget Impact</h3>
+                  <div class="value">₦${totalBudgetImpact.toLocaleString()}</div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="section">
+              <h3>📋 Project Breakdown</h3>`;
+
+      // Add recent projects
+      const recentProjects = [
+        ...filteredHistoryProjects.slice(0, 10),
+        ...pendingProjects.slice(0, 5),
+      ];
+      recentProjects.forEach((project, index) => {
+        const status = project.approver
+          ? project.status === "rejected"
+            ? "rejected"
+            : "approved"
+          : "pending";
+        const statusClass = status;
+
+        htmlContent += `
+              <div class="project-item ${statusClass}">
+                <h4>${index + 1}. ${project.name}</h4>
+                <p><strong>Code:</strong> ${project.code}</p>
+                <p><strong>Department:</strong> ${
+                  project.department?.name || "Unknown"
+                }</p>
+                <p><strong>Budget:</strong> ₦${(
+                  project.budget || 0
+                ).toLocaleString()}</p>
+                <p><strong>Status:</strong> <span class="status ${status}">${status.toUpperCase()}</span></p>
+                <p><strong>${
+                  project.approvedAt ? "Approved" : "Created"
+                }:</strong> ${
+          project.approvedAt
+            ? new Date(project.approvedAt).toLocaleDateString()
+            : new Date(project.createdAt).toLocaleDateString()
+        }</p>
+              </div>`;
+      });
+
+      htmlContent += `
+            </div>
+            
+            <div class="footer">
+              <p>This report was generated by the <strong>ELRA Project Management System</strong>.</p>
+              <p>For questions or clarifications, contact the Project Management Office.</p>
+              <p>© ${new Date().getFullYear()} ELRA - All rights reserved.</p>
+            </div>
+          </body>
+        </html>
+      `;
+
+      content = htmlContent;
+      filename = `ELRA-Project-Reports-${
+        new Date().toISOString().split("T")[0]
+      }.html`;
+      contentType = "text/html";
+    }
+
+    // Set response headers for file download
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(content);
+  } catch (error) {
+    console.error(
+      "❌ [PROJECT REPORTS EXPORT] Error exporting reports:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Failed to export project approval reports",
+      error: error.message,
+    });
+  }
 };

@@ -1,251 +1,326 @@
-import asyncHandler from "../utils/asyncHandler.js";
-import SalesFinancialTransaction from "../models/SalesFinancialTransaction.js";
-import MarketingFinancialTransaction from "../models/MarketingFinancialTransaction.js";
-import SalesMarketingFinancialService from "../services/SalesMarketingFinancialService.js";
+import SalesMarketingFinancialService from "../services/salesMarketingFinancialService.js";
+import ELRAWallet from "../models/ELRAWallet.js";
 
-// ===== CORE SALES & MARKETING CONTROLLERS =====
+// ===== DASHBOARD =====
+export const getSalesMarketingDashboard = async (req, res) => {
+  try {
+    const result = await SalesMarketingFinancialService.getDashboardData();
 
-// Dashboard - Get combined analytics
-export const getSalesMarketingDashboard = asyncHandler(async (req, res) => {
-  const analytics = await SalesMarketingFinancialService.getCombinedAnalytics();
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        data: result.data,
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+    }
+  } catch (error) {
+    console.error("Error getting dashboard:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
 
-  res.json({
-    success: true,
-    data: analytics,
-  });
-});
-
-// Get combined transactions (sales + marketing)
-export const getSalesMarketingTransactions = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, type, status } = req.query;
-
-  const salesQuery = { ...(type && { type }), ...(status && { status }) };
-  const marketingQuery = { ...(type && { type }), ...(status && { status }) };
-
-  const [salesTransactions, marketingTransactions] = await Promise.all([
-    SalesFinancialTransaction.find(salesQuery)
-      .populate("requestedBy", "firstName lastName email")
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit),
-    MarketingFinancialTransaction.find(marketingQuery)
-      .populate("requestedBy", "firstName lastName email")
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit),
-  ]);
-
-  const allTransactions = [...salesTransactions, ...marketingTransactions].sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-  );
-
-  res.json({
-    success: true,
-    data: {
-      transactions: allTransactions,
-      pagination: {
-        current: page,
-        pages: Math.ceil(allTransactions.length / limit),
-        total: allTransactions.length,
-      },
-    },
-  });
-});
-
-// Create transaction (determines if sales or marketing)
-export const createSalesMarketingTransaction = asyncHandler(
-  async (req, res) => {
-    const { module } = req.body;
-
-    const transactionData = {
-      ...req.body,
-      requestedBy: req.user._id,
-      department: "Sales & Marketing",
-      module: module || "sales", // Default to sales if not specified
-    };
-
-    const result = await SalesMarketingFinancialService.createTransaction(
-      transactionData,
-      req.user._id
+// ===== TRANSACTIONS =====
+export const getSalesMarketingTransactions = async (req, res) => {
+  try {
+    const { module, status } = req.query;
+    const result = await SalesMarketingFinancialService.getTransactions(
+      module,
+      status
     );
 
-    res.status(201).json({
-      success: true,
-      message: `${
-        module === "marketing" ? "Marketing" : "Sales"
-      } transaction created successfully`,
-      data: result,
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        data: result.data,
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+    }
+  } catch (error) {
+    console.error("Error getting transactions:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
     });
   }
-);
+};
 
-// Get pending approvals
-export const getSalesMarketingApprovals = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10 } = req.query;
+export const createSalesMarketingTransaction = async (req, res) => {
+  try {
+    console.log("🚀 [SALES_MARKETING_CONTROLLER] Creating transaction:", {
+      type: req.body.type,
+      amount: req.body.amount,
+      module: req.body.module,
+      title: req.body.title,
+      category: req.body.category,
+      budgetCategory: req.body.budgetCategory,
+      userId: req.user.id,
+      userEmail: req.user.email,
+    });
 
-  // Get pending transactions from both sales and marketing
-  const [salesPending, marketingPending] = await Promise.all([
-    SalesFinancialTransaction.find({ status: "pending" })
-      .populate("requestedBy", "firstName lastName email")
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit),
-    MarketingFinancialTransaction.find({ status: "pending" })
-      .populate("requestedBy", "firstName lastName email")
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit),
-  ]);
+    const result = await SalesMarketingFinancialService.createTransaction(
+      req.body,
+      req.user.id
+    );
 
-  const allApprovals = [...salesPending, ...marketingPending].sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-  );
+    if (result.success) {
+      console.log(
+        "✅ [SALES_MARKETING_CONTROLLER] Transaction created successfully:",
+        {
+          transactionId: result.data.transaction._id,
+          status: result.data.transaction.status,
+          amount: req.body.amount,
+        }
+      );
 
-  res.json({
-    success: true,
-    data: {
-      approvals: allApprovals,
-      pagination: {
-        current: page,
-        pages: Math.ceil(allApprovals.length / limit),
-        total: allApprovals.length,
+      res.status(201).json({
+        success: true,
+        data: result.data,
+        message: "Transaction created successfully",
+      });
+    } else {
+      console.log(
+        "❌ [SALES_MARKETING_CONTROLLER] Transaction creation failed:",
+        result.message
+      );
+      res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+    }
+  } catch (error) {
+    console.error(
+      "❌ [SALES_MARKETING_CONTROLLER] Error creating transaction:",
+      error.message
+    );
+    res.status(400).json({
+      success: false,
+      message: error.message || "Failed to create transaction",
+    });
+  }
+};
+
+// ===== APPROVALS =====
+export const getSalesMarketingApprovals = async (req, res) => {
+  try {
+    const result = await SalesMarketingFinancialService.getPendingApprovals();
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        data: result.data,
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+    }
+  } catch (error) {
+    console.error("Error getting approvals:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+// Get Sales & Marketing approval history
+export const getSalesMarketingApprovalHistory = async (req, res) => {
+  try {
+    const result = await SalesMarketingFinancialService.getApprovalHistory();
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        data: result.data,
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+    }
+  } catch (error) {
+    console.error("Error getting approval history:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+export const approveSalesMarketingTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { comments } = req.body;
+
+    const result = await SalesMarketingFinancialService.approveTransaction(
+      id,
+      req.user.id,
+      comments
+    );
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        data: result.data,
+        message: "Transaction approved successfully",
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+    }
+  } catch (error) {
+    console.error("Error approving transaction:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+export const rejectSalesMarketingTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { comments } = req.body;
+
+    const result = await SalesMarketingFinancialService.rejectTransaction(
+      id,
+      req.user.id,
+      comments
+    );
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        data: result.data,
+        message: "Transaction rejected successfully",
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+    }
+  } catch (error) {
+    console.error("Error rejecting transaction:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+// ===== REPORTS =====
+export const getSalesMarketingReports = async (req, res) => {
+  try {
+    const { dateRange = "30d", departmentFilter = "all" } = req.query;
+    const result = await SalesMarketingFinancialService.getReportsData(
+      dateRange,
+      departmentFilter
+    );
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        data: result.data,
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+      });
+    }
+  } catch (error) {
+    console.error("Error getting reports:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+// ===== CATEGORIES =====
+export const getSalesCategories = async (req, res) => {
+  try {
+    const result = await SalesMarketingFinancialService.getSalesCategories();
+
+    res.status(200).json({
+      success: true,
+      data: result.data,
+    });
+  } catch (error) {
+    console.error("Error getting sales categories:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+export const getMarketingCategories = async (req, res) => {
+  try {
+    const result =
+      await SalesMarketingFinancialService.getMarketingCategories();
+
+    res.status(200).json({
+      success: true,
+      data: result.data,
+    });
+  } catch (error) {
+    console.error("Error getting marketing categories:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+// ===== BUDGET INFORMATION =====
+export const getOperationalBudget = async (req, res) => {
+  try {
+    const wallet = await ELRAWallet.findOne();
+
+    if (!wallet) {
+      return res.status(404).json({
+        success: false,
+        message: "ELRA wallet not found",
+      });
+    }
+
+    const operationalBudget = wallet.budgetCategories.operational;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        available: operationalBudget.available,
+        allocated: operationalBudget.allocated,
+        used: operationalBudget.used,
+        reserved: operationalBudget.reserved || 0,
+        total: operationalBudget.allocated,
+        isLow: operationalBudget.available < 5000000,
+        isVeryLow: operationalBudget.available < 1000000,
+        threshold: 5000000,
       },
-    },
-  });
-});
-
-// Approve transaction (works for both sales and marketing)
-export const approveSalesMarketingTransaction = asyncHandler(
-  async (req, res) => {
-    const { id } = req.params;
-
-    // Try to find in both sales and marketing
-    const [salesTransaction, marketingTransaction] = await Promise.all([
-      SalesFinancialTransaction.findById(id),
-      MarketingFinancialTransaction.findById(id),
-    ]);
-
-    let result;
-    if (salesTransaction) {
-      result = await SalesMarketingFinancialService.approveTransaction(
-        "sales",
-        id,
-        req.user._id,
-        req.body.comments
-      );
-    } else if (marketingTransaction) {
-      result = await SalesMarketingFinancialService.approveTransaction(
-        "marketing",
-        id,
-        req.user._id,
-        req.body.comments
-      );
-    } else {
-      return res.status(404).json({
-        success: false,
-        message: "Transaction not found",
-      });
-    }
-
-    res.json({
-      success: true,
-      message: "Transaction approved successfully",
-      data: result,
+    });
+  } catch (error) {
+    console.error("Error getting operational budget:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
     });
   }
-);
-
-// Reject transaction (works for both sales and marketing)
-export const rejectSalesMarketingTransaction = asyncHandler(
-  async (req, res) => {
-    const { id } = req.params;
-
-    // Try to find in both sales and marketing
-    const [salesTransaction, marketingTransaction] = await Promise.all([
-      SalesFinancialTransaction.findById(id),
-      MarketingFinancialTransaction.findById(id),
-    ]);
-
-    let result;
-    if (salesTransaction) {
-      result = await SalesMarketingFinancialService.rejectTransaction(
-        "sales",
-        id,
-        req.user._id,
-        req.body.reason
-      );
-    } else if (marketingTransaction) {
-      result = await SalesMarketingFinancialService.rejectTransaction(
-        "marketing",
-        id,
-        req.user._id,
-        req.body.reason
-      );
-    } else {
-      return res.status(404).json({
-        success: false,
-        message: "Transaction not found",
-      });
-    }
-
-    res.json({
-      success: true,
-      message: "Transaction rejected successfully",
-      data: result,
-    });
-  }
-);
-
-// Reports (same as dashboard for now)
-export const getSalesMarketingReports = asyncHandler(async (req, res) => {
-  const analytics = await SalesMarketingFinancialService.getCombinedAnalytics();
-
-  res.json({
-    success: true,
-    data: analytics,
-  });
-});
-
-// Get sales categories
-export const getSalesCategories = asyncHandler(async (req, res) => {
-  const categories = [
-    "Client Acquisition",
-    "Sales Training",
-    "Sales Tools",
-    "Commission Payments",
-    "Sales Events",
-    "Lead Generation",
-    "Sales Materials",
-    "Sales Software",
-    "Travel & Entertainment",
-    "Other Sales Expenses",
-  ];
-
-  res.json({
-    success: true,
-    data: categories,
-  });
-});
-
-// Get marketing categories
-export const getMarketingCategories = asyncHandler(async (req, res) => {
-  const categories = [
-    "Digital Advertising",
-    "Social Media Marketing",
-    "Content Creation",
-    "Email Marketing",
-    "SEO/SEM",
-    "Print Advertising",
-    "Event Marketing",
-    "Influencer Marketing",
-    "Marketing Tools",
-    "Brand Development",
-    "Market Research",
-    "Other Marketing Expenses",
-  ];
-
-  res.json({
-    success: true,
-    data: categories,
-  });
-});
+};

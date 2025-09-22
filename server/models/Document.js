@@ -80,6 +80,40 @@ const documentSchema = new mongoose.Schema(
       default: "draft",
     },
 
+    // Archive Information
+    archivedAt: {
+      type: Date,
+    },
+    archivedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    archiveCategory: {
+      type: String,
+      enum: [
+        "project",
+        "financial",
+        "technical",
+        "legal",
+        "hr",
+        "compliance",
+        "contracts",
+        "reports",
+        "presentations",
+        "certificates",
+        "training",
+        "personal",
+        "other",
+      ],
+      default: "other",
+    },
+    customCategory: {
+      type: String,
+      required: function () {
+        return this.archiveCategory === "other";
+      },
+    },
+
     // Document Versioning
     version: {
       type: Number,
@@ -197,6 +231,15 @@ const documentSchema = new mongoose.Schema(
       default: true,
     },
 
+    // Soft Delete Fields
+    deletedAt: {
+      type: Date,
+    },
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+
     // OCR Processing Fields
     ocrResults: {
       type: Map,
@@ -213,10 +256,12 @@ const documentSchema = new mongoose.Schema(
     extractedText: {
       type: String,
     },
-    keywords: [{
-      type: String,
-      trim: true,
-    }],
+    keywords: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
     suggestedTitle: {
       type: String,
       trim: true,
@@ -241,10 +286,12 @@ const documentSchema = new mongoose.Schema(
       enum: ["public", "internal", "confidential", "restricted"],
       default: "internal",
     },
-    suggestedTags: [{
-      type: String,
-      trim: true,
-    }],
+    suggestedTags: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
   },
   {
     timestamps: true,

@@ -9,6 +9,7 @@ import {
   updateWalletSettings,
   exportTransactionHistoryPDF,
   exportTransactionHistoryWord,
+  exportTransactionHistoryCSV,
 } from "../controllers/companyWalletController.js";
 import { protect, checkFinanceAccess } from "../middleware/auth.js";
 
@@ -30,5 +31,6 @@ router.route("/settings").put(updateWalletSettings);
 // Transaction export routes
 router.route("/transactions/export/pdf").post(exportTransactionHistoryPDF);
 router.route("/transactions/export/word").post(exportTransactionHistoryWord);
+router.route("/transactions/export/csv").post(exportTransactionHistoryCSV);
 
 export default router;

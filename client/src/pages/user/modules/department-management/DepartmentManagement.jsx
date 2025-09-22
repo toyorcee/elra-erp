@@ -23,6 +23,20 @@ const DepartmentManagement = () => {
       path: "/dashboard/modules/department-management/project-approvals",
     },
     {
+      title: "User Management",
+      description: "View and manage users in your department",
+      icon: FaUsers,
+      color: "bg-[var(--elra-primary)]",
+      path: "/dashboard/modules/department-management/users",
+    },
+    {
+      title: "Departmental Projects",
+      description: "Create and manage projects for your department",
+      icon: FaClipboardCheck,
+      color: "bg-[var(--elra-primary)]",
+      path: "/dashboard/modules/department-management/departmental-projects",
+    },
+    {
       title: "Leave Management",
       description: "Handle leave requests and approvals for your department",
       icon: FaCalendarAlt,
@@ -65,7 +79,7 @@ const DepartmentManagement = () => {
       </div>
 
       {/* Department Management Features Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {deptFeatures.map((feature) => {
           const IconComponent = feature.icon;
           return (

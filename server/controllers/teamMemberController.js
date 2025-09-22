@@ -201,7 +201,9 @@ export const addTeamMember = async (req, res) => {
     }
 
     // Check if user exists
-    const user = await User.findById(userId).populate("role", "name level").populate("department", "name");
+    const user = await User.findById(userId)
+      .populate("role", "name level")
+      .populate("department", "name");
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -210,8 +212,12 @@ export const addTeamMember = async (req, res) => {
     }
 
     console.log("🔍 [TEAM MEMBERS] Adding team member:");
-    console.log(`  - Current User: ${currentUser.firstName} ${currentUser.lastName} (${currentUser.role?.name}, Level: ${currentUser.role?.level})`);
-    console.log(`  - Target User: ${user.firstName} ${user.lastName} (${user.role?.name}, Level: ${user.role?.level})`);
+    console.log(
+      `  - Current User: ${currentUser.firstName} ${currentUser.lastName} (${currentUser.role?.name}, Level: ${currentUser.role?.level})`
+    );
+    console.log(
+      `  - Target User: ${user.firstName} ${user.lastName} (${user.role?.name}, Level: ${user.role?.level})`
+    );
     console.log(`  - Project: ${project.name} (${project.projectScope})`);
 
     // Check access permissions
@@ -287,7 +293,9 @@ export const addTeamMember = async (req, res) => {
             "Access denied. MANAGER can only assign users at their level or below from their department.",
         });
       }
-      console.log("🔍 [TEAM MEMBERS] Manager - assigning user at level or below");
+      console.log(
+        "🔍 [TEAM MEMBERS] Manager - assigning user at level or below"
+      );
     }
     // STAFF (300) can assign users at their level or below from their department
     else if (currentUserRoleLevel >= 300) {

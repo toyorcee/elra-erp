@@ -6,6 +6,21 @@ import {
 import ProjectAuditService from "../services/projectAuditService.js";
 import ProjectDocumentService from "../services/projectDocumentService.js";
 
+// ============================================================================
+// SPECIAL CASE HODS - HODs who can skip their own approval when creating projects in their department
+// ============================================================================
+const SPECIAL_CASE_HODS = [
+  "Project Management", // Project Management HOD
+  "Finance & Accounting", // Finance HOD
+  "Legal & Compliance", // Legal HOD
+  "Executive Office", // Executive HOD
+];
+
+// Helper function to check if a HOD is a special case
+const isSpecialCaseHOD = (departmentName, userRoleLevel) => {
+  return userRoleLevel >= 700 && SPECIAL_CASE_HODS.includes(departmentName);
+};
+
 const projectSchema = new mongoose.Schema(
   {
     // Basic Project Information
@@ -43,6 +58,7 @@ const projectSchema = new mongoose.Schema(
         "pending_finance_approval",
         "pending_executive_approval",
         "pending_budget_allocation",
+        "pending_vendor_assignment",
         "pending_procurement",
         "approved",
         "in_progress",
@@ -185,6 +201,17 @@ const projectSchema = new mongoose.Schema(
       },
     },
 
+    // Budget Percentage (for external projects - what percentage ELRA handles)
+    budgetPercentage: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 100,
+      required: function () {
+        return this.projectScope === "external";
+      },
+    },
+
     // External Project Details (if applicable)
     externalProjectDetails: {
       targetIndustry: {
@@ -222,6 +249,50 @@ const projectSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Vendor",
       default: undefined,
+    },
+
+    // Delivery Address (for external projects with vendors)
+    deliveryAddress: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+    },
+
+    // Client Information (REQUIRED for external projects)
+    clientName: {
+      type: String,
+      required: function () {
+        return this.projectScope === "external";
+      },
+      trim: true,
+      maxlength: 200,
+    },
+    clientEmail: {
+      type: String,
+      required: function () {
+        return this.projectScope === "external";
+      },
+      trim: true,
+      lowercase: true,
+      maxlength: 255,
+    },
+    clientCompany: {
+      type: String,
+      required: function () {
+        return this.projectScope === "external";
+      },
+      trim: true,
+      maxlength: 200,
+    },
+    clientPhone: {
+      type: String,
+      trim: true,
+      maxlength: 20,
+    },
+    clientAddress: {
+      type: String,
+      trim: true,
+      maxlength: 500,
     },
 
     // Project Items (REQUIRED for external projects)
@@ -2758,9 +2829,13 @@ projectSchema.methods.generateApprovalChain = async function () {
     .populate("department");
   const creatorDepartment = creator?.department?.name;
   const isCreatorHOD = creator?.role?.level === 700;
+  const isSpecialCase = isSpecialCaseHOD(
+    creatorDepartment,
+    creator?.role?.level
+  );
 
   console.log(
-    `👤 [APPROVAL] Creator Department: ${creatorDepartment}, Is HOD: ${isCreatorHOD}`
+    `👤 [APPROVAL] Creator Department: ${creatorDepartment}, Is HOD: ${isCreatorHOD}, Is Special Case: ${isSpecialCase}`
   );
 
   // Check budget threshold to determine approval levels needed
@@ -2785,20 +2860,14 @@ projectSchema.methods.generateApprovalChain = async function () {
     console.log("👤 [APPROVAL] Personal Project Workflow");
 
     // Department HOD approval first
-    // Skip if creator is Super Admin (1000) or HOD (700) of their own department
-    // Special case: If creator is from Project Management department, skip HOD approval
-    // because Project Management HOD will handle it in the next step
+    // Skip if creator is Super Admin (1000) or Special Case HOD of their own department
     if (creator?.role?.level === 1000) {
       console.log(
         "✅ [APPROVAL] Auto-approving Department HOD - creator is Super Admin"
       );
-    } else if (isCreatorHOD && creatorDepartment === this.department?.name) {
+    } else if (isSpecialCase && creatorDepartment === this.department?.name) {
       console.log(
-        "✅ [APPROVAL] Auto-approving Department HOD - creator is HOD of their own department"
-      );
-    } else if (creatorDepartment === "Project Management") {
-      console.log(
-        "⚠️ [APPROVAL] Skipping Department HOD approval - creator is from Project Management department (will be handled by Project Management HOD)"
+        `✅ [APPROVAL] Auto-approving Department HOD - creator is Special Case HOD (${creatorDepartment}) of their own department`
       );
     } else {
       approvalChain.push({
@@ -2815,35 +2884,17 @@ projectSchema.methods.generateApprovalChain = async function () {
     // For budget allocation projects: HOD → Project Management HOD → Finance → Budget Allocation
     if (true) {
       // Always add Project Management approval for personal projects
-      // Skip if creator is Super Admin (1000) or Project Management HOD (700)
-      // But if creator is from Project Management dept but NOT HOD, still need Project Management HOD approval
+      // Skip if creator is Super Admin (1000) or Special Case Project Management HOD
       if (creator?.role?.level === 1000) {
         console.log(
           "✅ [APPROVAL] Auto-approving Project Management - creator is Super Admin"
         );
-      } else if (creatorDepartment === "Project Management") {
-        if (isCreatorHOD) {
-          console.log(
-            "✅ [APPROVAL] Auto-approving Project Management - creator is Project Management HOD"
-          );
-        } else {
-          // Creator is from Project Management dept but NOT HOD (level 600, 300, 100)
-          // They need Project Management HOD approval first
-          const projectMgmtDept = await mongoose
-            .model("Department")
-            .findOne({ name: "Project Management" });
-          if (projectMgmtDept) {
-            approvalChain.push({
-              level: "project_management",
-              department: projectMgmtDept._id,
-              status: "pending",
-              required: true,
-              type: "personal_project_management_approval",
-            });
-          }
-        }
+      } else if (isSpecialCase && creatorDepartment === "Project Management") {
+        console.log(
+          "✅ [APPROVAL] Auto-approving Project Management - creator is Special Case Project Management HOD"
+        );
       } else {
-        // Creator is from other departments, need Project Management HOD approval
+        // Need Project Management HOD approval
         const projectMgmtDept = await mongoose
           .model("Department")
           .findOne({ name: "Project Management" });
@@ -2853,7 +2904,7 @@ projectSchema.methods.generateApprovalChain = async function () {
             department: projectMgmtDept._id,
             status: "pending",
             required: true,
-            type: "personal_project_approval",
+            type: "personal_project_management_approval",
           });
         }
       }
@@ -2861,9 +2912,14 @@ projectSchema.methods.generateApprovalChain = async function () {
 
     // Legal and Finance approval (only if budget allocation is required)
     if (this.requiresBudgetAllocation === true) {
+      // Legal Compliance approval
       if (creator?.role?.level === 1000) {
         console.log(
           "✅ [APPROVAL] Auto-approving Legal Compliance - creator is Super Admin"
+        );
+      } else if (isSpecialCase && creatorDepartment === "Legal & Compliance") {
+        console.log(
+          "✅ [APPROVAL] Auto-approving Legal Compliance - creator is Special Case Legal HOD"
         );
       } else {
         const legalDept = await mongoose
@@ -2884,6 +2940,13 @@ projectSchema.methods.generateApprovalChain = async function () {
       if (creator?.role?.level === 1000) {
         console.log(
           "✅ [APPROVAL] Auto-approving Finance Budget - creator is Super Admin"
+        );
+      } else if (
+        isSpecialCase &&
+        creatorDepartment === "Finance & Accounting"
+      ) {
+        console.log(
+          "✅ [APPROVAL] Auto-approving Finance Budget - creator is Special Case Finance HOD"
         );
       } else {
         // All other users need Finance approval
@@ -2917,7 +2980,11 @@ projectSchema.methods.generateApprovalChain = async function () {
         console.log(
           "✅ [APPROVAL] Auto-approving Executive - creator is Super Admin"
         );
-      } else if (creatorDepartment !== "Executive Office") {
+      } else if (isSpecialCase && creatorDepartment === "Executive Office") {
+        console.log(
+          "✅ [APPROVAL] Auto-approving Executive - creator is Special Case Executive HOD"
+        );
+      } else {
         const execDept = await mongoose
           .model("Department")
           .findOne({ name: "Executive Office" });
@@ -2930,10 +2997,6 @@ projectSchema.methods.generateApprovalChain = async function () {
             type: "personal_executive_approval",
           });
         }
-      } else {
-        console.log(
-          "✅ [APPROVAL] Auto-approving Executive - creator is Executive HOD"
-        );
       }
     } else {
       // No budget allocation required OR budget threshold allows department HOD final approval
@@ -2973,31 +3036,13 @@ projectSchema.methods.generateApprovalChain = async function () {
 
     // Project Management HOD approval (only if budget threshold requires it)
     if (needsFullApprovalChain) {
-      // Skip if creator is Project Management HOD (auto-approve)
-      // But if creator is from Project Management dept but NOT HOD, still need Project Management HOD approval
-      if (creatorDepartment === "Project Management") {
-        if (isCreatorHOD) {
-          console.log(
-            "✅ [APPROVAL] Auto-approving Project Management - creator is Project Management HOD"
-          );
-        } else {
-          // Creator is from Project Management dept but NOT HOD (level 600, 300, 100)
-          // They need Project Management HOD approval first
-          const projectMgmtDept = await mongoose
-            .model("Department")
-            .findOne({ name: "Project Management" });
-          if (projectMgmtDept) {
-            approvalChain.push({
-              level: "department",
-              department: projectMgmtDept._id,
-              status: "pending",
-              required: true,
-              type: "departmental_project_management_approval",
-            });
-          }
-        }
+      // Skip if creator is Special Case Project Management HOD
+      if (isSpecialCase && creatorDepartment === "Project Management") {
+        console.log(
+          "✅ [APPROVAL] Auto-approving Project Management - creator is Special Case Project Management HOD"
+        );
       } else {
-        // Creator is from other departments, need Project Management HOD approval
+        // Need Project Management HOD approval
         const projectMgmtDept = await mongoose
           .model("Department")
           .findOne({ name: "Project Management" });
@@ -3007,7 +3052,7 @@ projectSchema.methods.generateApprovalChain = async function () {
             department: projectMgmtDept._id,
             status: "pending",
             required: true,
-            type: "personal_project_approval",
+            type: "departmental_project_management_approval",
           });
         }
       }
@@ -3017,13 +3062,8 @@ projectSchema.methods.generateApprovalChain = async function () {
       );
     }
 
-    // HOD approval (skip if creator is HOD of the same department)
-    // Special case: If creator is from Project Management department, skip HOD approval
-    // because Project Management HOD will handle it in the next step
-    if (
-      !(isCreatorHOD && creatorDepartment === this.department?.name) &&
-      creatorDepartment !== "Project Management"
-    ) {
+    // HOD approval (skip if creator is Special Case HOD of the same department)
+    if (!(isSpecialCase && creatorDepartment === this.department?.name)) {
       approvalChain.push({
         level: "hod",
         department: this.department,
@@ -3032,20 +3072,18 @@ projectSchema.methods.generateApprovalChain = async function () {
         type: "departmental_approval",
       });
     } else {
-      if (creatorDepartment === "Project Management") {
-        console.log(
-          "⚠️ [APPROVAL] Skipping HOD approval - creator is from Project Management department (will be handled by Project Management HOD)"
-        );
-      } else {
-        console.log(
-          "⚠️ [APPROVAL] Skipping HOD approval - creator is Project Management HOD"
-        );
-      }
+      console.log(
+        `✅ [APPROVAL] Auto-approving Department HOD - creator is Special Case HOD (${creatorDepartment}) of their own department`
+      );
     }
 
     // Finance HOD approval (only if budget threshold requires it)
     if (needsFullApprovalChain) {
-      if (creatorDepartment !== "Finance & Accounting") {
+      if (isSpecialCase && creatorDepartment === "Finance & Accounting") {
+        console.log(
+          "✅ [APPROVAL] Auto-approving Finance - creator is Special Case Finance HOD"
+        );
+      } else {
         const financeDept = await mongoose
           .model("Department")
           .findOne({ name: "Finance & Accounting" });
@@ -3058,10 +3096,6 @@ projectSchema.methods.generateApprovalChain = async function () {
             type: "departmental_finance",
           });
         }
-      } else {
-        console.log(
-          "⚠️ [APPROVAL] Skipping Finance approval - creator is Finance HOD"
-        );
       }
     } else {
       console.log(
@@ -3071,7 +3105,11 @@ projectSchema.methods.generateApprovalChain = async function () {
 
     // Executive HOD approval (only if budget threshold requires it)
     if (needsFullApprovalChain) {
-      if (creatorDepartment !== "Executive Office") {
+      if (isSpecialCase && creatorDepartment === "Executive Office") {
+        console.log(
+          "✅ [APPROVAL] Auto-approving Executive - creator is Special Case Executive HOD"
+        );
+      } else {
         const execDept = await mongoose
           .model("Department")
           .findOne({ name: "Executive Office" });
@@ -3084,10 +3122,6 @@ projectSchema.methods.generateApprovalChain = async function () {
             type: "departmental_executive",
           });
         }
-      } else {
-        console.log(
-          "⚠️ [APPROVAL] Skipping Executive approval - creator is Executive HOD"
-        );
       }
     } else {
       console.log(
@@ -3100,31 +3134,13 @@ projectSchema.methods.generateApprovalChain = async function () {
 
     // Project Management HOD approval (only if budget threshold requires it)
     if (needsFullApprovalChain) {
-      // Skip if creator is Project Management HOD (auto-approve)
-      // But if creator is from Project Management dept but NOT HOD, still need Project Management HOD approval
-      if (creatorDepartment === "Project Management") {
-        if (isCreatorHOD) {
-          console.log(
-            "✅ [APPROVAL] Auto-approving Project Management - creator is Project Management HOD"
-          );
-        } else {
-          // Creator is from Project Management dept but NOT HOD (level 600, 300, 100)
-          // They need Project Management HOD approval first
-          const projectMgmtDept = await mongoose
-            .model("Department")
-            .findOne({ name: "Project Management" });
-          if (projectMgmtDept) {
-            approvalChain.push({
-              level: "department",
-              department: projectMgmtDept._id,
-              status: "pending",
-              required: true,
-              type: "external_project_management_approval",
-            });
-          }
-        }
+      // Skip if creator is Special Case Project Management HOD
+      if (isSpecialCase && creatorDepartment === "Project Management") {
+        console.log(
+          "✅ [APPROVAL] Auto-approving Project Management - creator is Special Case Project Management HOD"
+        );
       } else {
-        // Creator is from other departments, need Project Management HOD approval
+        // Need Project Management HOD approval
         const projectMgmtDept = await mongoose
           .model("Department")
           .findOne({ name: "Project Management" });
@@ -3134,7 +3150,7 @@ projectSchema.methods.generateApprovalChain = async function () {
             department: projectMgmtDept._id,
             status: "pending",
             required: true,
-            type: "external_project_approval",
+            type: "external_project_management_approval",
           });
         }
       }
@@ -3144,95 +3160,59 @@ projectSchema.methods.generateApprovalChain = async function () {
       );
     }
 
-    // Legal & Compliance approval (only if budget threshold requires it)
-    if (needsFullApprovalChain) {
-      if (creatorDepartment !== "Legal & Compliance") {
-        const legalDept = await mongoose
-          .model("Department")
-          .findOne({ name: "Legal & Compliance" });
-        if (legalDept) {
-          approvalChain.push({
-            level: "legal_compliance",
-            department: legalDept._id,
-            status: "pending",
-            required: true,
-            type: "external_legal_compliance",
-          });
-        }
-      } else {
-        console.log(
-          "⚠️ [APPROVAL] Skipping Legal approval - creator is Legal HOD"
-        );
+    // Legal & Compliance approval (ALWAYS required for external projects)
+    // Only Project Management HOD can create external projects, so no auto-approval needed
+    const legalDept = await mongoose
+      .model("Department")
+      .findOne({ name: "Legal & Compliance" });
+    if (legalDept) {
+      approvalChain.push({
+        level: "legal_compliance",
+        department: legalDept._id,
+        status: "pending",
+        required: true,
+        type: "external_legal_compliance",
+      });
+    }
+
+    // Finance approval (only if budget allocation is required)
+    // Only Project Management HOD can create external projects, so no auto-approval needed
+    if (this.requiresBudgetAllocation === true) {
+      const financeDept = await mongoose
+        .model("Department")
+        .findOne({ name: "Finance & Accounting" });
+      if (financeDept) {
+        approvalChain.push({
+          level: "finance",
+          department: financeDept._id,
+          status: "pending",
+          required: true,
+          type: "external_finance_review",
+        });
       }
     } else {
       console.log(
-        "ℹ️ [APPROVAL] Skipping Legal approval - budget threshold allows department HOD final approval"
+        "ℹ️ [APPROVAL] Skipping Finance approval - no budget allocation required for external project"
       );
     }
 
-    // Finance approval (only if budget threshold requires it)
-    if (needsFullApprovalChain) {
-      if (
-        creatorDepartment !== "Finance & Accounting" &&
-        this.requiresBudgetAllocation !== false
-      ) {
-        const financeDept = await mongoose
-          .model("Department")
-          .findOne({ name: "Finance & Accounting" });
-        if (financeDept) {
-          approvalChain.push({
-            level: "finance",
-            department: financeDept._id,
-            status: "pending",
-            required: true,
-            type: "external_finance_review",
-          });
-        }
-      } else {
-        if (creatorDepartment === "Finance & Accounting") {
-          console.log(
-            "⚠️ [APPROVAL] Skipping Finance approval - creator is Finance HOD"
-          );
-        } else {
-          console.log(
-            "⚠️ [APPROVAL] Skipping Finance approval - no budget allocation required"
-          );
-        }
-      }
-    } else {
-      console.log(
-        "ℹ️ [APPROVAL] Skipping Finance approval - budget threshold allows department HOD final approval"
-      );
+    // Executive approval (ALWAYS required for external projects)
+    // Only Project Management HOD can create external projects, so no auto-approval needed
+    const execDept = await mongoose
+      .model("Department")
+      .findOne({ name: "Executive Office" });
+    if (execDept) {
+      approvalChain.push({
+        level: "executive",
+        department: execDept._id,
+        status: "pending",
+        required: true,
+        type: "external_executive",
+      });
     }
 
-    // Executive approval (only if budget threshold requires it)
-    if (needsFullApprovalChain) {
-      if (creatorDepartment !== "Executive Office") {
-        const execDept = await mongoose
-          .model("Department")
-          .findOne({ name: "Executive Office" });
-        if (execDept) {
-          approvalChain.push({
-            level: "executive",
-            department: execDept._id,
-            status: "pending",
-            required: true,
-            type: "external_executive",
-          });
-        }
-      } else {
-        console.log(
-          "⚠️ [APPROVAL] Skipping Executive approval - creator is Executive HOD"
-        );
-      }
-    } else {
-      console.log(
-        "ℹ️ [APPROVAL] Skipping Executive approval - budget threshold allows department HOD final approval"
-      );
-    }
-
-    // Budget allocation approval (only if budget threshold requires it)
-    if (this.requiresBudgetAllocation === true && needsFullApprovalChain) {
+    // Budget allocation approval (only if budget allocation is required)
+    if (this.requiresBudgetAllocation === true) {
       const financeDept = await mongoose
         .model("Department")
         .findOne({ name: "Finance & Accounting" });
@@ -3250,7 +3230,7 @@ projectSchema.methods.generateApprovalChain = async function () {
       }
     } else {
       console.log(
-        "💰 [APPROVAL] No budget allocation required OR budget threshold allows department HOD final approval - skipping allocation step"
+        "💰 [APPROVAL] No budget allocation required for external project - skipping allocation step"
       );
     }
   }
@@ -3872,6 +3852,23 @@ projectSchema.methods.updateTwoPhaseProgress = async function () {
 
     overallProgress =
       setupProgress + approvalProgress + implementationProgressWeight;
+
+    // Log progress breakdown for personal projects
+    console.log(`📊 [PERSONAL PROJECT] Progress breakdown:`);
+    console.log(
+      `  - Setup Progress: ${setupProgress}% (${submittedDocs}/${
+        this.requiredDocuments?.length || 0
+      } docs)`
+    );
+    console.log(
+      `  - Approval Progress: ${approvalProgress}% (${approvedSteps}/${
+        this.approvalChain?.length || 0
+      } approvals)`
+    );
+    console.log(
+      `  - Implementation Progress: ${implementationProgressWeight}% (${this.implementationProgress}% of tasks)`
+    );
+    console.log(`  - Total: ${overallProgress}%`);
   } else {
     // EXTERNAL PROJECTS: Keep existing logic for now
     let totalSteps = 0;
@@ -3966,24 +3963,6 @@ projectSchema.methods.updateTwoPhaseProgress = async function () {
     })`
   );
   console.log(`  - Overall Progress: ${this.progress}%`);
-
-  if (isPersonalProject) {
-    console.log(`📊 [PERSONAL PROJECT] Progress breakdown:`);
-    console.log(
-      `  - Setup Progress: ${setupProgress}% (${submittedDocs}/${
-        this.requiredDocuments?.length || 0
-      } docs)`
-    );
-    console.log(
-      `  - Approval Progress: ${approvalProgress}% (${approvedSteps}/${
-        this.approvalChain?.length || 0
-      } approvals)`
-    );
-    console.log(
-      `  - Implementation Progress: ${implementationProgressWeight}% (${this.implementationProgress}% of tasks)`
-    );
-    console.log(`  - Total: ${overallProgress}%`);
-  }
 
   // Log approval chain status for debugging
   console.log(

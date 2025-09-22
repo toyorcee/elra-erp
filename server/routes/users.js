@@ -14,6 +14,7 @@ import {
   getOnboardedMembers,
   updateUserSalary,
   getPayrollEligibleUsers,
+  getDepartmentUsers,
 } from "../controllers/userController.js";
 import { protect, checkRole } from "../middleware/auth.js";
 import { hasPermission } from "../utils/permissionUtils.js";
@@ -25,6 +26,7 @@ router.use(protect);
 
 // User management routes - All require HOD (700) or Super Admin (1000) level
 router.get("/", checkRole(700), getAllUsers);
+router.get("/department", checkRole(700), getDepartmentUsers);
 router.get("/payroll-eligible", checkRole(700), getPayrollEligibleUsers);
 router.get("/pending", checkRole(700), getPendingRegistrationUsers);
 router.get("/manageable", checkRole(700), getManageableUsers);

@@ -302,6 +302,39 @@ export const exportTransactionHistoryWord = async (filters = {}) => {
   }
 };
 
+// Export transaction history as CSV
+export const exportTransactionHistoryCSV = async (filters = {}) => {
+  try {
+    const response = await api.post(
+      "/elra-wallet/transactions/export/csv",
+      filters,
+      {
+        responseType: "blob",
+      }
+    );
+
+    // Create blob and download
+    const blob = new Blob([response.data], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().split("T")[0];
+    link.download = `transaction_history_${timestamp}.csv`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    return { success: true, message: "CSV report exported successfully" };
+  } catch (error) {
+    console.error("Error exporting transaction history CSV report:", error);
+    throw error;
+  }
+};
+
 // Get wallet allocations
 export const getWalletAllocations = async (params = {}) => {
   try {
@@ -372,6 +405,60 @@ export const rejectPayroll = async (approvalId, rejectionData = {}) => {
     return response.data;
   } catch (error) {
     console.error("Error rejecting payroll:", error);
+    throw error;
+  }
+};
+
+// ===== SALES & MARKETING APPROVALS API =====
+
+// Get Sales & Marketing pending approvals (Finance HOD only)
+export const getSalesMarketingApprovals = async () => {
+  try {
+    const response = await api.get(
+      "/finance/sales-marketing/pending-approvals"
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching Sales & Marketing pending approvals:", error);
+    throw error;
+  }
+};
+
+// Get Sales & Marketing approval history (Finance HOD only)
+export const getSalesMarketingApprovalHistory = async () => {
+  try {
+    const response = await api.get("/finance/sales-marketing/approval-history");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching Sales & Marketing approval history:", error);
+    throw error;
+  }
+};
+
+// Approve Sales & Marketing transaction (Finance HOD only)
+export const approveSalesMarketingTransaction = async (transactionId, data) => {
+  try {
+    const response = await api.post(
+      `/finance/sales-marketing/${transactionId}/approve`,
+      data
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error approving Sales & Marketing transaction:", error);
+    throw error;
+  }
+};
+
+// Reject Sales & Marketing transaction (Finance HOD only)
+export const rejectSalesMarketingTransaction = async (transactionId, data) => {
+  try {
+    const response = await api.post(
+      `/finance/sales-marketing/${transactionId}/reject`,
+      data
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error rejecting Sales & Marketing transaction:", error);
     throw error;
   }
 };

@@ -95,6 +95,11 @@ const companyWalletSchema = new mongoose.Schema(
           default: 0,
           min: 0,
         },
+        reserved: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
       },
     },
 
@@ -123,6 +128,7 @@ const companyWalletSchema = new mongoose.Schema(
             "allocation",
             "approval",
             "rejection",
+            "reversal",
           ],
           required: true,
         },
@@ -149,7 +155,53 @@ const companyWalletSchema = new mongoose.Schema(
             "general",
             "direct_allocation",
             "budget_allocation",
+            "sales",
+            "marketing",
+            "flexible_allocation",
+            "fund_addition",
+            "system",
           ],
+        },
+        budgetCategory: {
+          type: String,
+          enum: ["payroll", "projects", "operational"],
+        },
+        category: {
+          type: String,
+        },
+        status: {
+          type: String,
+          enum: ["pending", "approved", "rejected"],
+          default: "pending",
+        },
+        module: {
+          type: String,
+          enum: ["sales", "marketing"],
+        },
+        department: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Department",
+        },
+        requiresExecutiveApproval: {
+          type: Boolean,
+          default: false,
+        },
+        requestedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        requestedAt: {
+          type: Date,
+        },
+        approvedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        approvedAt: {
+          type: Date,
+        },
+        approvalComments: {
+          type: String,
         },
         date: {
           type: Date,
@@ -162,7 +214,7 @@ const companyWalletSchema = new mongoose.Schema(
         },
         balanceAfter: {
           type: Number,
-          required: true,
+          required: false,
         },
       },
     ],
@@ -400,19 +452,49 @@ companyWalletSchema.methods.reserveFromCategory = function (
   reference,
   referenceId,
   referenceType,
-  createdBy
+  createdBy,
+  session = null
 ) {
+  console.log(`🔍 [WALLET METHOD] reserveFromCategory called with:`, {
+    category,
+    amount,
+    description,
+    reference,
+    referenceId,
+    referenceType,
+    createdBy: createdBy?.toString(),
+    hasSession: !!session,
+  });
+
   if (!this.budgetCategories[category]) {
+    console.error(`❌ [WALLET METHOD] Invalid budget category: ${category}`);
     throw new Error(`Invalid budget category: ${category}`);
   }
 
+  console.log(`🔍 [WALLET METHOD] Current ${category} budget:`, {
+    available: this.budgetCategories[category].available,
+    reserved: this.budgetCategories[category].reserved,
+    required: amount,
+  });
+
   if (this.budgetCategories[category].available < amount) {
+    console.error(`❌ [WALLET METHOD] Insufficient funds:`, {
+      available: this.budgetCategories[category].available,
+      required: amount,
+    });
     throw new Error(
       `Insufficient ${category} funds for reservation. Available: ₦${this.budgetCategories[
         category
       ].available.toLocaleString()}, Required: ₦${amount.toLocaleString()}`
     );
   }
+
+  console.log(`💰 [WALLET METHOD] BEFORE UPDATE:`, {
+    categoryAvailable: this.budgetCategories[category].available,
+    categoryReserved: this.budgetCategories[category].reserved,
+    totalReservedFunds: this.reservedFunds,
+    totalAvailableFunds: this.availableFunds,
+  });
 
   // Update category reservation
   this.budgetCategories[category].available -= amount;
@@ -421,8 +503,15 @@ companyWalletSchema.methods.reserveFromCategory = function (
   // Update overall wallet
   this.reservedFunds += amount;
 
+  console.log(`💰 [WALLET METHOD] AFTER UPDATE:`, {
+    categoryAvailable: this.budgetCategories[category].available,
+    categoryReserved: this.budgetCategories[category].reserved,
+    totalReservedFunds: this.reservedFunds,
+    totalAvailableFunds: this.availableFunds,
+  });
+
   // Add transaction
-  this.transactions.push({
+  const transaction = {
     type: "allocation",
     amount,
     description: `Reserved from ${category}: ${description}`,
@@ -431,12 +520,24 @@ companyWalletSchema.methods.reserveFromCategory = function (
     referenceType,
     createdBy,
     balanceAfter: this.availableFunds,
+    date: new Date(),
+  };
+
+  this.transactions.push(transaction);
+
+  console.log(`📝 [WALLET METHOD] Added transaction:`, {
+    type: transaction.type,
+    amount: transaction.amount,
+    description: transaction.description,
+    reference: transaction.reference,
+    referenceType: transaction.referenceType,
   });
 
   this.metadata.lastUpdated = new Date();
   this.metadata.lastUpdatedBy = createdBy;
 
-  return this.save();
+  console.log(`💾 [WALLET METHOD] Saving wallet with session:`, !!session);
+  return this.save({ session });
 };
 
 // Simplified - no frequency limit methods needed
@@ -449,18 +550,54 @@ companyWalletSchema.methods.allocateFunds = function (
   allocationType,
   createdBy
 ) {
-  if (this.availableFunds < amount) {
-    throw new Error("Insufficient funds available for allocation");
+  // Determine which budget category to use based on allocation type
+  let budgetCategory;
+  if (allocationType === "project_budget") {
+    budgetCategory = "projects";
+  } else if (allocationType === "payroll_funding") {
+    budgetCategory = "payroll";
+  } else if (allocationType === "operational_funding") {
+    budgetCategory = "operational";
+  } else {
+    // Fallback to main wallet for unknown types
+    budgetCategory = null;
   }
 
-  this.availableFunds -= amount;
-  this.reservedFunds += amount;
+  // Check funds availability based on budget category
+  if (budgetCategory) {
+    const category = this.budgetCategories[budgetCategory];
+    if (!category) {
+      throw new Error(`Budget category ${budgetCategory} not found`);
+    }
+
+    if (category.available < amount) {
+      throw new Error(
+        `Insufficient funds in ${budgetCategory} budget category. Available: ₦${category.available.toLocaleString()}, Required: ₦${amount.toLocaleString()}`
+      );
+    }
+
+    // Deduct from specific budget category
+    category.available -= amount;
+    category.reserved += amount;
+
+    console.log(
+      `💰 [BUDGET ALLOCATION] Reserved ₦${amount.toLocaleString()} from ${budgetCategory} budget category`
+    );
+  } else {
+    // Fallback to main wallet
+    if (this.availableFunds < amount) {
+      throw new Error("Insufficient funds available for allocation");
+    }
+    this.availableFunds -= amount;
+    this.reservedFunds += amount;
+  }
 
   this.allocations.push({
     allocationId,
     allocationType,
     amount,
     status: "pending",
+    budgetCategory: budgetCategory, // Store which category was used
   });
 
   this.transactions.push({
@@ -476,7 +613,10 @@ companyWalletSchema.methods.allocateFunds = function (
         ? "payroll"
         : "operational",
     createdBy,
-    balanceAfter: this.availableFunds,
+    balanceAfter: budgetCategory
+      ? this.budgetCategories[budgetCategory].available
+      : this.availableFunds,
+    budgetCategory: budgetCategory,
   });
 
   this.metadata.lastUpdated = new Date();
@@ -502,9 +642,27 @@ companyWalletSchema.methods.approveAllocation = function (
     throw new Error("Allocation is not pending approval");
   }
 
-  // Move from reserved to allocated
-  this.reservedFunds -= allocation.amount;
-  this.allocatedFunds += allocation.amount;
+  // Handle fund movement based on budget category
+  if (allocation.budgetCategory) {
+    // Move from reserved to used in specific budget category
+    const category = this.budgetCategories[allocation.budgetCategory];
+    if (!category) {
+      throw new Error(`Budget category ${allocation.budgetCategory} not found`);
+    }
+
+    category.reserved -= allocation.amount;
+    category.used += allocation.amount;
+
+    console.log(
+      `✅ [BUDGET APPROVAL] Moved ₦${allocation.amount.toLocaleString()} from ${
+        allocation.budgetCategory
+      }.reserved to ${allocation.budgetCategory}.used`
+    );
+  } else {
+    // Fallback to main wallet movement
+    this.reservedFunds -= allocation.amount;
+    this.allocatedFunds += allocation.amount;
+  }
 
   allocation.status = "approved";
   allocation.approvedBy = approvedBy;
@@ -522,7 +680,10 @@ companyWalletSchema.methods.approveAllocation = function (
         ? "payroll"
         : "operational",
     createdBy: approvedBy,
-    balanceAfter: this.availableFunds,
+    balanceAfter: allocation.budgetCategory
+      ? this.budgetCategories[allocation.budgetCategory].available
+      : this.availableFunds,
+    budgetCategory: allocation.budgetCategory,
   });
 
   this.metadata.lastUpdated = new Date();
@@ -549,9 +710,27 @@ companyWalletSchema.methods.rejectAllocation = function (
     throw new Error("Allocation is not pending approval");
   }
 
-  // Return funds to available
-  this.reservedFunds -= allocation.amount;
-  this.availableFunds += allocation.amount;
+  // Return funds to available based on budget category
+  if (allocation.budgetCategory) {
+    // Return from reserved to available in specific budget category
+    const category = this.budgetCategories[allocation.budgetCategory];
+    if (!category) {
+      throw new Error(`Budget category ${allocation.budgetCategory} not found`);
+    }
+
+    category.reserved -= allocation.amount;
+    category.available += allocation.amount;
+
+    console.log(
+      `❌ [BUDGET REJECTION] Returned ₦${allocation.amount.toLocaleString()} from ${
+        allocation.budgetCategory
+      }.reserved to ${allocation.budgetCategory}.available`
+    );
+  } else {
+    // Fallback to main wallet movement
+    this.reservedFunds -= allocation.amount;
+    this.availableFunds += allocation.amount;
+  }
 
   allocation.status = "rejected";
 
@@ -568,7 +747,10 @@ companyWalletSchema.methods.rejectAllocation = function (
         ? "payroll"
         : "operational",
     createdBy: rejectedBy,
-    balanceAfter: this.availableFunds,
+    balanceAfter: allocation.budgetCategory
+      ? this.budgetCategories[allocation.budgetCategory].available
+      : this.availableFunds,
+    budgetCategory: allocation.budgetCategory,
   });
 
   this.metadata.lastUpdated = new Date();
@@ -615,6 +797,80 @@ companyWalletSchema.methods.processPayroll = function (
 
   this.metadata.lastUpdated = new Date();
   this.metadata.lastUpdatedBy = processedBy;
+
+  return this.save();
+};
+
+// Method to add funds with flexible budget allocation
+companyWalletSchema.methods.addFundsWithAllocation = function (
+  totalAmount,
+  allocations,
+  description,
+  reference,
+  createdBy
+) {
+  // Validate allocations
+  const validCategories = ["payroll", "projects", "operational"];
+  let totalAllocated = 0;
+
+  for (const allocation of allocations) {
+    if (!validCategories.includes(allocation.category)) {
+      throw new Error(`Invalid budget category: ${allocation.category}`);
+    }
+    if (allocation.amount <= 0) {
+      throw new Error(
+        `Invalid amount for ${allocation.category}: ${allocation.amount}`
+      );
+    }
+    totalAllocated += allocation.amount;
+  }
+
+  if (totalAllocated > totalAmount) {
+    throw new Error(
+      `Total allocations (₦${totalAllocated.toLocaleString()}) cannot exceed total amount (₦${totalAmount.toLocaleString()})`
+    );
+  }
+
+  // Add total amount to wallet
+  this.totalFunds += totalAmount;
+  this.allocatedFunds += totalAllocated;
+  const remainingAmount = totalAmount - totalAllocated;
+  this.availableFunds += remainingAmount;
+
+  // Allocate to specific categories
+  for (const allocation of allocations) {
+    const category = this.budgetCategories[allocation.category];
+    category.allocated += allocation.amount;
+    category.available += allocation.amount;
+
+    // Create transaction for each allocation
+    this.transactions.push({
+      type: "allocation",
+      amount: allocation.amount,
+      description: `Allocated to ${allocation.category}: ${description}`,
+      reference: `${reference}-${allocation.category}`,
+      referenceId: null,
+      referenceType: "flexible_allocation",
+      createdBy,
+      balanceAfter: this.availableFunds,
+      budgetCategory: allocation.category,
+    });
+  }
+
+  // Create main transaction for the total amount
+  this.transactions.push({
+    type: "deposit",
+    amount: totalAmount,
+    description: `Funds added with flexible allocation: ${description}`,
+    reference,
+    referenceId: null,
+    referenceType: "fund_addition",
+    createdBy,
+    balanceAfter: this.availableFunds,
+  });
+
+  this.metadata.lastUpdated = new Date();
+  this.metadata.lastUpdatedBy = createdBy;
 
   return this.save();
 };

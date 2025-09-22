@@ -23,6 +23,7 @@ import {
   CalendarIcon,
   UserIcon,
 } from "@heroicons/react/24/outline";
+import { HiChartBar } from "react-icons/hi2";
 import { HiDocument } from "react-icons/hi2";
 import DataTable from "../../../../components/common/DataTable";
 import ELRALogo from "../../../../components/ELRALogo.jsx";
@@ -39,6 +40,7 @@ import {
   getProjectDocuments,
 } from "../../../../services/documents.js";
 import { formatNumberWithCommas } from "../../../../utils/formatters.js";
+import AnimatedBubbles from "../../../../components/ui/AnimatedBubbles.jsx";
 
 const MyProjects = () => {
   const { user } = useAuth();
@@ -148,6 +150,7 @@ const MyProjects = () => {
   const [submitting, setSubmitting] = useState(false);
   const [projectCategories, setProjectCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
+  const [showBubbles, setShowBubbles] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -371,6 +374,7 @@ const MyProjects = () => {
 
   useEffect(() => {
     if (showCreateModal) {
+      setShowBubbles(loadingCategories);
       const fetchNextCode = async () => {
         try {
           const response = await getNextProjectCode();
@@ -384,43 +388,124 @@ const MyProjects = () => {
 
       fetchNextCode();
       setCurrentDate(new Date().toLocaleDateString());
+    } else {
+      setShowBubbles(false);
     }
-  }, [showCreateModal]);
+  }, [showCreateModal, loadingCategories]);
 
   const getApprovalLevelText = (budget, requiresBudgetAllocation) => {
     const numBudget = parseFloat(budget.replace(/,/g, "")) || 0;
 
+    const isHOD = user?.role?.level >= 700;
+    const userDepartment = user?.department?.name;
+
     if (!requiresBudgetAllocation || requiresBudgetAllocation === "false") {
-      // Self-funded projects (Budget Allocation = FALSE)
       if (numBudget < 5000000) {
+        const approvalChain = isHOD
+          ? "Project Management HOD"
+          : "HOD → Project Management HOD";
         return {
-          text: "HOD → Project Management HOD",
+          text: approvalChain,
           color: "text-green-600",
-          description:
-            "Self-funded project starts after HOD and Project Management HOD approvals",
+          description: isHOD
+            ? "Self-funded project starts after Project Management HOD approval (your department approval auto-skipped)"
+            : "Self-funded project starts after HOD and Project Management HOD approvals",
         };
       } else {
+        const approvalChain = isHOD
+          ? "Project Management → Legal → Executive"
+          : "HOD → Project Management → Legal → Executive";
         return {
-          text: "HOD → Project Management → Legal → Executive",
+          text: approvalChain,
           color: "text-orange-600",
-          description:
-            "Large self-funded project requires Legal and Executive approval",
+          description: isHOD
+            ? "Large self-funded project requires Legal and Executive approval (your department approval auto-skipped)"
+            : "Large self-funded project requires Legal and Executive approval",
         };
       }
     } else {
       // Budget allocation required (Budget Allocation = TRUE)
       if (numBudget < 5000000) {
+        let approvalChain;
+        let description;
+
+        if (!isHOD) {
+          approvalChain =
+            "HOD → Project Management → Legal → Finance → Budget Allocation";
+          description = "Legal review required before Finance allocation";
+        } else if (userDepartment === "Project Management") {
+          // Project Management HOD - skips both HOD and Project Management steps
+          approvalChain = "Legal → Finance → Budget Allocation";
+          description =
+            "Legal review required before Finance allocation (your department approvals auto-skipped)";
+        } else if (userDepartment === "Finance & Accounting") {
+          // Finance HOD - skips both HOD and Finance steps
+          approvalChain = "Project Management → Legal → Budget Allocation";
+          description =
+            "Legal review required before Finance allocation (your department approvals auto-skipped)";
+        } else if (userDepartment === "Legal & Compliance") {
+          // Legal HOD - skips both HOD and Legal steps
+          approvalChain = "Project Management → Finance → Budget Allocation";
+          description =
+            "Legal review required before Finance allocation (your department approvals auto-skipped)";
+        } else {
+          // Other HOD - only skips HOD step
+          approvalChain =
+            "Project Management → Legal → Finance → Budget Allocation";
+          description =
+            "Legal review required before Finance allocation (your department approval auto-skipped)";
+        }
+
         return {
-          text: "HOD → Project Management → Legal → Finance → Budget Allocation",
+          text: approvalChain,
           color: "text-blue-600",
-          description: "Legal review required before Finance allocation",
+          description: description,
         };
       } else {
+        let approvalChain;
+        let description;
+
+        if (!isHOD) {
+          // Regular user
+          approvalChain =
+            "HOD → Project Management → Legal → Finance → Executive → Budget Allocation";
+          description =
+            "Executive approval required for large budget allocation";
+        } else if (userDepartment === "Project Management") {
+          // Project Management HOD - skips both HOD and Project Management steps
+          approvalChain = "Legal → Finance → Executive → Budget Allocation";
+          description =
+            "Executive approval required for large budget allocation (your department approvals auto-skipped)";
+        } else if (userDepartment === "Finance & Accounting") {
+          // Finance HOD - skips both HOD and Finance steps
+          approvalChain =
+            "Project Management → Legal → Executive → Budget Allocation";
+          description =
+            "Executive approval required for large budget allocation (your department approvals auto-skipped)";
+        } else if (userDepartment === "Legal & Compliance") {
+          // Legal HOD - skips both HOD and Legal steps
+          approvalChain =
+            "Project Management → Finance → Executive → Budget Allocation";
+          description =
+            "Executive approval required for large budget allocation (your department approvals auto-skipped)";
+        } else if (userDepartment === "Executive Office") {
+          // Executive HOD - skips both HOD and Executive steps
+          approvalChain =
+            "Project Management → Legal → Finance → Budget Allocation";
+          description =
+            "Executive approval required for large budget allocation (your department approvals auto-skipped)";
+        } else {
+          // Other HOD - only skips HOD step
+          approvalChain =
+            "Project Management → Legal → Finance → Executive → Budget Allocation";
+          description =
+            "Executive approval required for large budget allocation (your department approval auto-skipped)";
+        }
+
         return {
-          text: "HOD → Project Management → Legal → Finance → Executive → Budget Allocation",
+          text: approvalChain,
           color: "text-red-600",
-          description:
-            "Executive approval required for large budget allocation",
+          description: description,
         };
       }
     }
@@ -457,15 +542,19 @@ const MyProjects = () => {
 
     if (projectItems.length > 0) {
       const itemsValid = validateProjectItems();
+
       const budgetValid =
-        getTotalItemsCost() <=
-        parseFloat(formData.budget.replace(/,/g, "") || 0);
+        formData.requiresBudgetAllocation === "true"
+          ? getTotalItemsCost() <=
+            parseFloat(formData.budget.replace(/,/g, "") || 0)
+          : true;
 
       console.log("🔍 [VALIDATION] Items validation:", {
         itemsValid,
         budgetValid,
         totalItemsCost: getTotalItemsCost(),
         budget: parseFloat(formData.budget.replace(/,/g, "") || 0),
+        requiresBudgetAllocation: formData.requiresBudgetAllocation,
       });
 
       return basicFieldsValid && itemsValid && budgetValid;
@@ -775,17 +864,20 @@ const MyProjects = () => {
   const openViewModal = (project) => {
     setSelectedProject(project);
     setShowViewModal(true);
+    setLoading(false); // Clear main loading state when modal opens
   };
 
   const openDocumentsModal = async (project) => {
     setSelectedProjectForDocuments(project);
     setShowDocumentsModal(true);
+    setLoading(false); // Clear main loading state when modal opens
     await fetchProjectDocuments(project.id);
   };
 
   const openImplementationModal = async (project) => {
     setSelectedProjectForImplementation(project);
     setShowImplementationModal(true);
+    setLoading(false); // Clear main loading state when modal opens
     await loadProjectTasks(project);
   };
 
@@ -912,6 +1004,10 @@ const MyProjects = () => {
       uploadData.append("documentType", documentFormData.documentType);
       uploadData.append("projectId", selectedProjectForDocument.id);
       uploadData.append("isConfidential", documentFormData.isConfidential);
+      uploadData.append(
+        "customCategory",
+        documentFormData.category || "Project Documentation"
+      );
 
       const result = await uploadDocument(uploadData);
       if (!result.success) {
@@ -953,6 +1049,8 @@ const MyProjects = () => {
         return "bg-orange-100 text-orange-800";
       case "pending_department_approval":
         return "bg-blue-100 text-blue-800";
+      case "pending_project_management_approval":
+        return "bg-indigo-100 text-indigo-800";
       case "pending_legal_compliance_approval":
         return "bg-purple-100 text-purple-800";
       case "pending_finance_approval":
@@ -989,6 +1087,7 @@ const MyProjects = () => {
         return <ExclamationTriangleIcon className="w-5 h-5 text-yellow-600" />;
       case "pending_approval":
       case "pending_department_approval":
+      case "pending_project_management_approval":
       case "pending_legal_compliance_approval":
       case "pending_finance_approval":
       case "pending_executive_approval":
@@ -1170,73 +1269,172 @@ const MyProjects = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">My Projects</h1>
-          <p className="text-gray-600 mt-2">
-            Manage your personal projects and track their progress
-          </p>
+        {/* Enhanced Header */}
+        <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-2xl p-8 text-white mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">My Projects</h1>
+              <p className="text-white text-opacity-90 text-lg">
+                Manage your personal projects and track their progress
+              </p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => {
+                  setSelectedProject(null);
+                  setIsEditMode(false);
+                  setShowCreateModal(true);
+                }}
+                className="bg-white text-[var(--elra-primary)] px-6 py-3 rounded-xl hover:bg-gray-50 transition-all duration-300 flex items-center space-x-3 font-semibold shadow-lg border border-white border-opacity-20"
+              >
+                <PlusIcon className="w-5 h-5" />
+                <span>Create Project</span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <ClockIcon className="w-6 h-6 text-blue-600" />
+        {/* Enhanced Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg border border-blue-200 p-6 hover:shadow-xl transition-all duration-300"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="p-3 bg-blue-500 rounded-xl shadow-lg">
+                  <ClockIcon className="w-6 h-6 text-white" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">
+                    Total Projects
+                  </p>
+                  <p className="text-3xl font-bold text-blue-900">
+                    {projects.length}
+                  </p>
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">
-                  Total Projects
-                </p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {projects.length}
-                </p>
+              <div className="text-blue-400">
+                <svg
+                  className="w-8 h-8"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircleIcon className="w-6 h-6 text-green-600" />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.1 }}
+            className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-lg border border-green-200 p-6 hover:shadow-xl transition-all duration-300"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="p-3 bg-green-500 rounded-xl shadow-lg">
+                  <CheckCircleIcon className="w-6 h-6 text-white" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-semibold text-green-700 uppercase tracking-wide">
+                    Completed
+                  </p>
+                  <p className="text-3xl font-bold text-green-900">
+                    {projects.filter((p) => p.status === "completed").length}
+                  </p>
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Completed</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {projects.filter((p) => p.status === "completed").length}
-                </p>
+              <div className="text-green-400">
+                <svg
+                  className="w-8 h-8"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <ClockIcon className="w-6 h-6 text-blue-600" />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.2 }}
+            className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg border border-blue-200 p-6 hover:shadow-xl transition-all duration-300"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="p-3 bg-blue-500 rounded-xl shadow-lg">
+                  <ClockIcon className="w-6 h-6 text-white" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">
+                    In Progress
+                  </p>
+                  <p className="text-3xl font-bold text-blue-900">
+                    {projects.filter((p) => p.status === "in-progress").length}
+                  </p>
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">In Progress</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {projects.filter((p) => p.status === "in-progress").length}
-                </p>
+              <div className="text-blue-400">
+                <svg
+                  className="w-8 h-8"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                    clipRule="evenodd"
+                  />
+                </svg>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <ExclamationTriangleIcon className="w-6 h-6 text-yellow-600" />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.3 }}
+            className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl shadow-lg border border-yellow-200 p-6 hover:shadow-xl transition-all duration-300"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="p-3 bg-yellow-500 rounded-xl shadow-lg">
+                  <ExclamationTriangleIcon className="w-6 h-6 text-white" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-semibold text-yellow-700 uppercase tracking-wide">
+                    Planning
+                  </p>
+                  <p className="text-3xl font-bold text-yellow-900">
+                    {projects.filter((p) => p.status === "planning").length}
+                  </p>
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Planning</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {projects.filter((p) => p.status === "planning").length}
-                </p>
+              <div className="text-yellow-400">
+                <svg
+                  className="w-8 h-8"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center">
@@ -1253,6 +1451,7 @@ const MyProjects = () => {
                       (p) =>
                         p.status === "pending_approval" ||
                         p.status === "pending_department_approval" ||
+                        p.status === "pending_project_management_approval" ||
                         p.status === "pending_legal_compliance_approval" ||
                         p.status === "pending_finance_approval" ||
                         p.status === "pending_executive_approval"
@@ -1264,310 +1463,336 @@ const MyProjects = () => {
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex space-x-4">
-            {/* Left side can have filters later */}
+        {/* Enhanced Projects Table */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
+          <div className="p-6 border-b border-gray-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-[var(--elra-primary)] rounded-lg flex items-center justify-center">
+                  <HiChartBar className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    My Projects
+                  </h2>
+                  <p className="text-sm text-gray-500">
+                    {projects.length} project{projects.length !== 1 ? "s" : ""}{" "}
+                    total
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors"
-          >
-            <PlusIcon className="h-5 w-5 mr-2" />
-            Create New Project
-          </button>
-        </div>
-
-        {/* Projects Table */}
-        <div className="overflow-x-auto">
-          <DataTable
-            data={projects}
-            columns={[
-              {
-                header: "Project",
-                accessor: "name",
-                renderer: (project) => (
-                  <div className="flex items-center min-w-0 max-w-[200px]">
-                    <FolderIcon className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <div
-                        className="font-medium text-gray-900 truncate"
-                        title={project.name}
-                      >
-                        {project.name && project.name.length > 20
-                          ? `${project.name.slice(0, 20)}...`
-                          : project.name}
-                      </div>
-                      <div className="text-sm text-gray-500 truncate">
-                        {project.description && project.description.length > 30
-                          ? `${project.description.slice(0, 30)}...`
-                          : project.description}
+          <div className="overflow-x-auto">
+            <DataTable
+              data={projects}
+              columns={[
+                {
+                  header: "Project",
+                  accessor: "name",
+                  renderer: (project) => (
+                    <div className="flex items-center min-w-0 max-w-[200px]">
+                      <FolderIcon className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div
+                          className="font-medium text-gray-900 truncate"
+                          title={project.name}
+                        >
+                          {project.name && project.name.length > 20
+                            ? `${project.name.slice(0, 20)}...`
+                            : project.name}
+                        </div>
+                        <div className="text-sm text-gray-500 truncate">
+                          {project.description &&
+                          project.description.length > 30
+                            ? `${project.description.slice(0, 30)}...`
+                            : project.description}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ),
-              },
-              {
-                header: "Status",
-                accessor: "status",
-                renderer: (project) => (
-                  <div className="flex items-center space-x-2">
-                    {getStatusIcon(project.status)}
+                  ),
+                },
+                {
+                  header: "Status",
+                  accessor: "status",
+                  renderer: (project) => (
+                    <div className="flex items-center space-x-2">
+                      {getStatusIcon(project.status)}
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
+                          project.status
+                        )}`}
+                      >
+                        {project.status === "pending_approval" &&
+                          "Pending Approval"}
+                        {project.status === "pending_department_approval" &&
+                          "Pending Department Approval"}
+                        {project.status ===
+                          "pending_project_management_approval" &&
+                          "Pending Project Management Approval"}
+                        {project.status ===
+                          "pending_legal_compliance_approval" &&
+                          "Pending Legal Approval"}
+                        {project.status === "pending_finance_approval" &&
+                          "Pending Finance Approval"}
+                        {project.status === "pending_executive_approval" &&
+                          "Pending Executive Approval"}
+                        {project.status !== "pending_approval" &&
+                          project.status !== "pending_department_approval" &&
+                          project.status !==
+                            "pending_project_management_approval" &&
+                          project.status !==
+                            "pending_legal_compliance_approval" &&
+                          project.status !== "pending_finance_approval" &&
+                          project.status !== "pending_executive_approval" &&
+                          project.status.replace(/_/g, " ")}
+                      </span>
+                    </div>
+                  ),
+                },
+                {
+                  header: "Priority",
+                  accessor: "priority",
+                  renderer: (project) => (
                     <span
-                      className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
-                        project.status
+                      className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(
+                        project.priority
                       )}`}
                     >
-                      {project.status === "pending_approval" &&
-                        "Pending Approval"}
-                      {project.status === "pending_department_approval" &&
-                        "Pending Department Approval"}
-                      {project.status === "pending_legal_compliance_approval" &&
-                        "Pending Legal Approval"}
-                      {project.status === "pending_finance_approval" &&
-                        "Pending Finance Approval"}
-                      {project.status === "pending_executive_approval" &&
-                        "Pending Executive Approval"}
-                      {project.status !== "pending_approval" &&
-                        project.status !== "pending_department_approval" &&
-                        project.status !==
-                          "pending_legal_compliance_approval" &&
-                        project.status !== "pending_finance_approval" &&
-                        project.status !== "pending_executive_approval" &&
-                        project.status.replace(/_/g, " ")}
+                      {project.priority}
                     </span>
-                  </div>
-                ),
-              },
-              {
-                header: "Priority",
-                accessor: "priority",
-                renderer: (project) => (
-                  <span
-                    className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(
-                      project.priority
-                    )}`}
-                  >
-                    {project.priority}
-                  </span>
-                ),
-              },
-              {
-                header: "Timeline",
-                accessor: "timeline",
-                renderer: (project) => (
-                  <div className="text-sm">
-                    <div className="text-gray-900">
-                      {new Date(project.startDate).toLocaleDateString()}
+                  ),
+                },
+                {
+                  header: "Timeline",
+                  accessor: "timeline",
+                  renderer: (project) => (
+                    <div className="text-sm">
+                      <div className="text-gray-900">
+                        {new Date(project.startDate).toLocaleDateString()}
+                      </div>
+                      <div className="text-gray-500">
+                        to {new Date(project.endDate).toLocaleDateString()}
+                      </div>
                     </div>
-                    <div className="text-gray-500">
-                      to {new Date(project.endDate).toLocaleDateString()}
+                  ),
+                },
+                {
+                  header: "Budget",
+                  accessor: "budget",
+                  renderer: (project) => (
+                    <span className="font-medium text-gray-900">
+                      ₦{project.budget.toLocaleString()}
+                    </span>
+                  ),
+                },
+                {
+                  header: "General Progress",
+                  accessor: "progress",
+                  renderer: (project) => (
+                    <div className="min-w-0 max-w-32">
+                      <div className="flex justify-between text-sm text-gray-600 mb-1">
+                        <span>{project.progress}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${project.progress}%` }}
+                        ></div>
+                      </div>
                     </div>
-                  </div>
-                ),
-              },
-              {
-                header: "Budget",
-                accessor: "budget",
-                renderer: (project) => (
-                  <span className="font-medium text-gray-900">
-                    ₦{project.budget.toLocaleString()}
-                  </span>
-                ),
-              },
-              {
-                header: "Progress",
-                accessor: "progress",
-                renderer: (project) => (
-                  <div className="min-w-0 max-w-32">
-                    <div className="flex justify-between text-sm text-gray-600 mb-1">
-                      <span>{project.progress}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${project.progress}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                ),
-              },
-              {
-                header: "Actions",
-                accessor: "actions",
-                align: "center",
-                renderer: (project) => (
-                  <div className="flex items-center justify-center space-x-1">
-                    <button
-                      onClick={() => openViewModal(project)}
-                      className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                      title="View Details"
-                    >
-                      <EyeIcon className="h-4 w-4" />
-                    </button>
+                  ),
+                },
+                {
+                  header: "Actions",
+                  accessor: "actions",
+                  align: "center",
+                  renderer: (project) => (
+                    <div className="flex items-center justify-center space-x-1">
+                      <button
+                        onClick={() => openViewModal(project)}
+                        className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                        title="View Details"
+                      >
+                        <EyeIcon className="h-4 w-4" />
+                      </button>
 
-                    {/* Documents Icon - Always show for document management */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openDocumentsModal(project);
-                      }}
-                      className={`p-2 rounded-lg transition-colors cursor-pointer relative ${
-                        project.requiredDocuments &&
-                        project.requiredDocuments.some((doc) => doc.isSubmitted)
-                          ? "text-green-600 hover:text-green-800 hover:bg-green-50"
-                          : "text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                      }`}
-                      title={
-                        project.requiredDocuments &&
-                        project.requiredDocuments.some((doc) => doc.isSubmitted)
-                          ? `View ${
-                              project.requiredDocuments.filter(
-                                (doc) => doc.isSubmitted
-                              ).length
-                            }/${
-                              project.requiredDocuments.length
-                            } uploaded documents`
-                          : "View Documents to Upload"
-                      }
-                    >
-                      <HiDocument className="h-4 w-4" />
-                      {project.requiredDocuments &&
-                        project.requiredDocuments.some(
-                          (doc) => doc.isSubmitted
-                        ) && (
-                          <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                            {
-                              project.requiredDocuments.filter(
-                                (doc) => doc.isSubmitted
-                              ).length
-                            }
-                          </span>
-                        )}
-                    </button>
-
-                    {/* Edit Project - Only show if project is still in planning stage */}
-                    {project.status === "planning" && (
+                      {/* Documents Icon - Always show for document management */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          openEditModal(project);
+                          openDocumentsModal(project);
                         }}
-                        className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
-                        title="Edit Project"
+                        className={`p-2 rounded-lg transition-colors cursor-pointer relative ${
+                          project.requiredDocuments &&
+                          project.requiredDocuments.some(
+                            (doc) => doc.isSubmitted
+                          )
+                            ? "text-green-600 hover:text-green-800 hover:bg-green-50"
+                            : "text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                        }`}
+                        title={
+                          project.requiredDocuments &&
+                          project.requiredDocuments.some(
+                            (doc) => doc.isSubmitted
+                          )
+                            ? `View ${
+                                project.requiredDocuments.filter(
+                                  (doc) => doc.isSubmitted
+                                ).length
+                              }/${
+                                project.requiredDocuments.length
+                              } uploaded documents`
+                            : "View Documents to Upload"
+                        }
                       >
-                        <PencilIcon className="h-4 w-4" />
+                        <HiDocument className="h-4 w-4" />
+                        {project.requiredDocuments &&
+                          project.requiredDocuments.some(
+                            (doc) => doc.isSubmitted
+                          ) && (
+                            <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                              {
+                                project.requiredDocuments.filter(
+                                  (doc) => doc.isSubmitted
+                                ).length
+                              }
+                            </span>
+                          )}
                       </button>
-                    )}
 
-                    {/* Delete Project - Only show if project is still in planning stage */}
-                    {project.status === "planning" && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteProject(project.id);
-                        }}
-                        className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                        title="Delete Project"
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    )}
+                      {/* Edit Project - Only show if project is still in planning stage */}
+                      {project.status === "planning" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditModal(project);
+                          }}
+                          className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Project"
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </button>
+                      )}
 
-                    {/* Implement Project - Show for approved projects */}
-                    {[
-                      "approved",
-                      "in_progress",
-                      "implementation",
-                      "active",
-                    ].includes(project.status) && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openImplementationModal(project);
-                        }}
-                        className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors cursor-pointer"
-                        title="Implement Project"
-                      >
-                        <CheckCircleIcon className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                ),
-              },
-            ]}
-            loading={loading}
-            onRowClick={openViewModal}
-            rowClassName="cursor-pointer hover:bg-gray-50 transition-colors"
-            actions={{
-              showEdit: false,
-              showDelete: false,
-              showToggle: false,
-            }}
-          />
+                      {/* Delete Project - Only show if project is still in planning stage */}
+                      {project.status === "planning" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteProject(project.id);
+                          }}
+                          className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Project"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      )}
+
+                      {/* Implement Project - Show for approved projects */}
+                      {[
+                        "approved",
+                        "in_progress",
+                        "implementation",
+                        "active",
+                      ].includes(project.status) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openImplementationModal(project);
+                          }}
+                          className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-colors cursor-pointer"
+                          title="Implement Project"
+                        >
+                          <CheckCircleIcon className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  ),
+                },
+              ]}
+              loading={loading}
+              onRowClick={openViewModal}
+              rowClassName="cursor-pointer hover:bg-gray-50 transition-colors"
+              actions={{
+                showEdit: false,
+                showDelete: false,
+                showToggle: false,
+              }}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Enhanced Create Project Modal with ELRA Branding - Exact Copy from ProjectList */}
+      {/* Enhanced Create Project Modal with Beautiful Design */}
       <AnimatePresence>
         {showCreateModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-gradient-to-br from-black/60 via-black/40 to-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowCreateModal(false)}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              initial={{ scale: 0.9, opacity: 0, y: 30 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="bg-white rounded-2xl shadow-2xl max-w-7xl w-full max-h-[95vh] flex flex-col"
+              exit={{ scale: 0.9, opacity: 0, y: 30 }}
+              transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+              className="bg-white rounded-3xl shadow-2xl max-w-7xl w-full max-h-[95vh] flex flex-col border border-gray-100 relative"
+              onClick={(e) => e.stopPropagation()}
             >
+              {/* Animated Bubbles */}
+              <AnimatedBubbles isVisible={showBubbles} />
+
               {/* Header - Fixed Position */}
-              <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-t-2xl flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                      <ELRALogo variant="dark" size="md" />
+              <div className="bg-gradient-to-br from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] text-white p-8 rounded-t-3xl flex-shrink-0 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-6">
+                      <div className="p-4 bg-white/20 rounded-3xl backdrop-blur-sm border border-white/20">
+                        <ELRALogo variant="dark" size="lg" />
+                      </div>
+                      <div>
+                        <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
+                          {isEditMode
+                            ? "Edit Personal Project"
+                            : "Create Personal Project"}
+                        </h2>
+                        <p className="text-white/90 mt-2 text-lg">
+                          {isEditMode
+                            ? "Update your project information and settings"
+                            : "Create a personal project for development, learning, or small tasks"}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-2xl font-bold">
-                        {isEditMode
-                          ? "Edit Personal Project"
-                          : "Create New Personal Project"}
-                      </h2>
-                      <p className="text-white text-opacity-90 mt-1 text-sm">
-                        {isEditMode
-                          ? "Update your project information"
-                          : "Create a personal project for development, learning, or small tasks"}
-                      </p>
-                      <p className="text-white text-opacity-75 mt-1 text-xs">
-                        Self-funded projects need only HOD approval
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
                     <button
                       onClick={() => setShowCreateModal(false)}
-                      className="bg-white text-[var(--elra-primary)] px-4 py-2 rounded-lg hover:bg-gray-50 transition-all duration-300 font-medium border border-white"
-                      disabled={submitting}
+                      className="p-3 hover:bg-white/20 rounded-2xl transition-all duration-200 backdrop-blur-sm border border-white/20 hover:border-white/30"
                     >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => setShowCreateModal(false)}
-                      className="text-white hover:text-gray-200 transition-colors p-1 rounded-full hover:bg-white hover:bg-opacity-20"
-                      disabled={submitting}
-                    >
-                      <XMarkIcon className="h-6 w-6" />
+                      <svg
+                        className="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Content - Scrollable */}
-              <div className="p-8 bg-white overflow-y-auto flex-1">
+              {/* Form Content - Scrollable */}
+              <div className="flex-1 overflow-y-auto p-6">
                 <form
                   id="create-project-form"
                   onSubmit={(e) => {
@@ -1575,21 +1800,23 @@ const MyProjects = () => {
                     handleCreateProject();
                   }}
                 >
-                  {/* Enhanced Project Code Display */}
+                  {/* Project Code Display */}
                   {nextProjectCode && (
-                    <div className="mb-4 p-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
+                    <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                           <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
                             <svg
                               className="w-4 h-4 text-white"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
                             >
                               <path
-                                fillRule="evenodd"
-                                d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
-                                clipRule="evenodd"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                               />
                             </svg>
                           </div>
@@ -1609,12 +1836,27 @@ const MyProjects = () => {
                     </div>
                   )}
 
-                  {/* Single-step form for personal projects */}
+                  {/* SECTION 1: BASIC PROJECT INFORMATION */}
                   <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3 }}
+                    className="bg-gray-50 border border-gray-200 rounded-xl p-6"
                   >
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                      <svg
+                        className="w-5 h-5 mr-2"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Basic Project Information
+                    </h3>
                     {/* Parent Level Fields - Moved to top for better UX */}
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
                       {/* Budget Field */}
@@ -1845,11 +2087,40 @@ const MyProjects = () => {
                         </label>
                       </div>
                       <p className="mt-2 text-sm text-gray-600">
-                        {formData.requiresBudgetAllocation === "true"
-                          ? "Project will go through: HOD → Project Management → Legal → Finance → Executive for budget allocation."
-                          : "Project will go through: HOD → Project Management approval. You'll manage your own budget."}
+                        {(() => {
+                          const approvalInfo = getApprovalLevelText(
+                            formData.budget || "0",
+                            formData.requiresBudgetAllocation
+                          );
+                          return formData.requiresBudgetAllocation === "true"
+                            ? `Project will go through: ${approvalInfo.text} for budget allocation.`
+                            : `Project will go through: ${approvalInfo.text} approval. You'll manage your own budget.`;
+                        })()}
                       </p>
                     </div>
+                  </motion.div>
+
+                  {/* SECTION 2: PROJECT ITEMS & SPECIFICATIONS */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: 0.1 }}
+                    className="bg-gray-50 border border-gray-200 rounded-xl p-6 mt-6"
+                  >
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                      <svg
+                        className="w-5 h-5 mr-2"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Project Items & Specifications
+                    </h3>
 
                     {/* Project Items - For All Personal Projects (Planning & Organization) */}
                     <div className="mt-6">
@@ -1872,7 +2143,10 @@ const MyProjects = () => {
                         <p className="text-sm text-blue-800">
                           📋 <strong>Project Planning:</strong> List items
                           you'll need for your project. This helps with planning
-                          and organization, even for self-funded projects.
+                          and organization
+                          {formData.requiresBudgetAllocation === "true"
+                            ? " and budget allocation approval."
+                            : ", even for self-funded projects."}
                         </p>
                       </div>
 
@@ -2125,11 +2399,19 @@ const MyProjects = () => {
                       type="submit"
                       form="create-project-form"
                       className={`px-6 py-3 rounded-lg transition-all duration-200 flex items-center space-x-2 ${
-                        isFormValid() && !submitting
+                        !submitting &&
+                        (projectItems.length === 0 ||
+                          getTotalItemsCost() <=
+                            parseFloat(formData.budget.replace(/,/g, "") || 0))
                           ? "bg-[var(--elra-primary)] text-white hover:bg-[var(--elra-primary-dark)]"
                           : "bg-gray-300 text-gray-500 cursor-not-allowed"
                       }`}
-                      disabled={submitting || !isFormValid()}
+                      disabled={
+                        submitting ||
+                        (projectItems.length > 0 &&
+                          getTotalItemsCost() >
+                            parseFloat(formData.budget.replace(/,/g, "") || 0))
+                      }
                     >
                       {submitting ? (
                         <>
@@ -2171,336 +2453,499 @@ const MyProjects = () => {
 
       {/* Project Details Modal */}
       {showViewModal && selectedProject && (
-        <div className="fixed inset-0 bg-white bg-opacity-95 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
-                Project Details
-              </h2>
-              <button
-                onClick={() => setShowViewModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <XMarkIcon className="h-6 w-6" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Basic Information */}
-              <div className="space-y-6">
-                <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                    <FolderIcon className="h-5 w-5 text-blue-600 mr-2" />
-                    Basic Information
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-blue-600 font-semibold text-sm">
-                          N
-                        </span>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
-                          Project Name
-                        </label>
-                        <p className="text-gray-900 font-semibold">
-                          {selectedProject.name}
-                        </p>
-                      </div>
+        <div className="fixed inset-0 modal-backdrop-enhanced flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl modal-shadow-enhanced max-w-4xl w-full max-h-[90vh] flex flex-col border border-gray-100">
+            {/* ELRA Branded Header */}
+            <div className="bg-gradient-to-br from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] text-white p-8 rounded-t-2xl flex-shrink-0 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-6">
+                    <div className="p-4 bg-white/20 rounded-3xl backdrop-blur-sm border border-white/20">
+                      <ELRALogo variant="dark" size="lg" />
                     </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                        <span className="text-green-600 font-semibold text-sm">
-                          #
-                        </span>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
-                          Project Code
-                        </label>
-                        <p className="text-green-600 font-mono font-semibold">
-                          {selectedProject.code || "N/A"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                        <span className="text-purple-600 font-semibold text-sm">
-                          D
-                        </span>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
-                          Department
-                        </label>
-                        <p className="text-gray-900 font-medium">
-                          {selectedProject.department?.name ||
-                            "Personal Project"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                        <span className="text-indigo-600 font-semibold text-sm">
-                          C
-                        </span>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
-                          Category
-                        </label>
-                        <p className="text-gray-900 font-medium">
-                          {selectedProject.category?.replace(/_/g, " ") ||
-                            "N/A"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-                        <span className="text-orange-600 font-semibold text-sm">
-                          S
-                        </span>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
-                          Status
-                        </label>
-                        <div className="mt-1">
-                          <span
-                            className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
-                              selectedProject.status
-                            )}`}
-                          >
-                            {selectedProject.status?.replace(/_/g, " ") ||
-                              "N/A"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center">
-                        <span className="text-teal-600 font-semibold text-sm">
-                          %
-                        </span>
-                      </div>
-                      <div className="flex-1">
-                        <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
-                          Progress
-                        </label>
-                        <div className="flex items-center mt-1">
-                          <div className="w-full bg-gray-200 rounded-full h-2 mr-2">
-                            <div
-                              className="bg-blue-600 h-2 rounded-full"
-                              style={{
-                                width: `${selectedProject.progress || 0}%`,
-                              }}
-                            ></div>
-                          </div>
-                          <span className="text-sm text-blue-600 font-semibold">
-                            {selectedProject.progress || 0}%
-                          </span>
-                        </div>
-                      </div>
+                    <div>
+                      <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
+                        Project Details
+                      </h2>
+                      <p className="text-white/90 mt-2 text-lg">
+                        {selectedProject.name} -{" "}
+                        {selectedProject.code || "Personal Project"}
+                      </p>
                     </div>
                   </div>
-                </div>
-
-                {/* Financial Information */}
-                <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                    <span className="text-green-600 font-bold text-xl mr-2">
-                      ₦
-                    </span>
-                    Financial Information
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                        <span className="text-green-600 font-semibold text-sm">
-                          B
-                        </span>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
-                          Budget
-                        </label>
-                        <p className="text-green-600 font-bold text-lg">
-                          ₦{formatNumberWithCommas(selectedProject.budget || 0)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-blue-600 font-semibold text-sm">
-                          ₦
-                        </span>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
-                          Budget Allocation
-                        </label>
-                        <p className="text-gray-900 font-medium">
-                          {selectedProject.requiresBudgetAllocation
-                            ? "Required"
-                            : "Self-funded"}
-                        </p>
-                      </div>
-                    </div>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => setShowViewModal(false)}
+                      className="p-3 hover:bg-white/20 rounded-2xl transition-all duration-200 backdrop-blur-sm border border-white/20 hover:border-white/30"
+                    >
+                      <XMarkIcon className="w-6 h-6" />
+                    </button>
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Project Details */}
-              <div className="space-y-6">
-                <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                    <span className="text-indigo-600 font-bold text-xl mr-2">
-                      📋
-                    </span>
-                    Project Details
-                  </h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">
-                        Description
-                      </label>
-                      <p className="text-gray-900 text-sm leading-relaxed">
-                        {selectedProject.description ||
-                          "No description provided"}
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">
-                          Start Date
-                        </label>
-                        <p className="text-gray-900 font-medium">
-                          {selectedProject.startDate
-                            ? new Date(
-                                selectedProject.startDate
-                              ).toLocaleDateString()
-                            : "N/A"}
-                        </p>
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-8 bg-white">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Basic Information */}
+                <div className="space-y-6">
+                  <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <FolderIcon className="h-5 w-5 text-blue-600 mr-2" />
+                      Basic Information
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <span className="text-blue-600 font-semibold text-sm">
+                            N
+                          </span>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
+                            Project Name
+                          </label>
+                          <p className="text-gray-900 font-semibold">
+                            {selectedProject.name}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">
-                          End Date
-                        </label>
-                        <p className="text-gray-900 font-medium">
-                          {selectedProject.endDate
-                            ? new Date(
-                                selectedProject.endDate
-                              ).toLocaleDateString()
-                            : "N/A"}
-                        </p>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                          <span className="text-green-600 font-semibold text-sm">
+                            #
+                          </span>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
+                            Project Code
+                          </label>
+                          <p className="text-green-600 font-mono font-semibold">
+                            {selectedProject.code || "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                          <span className="text-purple-600 font-semibold text-sm">
+                            D
+                          </span>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
+                            Department
+                          </label>
+                          <p className="text-gray-900 font-medium">
+                            {selectedProject.department?.name ||
+                              "Personal Project"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                          <span className="text-indigo-600 font-semibold text-sm">
+                            C
+                          </span>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
+                            Category
+                          </label>
+                          <p className="text-gray-900 font-medium">
+                            {selectedProject.category?.replace(/_/g, " ") ||
+                              "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                          <span className="text-orange-600 font-semibold text-sm">
+                            S
+                          </span>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
+                            Status
+                          </label>
+                          <div className="mt-1">
+                            <span
+                              className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
+                                selectedProject.status
+                              )}`}
+                            >
+                              {selectedProject.status?.replace(/_/g, " ") ||
+                                "N/A"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center">
+                          <span className="text-teal-600 font-semibold text-sm">
+                            %
+                          </span>
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
+                            General Progress
+                          </label>
+                          <div className="flex items-center mt-1">
+                            <div className="w-full bg-gray-200 rounded-full h-2 mr-2">
+                              <div
+                                className="bg-blue-600 h-2 rounded-full"
+                                style={{
+                                  width: `${selectedProject.progress || 0}%`,
+                                }}
+                              ></div>
+                            </div>
+                            <span className="text-sm text-blue-600 font-semibold">
+                              {selectedProject.progress || 0}%
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">
-                        Created
-                      </label>
-                      <p className="text-gray-900 font-medium">
-                        {selectedProject.createdAt
-                          ? new Date(
-                              selectedProject.createdAt
-                            ).toLocaleDateString()
-                          : "N/A"}
-                      </p>
+                  </div>
+
+                  {/* Approval Status */}
+                  {selectedProject.approvalChain &&
+                    selectedProject.approvalChain.length > 0 && (
+                      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                          <CheckCircleIcon className="h-5 w-5 text-blue-600 mr-2" />
+                          Approval Status
+                        </h3>
+                        <div className="space-y-4">
+                          {/* Current Approval Level */}
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                              <span className="text-blue-600 font-semibold text-sm">
+                                A
+                              </span>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
+                                Current Status
+                              </label>
+                              <p className="text-gray-900 font-medium">
+                                {selectedProject.status?.replace(/_/g, " ") ||
+                                  "N/A"}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Next Approver */}
+                          {(() => {
+                            const nextPendingStep =
+                              selectedProject.approvalChain?.find(
+                                (step) => step.status === "pending"
+                              );
+                            const allDocsSubmitted =
+                              selectedProject.requiredDocuments?.every(
+                                (doc) => doc.isSubmitted
+                              );
+
+                            if (nextPendingStep && allDocsSubmitted) {
+                              const getDepartmentName = (level) => {
+                                switch (level) {
+                                  case "hod":
+                                    return "Department HOD";
+                                  case "project_management":
+                                    return "Project Management";
+                                  case "legal_compliance":
+                                    return "Legal & Compliance";
+                                  case "finance":
+                                    return "Finance & Accounting";
+                                  case "executive":
+                                    return "Executive Office";
+                                  case "budget_allocation":
+                                    return "Budget Allocation";
+                                  default:
+                                    return level.replace(/_/g, " ");
+                                }
+                              };
+
+                              return (
+                                <div className="flex items-center space-x-3">
+                                  <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                                    <span className="text-orange-600 font-semibold text-sm">
+                                      →
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
+                                      Next Approver
+                                    </label>
+                                    <p className="text-orange-600 font-medium">
+                                      {getDepartmentName(nextPendingStep.level)}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+
+                          {/* Approval Progress */}
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                              <span className="text-purple-600 font-semibold text-sm">
+                                %
+                              </span>
+                            </div>
+                            <div className="flex-1">
+                              <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
+                                Approval Progress
+                              </label>
+                              <div className="flex items-center mt-1">
+                                <div className="w-full bg-gray-200 rounded-full h-2 mr-2">
+                                  <div
+                                    className="bg-purple-600 h-2 rounded-full"
+                                    style={{
+                                      width: `${
+                                        selectedProject.approvalProgress || 0
+                                      }%`,
+                                    }}
+                                  ></div>
+                                </div>
+                                <span className="text-sm text-purple-600 font-semibold">
+                                  {selectedProject.approvalProgress || 0}%
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Documents Status */}
+                          {selectedProject.requiredDocuments && (
+                            <div className="flex items-center space-x-3">
+                              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                <span className="text-green-600 font-semibold text-sm">
+                                  📄
+                                </span>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
+                                  Documents Status
+                                </label>
+                                <p className="text-gray-900 font-medium">
+                                  {
+                                    selectedProject.requiredDocuments.filter(
+                                      (doc) => doc.isSubmitted
+                                    ).length
+                                  }{" "}
+                                  / {selectedProject.requiredDocuments.length}{" "}
+                                  submitted
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Financial Information */}
+                  <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <span className="text-green-600 font-bold text-xl mr-2">
+                        ₦
+                      </span>
+                      Financial Information
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                          <span className="text-green-600 font-semibold text-sm">
+                            B
+                          </span>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
+                            Budget
+                          </label>
+                          <p className="text-green-600 font-bold text-lg">
+                            ₦
+                            {formatNumberWithCommas(
+                              selectedProject.budget || 0
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <span className="text-blue-600 font-semibold text-sm">
+                            ₦
+                          </span>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide">
+                            Budget Allocation
+                          </label>
+                          <p className="text-gray-900 font-medium">
+                            {selectedProject.requiresBudgetAllocation
+                              ? "Required"
+                              : "Self-funded"}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Project Items (if any) */}
-                {selectedProject.projectItems &&
-                  selectedProject.projectItems.length > 0 && (
-                    <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                        <span className="text-purple-600 font-bold text-xl mr-2">
-                          📦
-                        </span>
-                        Project Items
-                      </h3>
-                      <div className="space-y-3">
-                        {selectedProject.projectItems.map((item, index) => (
-                          <div
-                            key={index}
-                            className="p-3 bg-gray-50 rounded-lg border border-gray-200"
-                          >
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <h4 className="font-medium text-gray-900">
-                                  {item.name}
-                                </h4>
-                                <p className="text-sm text-gray-600">
-                                  {item.description}
-                                </p>
-                                <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                                  <span>Qty: {item.quantity}</span>
-                                  <span>
-                                    Price: ₦
-                                    {formatNumberWithCommas(item.unitPrice)}
-                                  </span>
-                                  <span>
-                                    Total: ₦
-                                    {formatNumberWithCommas(item.totalPrice)}
-                                  </span>
+                {/* Project Details */}
+                <div className="space-y-6">
+                  <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <span className="text-indigo-600 font-bold text-xl mr-2">
+                        📋
+                      </span>
+                      Project Details
+                    </h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">
+                          Description
+                        </label>
+                        <p className="text-gray-900 text-sm leading-relaxed">
+                          {selectedProject.description ||
+                            "No description provided"}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">
+                            Start Date
+                          </label>
+                          <p className="text-gray-900 font-medium">
+                            {selectedProject.startDate
+                              ? new Date(
+                                  selectedProject.startDate
+                                ).toLocaleDateString()
+                              : "N/A"}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">
+                            End Date
+                          </label>
+                          <p className="text-gray-900 font-medium">
+                            {selectedProject.endDate
+                              ? new Date(
+                                  selectedProject.endDate
+                                ).toLocaleDateString()
+                              : "N/A"}
+                          </p>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">
+                          Created
+                        </label>
+                        <p className="text-gray-900 font-medium">
+                          {selectedProject.createdAt
+                            ? new Date(
+                                selectedProject.createdAt
+                              ).toLocaleDateString()
+                            : "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Project Items (if any) */}
+                  {selectedProject.projectItems &&
+                    selectedProject.projectItems.length > 0 && (
+                      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                          <span className="text-purple-600 font-bold text-xl mr-2">
+                            📦
+                          </span>
+                          Project Items
+                        </h3>
+                        <div className="space-y-3">
+                          {selectedProject.projectItems.map((item, index) => (
+                            <div
+                              key={index}
+                              className="p-3 bg-gray-50 rounded-lg border border-gray-200"
+                            >
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-gray-900">
+                                    {item.name}
+                                  </h4>
+                                  <p className="text-sm text-gray-600">
+                                    {item.description}
+                                  </p>
+                                  <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                                    <span>Qty: {item.quantity}</span>
+                                    <span>
+                                      Price: ₦
+                                      {formatNumberWithCommas(item.unitPrice)}
+                                    </span>
+                                    <span>
+                                      Total: ₦
+                                      {formatNumberWithCommas(item.totalPrice)}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
 
-                      {/* Budget Allocation Notice */}
-                      {selectedProject.requiresBudgetAllocation &&
-                        (() => {
-                          const totalItemsCost =
-                            selectedProject.projectItems.reduce(
-                              (sum, item) =>
-                                sum + (parseFloat(item.totalPrice) || 0),
-                              0
-                            );
-                          const budget =
-                            parseFloat(selectedProject.budget) || 0;
+                        {/* Budget Allocation Notice */}
+                        {selectedProject.requiresBudgetAllocation &&
+                          (() => {
+                            const totalItemsCost =
+                              selectedProject.projectItems.reduce(
+                                (sum, item) =>
+                                  sum + (parseFloat(item.totalPrice) || 0),
+                                0
+                              );
+                            const budget =
+                              parseFloat(selectedProject.budget) || 0;
 
-                          if (totalItemsCost < budget && totalItemsCost > 0) {
-                            return (
-                              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                <div className="flex items-start space-x-2">
-                                  <div className="flex-shrink-0">
-                                    <svg
-                                      className="w-5 h-5 text-blue-600 mt-0.5"
-                                      fill="currentColor"
-                                      viewBox="0 0 20 20"
-                                    >
-                                      <path
-                                        fillRule="evenodd"
-                                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                                        clipRule="evenodd"
-                                      />
-                                    </svg>
-                                  </div>
-                                  <div className="flex-1">
-                                    <p className="text-sm text-blue-800">
-                                      <span className="font-medium">
-                                        Budget Allocation Notice:
-                                      </span>{" "}
-                                      Finance will allocate ₦
-                                      {formatNumberWithCommas(totalItemsCost)}{" "}
-                                      (total items cost) instead of the full
-                                      project budget of ₦
-                                      {formatNumberWithCommas(budget)}.
-                                    </p>
+                            if (totalItemsCost < budget && totalItemsCost > 0) {
+                              return (
+                                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                  <div className="flex items-start space-x-2">
+                                    <div className="flex-shrink-0">
+                                      <svg
+                                        className="w-5 h-5 text-blue-600 mt-0.5"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                      >
+                                        <path
+                                          fillRule="evenodd"
+                                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                          clipRule="evenodd"
+                                        />
+                                      </svg>
+                                    </div>
+                                    <div className="flex-1">
+                                      <p className="text-sm text-blue-800">
+                                        <span className="font-medium">
+                                          Budget Allocation Notice:
+                                        </span>{" "}
+                                        Finance will allocate ₦
+                                        {formatNumberWithCommas(totalItemsCost)}{" "}
+                                        (total items cost) instead of the full
+                                        project budget of ₦
+                                        {formatNumberWithCommas(budget)}.
+                                      </p>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
-                    </div>
-                  )}
+                              );
+                            }
+                            return null;
+                          })()}
+                      </div>
+                    )}
+                </div>
               </div>
             </div>
           </div>
@@ -2509,45 +2954,50 @@ const MyProjects = () => {
 
       {/* Document Upload Modal */}
       {showDocumentModal && selectedProjectForDocument && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[95vh] flex flex-col">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-t-2xl flex-shrink-0">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                    <ELRALogo variant="dark" size="sm" />
+        <div className="fixed inset-0 modal-backdrop-enhanced flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl modal-shadow-enhanced max-w-6xl w-full max-h-[95vh] flex flex-col border border-gray-100">
+            {/* ELRA Branded Header */}
+            <div className="bg-gradient-to-br from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] text-white p-8 rounded-t-2xl flex-shrink-0 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-6">
+                    <div className="p-4 bg-white/20 rounded-3xl backdrop-blur-sm border border-white/20">
+                      <ELRALogo variant="dark" size="lg" />
+                    </div>
+                    <div>
+                      <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
+                        {isReplacingDocument
+                          ? "Replace Document"
+                          : "Upload Document"}{" "}
+                        for Project
+                      </h2>
+                      <p className="text-white/90 mt-2 text-lg">
+                        {selectedProjectForDocument.name} -{" "}
+                        {selectedProjectForDocument.code || "Personal Project"}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-2xl font-bold">
-                      {isReplacingDocument
-                        ? "Replace Document"
-                        : "Upload Document"}{" "}
-                      for Project
-                    </h2>
-                    <p className="text-white text-opacity-80">
-                      {selectedProjectForDocument.name} -{" "}
-                      {selectedProjectForDocument.code || "Personal Project"}
-                    </p>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => {
+                        setShowDocumentModal(false);
+                        setShowDocumentsModal(true);
+                      }}
+                      className="p-3 hover:bg-white/20 rounded-2xl transition-all duration-200 backdrop-blur-sm border border-white/20 hover:border-white/30"
+                      title="Back to Documents"
+                    >
+                      <ArrowLeftIcon className="w-6 h-6" />
+                    </button>
+                    <button
+                      onClick={closeDocumentModal}
+                      className="p-3 hover:bg-white/20 rounded-2xl transition-all duration-200 backdrop-blur-sm border border-white/20 hover:border-white/30"
+                    >
+                      <XMarkIcon className="w-6 h-6" />
+                    </button>
                   </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => {
-                      setShowDocumentModal(false);
-                      setShowDocumentsModal(true);
-                    }}
-                    className="text-white hover:text-[var(--elra-primary)] transition-colors p-2 rounded-full hover:bg-white hover:bg-opacity-20 cursor-pointer"
-                    title="Back to Documents"
-                  >
-                    <ArrowLeftIcon className="w-6 h-6" />
-                  </button>
-                  <button
-                    onClick={closeDocumentModal}
-                    className="text-white hover:text-gray-200 transition-colors p-1 rounded-full hover:bg-white hover:bg-opacity-20"
-                  >
-                    <XMarkIcon className="w-6 h-6" />
-                  </button>
                 </div>
               </div>
             </div>
@@ -2628,15 +3078,17 @@ const MyProjects = () => {
                     onDrop={handleDrop}
                   >
                     <div className="text-center">
-                      <div
-                        className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 transition-all duration-300 ${
-                          isDragOver
-                            ? "bg-[var(--elra-primary)] scale-110"
-                            : "bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] group-hover:scale-110"
-                        }`}
-                      >
-                        <ArrowUpTrayIcon className="w-8 h-8 text-white" />
-                      </div>
+                      {!selectedFile && (
+                        <div
+                          className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 transition-all duration-300 ${
+                            isDragOver
+                              ? "bg-[var(--elra-primary)] scale-110"
+                              : "bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] group-hover:scale-110"
+                          }`}
+                        >
+                          <ArrowUpTrayIcon className="w-8 h-8 text-white" />
+                        </div>
+                      )}
                       <h3
                         className={`text-xl font-bold mb-3 transition-colors duration-300 ${
                           isDragOver
@@ -2741,7 +3193,19 @@ const MyProjects = () => {
                               : "Upload Document"
                           }
                         >
-                          <ArrowUpTrayIcon className="w-6 h-6" />
+                          <svg
+                            className="w-6 h-6"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                            />
+                          </svg>
                         </button>
                       )}
                     </div>
@@ -2755,36 +3219,41 @@ const MyProjects = () => {
 
       {/* Project Documents Modal */}
       {showDocumentsModal && selectedProjectForDocuments && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-[90vw] w-full max-h-[90vh] flex flex-col">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-t-2xl">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="w-20 h-20 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                    <ELRALogo variant="light" size="md" />
+        <div className="fixed inset-0 modal-backdrop-enhanced flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl modal-shadow-enhanced max-w-[90vw] w-full max-h-[90vh] flex flex-col border border-gray-100">
+            {/* ELRA Branded Header */}
+            <div className="bg-gradient-to-br from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] text-white p-8 rounded-t-2xl flex-shrink-0 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-6">
+                    <div className="p-4 bg-white/20 rounded-3xl backdrop-blur-sm border border-white/20">
+                      <ELRALogo variant="dark" size="lg" />
+                    </div>
+                    <div>
+                      <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
+                        Project Documents - {selectedProjectForDocuments.name}
+                      </h2>
+                      <p className="text-white/90 mt-2 text-lg">
+                        Code: {selectedProjectForDocuments.code} • Budget: ₦
+                        {selectedProjectForDocuments.budget?.toLocaleString()}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-2xl font-bold">
-                      Project Documents - {selectedProjectForDocuments.name}
-                    </h2>
-                    <p className="text-white text-opacity-80">
-                      Code: {selectedProjectForDocuments.code} • Budget: ₦
-                      {selectedProjectForDocuments.budget?.toLocaleString()}
-                    </p>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={async () => {
+                        setShowDocumentsModal(false);
+                        // Refresh projects data when closing documents modal
+                        await refreshData();
+                      }}
+                      className="p-3 hover:bg-white/20 rounded-2xl transition-all duration-200 backdrop-blur-sm border border-white/20 hover:border-white/30"
+                    >
+                      <XMarkIcon className="w-6 h-6" />
+                    </button>
                   </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={async () => {
-                      setShowDocumentsModal(false);
-                      // Refresh projects data when closing documents modal
-                      await refreshData();
-                    }}
-                    className="text-white hover:text-gray-200 transition-colors"
-                  >
-                    <XMarkIcon className="w-8 h-8" />
-                  </button>
                 </div>
               </div>
             </div>
@@ -2923,10 +3392,10 @@ const MyProjects = () => {
                                         const uploadedDoc = getUploadedDocument(
                                           doc.documentType
                                         );
-                                        if (uploadedDoc) {
-                                          toast.info(
-                                            "View document functionality coming soon"
-                                          );
+                                        if (uploadedDoc && uploadedDoc._id) {
+                                          const viewUrl = `/api/documents/${uploadedDoc._id}/view`;
+                                          window.open(viewUrl, "_blank");
+                                          toast.success("Opening document...");
                                         } else {
                                           toast.error(
                                             "Document not found. Please try uploading again."
@@ -3005,38 +3474,44 @@ const MyProjects = () => {
       {/* Project Implementation Modal */}
       {showImplementationModal && selectedProjectForImplementation && (
         <div className="fixed inset-0 modal-backdrop-enhanced flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl modal-shadow-enhanced max-w-[90vw] w-full max-h-[90vh] flex flex-col">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-t-2xl">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="w-20 h-20 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                    <ELRALogo variant="light" size="md" />
+          <div className="bg-white rounded-2xl modal-shadow-enhanced max-w-[90vw] w-full max-h-[90vh] flex flex-col border border-gray-100">
+            {/* ELRA Branded Header */}
+            <div className="bg-gradient-to-br from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] text-white p-8 rounded-t-2xl flex-shrink-0 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-6">
+                    <div className="p-4 bg-white/20 rounded-3xl backdrop-blur-sm border border-white/20">
+                      <ELRALogo variant="dark" size="lg" />
+                    </div>
+                    <div>
+                      <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
+                        Project Implementation -{" "}
+                        {selectedProjectForImplementation.name}
+                      </h2>
+                      <p className="text-white/90 mt-2 text-lg">
+                        Code: {selectedProjectForImplementation.code} • Budget:
+                        ₦
+                        {selectedProjectForImplementation.budget?.toLocaleString()}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-2xl font-bold">
-                      Project Implementation -{" "}
-                      {selectedProjectForImplementation.name}
-                    </h2>
-                    <p className="text-white text-opacity-80">
-                      Code: {selectedProjectForImplementation.code} • Budget: ₦
-                      {selectedProjectForImplementation.budget?.toLocaleString()}
-                    </p>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => setShowImplementationModal(false)}
+                      className="p-3 hover:bg-white/20 rounded-2xl transition-all duration-200 backdrop-blur-sm border border-white/20 hover:border-white/30"
+                    >
+                      <XMarkIcon className="w-6 h-6" />
+                    </button>
                   </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => setShowImplementationModal(false)}
-                    className="text-white hover:text-gray-200 transition-colors"
-                  >
-                    <XMarkIcon className="w-8 h-8" />
-                  </button>
                 </div>
               </div>
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-8 bg-white">
               {loadingTasks ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>

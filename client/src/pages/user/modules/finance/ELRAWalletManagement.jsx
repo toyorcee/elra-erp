@@ -39,6 +39,8 @@ const ELRAWalletManagement = () => {
     description: "",
     allocateToBudget: false,
     budgetCategory: "payroll",
+    flexibleAllocation: false,
+    allocations: [],
   });
   const [addingFunds, setAddingFunds] = useState(false);
   const [showBudgetModal, setShowBudgetModal] = useState(false);
@@ -56,6 +58,85 @@ const ELRAWalletManagement = () => {
       user?.role?.level === 700 && userDepartment === "Executive Office";
 
     return isSuperAdmin || isExecutive;
+  };
+
+  const addAllocation = () => {
+    const availableCategories = getAvailableCategories(-1);
+    const defaultCategory =
+      availableCategories.length > 0 ? availableCategories[0].value : "payroll";
+
+    setAddFundsData({
+      ...addFundsData,
+      allocations: [
+        ...addFundsData.allocations,
+        { category: defaultCategory, amount: "" },
+      ],
+    });
+  };
+
+  const removeAllocation = (index) => {
+    setAddFundsData({
+      ...addFundsData,
+      allocations: addFundsData.allocations.filter((_, i) => i !== index),
+    });
+  };
+
+  const updateAllocation = (index, field, value) => {
+    const newAllocations = [...addFundsData.allocations];
+    newAllocations[index] = { ...newAllocations[index], [field]: value };
+
+    if (field === "category") {
+      const conflictingIndex = newAllocations.findIndex(
+        (alloc, i) => i !== index && alloc.category === value
+      );
+
+      if (conflictingIndex !== -1) {
+        const availableForConflicting =
+          getAvailableCategories(conflictingIndex);
+        if (availableForConflicting.length > 0) {
+          newAllocations[conflictingIndex].category =
+            availableForConflicting[0].value;
+        }
+      }
+    }
+
+    setAddFundsData({ ...addFundsData, allocations: newAllocations });
+  };
+
+  const getTotalAllocated = () => {
+    return addFundsData.allocations.reduce((total, alloc) => {
+      return total + (parseFormattedNumber(alloc.amount) || 0);
+    }, 0);
+  };
+
+  const getRemainingAmount = () => {
+    const totalAmount = parseFormattedNumber(addFundsData.amount) || 0;
+    return totalAmount - getTotalAllocated();
+  };
+
+  const getAvailableCategories = (currentIndex) => {
+    const allCategories = [
+      { value: "payroll", label: "Payroll Budget" },
+      { value: "projects", label: "Projects Budget" },
+      { value: "operational", label: "Operational Budget" },
+    ];
+
+    const usedCategories = addFundsData.allocations
+      .filter((_, index) => index !== currentIndex)
+      .map((alloc) => alloc.category);
+
+    return allCategories.filter((cat) => !usedCategories.includes(cat.value));
+  };
+
+  const isOverAllocated = () => {
+    if (addFundsData.flexibleAllocation) {
+      return getRemainingAmount() < 0;
+    }
+    if (addFundsData.allocateToBudget && addFundsData.amount) {
+      const totalAmount = parseFormattedNumber(addFundsData.amount) || 0;
+      return totalAmount <= 0;
+    }
+    return false;
   };
 
   const transactionColumns = [
@@ -82,11 +163,11 @@ const ELRAWalletManagement = () => {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-medium text-gray-900 truncate">
+            <p className="font-medium text-gray-900 text-sm leading-tight break-words">
               {transaction.description?.replace(/_/g, " ").replace(/-/g, " ")}
             </p>
             {transaction.reference && (
-              <p className="text-xs text-gray-500 font-mono">
+              <p className="text-xs text-gray-500 font-mono mt-1">
                 Ref:{" "}
                 {transaction.reference?.replace(/_/g, " ").replace(/-/g, " ")}
               </p>
@@ -137,21 +218,48 @@ const ELRAWalletManagement = () => {
     {
       header: "Amount",
       accessor: "amount",
-      renderer: (transaction) => (
-        <div>
-          <div
-            className={`text-sm font-medium ${
-              transaction.amount > 0 ? "text-green-600" : "text-red-600"
-            }`}
-          >
-            {transaction.amount > 0 ? "+" : ""}
-            {formatCurrency(transaction.amount)}
+      renderer: (transaction) => {
+        const isDeposit = transaction.type === "deposit";
+        const isWithdrawal = transaction.type === "withdrawal";
+
+        return (
+          <div>
+            <div
+              className={`text-sm font-medium ${
+                isDeposit
+                  ? "text-green-600"
+                  : isWithdrawal
+                  ? "text-red-600"
+                  : "text-blue-600"
+              }`}
+            >
+              {isDeposit ? "+" : isWithdrawal ? "-" : ""}
+              {formatCurrency(transaction.amount)}
+            </div>
+            <div className="text-sm text-gray-500">
+              Balance: {formatCurrency(transaction.balanceAfter)}
+            </div>
+            {isWithdrawal && (
+              <div className="text-xs text-gray-500 mt-1">
+                Status:{" "}
+                <span
+                  className={`font-medium ${
+                    transaction.status === "approved"
+                      ? "text-green-600"
+                      : transaction.status === "rejected"
+                      ? "text-red-600"
+                      : transaction.status === "pending"
+                      ? "text-amber-600"
+                      : "text-gray-600"
+                  }`}
+                >
+                  {transaction.status}
+                </span>
+              </div>
+            )}
           </div>
-          <div className="text-sm text-gray-500">
-            Balance: {formatCurrency(transaction.balanceAfter)}
-          </div>
-        </div>
-      ),
+        );
+      },
     },
   ];
 
@@ -180,6 +288,32 @@ const ELRAWalletManagement = () => {
   // Add funds to wallet
   const handleAddFunds = async (e) => {
     e.preventDefault();
+
+    // Validate allocations
+    if (addFundsData.flexibleAllocation) {
+      const totalAmount = parseFormattedNumber(addFundsData.amount) || 0;
+      const totalAllocated = getTotalAllocated();
+
+      if (totalAllocated > totalAmount) {
+        toast.error(
+          `Total allocations (₦${totalAllocated.toLocaleString()}) cannot exceed total amount (₦${totalAmount.toLocaleString()})`
+        );
+        return;
+      }
+
+      if (addFundsData.allocations.length === 0) {
+        toast.error("Please add at least one budget category allocation");
+        return;
+      }
+    } else if (addFundsData.allocateToBudget) {
+      const totalAmount = parseFormattedNumber(addFundsData.amount) || 0;
+
+      if (totalAmount <= 0) {
+        toast.error("Please enter a valid amount greater than ₦0");
+        return;
+      }
+    }
+
     try {
       setAddingFunds(true);
 
@@ -191,6 +325,13 @@ const ELRAWalletManagement = () => {
         budgetCategory: addFundsData.allocateToBudget
           ? addFundsData.budgetCategory
           : null,
+        flexibleAllocation: addFundsData.flexibleAllocation,
+        allocations: addFundsData.flexibleAllocation
+          ? addFundsData.allocations.map((alloc) => ({
+              category: alloc.category,
+              amount: parseFormattedNumber(alloc.amount),
+            }))
+          : [],
         monthlyLimit:
           addFundsData.allocateToBudget &&
           addFundsData.budgetCategory === "payroll" &&
@@ -221,6 +362,8 @@ const ELRAWalletManagement = () => {
           description: "",
           allocateToBudget: false,
           budgetCategory: "payroll",
+          flexibleAllocation: false,
+          allocations: [],
         });
         fetchWalletData();
       } else {
@@ -535,14 +678,6 @@ const ELRAWalletManagement = () => {
       {/* Fund Utilization */}
       {walletData?.financialSummary && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          {/* Debug info - remove this later */}
-          <div className="mb-2 text-xs text-gray-500 bg-gray-100 p-2 rounded">
-            Debug: Total={walletData.financialSummary.totalFunds}, Allocated=
-            {walletData.financialSummary.allocatedFunds}, Reserved=
-            {walletData.financialSummary.reservedFunds}, Available=
-            {walletData.financialSummary.availableFunds}, Utilization=
-            {walletData.financialSummary.utilizationPercentage}%
-          </div>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">
               Fund Utilization
@@ -911,96 +1046,301 @@ const ELRAWalletManagement = () => {
                     transition={{ delay: 0.25 }}
                     className="border-t border-gray-200 pt-6"
                   >
-                    <div className="flex items-center space-x-3 mb-4">
-                      <input
-                        type="checkbox"
-                        id="allocateToBudget"
-                        checked={addFundsData.allocateToBudget}
-                        onChange={(e) =>
-                          setAddFundsData({
-                            ...addFundsData,
-                            allocateToBudget: e.target.checked,
-                          })
-                        }
-                        className="w-4 h-4 text-[var(--elra-primary)] bg-gray-100 border-gray-300 rounded focus:ring-[var(--elra-primary)] focus:ring-2"
-                      />
-                      <label
-                        htmlFor="allocateToBudget"
-                        className="text-sm font-semibold text-gray-700"
-                      >
-                        Allocate directly to budget category
-                      </label>
-                    </div>
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <input
+                          type="checkbox"
+                          id="allocateToBudget"
+                          checked={addFundsData.allocateToBudget}
+                          onChange={(e) =>
+                            setAddFundsData({
+                              ...addFundsData,
+                              allocateToBudget: e.target.checked,
+                              flexibleAllocation: false, // Reset flexible allocation
+                            })
+                          }
+                          className="w-4 h-4 text-[var(--elra-primary)] bg-gray-100 border-gray-300 rounded focus:ring-[var(--elra-primary)] focus:ring-2"
+                        />
+                        <label
+                          htmlFor="allocateToBudget"
+                          className="text-sm font-semibold text-gray-700"
+                        >
+                          Allocate directly to budget category
+                        </label>
+                      </div>
 
-                    {addFundsData.allocateToBudget && (
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Budget Category
-                          </label>
-                          <select
-                            value={addFundsData.budgetCategory}
-                            onChange={(e) => {
-                              setShowBubbles(true);
-                              setAddFundsData({
-                                ...addFundsData,
-                                budgetCategory: e.target.value,
-                              });
-                              setTimeout(() => setShowBubbles(false), 2000);
-                            }}
-                            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
-                          >
-                            <option value="payroll">Payroll Budget</option>
-                            <option value="projects">Projects Budget</option>
-                            <option value="operational">
-                              Operational Budget
-                            </option>
-                          </select>
-                        </div>
+                      <div className="flex items-center space-x-3 mb-4">
+                        <input
+                          type="checkbox"
+                          id="flexibleAllocation"
+                          checked={addFundsData.flexibleAllocation}
+                          onChange={(e) =>
+                            setAddFundsData({
+                              ...addFundsData,
+                              flexibleAllocation: e.target.checked,
+                              allocateToBudget: false, // Reset single allocation
+                            })
+                          }
+                          className="w-4 h-4 text-[var(--elra-primary)] bg-gray-100 border-gray-300 rounded focus:ring-[var(--elra-primary)] focus:ring-2"
+                        />
+                        <label
+                          htmlFor="flexibleAllocation"
+                          className="text-sm font-semibold text-gray-700"
+                        >
+                          Split funds across multiple budget categories
+                        </label>
+                      </div>
 
-                        {/* Category Balance Information */}
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-blue-800">
-                              Current{" "}
-                              {addFundsData.budgetCategory
-                                .charAt(0)
-                                .toUpperCase() +
-                                addFundsData.budgetCategory.slice(1)}{" "}
-                              Budget:
-                            </span>
-                            <span className="text-lg font-bold text-blue-900">
-                              ₦
-                              {walletData?.financialSummary?.budgetCategories?.[
-                                addFundsData.budgetCategory
-                              ]?.available?.toLocaleString() || "0"}
-                            </span>
+                      {/* Single Budget Allocation */}
+                      {addFundsData.allocateToBudget && (
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Budget Category
+                            </label>
+                            <select
+                              value={addFundsData.budgetCategory}
+                              onChange={(e) => {
+                                setShowBubbles(true);
+                                setAddFundsData({
+                                  ...addFundsData,
+                                  budgetCategory: e.target.value,
+                                });
+                                setTimeout(() => setShowBubbles(false), 2000);
+                              }}
+                              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
+                            >
+                              <option value="payroll">Payroll Budget</option>
+                              <option value="projects">Projects Budget</option>
+                              <option value="operational">
+                                Operational Budget
+                              </option>
+                            </select>
                           </div>
-                          {addFundsData.amount && (
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-blue-700">
-                                After allocation:
+
+                          {/* Category Balance Information */}
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-blue-800">
+                                Current{" "}
+                                {addFundsData.budgetCategory
+                                  .charAt(0)
+                                  .toUpperCase() +
+                                  addFundsData.budgetCategory.slice(1)}{" "}
+                                Budget:
                               </span>
-                              <span className="font-semibold text-blue-900">
+                              <span className="text-lg font-bold text-blue-900">
                                 ₦
-                                {(
-                                  walletData?.financialSummary
-                                    ?.budgetCategories?.[
-                                    addFundsData.budgetCategory
-                                  ]?.available +
-                                  parseFormattedNumber(addFundsData.amount)
-                                ).toLocaleString()}
+                                {walletData?.financialSummary?.budgetCategories?.[
+                                  addFundsData.budgetCategory
+                                ]?.available?.toLocaleString() || "0"}
                               </span>
                             </div>
-                          )}
-                          <p className="text-xs text-blue-700 mt-2">
-                            <strong>Note:</strong> This amount will be added
-                            directly to the {addFundsData.budgetCategory} budget
-                            category.
-                          </p>
+                            {addFundsData.amount && (
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-blue-700">
+                                  After allocation:
+                                </span>
+                                <span className="font-semibold text-blue-900">
+                                  ₦
+                                  {(
+                                    walletData?.financialSummary
+                                      ?.budgetCategories?.[
+                                      addFundsData.budgetCategory
+                                    ]?.available +
+                                    parseFormattedNumber(addFundsData.amount)
+                                  ).toLocaleString()}
+                                </span>
+                              </div>
+                            )}
+                            <p className="text-xs text-blue-700 mt-2">
+                              <strong>Note:</strong> This amount will be added
+                              directly to the {addFundsData.budgetCategory}{" "}
+                              budget category.
+                            </p>
+                          </div>
+
+                          {/* Single Allocation Warning */}
+                          {addFundsData.amount &&
+                            parseFormattedNumber(addFundsData.amount) <= 0 && (
+                              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                <div className="flex items-center space-x-2">
+                                  <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />
+                                  <div>
+                                    <p className="text-sm font-medium text-red-800">
+                                      Invalid Amount
+                                    </p>
+                                    <p className="text-xs text-red-700">
+                                      Please enter a valid amount greater than
+                                      ₦0.
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                         </div>
-                      </div>
-                    )}
+                      )}
+
+                      {/* Flexible Allocation */}
+                      {addFundsData.flexibleAllocation && (
+                        <div className="space-y-4">
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <h4 className="text-sm font-semibold text-green-800 mb-2">
+                              Flexible Budget Allocation
+                            </h4>
+                            <p className="text-xs text-green-700">
+                              Split your total amount across multiple budget
+                              categories. Any remaining amount will stay in the
+                              general available pool.
+                            </p>
+                          </div>
+
+                          {/* Allocation Summary */}
+                          {addFundsData.amount && (
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <span className="text-gray-600">
+                                    Total Amount:
+                                  </span>
+                                  <span className="font-semibold text-gray-900 ml-2">
+                                    ₦
+                                    {parseFormattedNumber(
+                                      addFundsData.amount
+                                    ).toLocaleString()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600">
+                                    Total Allocated:
+                                  </span>
+                                  <span className="font-semibold text-blue-600 ml-2">
+                                    ₦{getTotalAllocated().toLocaleString()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600">
+                                    Remaining:
+                                  </span>
+                                  <span
+                                    className={`font-semibold ml-2 ${
+                                      getRemainingAmount() >= 0
+                                        ? "text-green-600"
+                                        : "text-red-600"
+                                    }`}
+                                  >
+                                    ₦{getRemainingAmount().toLocaleString()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600">
+                                    Will go to:
+                                  </span>
+                                  <span className="font-semibold text-gray-900 ml-2">
+                                    {getRemainingAmount() > 0
+                                      ? "General Pool"
+                                      : "Over-allocated"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Allocation Items */}
+                          <div className="space-y-3">
+                            {addFundsData.allocations.map(
+                              (allocation, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg"
+                                >
+                                  <select
+                                    value={allocation.category}
+                                    onChange={(e) =>
+                                      updateAllocation(
+                                        index,
+                                        "category",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                                  >
+                                    {getAvailableCategories(index).map(
+                                      (category) => (
+                                        <option
+                                          key={category.value}
+                                          value={category.value}
+                                        >
+                                          {category.label}
+                                        </option>
+                                      )
+                                    )}
+                                  </select>
+                                  <input
+                                    type="text"
+                                    value={formatNumberWithCommas(
+                                      allocation.amount
+                                    )}
+                                    onChange={(e) =>
+                                      updateAllocation(
+                                        index,
+                                        "amount",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                                    placeholder="Amount"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => removeAllocation(index)}
+                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  >
+                                    <XMarkIcon className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              )
+                            )}
+                          </div>
+
+                          {/* Over-allocation Warning */}
+                          {addFundsData.amount && getRemainingAmount() < 0 && (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                              <div className="flex items-center space-x-2">
+                                <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />
+                                <div>
+                                  <p className="text-sm font-medium text-red-800">
+                                    Over-allocation Detected
+                                  </p>
+                                  <p className="text-xs text-red-700">
+                                    Total allocations exceed the amount being
+                                    added. Please reduce allocations or increase
+                                    the total amount.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Add Allocation Button */}
+                          {getAvailableCategories(-1).length > 0 ? (
+                            <button
+                              type="button"
+                              onClick={addAllocation}
+                              className="w-full py-2 border-2 border-dashed border-gray-300 text-gray-600 rounded-lg hover:border-[var(--elra-primary)] hover:text-[var(--elra-primary)] transition-colors flex items-center justify-center space-x-2"
+                            >
+                              <PlusIcon className="w-4 h-4" />
+                              <span>Add Budget Category</span>
+                            </button>
+                          ) : (
+                            <div className="w-full py-2 border-2 border-dashed border-gray-200 text-gray-400 rounded-lg flex items-center justify-center space-x-2">
+                              <PlusIcon className="w-4 h-4" />
+                              <span>All categories allocated</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </motion.div>
 
                   <motion.div
@@ -1019,7 +1359,7 @@ const ELRAWalletManagement = () => {
                     </button>
                     <button
                       type="submit"
-                      disabled={addingFunds}
+                      disabled={addingFunds || isOverAllocated()}
                       className="flex-1 px-6 py-3 bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white rounded-xl hover:shadow-lg hover:scale-[1.02] transition-all duration-200 font-semibold flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                     >
                       {addingFunds ? (
@@ -1045,6 +1385,11 @@ const ELRAWalletManagement = () => {
                             ></path>
                           </svg>
                           <span>Adding Funds...</span>
+                        </>
+                      ) : isOverAllocated() ? (
+                        <>
+                          <ExclamationTriangleIcon className="w-5 h-5" />
+                          <span>Fix Allocation</span>
                         </>
                       ) : (
                         <>

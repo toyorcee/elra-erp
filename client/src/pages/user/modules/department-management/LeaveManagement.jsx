@@ -440,7 +440,7 @@ const LeaveManagement = () => {
           <p className="text-gray-600">
             {isHRHOD
               ? "As HR HOD, you can approve leave requests from all departments."
-              : `As ${user.department?.name} Department Head, you can approve leave requests from your team members.`}
+              : `As ${user.department?.name} Department Head, you can approve leave requests from your department staff.`}
           </p>
         </div>
 

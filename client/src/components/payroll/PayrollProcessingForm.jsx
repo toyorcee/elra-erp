@@ -11,16 +11,18 @@ import {
   HiExclamation,
   HiRefresh,
   HiClock,
+  HiInformationCircle,
   HiCurrencyDollar,
   HiMinusCircle,
   HiPlus,
   HiChevronLeft,
   HiChevronRight,
+  HiBriefcase,
 } from "react-icons/hi";
 import { toast } from "react-toastify";
 import { userModulesAPI } from "../../services/userModules.js";
 import DataTable from "../common/DataTable.jsx";
-import ELRALogo from "../../assets/ELRA.png";
+import ELRALogo from "../ELRALogo";
 
 const GreenSpinner = ({ text = "Loading" }) => (
   <div className="flex items-center justify-center h-10 w-full bg-gray-50 rounded-lg border">
@@ -246,6 +248,196 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
     }
   };
 
+  const checkForExistingPreview = async (
+    month,
+    year,
+    frequency,
+    scope,
+    scopeId
+  ) => {
+    try {
+      console.log(
+        "🔍 [PayrollProcessingForm] Checking for existing previews and payrolls..."
+      );
+
+      const currentEmployeeIds = await getEmployeeIdsForScope(scope, scopeId);
+      console.log(
+        "🔍 [PayrollProcessingForm] Current scope employee IDs:",
+        currentEmployeeIds
+      );
+
+      const [pendingResponse, savedResponse] = await Promise.all([
+        userModulesAPI.payroll.getPendingApprovals(),
+        userModulesAPI.payroll.getSavedPayrolls({ month, year }),
+      ]);
+
+      const existingPreviews = pendingResponse.success
+        ? pendingResponse.data || []
+        : [];
+      const existingPayrolls = savedResponse.success
+        ? savedResponse.data?.payrolls || []
+        : [];
+
+      // Check for employee overlap in pending previews
+      const duplicatePreview = existingPreviews.find((preview) => {
+        const samePeriod =
+          preview.period?.month === month && preview.period?.year === year;
+        const sameFrequency = preview.metadata?.frequency === frequency;
+
+        if (!samePeriod || !sameFrequency) return false;
+
+        // Get employee IDs from the existing preview
+        const existingEmployeeIds = getEmployeeIdsFromPreview(preview);
+        console.log(
+          "🔍 [PayrollProcessingForm] Existing preview employee IDs:",
+          existingEmployeeIds
+        );
+
+        // Check if there's any overlap between current and existing employees
+        const hasOverlap = currentEmployeeIds.some((id) =>
+          existingEmployeeIds.includes(id)
+        );
+
+        if (hasOverlap) {
+          console.log("🔍 [PayrollProcessingForm] Found employee overlap:", {
+            current: currentEmployeeIds,
+            existing: existingEmployeeIds,
+            overlap: currentEmployeeIds.filter((id) =>
+              existingEmployeeIds.includes(id)
+            ),
+          });
+        }
+
+        return hasOverlap;
+      });
+
+      // Check for employee overlap in saved payrolls
+      const duplicatePayroll = existingPayrolls.find((payroll) => {
+        const samePeriod =
+          payroll.period?.month === month && payroll.period?.year === year;
+        const sameFrequency = payroll.frequency === frequency;
+
+        if (!samePeriod || !sameFrequency) return false;
+
+        // Get employee IDs from the existing payroll
+        const existingEmployeeIds = getEmployeeIdsFromPayroll(payroll);
+        console.log(
+          "🔍 [PayrollProcessingForm] Existing payroll employee IDs:",
+          existingEmployeeIds
+        );
+
+        // Check if there's any overlap between current and existing employees
+        const hasOverlap = currentEmployeeIds.some((id) =>
+          existingEmployeeIds.includes(id)
+        );
+
+        if (hasOverlap) {
+          console.log(
+            "🔍 [PayrollProcessingForm] Found employee overlap in payroll:",
+            {
+              current: currentEmployeeIds,
+              existing: existingEmployeeIds,
+              overlap: currentEmployeeIds.filter((id) =>
+                existingEmployeeIds.includes(id)
+              ),
+            }
+          );
+        }
+
+        return hasOverlap;
+      });
+
+      if (duplicatePreview) {
+        const periodName = months.find((m) => m.value === month)?.label;
+        const statusText =
+          duplicatePreview.approvalStatus === "pending_finance"
+            ? "pending finance approval"
+            : duplicatePreview.approvalStatus === "approved_finance"
+            ? "approved by finance"
+            : "in review";
+
+        toast.error(
+          `Cannot create payroll preview: Some employees in your selection have already been included in a payroll preview for ${periodName} ${year} (${frequency}). ` +
+            `Status: ${statusText}. Approval ID: ${duplicatePreview.approvalId}. Please select different employees or create for a different period.`
+        );
+        return true; // Duplicate found
+      }
+
+      if (duplicatePayroll) {
+        const periodName = months.find((m) => m.value === month)?.label;
+
+        toast.error(
+          `Cannot create payroll preview: Some employees in your selection have already been processed in a payroll for ${periodName} ${year} (${frequency}). ` +
+            `Payroll ID: ${duplicatePayroll._id}. Please select different employees or create for a different period.`
+        );
+        return true; // Duplicate found
+      }
+
+      return false;
+    } catch (error) {
+      console.error(
+        "❌ [PayrollProcessingForm] Error checking for existing previews:",
+        error
+      );
+      return false;
+    }
+  };
+
+  const getEmployeeIdsForScope = async (scope, scopeId) => {
+    try {
+      switch (scope) {
+        case "company":
+          const allEmployeesResponse = await userModulesAPI.users.getAllUsers();
+          if (allEmployeesResponse.success) {
+            return allEmployeesResponse.data
+              .filter((emp) => emp.isActive && emp.status === "ACTIVE")
+              .map((emp) => emp._id);
+          }
+          return [];
+
+        case "department":
+          // For department scope, get employees in that department
+          const deptEmployeesResponse =
+            await userModulesAPI.users.getUsersByDepartment(scopeId);
+          if (deptEmployeesResponse.success) {
+            return deptEmployeesResponse.data
+              .filter((emp) => emp.isActive && emp.status === "ACTIVE")
+              .map((emp) => emp._id);
+          }
+          return [];
+
+        case "individual":
+          // For individual scope, scopeId is already the employee IDs
+          return Array.isArray(scopeId) ? scopeId : [scopeId];
+
+        default:
+          return [];
+      }
+    } catch (error) {
+      console.error("Error getting employee IDs for scope:", error);
+      return [];
+    }
+  };
+
+  // Helper function to extract employee IDs from a preview
+  const getEmployeeIdsFromPreview = (preview) => {
+    if (!preview.payrollData?.payrolls) return [];
+    return preview.payrollData.payrolls
+      .map((payroll) => payroll.employee?.id)
+      .filter(Boolean);
+  };
+
+  // Helper function to extract employee IDs from a payroll
+  const getEmployeeIdsFromPayroll = (payroll) => {
+    if (payroll.payrolls && Array.isArray(payroll.payrolls)) {
+      return payroll.payrolls.map((p) => p.employee).filter(Boolean);
+    }
+    if (payroll.employee) {
+      return [payroll.employee];
+    }
+    return [];
+  };
+
   const handlePreviewPayroll = async () => {
     if (!validateForm()) {
       toast.error("Please fix the validation errors");
@@ -262,9 +454,36 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
     const finalScopeId =
       formData.scope === "individual" ? selectedEmployees : formData.scopeId;
 
+    // Set loading state immediately
+    setLoading(true);
+    setProcessingStatus("previewing");
+
     try {
-      setLoading(true);
-      setProcessingStatus("previewing");
+      // Check for existing preview before proceeding
+      const hasDuplicate = await checkForExistingPreview(
+        formData.month,
+        formData.year,
+        formData.frequency,
+        formData.scope,
+        finalScopeId
+      );
+
+      if (hasDuplicate) {
+        setLoading(false);
+        setProcessingStatus("idle");
+        return; // Stop the process if duplicate found
+      }
+
+      console.log(
+        "🔍 [PayrollProcessingForm] Calling getPayrollPreview with:",
+        {
+          month: formData.month,
+          year: formData.year,
+          frequency: formData.frequency,
+          scope: formData.scope,
+          scopeId: finalScopeId,
+        }
+      );
 
       const result = await userModulesAPI.payroll.getPayrollPreview({
         month: formData.month,
@@ -275,25 +494,37 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
       });
 
       console.log("✅ [PayrollProcessingForm] Preview Result:", result);
-
-      // Essential logging for debugging
-      console.log("📊 [SUMMARY CARDS] Data:", {
-        totalEmployees: result.data.totalEmployees,
-        totalGrossPay: result.data.totalGrossPay,
-        totalDeductions: result.data.totalDeductions,
-        totalNetPay: result.data.totalNetPay,
-        totalTaxableIncome: result.data.totalTaxableIncome,
-        totalPAYE: result.data.totalPAYE,
+      console.log("🔍 [PayrollProcessingForm] Result structure:", {
+        success: result.success,
+        message: result.message,
+        hasData: !!result.data,
+        dataKeys: result.data ? Object.keys(result.data) : [],
+        hasPreview: !!(result.data && result.data.preview),
+        previewKeys:
+          result.data && result.data.preview
+            ? Object.keys(result.data.preview)
+            : [],
       });
 
-      console.log("📋 [TABLE DATA] Payrolls:", result.data.payrolls);
+      const payrollData = result.data;
 
-      if (result.data.payrolls && result.data.payrolls.length > 0) {
+      console.log("📊 [SUMMARY CARDS] Data:", {
+        totalEmployees: payrollData.totalEmployees,
+        totalGrossPay: payrollData.totalGrossPay,
+        totalDeductions: payrollData.totalDeductions,
+        totalNetPay: payrollData.totalNetPay,
+        totalTaxableIncome: payrollData.totalTaxableIncome,
+        totalPAYE: payrollData.totalPAYE,
+      });
+
+      console.log("📋 [TABLE DATA] Payrolls:", payrollData.payrolls);
+
+      if (payrollData.payrolls && payrollData.payrolls.length > 0) {
         console.log("🔍 [DEBUG] First payroll:", {
-          employee: result.data.payrolls[0].employee,
-          baseSalary: result.data.payrolls[0].baseSalary,
-          summary: result.data.payrolls[0].summary,
-          deductions: result.data.payrolls[0].deductions,
+          employee: payrollData.payrolls[0].employee,
+          baseSalary: payrollData.payrolls[0].baseSalary,
+          summary: payrollData.payrolls[0].summary,
+          deductions: payrollData.payrolls[0].deductions,
         });
       }
 
@@ -301,9 +532,9 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
       console.log(
         "🔍 [PREVIEW DEBUG] =========================================="
       );
-      console.log("🔍 [PREVIEW DEBUG] FULL PREVIEW DATA:", result.data);
-      if (result.data.payrolls && result.data.payrolls.length > 0) {
-        const firstPayroll = result.data.payrolls[0];
+      console.log("🔍 [PREVIEW DEBUG] FULL PREVIEW DATA:", payrollData);
+      if (payrollData.payrolls && payrollData.payrolls.length > 0) {
+        const firstPayroll = payrollData.payrolls[0];
         console.log("🔍 [PREVIEW DEBUG] FIRST PAYROLL:", {
           employee: firstPayroll.employee?.name,
           baseSalary: firstPayroll.baseSalary?.effectiveBaseSalary,
@@ -339,24 +570,24 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
       );
 
       // Ensure payroll data is valid before setting
-      const validPayrolls = Array.isArray(result.data.payrolls)
-        ? result.data.payrolls
+      const validPayrolls = Array.isArray(payrollData.payrolls)
+        ? payrollData.payrolls
         : [];
       setPayrollData(validPayrolls);
 
-      const totalPAYE = calculateTotalPAYE(result.data.payrolls);
+      const totalPAYE = calculateTotalPAYE(payrollData.payrolls);
 
       setPayrollSummary({
-        totalEmployees: result.data.totalEmployees || 0,
-        totalGrossPay: result.data.totalGrossPay || 0,
-        totalDeductions: result.data.totalDeductions || 0,
-        totalNetPay: result.data.totalNetPay || 0,
-        totalTaxableIncome: result.data.totalTaxableIncome || 0,
+        totalEmployees: payrollData.totalEmployees || 0,
+        totalGrossPay: payrollData.totalGrossPay || 0,
+        totalDeductions: payrollData.totalDeductions || 0,
+        totalNetPay: payrollData.totalNetPay || 0,
+        totalTaxableIncome: payrollData.totalTaxableIncome || 0,
         totalPAYE: totalPAYE,
       });
 
       const previewDataForProcessing = {
-        ...result.data,
+        ...payrollData,
         scope: {
           type: formData.scope,
           details:
@@ -370,7 +601,7 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
       setPreviewData(previewDataForProcessing);
 
       // Extract errors from the result if any
-      const errors = result.data?.errors || [];
+      const errors = payrollData?.errors || [];
       setPreviewErrors(errors);
 
       setProcessingStatus("previewed");
@@ -406,39 +637,55 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
       setLoading(true);
       setProcessingStatus("processing");
 
-      const result = await userModulesAPI.payroll.processPayrollWithData(
-        previewData
+      // Submit for finance approval instead of direct processing
+      // Prepare the payroll data for submission with proper structure
+      const submissionData = {
+        ...previewData,
+        scope: {
+          type: formData.scope,
+          details:
+            formData.scope === "department"
+              ? { scopeId: formData.scopeId }
+              : formData.scope === "individual"
+              ? { scopeId: formData.scopeId }
+              : null,
+        },
+      };
+
+      const result = await userModulesAPI.payroll.submitForApproval(
+        submissionData
       );
 
-      console.log("✅ [PayrollProcessingForm] Process Result:", {
+      console.log("✅ [PayrollProcessingForm] Submit Result:", {
         success: result.success,
         message: result.message,
-        totalEmployees: result.data?.totalEmployees,
-        totalGrossPay: result.data?.totalGrossPay,
-        totalNetPay: result.data?.totalNetPay,
-        totalDeductions: result.data?.totalDeductions,
-        totalPAYE: result.data?.totalPAYE,
-        totalTaxableIncome: result.data?.totalTaxableIncome,
-        payrollId: result.data?.payrollId,
+        approvalId: result.data?.approval?.approvalId,
+        status: result.data?.approval?.status,
+        totalEmployees: result.data?.payroll?.totalEmployees,
+        totalNetPay: result.data?.payroll?.totalNetPay,
       });
 
       setProcessingStatus("completed");
 
-      // Store the batch result for the modal
       setPayrollBatchResult(result.data);
 
-      // Show success message based on the result
       if (result.data?.processingSummary) {
         const summary = result.data.processingSummary;
-        if (summary.duplicates > 0 || summary.failed > 0) {
-          toast.success(
-            `✅ Payroll processed: ${summary.successful} successful, ${summary.duplicates} duplicates skipped, ${summary.failed} failed`
-          );
-        } else {
-          toast.success("🎉 Payroll processed successfully for all employees!");
-        }
+        const scopeDescription = getScopeDescription(
+          formData.scope,
+          formData.scopeId
+        );
+        toast.success(
+          `✅ Payroll submitted for finance approval! ${scopeDescription} Approval ID: ${result.data?.approval?.approvalId}`
+        );
+      } else if (result.data?.approval?.approvalId) {
+        toast.success(
+          `✅ Payroll submitted for finance approval! Approval ID: ${result.data.approval.approvalId}`
+        );
       } else {
-        toast.success("🎉 Payroll processed successfully!");
+        toast.success(
+          "✅ Payroll submitted for finance approval successfully!"
+        );
       }
 
       setTimeout(() => {
@@ -461,6 +708,68 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleResendToFinance = async () => {
+    if (!previewData) {
+      toast.error("No payroll data available to resend");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Prepare the payroll data for resubmission
+      const submissionData = {
+        ...previewData,
+        scope: {
+          type: formData.scope,
+          details:
+            formData.scope === "department"
+              ? { scopeId: formData.scopeId }
+              : formData.scope === "individual"
+              ? { scopeId: formData.scopeId }
+              : null,
+        },
+      };
+
+      const result = await userModulesAPI.payroll.submitForApproval(
+        submissionData
+      );
+
+      setPayrollBatchResult(result.data);
+
+      toast.success(
+        `✅ Payroll resent for finance approval! New Approval ID: ${result.data?.approval?.approvalId}`
+      );
+    } catch (error) {
+      toast.error(error.message || "Error resending payroll");
+      console.error("Payroll resend error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNewPayroll = () => {
+    // Reset all form data and state
+    setFormData({
+      month: new Date().getMonth() + 1,
+      year: new Date().getFullYear(),
+      frequency: "monthly",
+      scope: "company",
+      scopeId: null,
+    });
+    setSelectedEmployees([]);
+    setPreviewData(null);
+    setPayrollData([]);
+    setPayrollBatchResult(null);
+    setProcessingStatus("idle");
+    setPreviewErrors([]);
+    setShowBatchModal(false);
+    setShowDetailModal(false);
+    setSelectedPayrollDetail(null);
+
+    toast.info("Form reset. You can now create a new payroll.");
   };
 
   const getScopeLabel = () => {
@@ -731,11 +1040,9 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center space-x-3">
-            <img
-              src={ELRALogo}
-              alt="ELRA Logo"
-              className="w-8 h-8 object-contain"
-            />
+            <div className="w-8 h-8 flex items-center justify-center">
+              <ELRALogo variant="dark" size="sm" />
+            </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
                 Process Payroll
@@ -909,7 +1216,7 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                     (formData.scope === "individual" &&
                       selectedEmployees.length === 0)
                   }
-                  className={`w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center ${
+                  className={`w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center cursor-pointer ${
                     processingStatus === "previewed" ||
                     processingStatus === "completed"
                       ? "text-gray-500 bg-gray-100 cursor-not-allowed"
@@ -924,12 +1231,12 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                   ) : processingStatus === "processing" ? (
                     <>
                       <HiRefresh className="w-4 h-4 mr-2 animate-spin" />
-                      Processing...
+                      Sending to Finance...
                     </>
                   ) : processingStatus === "completed" ? (
                     <>
                       <HiCheckCircle className="w-4 h-4 mr-2" />
-                      Payroll Processed
+                      Sent to Finance
                     </>
                   ) : loadingData ? (
                     <>
@@ -952,7 +1259,7 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                     !previewData ||
                     processingStatus !== "previewed"
                   }
-                  className={`w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center ${
+                  className={`w-full px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center cursor-pointer ${
                     processingStatus === "completed"
                       ? "text-gray-500 bg-gray-100 cursor-not-allowed"
                       : processingStatus === "previewed" && previewData
@@ -963,18 +1270,18 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                   {processingStatus === "processing" ? (
                     <>
                       <HiRefresh className="w-4 h-4 mr-2 animate-spin" />
-                      Processing...
+                      Sending to Finance...
                     </>
                   ) : processingStatus === "completed" ? (
                     <>
                       <HiCheckCircle className="w-4 h-4 mr-2" />
-                      Payroll Processed
+                      Sent to Finance
                     </>
                   ) : (
                     <>
                       <HiCalculator className="w-4 h-4 mr-2" />
                       {processingStatus === "previewed" && previewData
-                        ? "Process Payroll"
+                        ? "Submit for Finance Approval"
                         : "Generate Preview First"}
                     </>
                   )}
@@ -1581,7 +1888,7 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                     <>
                       <HiRefresh className="w-6 h-6 animate-spin text-[var(--elra-primary)]" />
                       <span className="text-[var(--elra-primary)] font-medium">
-                        Processing payroll...
+                        Sending to Finance...
                       </span>
                     </>
                   )}
@@ -1597,7 +1904,7 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                     <>
                       <HiCheckCircle className="w-6 h-6 text-green-500" />
                       <span className="text-green-600 font-medium">
-                        Payroll completed successfully
+                        Payroll sent to Finance for approval
                       </span>
                       {payrollBatchResult && (
                         <button
@@ -1622,90 +1929,46 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
               </div>
             )}
 
-            {/* Preview Summary - Show when previewed */}
-            {processingStatus === "previewed" && previewData && (
+            {/* Submitted Payroll Information - Show after successful submission */}
+            {processingStatus === "completed" && payrollBatchResult && (
               <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Payroll Preview
-                </h3>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <div className="flex items-center">
-                      <HiUserGroup className="w-8 h-8 text-blue-500" />
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-blue-600">
-                          Employees to Process
-                        </p>
-                        <p className="text-2xl font-bold text-blue-900">
-                          {previewData.payrolls?.length || 0}
-                        </p>
-                      </div>
-                    </div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Submitted Payroll for Finance Approval
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      <HiClock className="w-3 h-3 mr-1" />
+                      Pending Finance Approval
+                    </span>
+                    <button
+                      onClick={() => setShowBatchModal(true)}
+                      className="px-3 py-1 text-sm bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors flex items-center gap-1"
+                    >
+                      <HiDocumentText className="w-4 h-4" />
+                      View Details
+                    </button>
                   </div>
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <div className="flex items-center">
-                      <HiCurrencyDollar className="w-8 h-8 text-green-500" />
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-green-600">
-                          Total Gross Pay
-                        </p>
-                        <p className="text-2xl font-bold text-green-900">
-                          {formatCurrency(previewData.totalGrossPay || 0)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-red-50 p-4 rounded-lg">
-                    <div className="flex items-center">
-                      <HiMinusCircle className="w-8 h-8 text-red-500" />
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-red-600">
-                          Total Deductions
-                        </p>
-                        <p className="text-2xl font-bold text-red-900">
-                          {formatCurrency(previewData.totalDeductions || 0)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-purple-50 p-4 rounded-lg">
-                    <div className="flex items-center">
-                      <HiCheckCircle className="w-8 h-8 text-purple-500" />
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-purple-600">
-                          Total Net Pay
-                        </p>
-                        <p className="text-2xl font-bold text-purple-900">
-                          {formatCurrency(previewData.totalNetPay || 0)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  {previewErrors.length > 0 && (
-                    <div className="bg-yellow-50 p-4 rounded-lg">
-                      <div className="flex items-center">
-                        <HiExclamation className="w-8 h-8 text-yellow-500" />
-                        <div className="ml-3">
-                          <p className="text-sm font-medium text-yellow-600">
-                            Employees with Issues
-                          </p>
-                          <p className="text-2xl font-bold text-yellow-900">
-                            {previewErrors.length}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
-              </div>
-            )}
 
-            {/* Payroll Summary - Only show after successful payroll */}
-            {payrollData && payrollData.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Payroll Summary
-                </h3>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-start gap-3">
+                    <HiInformationCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm text-blue-800 font-medium mb-1">
+                        Payroll Submitted Successfully
+                      </p>
+                      <p className="text-sm text-blue-700">
+                        Your payroll has been submitted for finance approval.
+                        Approval ID:{" "}
+                        <span className="font-mono font-semibold">
+                          {payrollBatchResult.approval?.approvalId}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <div className="flex items-center">
@@ -1715,11 +1978,14 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                           Total Employees
                         </p>
                         <p className="text-2xl font-bold text-blue-900">
-                          {payrollSummary.totalEmployees || 0}
+                          {payrollBatchResult.payroll?.totalEmployees ||
+                            payrollSummary.totalEmployees ||
+                            0}
                         </p>
                       </div>
                     </div>
                   </div>
+
                   <div className="bg-green-50 p-4 rounded-lg">
                     <div className="flex items-center">
                       <HiCurrencyDollar className="w-8 h-8 text-green-500" />
@@ -1728,11 +1994,16 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                           Total Gross Pay
                         </p>
                         <p className="text-2xl font-bold text-green-900">
-                          {formatCurrency(payrollSummary.totalGrossPay || 0)}
+                          {formatCurrency(
+                            payrollBatchResult.payroll?.totalGrossPay ||
+                              payrollSummary.totalGrossPay ||
+                              0
+                          )}
                         </p>
                       </div>
                     </div>
                   </div>
+
                   <div className="bg-red-50 p-4 rounded-lg">
                     <div className="flex items-center">
                       <HiMinusCircle className="w-8 h-8 text-red-500" />
@@ -1741,11 +2012,16 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                           Total Deductions
                         </p>
                         <p className="text-2xl font-bold text-red-900">
-                          {formatCurrency(payrollSummary.totalDeductions || 0)}
+                          {formatCurrency(
+                            payrollBatchResult.payroll?.totalDeductions ||
+                              payrollSummary.totalDeductions ||
+                              0
+                          )}
                         </p>
                       </div>
                     </div>
                   </div>
+
                   <div className="bg-purple-50 p-4 rounded-lg">
                     <div className="flex items-center">
                       <HiCheckCircle className="w-8 h-8 text-purple-500" />
@@ -1754,11 +2030,16 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                           Net Pay
                         </p>
                         <p className="text-2xl font-bold text-purple-900">
-                          {formatCurrency(payrollSummary.totalNetPay || 0)}
+                          {formatCurrency(
+                            payrollBatchResult.payroll?.totalNetPay ||
+                              payrollSummary.totalNetPay ||
+                              0
+                          )}
                         </p>
                       </div>
                     </div>
                   </div>
+
                   <div className="bg-orange-50 p-4 rounded-lg">
                     <div className="flex items-center">
                       <HiCurrencyDollar className="w-8 h-8 text-orange-500" />
@@ -1774,6 +2055,7 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                       </div>
                     </div>
                   </div>
+
                   <div className="bg-red-50 p-4 rounded-lg">
                     <div className="flex items-center">
                       <HiMinusCircle className="w-8 h-8 text-red-500" />
@@ -1788,18 +2070,131 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                     </div>
                   </div>
                 </div>
+
+                <div className="mt-4 flex items-center gap-3">
+                  <button
+                    onClick={handleResendToFinance}
+                    disabled={loading}
+                    className="px-4 py-2 text-sm font-medium text-[var(--elra-primary)] bg-white border border-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary)] hover:text-white transition-colors flex items-center gap-2"
+                  >
+                    <HiRefresh className="w-4 h-4" />
+                    Resend to Finance
+                  </button>
+                  <button
+                    onClick={handleNewPayroll}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
+                  >
+                    <HiPlus className="w-4 h-4" />
+                    Create New Payroll
+                  </button>
+                </div>
               </div>
             )}
+
+            {/* Payroll Summary - Only show after successful payroll */}
+            {payrollData &&
+              payrollData.length > 0 &&
+              processingStatus !== "completed" && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                    Payroll Summary
+                  </h3>
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <div className="flex items-center">
+                        <HiUserGroup className="w-8 h-8 text-blue-500" />
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-blue-600">
+                            Total Employees
+                          </p>
+                          <p className="text-2xl font-bold text-blue-900">
+                            {payrollSummary.totalEmployees || 0}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <div className="flex items-center">
+                        <HiCurrencyDollar className="w-8 h-8 text-green-500" />
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-green-600">
+                            Total Gross Pay
+                          </p>
+                          <p className="text-2xl font-bold text-green-900">
+                            {formatCurrency(payrollSummary.totalGrossPay || 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-red-50 p-4 rounded-lg">
+                      <div className="flex items-center">
+                        <HiMinusCircle className="w-8 h-8 text-red-500" />
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-red-600">
+                            Total Deductions
+                          </p>
+                          <p className="text-2xl font-bold text-red-900">
+                            {formatCurrency(
+                              payrollSummary.totalDeductions || 0
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                      <div className="flex items-center">
+                        <HiCheckCircle className="w-8 h-8 text-purple-500" />
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-purple-600">
+                            Net Pay
+                          </p>
+                          <p className="text-2xl font-bold text-purple-900">
+                            {formatCurrency(payrollSummary.totalNetPay || 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-orange-50 p-4 rounded-lg">
+                      <div className="flex items-center">
+                        <HiCurrencyDollar className="w-8 h-8 text-orange-500" />
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-orange-600">
+                            Taxable Income
+                          </p>
+                          <p className="text-2xl font-bold text-orange-900">
+                            {formatCurrency(
+                              payrollSummary.totalTaxableIncome || 0
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-red-50 p-4 rounded-lg">
+                      <div className="flex items-center">
+                        <HiMinusCircle className="w-8 h-8 text-red-500" />
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-red-600">
+                            PAYE Tax
+                          </p>
+                          <p className="text-2xl font-bold text-red-900">
+                            {formatCurrency(payrollSummary.totalPAYE || 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
             {/* Payroll Breakdown Table - Show preview or results */}
             {processingStatus === "processing" ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <div className="w-16 h-16 border-4 border-[var(--elra-primary)] border-t-transparent rounded-full animate-spin mb-4"></div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Processing Payroll...
+                  Sending to Finance...
                 </h3>
                 <p className="text-gray-600 text-center max-w-md">
-                  Please wait while we process the payroll for all employees.
+                  Please wait while we submit the payroll for finance approval.
                   This may take a few moments.
                 </p>
               </div>
@@ -1962,76 +2357,98 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
       {showDetailModal &&
         selectedPayrollDetail &&
         selectedPayrollDetail.employee && (
-          <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <div className="flex items-center space-x-3">
-                  <img
-                    src={ELRALogo}
-                    alt="ELRA Logo"
-                    className="w-8 h-8 object-contain"
-                  />
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">
-                      Detailed Payroll Breakdown
-                    </h3>
-                    <p className="text-gray-600 mt-1">
-                      {selectedPayrollDetail.employee?.name || "Unknown"} -{" "}
-                      {selectedPayrollDetail.employee?.employeeId || "No ID"}
-                    </p>
+          <div className="fixed inset-0 bg-white bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl modal-shadow-enhanced w-full max-w-5xl max-h-[95vh] flex flex-col border border-gray-100">
+              {/* ELRA Branded Header */}
+              <div className="bg-gradient-to-br from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] text-white p-8 rounded-t-2xl flex-shrink-0 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                        <ELRALogo variant="dark" size="md" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-bold text-white">
+                          Employee Payroll Details
+                        </h2>
+                        <p className="text-white/80 text-sm mt-1">
+                          {selectedPayrollDetail.employee?.name || "Unknown"} -{" "}
+                          {selectedPayrollDetail.employee?.employeeId ||
+                            "No ID"}
+                        </p>
+                        <p className="text-white/70 text-xs mt-1">
+                          {selectedPayrollDetail.employee?.department ||
+                            "No Department"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => {
+                          setShowDetailModal(false);
+                          setSelectedPayrollDetail(null);
+                        }}
+                        className="bg-white/20 text-white px-4 py-2 rounded-lg hover:bg-white/30 transition-all duration-300 font-medium border border-white/30 backdrop-blur-sm"
+                      >
+                        Close
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowDetailModal(false);
+                          setSelectedPayrollDetail(null);
+                        }}
+                        className="text-white/80 hover:text-white transition-colors p-2 rounded-full hover:bg-white/20"
+                      >
+                        <HiX className="h-6 w-6" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => {
-                    setShowDetailModal(false);
-                    setSelectedPayrollDetail(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <HiX className="w-6 h-6" />
-                </button>
               </div>
 
-              {/* Modal Content */}
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                {/* Employee Info with Image */}
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-4 mb-4">
-                    <img
-                      src={getEmployeeAvatar(selectedPayrollDetail.employee)}
-                      alt={`${
-                        selectedPayrollDetail.employee?.name || "Employee"
-                      }`}
-                      className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
-                      onError={(e) => {
-                        e.target.src = getDefaultAvatar(
-                          selectedPayrollDetail.employee
-                        );
-                      }}
-                    />
-                    <div>
-                      <h4 className="text-lg font-bold text-gray-900">
+              {/* Modal Content - Scrollable */}
+              <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                {/* Employee Info Card */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200 shadow-sm">
+                  <div className="flex items-center space-x-6 mb-6">
+                    <div className="relative">
+                      <img
+                        src={getEmployeeAvatar(selectedPayrollDetail.employee)}
+                        alt={`${
+                          selectedPayrollDetail.employee?.name || "Employee"
+                        }`}
+                        className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
+                        onError={(e) => {
+                          e.target.src = getDefaultAvatar(
+                            selectedPayrollDetail.employee
+                          );
+                        }}
+                      />
+                      <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                        <HiCheckCircle className="w-3 h-3 text-white" />
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-2xl font-bold text-gray-900 mb-2">
                         {selectedPayrollDetail.employee?.name || "Unknown"}
-                      </h4>
-                      <p className="text-sm text-gray-600">
+                      </h3>
+                      <p className="text-lg text-gray-600 mb-1">
                         {selectedPayrollDetail.employee?.employeeId || "No ID"}
                       </p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">Department:</span>
-                      <span className="ml-2 font-medium">
-                        {selectedPayrollDetail.employee?.department ||
-                          "No Department"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Role:</span>
-                      <span className="ml-2 font-medium">
-                        {selectedPayrollDetail.employee?.role || "No Role"}
-                      </span>
+                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <HiUserGroup className="w-4 h-4" />
+                          {selectedPayrollDetail.employee?.department ||
+                            "No Department"}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <HiBriefcase className="w-4 h-4" />
+                          {selectedPayrollDetail.employee?.role || "No Role"}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2542,11 +2959,11 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
 
               {/* Success Message */}
               <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                🎉 Payroll Processed!
+                ✅ Payroll Submitted for Approval!
               </h3>
               <p className="text-gray-600 mb-6">
-                Your payroll has been successfully processed and saved to the
-                database.
+                Your payroll has been submitted for finance approval. You will
+                be notified once it's approved and processed.
               </p>
 
               {/* Success Details */}
@@ -2597,45 +3014,148 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
 
       {/* Payroll Batch Details Modal */}
       {showBatchModal && payrollBatchResult && (
-        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-[70] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-[95vw] w-full max-h-[95vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-[var(--elra-primary)] rounded-lg flex items-center justify-center">
-                  <HiDocumentText className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-800">
-                    Payroll Batch Details
-                  </h2>
-                  <p className="text-gray-600">
-                    {payrollBatchResult.scope?.type === "company"
-                      ? "Company-wide"
-                      : payrollBatchResult.scope?.type === "department"
-                      ? "Department"
-                      : "Individual"}{" "}
-                    Payroll -
-                    {months.find((m) => m.value === formData.month)?.label}{" "}
-                    {formData.year}
-                  </p>
+        <div className="fixed inset-0 bg-white bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
+          <div className="bg-white rounded-2xl modal-shadow-enhanced max-w-[95vw] w-full max-h-[95vh] flex flex-col border border-gray-100">
+            {/* ELRA Branded Header */}
+            <div className="bg-gradient-to-br from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] text-white p-8 rounded-t-2xl flex-shrink-0 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                      <ELRALogo variant="dark" size="md" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">
+                        Payroll Batch Details
+                      </h2>
+                      <p className="text-white/80 text-sm mt-1">
+                        {payrollBatchResult.scope?.type === "company"
+                          ? "Company-wide"
+                          : payrollBatchResult.scope?.type === "department"
+                          ? "Department"
+                          : "Individual"}{" "}
+                        Payroll -{" "}
+                        {months.find((m) => m.value === formData.month)?.label}{" "}
+                        {formData.year}
+                      </p>
+                      {payrollBatchResult.approval?.approvalId && (
+                        <p className="text-white/70 text-xs mt-1 font-mono">
+                          Approval ID: {payrollBatchResult.approval.approvalId}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => setShowBatchModal(false)}
+                      className="bg-white/20 text-white px-4 py-2 rounded-lg hover:bg-white/30 transition-all duration-300 font-medium border border-white/30 backdrop-blur-sm"
+                    >
+                      Close
+                    </button>
+                    <button
+                      onClick={() => setShowBatchModal(false)}
+                      className="text-white/80 hover:text-white transition-colors p-2 rounded-full hover:bg-white/20"
+                    >
+                      <HiX className="h-6 w-6" />
+                    </button>
+                  </div>
                 </div>
               </div>
-              <button
-                onClick={() => setShowBatchModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <HiX className="w-6 h-6 text-gray-500" />
-              </button>
             </div>
 
-            {/* Modal Content */}
-            <div className="flex-1 overflow-hidden flex flex-col">
-              {/* Summary Cards */}
+            {/* Modal Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-8 space-y-8">
+              {/* Financial Summary Cards */}
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <HiCurrencyDollar className="w-6 h-6 text-[var(--elra-primary)]" />
+                  Financial Summary
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
+                        <HiUserGroup className="w-6 h-6 text-white" />
+                      </div>
+                      <span className="text-sm font-semibold text-blue-800">
+                        Total Employees
+                      </span>
+                    </div>
+                    <div className="text-3xl font-bold text-blue-900">
+                      {payrollBatchResult.payroll?.totalEmployees ||
+                        payrollSummary.totalEmployees ||
+                        0}
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center shadow-lg">
+                        <HiCurrencyDollar className="w-6 h-6 text-white" />
+                      </div>
+                      <span className="text-sm font-semibold text-green-800">
+                        Total Gross Pay
+                      </span>
+                    </div>
+                    <div className="text-3xl font-bold text-green-900">
+                      {formatCurrency(
+                        payrollBatchResult.payroll?.totalGrossPay ||
+                          payrollSummary.totalGrossPay ||
+                          0
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200 shadow-sm">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center shadow-lg">
+                        <HiMinusCircle className="w-6 h-6 text-white" />
+                      </div>
+                      <span className="text-sm font-semibold text-red-800">
+                        Total Deductions
+                      </span>
+                    </div>
+                    <div className="text-3xl font-bold text-red-900">
+                      {formatCurrency(
+                        payrollBatchResult.payroll?.totalDeductions ||
+                          payrollSummary.totalDeductions ||
+                          0
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200 shadow-sm">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                        <HiCheckCircle className="w-6 h-6 text-white" />
+                      </div>
+                      <span className="text-sm font-semibold text-purple-800">
+                        Net Pay
+                      </span>
+                    </div>
+                    <div className="text-3xl font-bold text-purple-900">
+                      {formatCurrency(
+                        payrollBatchResult.payroll?.totalNetPay ||
+                          payrollSummary.totalNetPay ||
+                          0
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Processing Summary */}
               {payrollBatchResult.processingSummary && (
-                <div className="p-6 border-b border-gray-200">
+                <div className="space-y-4">
+                  <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <HiCheckCircle className="w-6 h-6 text-[var(--elra-primary)]" />
+                    Processing Summary
+                  </h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-green-50 rounded-lg p-4">
+                    <div className="bg-green-50 rounded-xl p-4 border border-green-200 shadow-sm">
                       <div className="flex items-center gap-2 mb-2">
                         <HiCheckCircle className="w-5 h-5 text-green-600" />
                         <span className="text-sm font-medium text-green-800">
@@ -2648,7 +3168,7 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                     </div>
 
                     {payrollBatchResult.processingSummary.duplicates > 0 && (
-                      <div className="bg-yellow-50 rounded-lg p-4">
+                      <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-200 shadow-sm">
                         <div className="flex items-center gap-2 mb-2">
                           <HiExclamation className="w-5 h-5 text-yellow-600" />
                           <span className="text-sm font-medium text-yellow-800">
@@ -2662,7 +3182,7 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                     )}
 
                     {payrollBatchResult.processingSummary.failed > 0 && (
-                      <div className="bg-red-50 rounded-lg p-4">
+                      <div className="bg-red-50 rounded-xl p-4 border border-red-200 shadow-sm">
                         <div className="flex items-center gap-2 mb-2">
                           <HiMinusCircle className="w-5 h-5 text-red-600" />
                           <span className="text-sm font-medium text-red-800">
@@ -2675,7 +3195,7 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                       </div>
                     )}
 
-                    <div className="bg-blue-50 rounded-lg p-4">
+                    <div className="bg-blue-50 rounded-xl p-4 border border-blue-200 shadow-sm">
                       <div className="flex items-center gap-2 mb-2">
                         <HiUserGroup className="w-5 h-5 text-blue-600" />
                         <span className="text-sm font-medium text-blue-800">
@@ -2690,150 +3210,199 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                 </div>
               )}
 
-              {/* Employee Details Table */}
-              <div className="flex-1 overflow-hidden p-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                  Employee Details
-                </h3>
-                <div className="h-full overflow-auto border border-gray-200 rounded-lg">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 sticky top-0">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Employee
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Employee ID
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Department
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Gross Pay
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Net Pay
-                        </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Error Details
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {/* Successful Employees */}
-                      {payrollBatchResult.payrolls?.map((payroll, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="w-8 h-8 bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white text-sm font-medium">
-                                {payroll.employee.name.charAt(0)}
-                              </div>
-                              <div className="ml-3">
-                                <div className="text-sm font-medium text-gray-900">
-                                  {payroll.employee.name}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {payroll.employee.employeeId}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {payroll.employee.department}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              <HiCheckCircle className="w-3 h-3 mr-1" />
-                              Success
-                            </span>
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatCurrency(payroll.summary.grossPay)}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatCurrency(payroll.summary.netPay)}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                            -
-                          </td>
-                        </tr>
-                      ))}
-
-                      {/* Error Employees */}
-                      {payrollBatchResult.processingSummary?.errors?.map(
-                        (error, index) => (
-                          <tr
-                            key={`error-${index}`}
-                            className="hover:bg-gray-50"
-                          >
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <div className="flex items-center">
-                                <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                                  {error.employee.charAt(0)}
-                                </div>
-                                <div className="ml-3">
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {error.employee}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {error.employeeId || "N/A"}
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                              -
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                  error.step === "duplicate_check"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-red-100 text-red-800"
-                                }`}
+              {/* Employee Details Section */}
+              {previewData &&
+                previewData.payrolls &&
+                previewData.payrolls.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                      <HiUserGroup className="w-6 h-6 text-[var(--elra-primary)]" />
+                      Employee Details ({previewData.payrolls.length} employees)
+                    </h3>
+                    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                            <tr>
+                              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                Employee
+                              </th>
+                              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                Department
+                              </th>
+                              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                Gross Pay
+                              </th>
+                              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                Deductions
+                              </th>
+                              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                Net Pay
+                              </th>
+                              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                Actions
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {previewData.payrolls.map((payroll, index) => (
+                              <tr
+                                key={index}
+                                className="hover:bg-gray-50 transition-colors"
                               >
-                                {error.step === "duplicate_check" ? (
-                                  <>
-                                    <HiExclamation className="w-3 h-3 mr-1" />
-                                    Duplicate
-                                  </>
-                                ) : (
-                                  <>
-                                    <HiMinusCircle className="w-3 h-3 mr-1" />
-                                    Failed
-                                  </>
-                                )}
-                              </span>
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                              -
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                              -
-                            </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-red-600">
-                              {error.error}
-                            </td>
-                          </tr>
-                        )
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="flex items-center">
+                                    <div className="w-10 h-10 bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-md">
+                                      {payroll.employee.name.charAt(0)}
+                                    </div>
+                                    <div className="ml-4">
+                                      <div className="text-sm font-medium text-gray-900">
+                                        {payroll.employee.name}
+                                      </div>
+                                      <div className="text-sm text-gray-500">
+                                        {payroll.employee.employeeId}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900">
+                                    {payroll.employee.department?.name || "N/A"}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-green-600">
+                                    {formatCurrency(
+                                      payroll.summary?.grossPay || 0
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-red-600">
+                                    {formatCurrency(
+                                      payroll.summary?.totalDeductions || 0
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-bold text-[var(--elra-primary)]">
+                                    {formatCurrency(
+                                      payroll.summary?.netPay || 0
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedPayrollDetail(payroll);
+                                      setShowDetailModal(true);
+                                    }}
+                                    className="text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] font-medium text-sm transition-colors px-3 py-1 rounded-lg hover:bg-[var(--elra-primary)]/10"
+                                  >
+                                    View Details
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-              {/* Modal Footer */}
-              <div className="p-6 border-t border-gray-200 flex justify-end">
-                <button
-                  onClick={() => setShowBatchModal(false)}
-                  className="bg-[var(--elra-primary)] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[var(--elra-primary)]/90 transition-colors"
-                >
-                  Close
-                </button>
-              </div>
+              {/* Fallback for payrollBatchResult.payrolls if previewData is not available */}
+              {(!previewData || !previewData.payrolls) &&
+                payrollBatchResult.payrolls && (
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                      <HiUserGroup className="w-6 h-6 text-[var(--elra-primary)]" />
+                      Employee Details ({payrollBatchResult.payrolls.length}{" "}
+                      employees)
+                    </h3>
+                    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                            <tr>
+                              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                Employee
+                              </th>
+                              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                Department
+                              </th>
+                              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                Gross Pay
+                              </th>
+                              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                Net Pay
+                              </th>
+                              <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                Actions
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {payrollBatchResult.payrolls.map(
+                              (payroll, index) => (
+                                <tr
+                                  key={index}
+                                  className="hover:bg-gray-50 transition-colors"
+                                >
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="flex items-center">
+                                      <div className="w-10 h-10 bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white font-semibold text-sm shadow-md">
+                                        {payroll.employee.name.charAt(0)}
+                                      </div>
+                                      <div className="ml-4">
+                                        <div className="text-sm font-medium text-gray-900">
+                                          {payroll.employee.name}
+                                        </div>
+                                        <div className="text-sm text-gray-500">
+                                          {payroll.employee.employeeId}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm text-gray-900">
+                                      {payroll.employee.department || "N/A"}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-medium text-green-600">
+                                      {formatCurrency(
+                                        payroll.summary?.grossPay || 0
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-bold text-[var(--elra-primary)]">
+                                      {formatCurrency(
+                                        payroll.summary?.netPay || 0
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <button
+                                      onClick={() => {
+                                        setSelectedPayrollDetail(payroll);
+                                        setShowDetailModal(true);
+                                      }}
+                                      className="text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] font-medium text-sm transition-colors px-3 py-1 rounded-lg hover:bg-[var(--elra-primary)]/10"
+                                    >
+                                      View Details
+                                    </button>
+                                  </td>
+                                </tr>
+                              )
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
             </div>
           </div>
         </div>

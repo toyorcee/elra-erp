@@ -9,6 +9,7 @@ import {
   getSalesMarketingReports,
   getSalesCategories,
   getMarketingCategories,
+  getOperationalBudget,
 } from "../controllers/salesMarketingFinancialController.js";
 import {
   protect,
@@ -26,6 +27,9 @@ router.use(checkSalesMarketingAccess);
 
 // Dashboard
 router.route("/dashboard").get(getSalesMarketingDashboard);
+
+// Budget Information
+router.route("/operational-budget").get(getOperationalBudget);
 
 // Transactions
 router

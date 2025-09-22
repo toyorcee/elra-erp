@@ -13,17 +13,32 @@ class PayrollApprovalService {
    */
   async createApprovalRequest(payrollData, requestedBy) {
     try {
+      // Calculate total tax from payroll data
+      const totalTax = payrollData.totalPAYE || 0;
+
+      console.log(
+        "🔍 [PAYROLL_APPROVAL] Creating approval request with data:",
+        {
+          totalEmployees: payrollData.totalEmployees,
+          totalGrossPay: payrollData.totalGrossPay,
+          totalNetPay: payrollData.totalNetPay,
+          totalDeductions: payrollData.totalDeductions,
+          totalPAYE: payrollData.totalPAYE,
+          totalTax: totalTax,
+        }
+      );
+
       // Create the approval request
       const approvalRequest = new PayrollApproval({
         payrollData,
         period: payrollData.period,
         scope: payrollData.scope,
         financialSummary: {
-          totalEmployees: payrollData.totalEmployees,
-          totalGrossPay: payrollData.totalGrossPay,
-          totalNetPay: payrollData.totalNetPay,
-          totalDeductions: payrollData.totalDeductions,
-          totalTax: payrollData.totalTax,
+          totalEmployees: payrollData.totalEmployees || 0,
+          totalGrossPay: payrollData.totalGrossPay || 0,
+          totalNetPay: payrollData.totalNetPay || 0,
+          totalDeductions: payrollData.totalDeductions || 0,
+          totalTax: totalTax,
         },
         requestedBy,
         approvalStatus: "pending_finance",
@@ -250,10 +265,6 @@ class PayrollApprovalService {
     }
   }
 
-  // Simplified - no period reset methods needed
-
-  // Simplified - no frequency limit methods needed
-
   /**
    * Reject payroll approval
    */
@@ -288,11 +299,46 @@ class PayrollApprovalService {
 
       await approval.save();
 
+      try {
+        const ELRAWallet = await import("../models/CompanyWallet.js");
+        const elraWallet = await ELRAWallet.default.getOrCreateWallet(
+          "ELRA_MAIN",
+          rejectedBy
+        );
+
+        const payrollAmount = approval.financialSummary.totalNetPay;
+
+        const payrollBudget = elraWallet.budgetCategories?.payroll;
+        if (payrollBudget && payrollBudget.reserved >= payrollAmount) {
+          payrollBudget.reserved -= payrollAmount;
+          payrollBudget.available += payrollAmount;
+
+          elraWallet.reservedFunds -= payrollAmount;
+
+          await elraWallet.save();
+
+          console.log(
+            `💳 [ELRA WALLET] Released ₦${payrollAmount.toLocaleString()} from reserved back to available in payroll budget due to rejection`
+          );
+        } else {
+          console.warn(
+            `⚠️ [ELRA WALLET] Could not release funds - insufficient reserved funds. Reserved: ₦${
+              payrollBudget?.reserved || 0
+            }, Required: ₦${payrollAmount.toLocaleString()}`
+          );
+        }
+      } catch (walletError) {
+        console.error(
+          "❌ [ELRA WALLET] Error releasing funds on rejection:",
+          walletError
+        );
+      }
+
       // Send rejection notification
       await this.sendRejectionNotification(approval, rejectedBy, reason);
 
       console.log(
-        `❌ [PAYROLL_APPROVAL] Rejected: ${approvalId} by ${userRole}`
+        `❌ [PAYROLL_APPROVAL] Rejected: ${approvalId} by ${userRole} - Funds released back to available`
       );
 
       return approval;
@@ -303,7 +349,7 @@ class PayrollApprovalService {
   }
 
   /**
-   * Mark payroll as processed
+   * Mark payroll as processed and move funds from reserved to used
    */
   async markAsProcessed(approvalId, processedBy) {
     try {
@@ -315,6 +361,45 @@ class PayrollApprovalService {
 
       if (approval.approvalStatus !== "approved_hr") {
         throw new Error("Payroll approval is not in approved HR status");
+      }
+
+      // Move funds from reserved to used in ELRA wallet
+      try {
+        const ELRAWallet = await import("../models/CompanyWallet.js");
+        const elraWallet = await ELRAWallet.default.getOrCreateWallet(
+          "ELRA_MAIN",
+          processedBy
+        );
+
+        const payrollAmount = approval.financialSummary.totalNetPay;
+
+        // Move from reserved to used in payroll budget category
+        const payrollBudget = elraWallet.budgetCategories?.payroll;
+        if (payrollBudget && payrollBudget.reserved >= payrollAmount) {
+          payrollBudget.reserved -= payrollAmount;
+          payrollBudget.used += payrollAmount;
+
+          // Update overall wallet
+          elraWallet.reservedFunds -= payrollAmount;
+
+          await elraWallet.save();
+
+          console.log(
+            `💳 [ELRA WALLET] Moved ₦${payrollAmount.toLocaleString()} from reserved to used in payroll budget`
+          );
+        } else {
+          console.warn(
+            `⚠️ [ELRA WALLET] Insufficient reserved funds for payroll processing. Reserved: ₦${
+              payrollBudget?.reserved || 0
+            }, Required: ₦${payrollAmount.toLocaleString()}`
+          );
+        }
+      } catch (walletError) {
+        console.error(
+          "❌ [ELRA WALLET] Error moving funds from reserved to used:",
+          walletError
+        );
+        // Don't fail the processing if wallet update fails
       }
 
       approval.approvalStatus = "processed";
@@ -352,10 +437,11 @@ class PayrollApprovalService {
   async getApprovalDetails(approvalId) {
     try {
       return await PayrollApproval.findOne({ approvalId })
-        .populate(
-          "requestedBy",
-          "firstName lastName email employeeId department"
-        )
+        .populate({
+          path: "requestedBy",
+          select: "firstName lastName email employeeId department",
+          populate: { path: "department", select: "name" }
+        })
         .populate("financeApproval.approvedBy", "firstName lastName email")
         .populate("hrApproval.approvedBy", "firstName lastName email")
         .populate("processedBy", "firstName lastName email");

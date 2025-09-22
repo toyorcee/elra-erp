@@ -30,6 +30,7 @@ import { formatCurrency } from "../../../../utils/formatters.js";
 import DataTable from "../../../../components/common/DataTable";
 
 const ApprovalDashboard = () => {
+  ``;
   const { user } = useAuth();
   const [projects, setProjects] = useState([]);
   const [approvedProjects, setApprovedProjects] = useState([]);
@@ -43,7 +44,6 @@ const ApprovalDashboard = () => {
     rejected: 0,
   });
 
-  // Approval confirmation modal states
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -51,7 +51,6 @@ const ApprovalDashboard = () => {
   const [rejectionComments, setRejectionComments] = useState("");
   const [rejectionReason, setRejectionReason] = useState("");
 
-  // Document viewing states
   const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [showProjectDetailsModal, setShowProjectDetailsModal] = useState(false);
   const [projectDocuments, setProjectDocuments] = useState({});
@@ -70,8 +69,7 @@ const ApprovalDashboard = () => {
       if (response.success) {
         setProjects(response.data);
 
-        // Calculate stats for cross-departmental approvals
-        const stats = {
+        setStats((prevStats) => ({
           total: response.data.length,
           pending: response.data.filter(
             (p) =>
@@ -83,10 +81,9 @@ const ApprovalDashboard = () => {
               p.status === "pending_procurement" ||
               p.status === "resubmitted"
           ).length,
-          approved: response.data.filter((p) => p.status === "approved").length,
-          rejected: response.data.filter((p) => p.status === "rejected").length,
-        };
-        setStats(stats);
+          approved: prevStats.approved,
+          rejected: prevStats.rejected,
+        }));
       } else {
         toast.error("Failed to load pending project approvals");
       }
@@ -109,6 +106,24 @@ const ApprovalDashboard = () => {
       if (response.success) {
         setApprovedProjects(response.data);
         console.log("🔍 [FRONTEND] Set approved projects:", response.data);
+
+        const approvedCount = response.data.filter(
+          (p) => p.approver?._id?.toString() === user?.id
+        ).length;
+
+        const rejectedCount = response.data.filter(
+          (p) =>
+            p.approver?._id?.toString() === user?.id && p.status === "rejected"
+        ).length;
+
+        console.log("🔍 [FRONTEND] Approved count:", approvedCount);
+        console.log("🔍 [FRONTEND] Rejected count:", rejectedCount);
+
+        setStats((prevStats) => ({
+          ...prevStats,
+          approved: approvedCount,
+          rejected: rejectedCount,
+        }));
       } else {
         console.error("Failed to load approved projects:", response.message);
       }
@@ -192,7 +207,6 @@ const ApprovalDashboard = () => {
         loadPendingProjectApprovals();
         loadApprovedProjects();
 
-        // Close modals
         setShowApprovalModal(false);
         setShowRejectionModal(false);
         setSelectedProject(null);
@@ -218,7 +232,6 @@ const ApprovalDashboard = () => {
       return "No approval chain";
     }
 
-    // Handle resubmitted projects - show which step was rejected and preserved approvals
     if (
       project.status === "resubmitted" ||
       project.workflowHistory?.some((h) => h.action === "project_resubmitted")
@@ -227,7 +240,6 @@ const ApprovalDashboard = () => {
         (step) => step.status === "pending"
       );
 
-      // Find the rejection point from workflow history
       const resubmissionHistory = project.workflowHistory?.find(
         (h) => h.action === "project_resubmitted"
       );
@@ -249,7 +261,6 @@ const ApprovalDashboard = () => {
           levelMap[firstPendingStep.level] || firstPendingStep.level
         } (Resubmitted)`;
 
-        // Show preserved approvals if any
         if (preservedApprovals.length > 0) {
           const preservedText = preservedApprovals
             .map((level) => levelMap[level] || level)
@@ -305,7 +316,6 @@ const ApprovalDashboard = () => {
     return "bg-blue-100 text-blue-800";
   };
 
-  // Get document submission status
   const getDocumentStatus = (project) => {
     if (!project.requiredDocuments || project.requiredDocuments.length === 0) {
       return { submitted: 0, total: 0, percentage: 0 };
@@ -323,7 +333,6 @@ const ApprovalDashboard = () => {
     };
   };
 
-  // Avatar handling functions
   const getDefaultAvatar = (user = null) => {
     if (user && user.firstName && user.lastName) {
       const firstName = user.firstName.charAt(0).toUpperCase();
@@ -372,181 +381,215 @@ const ApprovalDashboard = () => {
     );
   };
 
-  const columns = [
-    {
-      header: "Project",
-      accessor: "name",
-      renderer: (project) => (
-        <div className="flex items-center space-x-3">
-          <div className="flex-shrink-0">
-            <div
-              className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                activeTab === "approved"
-                  ? "bg-gradient-to-br from-green-500 to-green-600"
-                  : "bg-gradient-to-br from-blue-500 to-purple-600"
-              }`}
-            >
-              {activeTab === "approved" ? (
-                <CheckCircleIcon className="h-6 w-6 text-white" />
-              ) : (
-                <DocumentTextIcon className="h-6 w-6 text-white" />
-              )}
-            </div>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="font-medium text-gray-900 break-words leading-tight">
-              {project.name}
-              {activeTab === "approved" && (
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  ✓ Approved by You
-                </span>
-              )}
-            </div>
-            <div className="text-sm text-gray-500 break-words">
-              {project.code} •{" "}
-              {project.category?.replace(/_/g, " ").toUpperCase()}
-            </div>
-            <div className="text-xs text-gray-400 mt-1 break-words">
-              Created by {project.createdBy?.firstName}{" "}
-              {project.createdBy?.lastName}
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      header: "Current Level",
-      accessor: "currentLevel",
-      renderer: (project) => {
-        // For approved projects in history tab, show approval information
-        if (activeTab === "approved" && project.approvalLevel) {
-          return (
-            <div className="space-y-2">
-              <div className="text-sm font-medium text-green-700">
-                ✅ Approved at {project.approvalLevel.replace(/_/g, " ")} level
-              </div>
-              <div className="text-xs text-gray-600">
-                Approved: {new Date(project.approvedAt).toLocaleDateString()}
-              </div>
-              {project.approvalComments && (
-                <div className="text-xs text-gray-500 italic">
-                  "{project.approvalComments}"
-                </div>
-              )}
-            </div>
-          );
-        }
+  // Helper function to check if all documents are uploaded
+  const areAllDocumentsUploaded = (project) => {
+    if (!project.requiredDocuments || project.requiredDocuments.length === 0) {
+      return true;
+    }
+    const total = project.requiredDocuments.length;
+    const submitted = project.requiredDocuments.filter(
+      (doc) => doc.isSubmitted
+    ).length;
+    return submitted === total;
+  };
 
-        // For pending projects, show current approval level
-        const currentLevel = getCurrentApprovalLevel(project);
-        const progress = getApprovalProgress(project);
-
-        return (
-          <div className="space-y-2">
-            <div className="text-sm font-medium text-gray-900">
-              {currentLevel}
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+  const getColumns = () => {
+    const baseColumns = [
+      {
+        header: "Project",
+        accessor: "name",
+        renderer: (project) => (
+          <div className="flex items-center space-x-3 max-w-xs">
+            <div className="flex-shrink-0">
               <div
-                className="bg-[var(--elra-primary)] h-2 rounded-full transition-all duration-300"
-                style={{ width: `${progress.percentage}%` }}
-              ></div>
-            </div>
-            <div className="text-xs text-gray-500">
-              {progress.completed} of {progress.total} levels completed
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      header: "Documents",
-      accessor: "documents",
-      renderer: (project) => {
-        const docStatus = getDocumentStatus(project);
-
-        return (
-          <div className="space-y-2">
-            <div className="text-sm font-medium text-gray-900">
-              Documents: {docStatus.submitted}/{docStatus.total}
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${docStatus.percentage}%` }}
-              ></div>
-            </div>
-            <div className="text-xs text-gray-500">
-              {docStatus.percentage}% submitted
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      header: "Department",
-      accessor: "department",
-      renderer: (project) => (
-        <div className="flex items-center space-x-2">
-          <BuildingOfficeIcon className="h-4 w-4 text-gray-400" />
-          <div className="text-sm text-gray-900">
-            {project.department?.name || "N/A"}
-          </div>
-        </div>
-      ),
-    },
-    {
-      header: "Budget",
-      accessor: "budget",
-      renderer: (project) => (
-        <div className="flex items-center space-x-2">
-          <CurrencyDollarIcon className="h-4 w-4 text-green-500" />
-          <div className="text-sm">
-            <div className="font-medium text-gray-900">
-              {formatCurrency(project.budget)}
-            </div>
-            <div className="text-xs text-gray-500">
-              {project.budgetThreshold?.replace(/_/g, " ")}
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      header: "Timeline",
-      accessor: "timeline",
-      renderer: (project) => {
-        const startDate = new Date(project.startDate);
-        const endDate = new Date(project.endDate);
-        const today = new Date();
-        const isOverdue = endDate < today;
-
-        return (
-          <div className="flex items-center space-x-2">
-            <CalendarIcon
-              className={`h-4 w-4 ${
-                isOverdue ? "text-red-500" : "text-gray-400"
-              }`}
-            />
-            <div className="text-sm">
-              <div
-                className={`font-medium ${
-                  isOverdue ? "text-red-600" : "text-gray-900"
+                className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  activeTab === "approved"
+                    ? "bg-gradient-to-br from-green-500 to-green-600"
+                    : "bg-gradient-to-br from-blue-500 to-purple-600"
                 }`}
               >
-                {startDate.toLocaleDateString()} -{" "}
-                {endDate.toLocaleDateString()}
+                {activeTab === "approved" ? (
+                  <CheckCircleIcon className="h-5 w-5 text-white" />
+                ) : (
+                  <DocumentTextIcon className="h-5 w-5 text-white" />
+                )}
               </div>
-              <div className="text-xs text-gray-500">
-                {project.duration} days •{" "}
-                {project.isOverdue ? "Overdue" : "On track"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div
+                className="font-medium text-gray-900 text-sm leading-tight truncate"
+                title={project.name}
+              >
+                {project.name}
+                {activeTab === "approved" && (
+                  <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    ✓
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-gray-500 truncate">
+                {project.code} •{" "}
+                {project.category?.replace(/_/g, " ").toUpperCase()}
+              </div>
+              <div className="text-xs text-gray-400 truncate">
+                By {project.createdBy?.firstName} {project.createdBy?.lastName}
               </div>
             </div>
           </div>
-        );
+        ),
       },
-    },
-  ];
+      {
+        header: "Current Level",
+        accessor: "currentLevel",
+        renderer: (project) => {
+          if (activeTab === "approved" && project.approvalLevel) {
+            return (
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-green-700">
+                  ✅ Approved at {project.approvalLevel.replace(/_/g, " ")}{" "}
+                  level
+                </div>
+                <div className="text-xs text-gray-600">
+                  Approved: {new Date(project.approvedAt).toLocaleDateString()}
+                </div>
+                {project.approvalComments && (
+                  <div className="text-xs text-gray-500 italic">
+                    "{project.approvalComments}"
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          // For pending projects, show current approval level
+          const currentLevel = getCurrentApprovalLevel(project);
+          const progress = getApprovalProgress(project);
+
+          return (
+            <div className="space-y-1 max-w-xs">
+              <div
+                className="text-sm font-medium text-gray-900 truncate"
+                title={currentLevel}
+              >
+                {currentLevel}
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-1.5">
+                <div
+                  className="bg-[var(--elra-primary)] h-1.5 rounded-full transition-all duration-300"
+                  style={{ width: `${progress.percentage}%` }}
+                ></div>
+              </div>
+              <div className="text-xs text-gray-500">
+                {progress.completed}/{progress.total} levels
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        header: "Department",
+        accessor: "department",
+        renderer: (project) => (
+          <div className="flex items-center space-x-2 max-w-xs">
+            <BuildingOfficeIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <div
+              className="text-sm text-gray-900 truncate"
+              title={project.department?.name || "N/A"}
+            >
+              {project.department?.name || "N/A"}
+            </div>
+          </div>
+        ),
+      },
+      {
+        header: "Budget",
+        accessor: "budget",
+        renderer: (project) => (
+          <div className="flex items-center space-x-2 max-w-xs">
+            <CurrencyDollarIcon className="h-4 w-4 text-green-500 flex-shrink-0" />
+            <div className="text-sm min-w-0">
+              <div className="font-medium text-gray-900 truncate">
+                {formatCurrency(project.budget)}
+              </div>
+              <div className="text-xs text-gray-500 truncate">
+                {project.budgetThreshold?.replace(/_/g, " ")}
+              </div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        header: "Timeline",
+        accessor: "timeline",
+        renderer: (project) => {
+          const startDate = new Date(project.startDate);
+          const endDate = new Date(project.endDate);
+          const today = new Date();
+          const isOverdue = endDate < today;
+
+          return (
+            <div className="flex items-center space-x-2 max-w-xs">
+              <CalendarIcon
+                className={`h-4 w-4 flex-shrink-0 ${
+                  isOverdue ? "text-red-500" : "text-gray-400"
+                }`}
+              />
+              <div className="text-sm min-w-0">
+                <div
+                  className={`font-medium truncate ${
+                    isOverdue ? "text-red-600" : "text-gray-900"
+                  }`}
+                >
+                  {startDate.toLocaleDateString()} -{" "}
+                  {endDate.toLocaleDateString()}
+                </div>
+                <div className="text-xs text-gray-500 truncate">
+                  {project.duration} days •{" "}
+                  {project.isOverdue ? "Overdue" : "On track"}
+                </div>
+              </div>
+            </div>
+          );
+        },
+      },
+    ];
+
+    // Add Documents column only if not all projects have all documents uploaded
+    const hasIncompleteDocuments = (
+      activeTab === "pending" ? projects : approvedProjects
+    ).some((project) => !areAllDocumentsUploaded(project));
+
+    if (hasIncompleteDocuments) {
+      baseColumns.splice(2, 0, {
+        header: "Documents",
+        accessor: "documents",
+        renderer: (project) => {
+          const docStatus = getDocumentStatus(project);
+
+          return (
+            <div className="space-y-1 max-w-xs">
+              <div className="text-sm font-medium text-gray-900">
+                {docStatus.submitted}/{docStatus.total} docs
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-1.5">
+                <div
+                  className="bg-green-500 h-1.5 rounded-full transition-all duration-300"
+                  style={{ width: `${docStatus.percentage}%` }}
+                ></div>
+              </div>
+              <div className="text-xs text-gray-500">
+                {docStatus.percentage}% complete
+              </div>
+            </div>
+          );
+        },
+      });
+    }
+
+    return baseColumns;
+  };
+
+  const columns = getColumns();
 
   if (loading) {
     return (
@@ -558,71 +601,99 @@ const ApprovalDashboard = () => {
 
   return (
     <div className="w-full max-w-7xl mx-auto py-8 px-4">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Cross-Departmental Project Approvals
-        </h1>
-        <p className="text-gray-600">
-          Review and approve projects from other departments that require your
-          expertise
-        </p>
+      {/* Enhanced Header */}
+      <div className="mb-8 relative">
+        <div className="bg-gradient-to-br from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] rounded-2xl p-8 text-white relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+          <div className="relative z-10">
+            <div className="flex items-center space-x-4 mb-4">
+              <div className="p-4 bg-white/20 rounded-3xl backdrop-blur-sm border border-white/20">
+                <DocumentTextIcon className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
+                  Cross-Departmental Project Approvals
+                </h1>
+                <p className="text-white/90 mt-2 text-lg">
+                  Review and approve projects from other departments that
+                  require your expertise
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Statistics Cards */}
+      {/* Enhanced Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <DocumentTextIcon className="h-8 w-8 text-blue-500" />
+              <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl">
+                <DocumentTextIcon className="h-8 w-8 text-white" />
+              </div>
             </div>
             <div className="ml-4">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-sm font-medium text-gray-600 uppercase tracking-wide">
                 Total Projects
               </h3>
-              <p className="text-3xl font-bold text-blue-600">{stats.total}</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">
+                {stats.total}
+              </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <ClockSolid className="h-8 w-8 text-yellow-500" />
+              <div className="p-3 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl">
+                <ClockSolid className="h-8 w-8 text-white" />
+              </div>
             </div>
             <div className="ml-4">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-sm font-medium text-gray-600 uppercase tracking-wide">
                 Pending Approval
               </h3>
-              <p className="text-3xl font-bold text-yellow-600">
+              <p className="text-3xl font-bold text-gray-900 mt-1">
                 {stats.pending}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <CheckCircleIcon className="h-8 w-8 text-green-500" />
+              <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl">
+                <CheckCircleIcon className="h-8 w-8 text-white" />
+              </div>
             </div>
             <div className="ml-4">
-              <h3 className="text-lg font-semibold text-gray-900">Approved</h3>
-              <p className="text-3xl font-bold text-green-600">
+              <h3 className="text-sm font-medium text-gray-600 uppercase tracking-wide">
+                Approved
+              </h3>
+              <p className="text-3xl font-bold text-gray-900 mt-1">
                 {stats.approved}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <XCircleIcon className="h-8 w-8 text-red-500" />
+              <div className="p-3 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl">
+                <XCircleIcon className="h-8 w-8 text-white" />
+              </div>
             </div>
             <div className="ml-4">
-              <h3 className="text-lg font-semibold text-gray-900">Rejected</h3>
-              <p className="text-3xl font-bold text-red-600">
+              <h3 className="text-sm font-medium text-gray-600 uppercase tracking-wide">
+                Rejected
+              </h3>
+              <p className="text-3xl font-bold text-gray-900 mt-1">
                 {stats.rejected}
               </p>
             </div>
@@ -630,55 +701,69 @@ const ApprovalDashboard = () => {
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="bg-white rounded-lg shadow mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">
+      {/* Enhanced Tab Navigation */}
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 mb-6">
+        <div className="p-6">
+          <nav
+            className="flex space-x-1 bg-gray-100 p-1 rounded-xl"
+            aria-label="Tabs"
+          >
             <button
               onClick={() => setActiveTab("pending")}
               className={`${
                 activeTab === "pending"
-                  ? "border-[var(--elra-primary)] text-[var(--elra-primary)]"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm cursor-pointer transition-colors duration-200`}
+                  ? "bg-white text-[var(--elra-primary)] shadow-sm"
+                  : "text-gray-600 hover:text-gray-900"
+              } flex-1 py-3 px-4 rounded-lg font-medium text-sm cursor-pointer transition-all duration-200 flex items-center justify-center space-x-2`}
             >
-              Pending Approvals ({projects.length})
+              <ClockSolid className="h-5 w-5" />
+              <span>Pending Approvals ({projects.length})</span>
             </button>
             <button
               onClick={() => setActiveTab("approved")}
               className={`${
                 activeTab === "approved"
-                  ? "border-[var(--elra-primary)] text-[var(--elra-primary)]"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm cursor-pointer transition-colors duration-200`}
+                  ? "bg-white text-[var(--elra-primary)] shadow-sm"
+                  : "text-gray-600 hover:text-gray-900"
+              } flex-1 py-3 px-4 rounded-lg font-medium text-sm cursor-pointer transition-all duration-200 flex items-center justify-center space-x-2`}
             >
-              My Approval History ({approvedProjects.length})
+              <CheckCircleIcon className="h-5 w-5" />
+              <span>My Approval History ({approvedProjects.length})</span>
             </button>
           </nav>
         </div>
       </div>
 
-      {/* Approvals Table */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
+      {/* Enhanced Approvals Table */}
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
+        <div className="px-8 py-6 border-b border-gray-100">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">
-              {activeTab === "pending"
-                ? "Project Approval Requests & Audit Trail"
-                : "My Approval History"}
-            </h2>
-            <div className="flex items-center space-x-4">
-              <div className="text-sm text-gray-500">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">
                 {activeTab === "pending"
-                  ? projects.length
-                  : approvedProjects.length}{" "}
-                project
-                {(activeTab === "pending"
-                  ? projects.length
-                  : approvedProjects.length) !== 1
-                  ? "s"
-                  : ""}{" "}
-                found
+                  ? "Project Approval Requests & Audit Trail"
+                  : "My Approval History"}
+              </h2>
+              <p className="text-gray-600 mt-1">
+                {activeTab === "pending"
+                  ? "Review and approve projects requiring your expertise"
+                  : "Track your approval decisions and project outcomes"}
+              </p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="bg-gray-50 px-4 py-2 rounded-lg">
+                <div className="text-sm font-medium text-gray-900">
+                  {activeTab === "pending"
+                    ? projects.length
+                    : approvedProjects.length}{" "}
+                  project
+                  {(activeTab === "pending"
+                    ? projects.length
+                    : approvedProjects.length) !== 1
+                    ? "s"
+                    : ""}{" "}
+                  found
+                </div>
               </div>
             </div>
           </div>
@@ -689,25 +774,28 @@ const ApprovalDashboard = () => {
             ? projects.length === 0
             : approvedProjects.length === 0
         ) ? (
-          <div className="text-center py-12">
-            <div className="mb-6">
-              <div className="relative">
-                <CheckCircleIcon className="h-16 w-16 text-green-500 mx-auto" />
+          <div className="text-center py-16 px-8">
+            <div className="mb-8">
+              <div className="relative mx-auto w-24 h-24">
+                <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-green-600 rounded-full opacity-20"></div>
+                <div className="relative flex items-center justify-center w-24 h-24 bg-gradient-to-br from-green-500 to-green-600 rounded-full">
+                  <CheckCircleIcon className="h-12 w-12 text-white" />
+                </div>
               </div>
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-3">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">
               {activeTab === "pending"
                 ? "All Projects Approved! 🎉"
                 : "No Approval History Yet"}
             </h3>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto leading-relaxed">
+            <p className="text-gray-600 mb-8 max-w-lg mx-auto leading-relaxed text-lg">
               {activeTab === "pending"
-                ? "Great news! All project approval requests have been processed.\nNo pending approvals require your attention."
-                : "You haven't approved any cross-departmental projects yet.\nYour approval history will appear here once you start reviewing projects."}
+                ? "Great news! All project approval requests have been processed. No pending approvals require your attention."
+                : "You haven't approved any cross-departmental projects yet. Your approval history will appear here once you start reviewing projects."}
             </p>
-            <div className="flex items-center justify-center space-x-2 text-sm text-green-600 bg-green-50 rounded-full px-4 py-2 shadow-sm">
+            <div className="inline-flex items-center space-x-3 text-sm font-medium text-green-700 bg-green-50 rounded-full px-6 py-3 shadow-sm border border-green-200">
               <CheckCircleIcon className="h-5 w-5" />
-              <span className="font-medium">
+              <span>
                 {activeTab === "pending"
                   ? "All projects are approved"
                   : "No approvals yet"}
@@ -741,22 +829,20 @@ const ApprovalDashboard = () => {
                 // For approved projects, show read-only actions
                 if (activeTab === "approved") {
                   return (
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1.5">
                       <button
                         onClick={() => handleViewProject(project)}
-                        className="inline-flex items-center px-3 py-2 border border-[var(--elra-primary)] text-xs font-medium rounded-md text-[var(--elra-primary)] bg-white hover:bg-[var(--elra-primary)] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--elra-primary)] cursor-pointer transition-all duration-200 shadow-sm"
+                        className="group inline-flex items-center justify-center w-8 h-8 bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white rounded-lg hover:shadow-md hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--elra-primary)] transition-all duration-200 cursor-pointer"
                         title="View Project Details"
                       >
-                        <EyeIcon className="h-4 w-4 mr-1.5" />
-                        View
+                        <EyeIcon className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
                       </button>
                       <button
                         onClick={() => handleViewDocuments(project)}
-                        className="inline-flex items-center px-3 py-2 border border-blue-500 text-xs font-medium rounded-md text-blue-600 bg-white hover:bg-blue-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer transition-all duration-200 shadow-sm"
-                        title="View Documents"
+                        className="group inline-flex items-center justify-center w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg hover:shadow-md hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 cursor-pointer"
+                        title="View Project Documents"
                       >
-                        <DocumentIcon className="h-4 w-4 mr-1.5" />
-                        Documents
+                        <DocumentIcon className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
                       </button>
                     </div>
                   );
@@ -932,104 +1018,110 @@ const ApprovalDashboard = () => {
                 });
 
                 return (
-                  <div className="flex items-center space-x-2">
-                    {/* View Project Button - Always visible */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleViewProject(project);
-                      }}
-                      className="inline-flex items-center justify-center w-9 h-9 border border-[var(--elra-primary)] text-xs font-medium rounded-lg text-[var(--elra-primary)] bg-white hover:bg-[var(--elra-primary)] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--elra-primary)] transition-all duration-200 cursor-pointer shadow-sm"
-                      title="View Project Details"
-                    >
-                      <EyeIcon className="h-4 w-4" />
-                    </button>
-
-                    {/* View Documents Button - Always visible */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleViewDocuments(project);
-                      }}
-                      disabled={loadingDocuments[project._id]}
-                      className="inline-flex items-center justify-center w-9 h-9 border border-blue-500 text-xs font-medium rounded-lg text-blue-600 bg-white hover:bg-blue-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-all duration-200 cursor-pointer shadow-sm"
-                      title="View Project Documents"
-                    >
-                      {loadingDocuments[project._id] ? (
-                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                      ) : (
-                        <DocumentIcon className="h-4 w-4" />
-                      )}
-                    </button>
-
-                    {canShowActions &&
-                    docStatus.submitted === docStatus.total ? (
-                      <>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleApprovalClick(project);
-                          }}
-                          disabled={actionLoading[project._id]}
-                          className="inline-flex items-center justify-center w-9 h-9 border border-green-500 text-xs font-medium rounded-lg text-green-600 bg-white hover:bg-green-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 transition-all duration-200 cursor-pointer shadow-sm"
-                          title="Approve Project"
-                        >
-                          {actionLoading[project._id] ? (
-                            <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin"></div>
-                          ) : (
-                            <CheckIcon className="h-4 w-4" />
-                          )}
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRejectionClick(project);
-                          }}
-                          disabled={actionLoading[project._id]}
-                          className="inline-flex items-center justify-center w-9 h-9 border border-red-500 text-xs font-medium rounded-lg text-red-600 bg-white hover:bg-red-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 transition-all duration-200 cursor-pointer shadow-sm"
-                          title="Reject Project"
-                        >
-                          {actionLoading[project._id] ? (
-                            <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-                          ) : (
-                            <XMarkIcon className="h-4 w-4" />
-                          )}
-                        </button>
-                      </>
-                    ) : canShowActions &&
-                      docStatus.submitted < docStatus.total ? (
-                      <span
-                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800"
-                        title={`${
-                          docStatus.total - docStatus.submitted
-                        } document(s) still need to be submitted before approval`}
+                  <div className="flex flex-col space-y-1.5">
+                    {/* First row: View and Documents buttons */}
+                    <div className="flex items-center space-x-1.5">
+                      {/* Enhanced View Project Button - Always visible */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewProject(project);
+                        }}
+                        className="group inline-flex items-center justify-center w-8 h-8 bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white rounded-lg hover:shadow-md hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--elra-primary)] transition-all duration-200 cursor-pointer"
+                        title="View Project Details"
                       >
-                        <ClockIcon className="h-3 w-3 mr-1" />
-                        Waiting for Docs
-                      </span>
-                    ) : isApproved ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <CheckCircleIcon className="h-4 w-4 mr-1" />
-                        {project.status === "implementation"
-                          ? "In Implementation"
-                          : "Approved"}
-                      </span>
-                    ) : progress.percentage === 100 ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <CheckCircleIcon className="h-4 w-4 mr-1" />
-                        Completed
-                      </span>
-                    ) : isProjectCreator ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        <ClockIcon className="h-4 w-4 mr-1" />
-                        Waiting for Approval
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        <ClockIcon className="h-4 w-4 mr-1" />
-                        Pending
-                      </span>
-                    )}
+                        <EyeIcon className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+                      </button>
+
+                      {/* Enhanced View Documents Button - Always visible */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewDocuments(project);
+                        }}
+                        disabled={loadingDocuments[project._id]}
+                        className="group inline-flex items-center justify-center w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg hover:shadow-md hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:hover:scale-100 transition-all duration-200 cursor-pointer"
+                        title="View Project Documents"
+                      >
+                        {loadingDocuments[project._id] ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <DocumentIcon className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Second row: Action buttons or status */}
+                    <div className="flex items-center space-x-1.5">
+                      {canShowActions &&
+                      docStatus.submitted === docStatus.total ? (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleApprovalClick(project);
+                            }}
+                            disabled={actionLoading[project._id]}
+                            className="group inline-flex items-center justify-center w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg hover:shadow-md hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:hover:scale-100 transition-all duration-200 cursor-pointer"
+                            title="Approve Project"
+                          >
+                            {actionLoading[project._id] ? (
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                              <CheckIcon className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+                            )}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRejectionClick(project);
+                            }}
+                            disabled={actionLoading[project._id]}
+                            className="group inline-flex items-center justify-center w-8 h-8 bg-gradient-to-br from-red-500 to-red-600 text-white rounded-lg hover:shadow-md hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:hover:scale-100 transition-all duration-200 cursor-pointer"
+                            title="Reject Project"
+                          >
+                            {actionLoading[project._id] ? (
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                              <XMarkIcon className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+                            )}
+                          </button>
+                        </>
+                      ) : canShowActions &&
+                        docStatus.submitted < docStatus.total ? (
+                        <span
+                          className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-gradient-to-r from-yellow-100 to-orange-100 text-yellow-800 border border-yellow-200"
+                          title={`${
+                            docStatus.total - docStatus.submitted
+                          } document(s) still need to be submitted before approval`}
+                        >
+                          <ClockIcon className="h-3 w-3 mr-1" />
+                          Waiting for Docs
+                        </span>
+                      ) : isApproved ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border border-green-200">
+                          <CheckCircleIcon className="h-3 w-3 mr-1" />
+                          {project.status === "implementation"
+                            ? "In Implementation"
+                            : "Approved"}
+                        </span>
+                      ) : progress.percentage === 100 ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border border-green-200">
+                          <CheckCircleIcon className="h-3 w-3 mr-1" />
+                          Completed
+                        </span>
+                      ) : isProjectCreator ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border border-blue-200">
+                          <ClockIcon className="h-3 w-3 mr-1" />
+                          Waiting for Approval
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-gradient-to-r from-gray-100 to-slate-100 text-gray-800 border border-gray-200">
+                          <ClockIcon className="h-3 w-3 mr-1" />
+                          Pending
+                        </span>
+                      )}
+                    </div>
                   </div>
                 );
               },
@@ -1043,100 +1135,128 @@ const ApprovalDashboard = () => {
           />
         )}
 
-        {/* Approval Confirmation Modal */}
+        {/* Enhanced Approval Confirmation Modal */}
         {showApprovalModal && selectedProject && (
-          <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center p-4 z-50 animate-fade-in">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto transition-all duration-300">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-gray-900">
-                    ELRA Project Authorization
-                  </h3>
-                  <button
-                    onClick={() => {
-                      setShowApprovalModal(false);
-                      setSelectedProject(null);
-                      setApprovalComments("");
-                    }}
-                    disabled={actionLoading[selectedProject._id]}
-                    className="p-1 text-gray-400 hover:text-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <XMarkIcon className="h-5 w-5" />
-                  </button>
-                </div>
-
-                {/* Project Information Section */}
-                <div className="bg-white border border-gray-200 p-4 rounded-lg shadow-sm">
-                  <div className="flex">
-                    <InformationCircleIcon className="h-5 w-5 text-[var(--elra-primary)] mr-3 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm text-[var(--elra-primary)] font-medium mb-3">
-                        Project Information
-                      </p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <span className="font-medium text-gray-700">
-                            Project:
-                          </span>
-                          <p className="text-gray-600 break-words">
-                            {selectedProject.name}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-700">
-                            Budget:
-                          </span>
-                          <p className="text-gray-600">
-                            {formatCurrency(selectedProject.budget)}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-700">
-                            Department:
-                          </span>
-                          <p className="text-gray-600">
-                            {selectedProject.department?.name}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="font-medium text-gray-700">
-                            Submitted By:
-                          </span>
-                          <p className="text-gray-600">
-                            {selectedProject.createdBy?.firstName}{" "}
-                            {selectedProject.createdBy?.lastName}
-                          </p>
-                        </div>
+          <div className="fixed inset-0 bg-white bg-opacity-75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-gray-100">
+              {/* ELRA Branded Header */}
+              <div className="bg-gradient-to-br from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] text-white p-8 rounded-t-2xl flex-shrink-0 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-4 bg-white/20 rounded-3xl backdrop-blur-sm border border-white/20">
+                        <CheckCircleIcon className="w-8 h-8 text-white" />
                       </div>
+                      <div>
+                        <h3 className="text-3xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
+                          ELRA Project Authorization
+                        </h3>
+                        <p className="text-white/90 mt-2 text-lg">
+                          Authorize project: {selectedProject.name}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowApprovalModal(false);
+                        setSelectedProject(null);
+                        setApprovalComments("");
+                      }}
+                      disabled={actionLoading[selectedProject._id]}
+                      className="p-3 hover:bg-white/20 rounded-2xl transition-all duration-200 backdrop-blur-sm border border-white/20 hover:border-white/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <XMarkIcon className="h-6 w-6 text-white" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-8 bg-white flex-1 overflow-y-auto">
+                {/* Enhanced Project Information Section */}
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 p-6 rounded-2xl shadow-sm mb-6">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="p-2 bg-[var(--elra-primary)] rounded-xl">
+                      <InformationCircleIcon className="h-6 w-6 text-white" />
+                    </div>
+                    <h4 className="text-lg font-semibold text-gray-900">
+                      Project Information
+                    </h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-white p-4 rounded-xl border border-gray-200">
+                      <span className="text-sm font-medium text-gray-600 uppercase tracking-wide">
+                        Project Name
+                      </span>
+                      <p className="text-gray-900 font-medium mt-1 break-words">
+                        {selectedProject.name}
+                      </p>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl border border-gray-200">
+                      <span className="text-sm font-medium text-gray-600 uppercase tracking-wide">
+                        Budget
+                      </span>
+                      <p className="text-gray-900 font-medium mt-1">
+                        {formatCurrency(selectedProject.budget)}
+                      </p>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl border border-gray-200">
+                      <span className="text-sm font-medium text-gray-600 uppercase tracking-wide">
+                        Department
+                      </span>
+                      <p className="text-gray-900 font-medium mt-1">
+                        {selectedProject.department?.name}
+                      </p>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl border border-gray-200">
+                      <span className="text-sm font-medium text-gray-600 uppercase tracking-wide">
+                        Submitted By
+                      </span>
+                      <p className="text-gray-900 font-medium mt-1">
+                        {selectedProject.createdBy?.firstName}{" "}
+                        {selectedProject.createdBy?.lastName}
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Authorization Level */}
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">
-                    Authorization Level
-                  </h4>
-                  <p className="text-sm text-gray-600">
+                {/* Enhanced Authorization Level */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-200 mb-6">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <div className="p-2 bg-blue-500 rounded-xl">
+                      <CheckCircleIcon className="h-5 w-5 text-white" />
+                    </div>
+                    <h4 className="text-lg font-semibold text-gray-900">
+                      Authorization Level
+                    </h4>
+                  </div>
+                  <p className="text-gray-700">
                     You are authorizing this project at the{" "}
-                    <strong className="text-[var(--elra-primary)]">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-[var(--elra-primary)] text-white">
                       {getCurrentApprovalLevel(selectedProject)}
-                    </strong>{" "}
+                    </span>{" "}
                     level.
                   </p>
                 </div>
 
-                {/* Authorization Checklist */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Authorization Checklist
-                  </label>
-                  <div className="mb-2 p-3 bg-green-50 border border-green-200 rounded-md">
-                    <p className="text-sm text-green-800">
-                      <strong>Please confirm the following:</strong>
+                {/* Enhanced Authorization Checklist */}
+                <div className="mb-6">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="p-2 bg-green-500 rounded-xl">
+                      <CheckIcon className="h-5 w-5 text-white" />
+                    </div>
+                    <h4 className="text-lg font-semibold text-gray-900">
+                      Authorization Checklist
+                    </h4>
+                  </div>
+                  <div className="mb-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl">
+                    <p className="text-green-800 font-medium">
+                      Please confirm the following criteria have been met:
                     </p>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {[
                       "Project scope and objectives are clearly defined",
                       "Budget allocation is justified and within limits",
@@ -1146,35 +1266,47 @@ const ApprovalDashboard = () => {
                     ].map((item, index) => (
                       <div
                         key={index}
-                        className="flex items-center space-x-3 p-2 bg-gray-50 rounded-md"
+                        className="flex items-center space-x-3 p-4 bg-white border border-gray-200 rounded-xl hover:shadow-sm transition-shadow"
                       >
-                        <CheckIcon className="h-4 w-4 text-green-500 flex-shrink-0" />
-                        <span className="text-sm text-gray-700">{item}</span>
+                        <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                          <CheckIcon className="h-4 w-4 text-green-600" />
+                        </div>
+                        <span className="text-gray-700 font-medium">
+                          {item}
+                        </span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Authorization Notes */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Authorization Notes
-                  </label>
+                {/* Enhanced Authorization Notes */}
+                <div className="mb-6">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="p-2 bg-purple-500 rounded-xl">
+                      <DocumentTextIcon className="h-5 w-5 text-white" />
+                    </div>
+                    <h4 className="text-lg font-semibold text-gray-900">
+                      Authorization Notes
+                    </h4>
+                  </div>
                   <textarea
                     value={approvalComments}
                     onChange={(e) => setApprovalComments(e.target.value)}
                     placeholder="Add any additional notes or comments for this authorization..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-                    rows="3"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent transition-all duration-200 resize-none"
+                    rows="4"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    <strong>Note:</strong> These notes will be recorded with
-                    your authorization.
+                  <p className="text-sm text-gray-600 mt-2 flex items-center space-x-2">
+                    <InformationCircleIcon className="h-4 w-4 text-gray-400" />
+                    <span>
+                      These notes will be recorded with your authorization and
+                      visible to the project team.
+                    </span>
                   </p>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex justify-end space-x-3 pt-4">
+                {/* Enhanced Action Buttons */}
+                <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
                   <button
                     type="button"
                     onClick={() => {
@@ -1183,7 +1315,7 @@ const ApprovalDashboard = () => {
                       setApprovalComments("");
                     }}
                     disabled={actionLoading[selectedProject._id]}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-6 py-3 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                   >
                     Cancel
                   </button>
@@ -1196,7 +1328,7 @@ const ApprovalDashboard = () => {
                       )
                     }
                     disabled={actionLoading[selectedProject._id]}
-                    className="px-4 py-2 text-sm font-medium text-white bg-[var(--elra-primary)] rounded-md hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 cursor-pointer"
+                    className="px-8 py-3 text-sm font-medium text-white bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 cursor-pointer transition-all duration-200"
                   >
                     {actionLoading[selectedProject._id] ? (
                       <>
@@ -1204,7 +1336,10 @@ const ApprovalDashboard = () => {
                         <span>Processing...</span>
                       </>
                     ) : (
-                      "Authorize Project"
+                      <>
+                        <CheckIcon className="h-5 w-5" />
+                        <span>Authorize Project</span>
+                      </>
                     )}
                   </button>
                 </div>
@@ -1213,29 +1348,47 @@ const ApprovalDashboard = () => {
           </div>
         )}
 
-        {/* Rejection Confirmation Modal */}
+        {/* Enhanced Rejection Confirmation Modal */}
         {showRejectionModal && selectedProject && (
-          <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center p-4 z-50 animate-fade-in">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto transition-all duration-300">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-gray-900">
-                    ELRA Project Review - Revision Required
-                  </h3>
-                  <button
-                    onClick={() => {
-                      setShowRejectionModal(false);
-                      setSelectedProject(null);
-                      setRejectionComments("");
-                      setRejectionReason("");
-                    }}
-                    disabled={actionLoading[selectedProject._id]}
-                    className="p-1 text-gray-400 hover:text-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <XMarkIcon className="h-5 w-5" />
-                  </button>
+          <div className="fixed inset-0 bg-white bg-opacity-75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-gray-100">
+              {/* ELRA Branded Header */}
+              <div className="bg-gradient-to-br from-red-500 via-red-600 to-red-700 text-white p-8 rounded-t-2xl flex-shrink-0 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-4 bg-white/20 rounded-3xl backdrop-blur-sm border border-white/20">
+                        <XMarkIcon className="w-8 h-8 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-3xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
+                          ELRA Project Review - Revision Required
+                        </h3>
+                        <p className="text-white/90 mt-2 text-lg">
+                          Request revision for: {selectedProject.name}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowRejectionModal(false);
+                        setSelectedProject(null);
+                        setRejectionComments("");
+                        setRejectionReason("");
+                      }}
+                      disabled={actionLoading[selectedProject._id]}
+                      className="p-3 hover:bg-white/20 rounded-2xl transition-all duration-200 backdrop-blur-sm border border-white/20 hover:border-white/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <XMarkIcon className="h-6 w-6 text-white" />
+                    </button>
+                  </div>
                 </div>
+              </div>
 
+              <div className="p-8 bg-white flex-1 overflow-y-auto">
                 <div className="space-y-6">
                   {/* Project Information Section */}
                   <div className="bg-white border border-gray-200 p-4 rounded-lg shadow-sm">
@@ -1415,10 +1568,10 @@ const ApprovalDashboard = () => {
           </div>
         )}
 
-        {/* Documents Modal */}
+        {/* Enhanced Documents Modal */}
         {showDocumentsModal && selectedProject && (
-          <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-white bg-opacity-75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-100">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xl font-bold text-gray-900">
@@ -1511,10 +1664,10 @@ const ApprovalDashboard = () => {
           </div>
         )}
 
-        {/* Project Details Modal */}
+        {/* Enhanced Project Details Modal */}
         {showProjectDetailsModal && selectedProject && (
-          <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-white bg-opacity-75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-100">
               <div className="p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-2xl font-bold text-gray-900">

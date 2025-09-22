@@ -26,10 +26,17 @@ export const moduleSidebarConfig = {
         ],
       },
       {
-        title: "Project Approvals",
+        title: "Departmental Projects Management",
         collapsible: true,
         defaultExpanded: true,
         items: [
+          {
+            label: "Create Department Project",
+            icon: "PlusCircleIcon",
+            path: "/dashboard/modules/department-management/create-department-project",
+            required: { minLevel: 700 },
+            description: "Create new projects for your department",
+          },
           {
             label: "Pending Approvals",
             icon: "ClockIcon",
@@ -43,6 +50,20 @@ export const moduleSidebarConfig = {
             path: "/dashboard/modules/department-management/approval-history",
             required: { minLevel: 700 },
             description: "View all project approval decisions and history",
+          },
+        ],
+      },
+      {
+        title: "User Management",
+        collapsible: true,
+        defaultExpanded: true,
+        items: [
+          {
+            label: "Department Users",
+            icon: "UserGroupIcon",
+            path: "/dashboard/modules/department-management/users",
+            required: { minLevel: 700 },
+            description: "View and manage users in your department",
           },
         ],
       },
@@ -142,33 +163,33 @@ export const moduleSidebarConfig = {
           },
         ],
       },
-      {
-        title: "Department Approvals",
-        collapsible: true,
-        defaultExpanded: false,
-        items: [
-          {
-            label: "Leave Approvals",
-            icon: "ClipboardDocumentCheckIcon",
-            path: "/dashboard/modules/self-service/department-approvals",
-            required: { minLevel: 700 },
-            description: "Approve leave requests for your department team",
-            hidden: (user) => {
-              if (!user || !user.role || !user.department) return false;
+      // {
+      //   title: "Department Approvals",
+      //   collapsible: true,
+      //   defaultExpanded: false,
+      //   items: [
+      //     {
+      //       label: "Leave Approvals",
+      //       icon: "ClipboardDocumentCheckIcon",
+      //       path: "/dashboard/modules/self-service/department-approvals",
+      //       required: { minLevel: 700 },
+      //       description: "Approve leave requests for your department team",
+      //       hidden: (user) => {
+      //         if (!user || !user.role || !user.department) return false;
 
-              if (user.role.level !== 700) return false;
+      //         if (user.role.level !== 700) return false;
 
-              const userDeptName =
-                user.department?.name ||
-                user.department?.departmentName ||
-                user.department;
-              const isHRHOD = userDeptName === "Human Resources";
+      //         const userDeptName =
+      //           user.department?.name ||
+      //           user.department?.departmentName ||
+      //           user.department;
+      //         const isHRHOD = userDeptName === "Human Resources";
 
-              return isHRHOD; // Hide if user is HR HOD
-            },
-          },
-        ],
-      },
+      //         return isHRHOD; // Hide if user is HR HOD
+      //       },
+      //     },
+      //   ],
+      // },
     ],
   },
 
@@ -396,6 +417,21 @@ export const moduleSidebarConfig = {
     borderColor: "border-[var(--elra-primary)]",
     sections: [
       {
+        title: "Project Dashboard",
+        collapsible: true,
+        defaultExpanded: true,
+        items: [
+          {
+            label: "Project Dashboard",
+            icon: "ChartBarIcon",
+            path: "/dashboard/modules/projects/analytics",
+            required: { minLevel: 700, department: "Project Management" },
+            description:
+              "Project Management HOD dashboard - comprehensive overview of project performance and financial management",
+          },
+        ],
+      },
+      {
         title: "Project Operations",
         collapsible: true,
         defaultExpanded: false,
@@ -410,6 +446,21 @@ export const moduleSidebarConfig = {
         ],
       },
       {
+        title: "External Project Management",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Manage External Projects",
+            icon: "GlobeAltIcon",
+            path: "/dashboard/modules/projects/external",
+            required: { minLevel: 700, department: "Project Management" },
+            description:
+              "Create and manage external projects - Project Management HOD only",
+          },
+        ],
+      },
+      {
         title: "Team & Resources",
         collapsible: true,
         defaultExpanded: false,
@@ -418,29 +469,22 @@ export const moduleSidebarConfig = {
             label: "Project Teams",
             icon: "UserGroupIcon",
             path: "/dashboard/modules/projects/teams",
-            required: { minLevel: 300 },
+            required: { minLevel: 700, department: "Project Management" },
             description: "Manage project teams and assignments",
           },
-          // {
-          //   label: "Resource Allocation",
-          //   icon: "CogIcon",
-          //   path: "/dashboard/modules/projects/resources",
-          //   required: { minLevel: 600 },
-          //   description: "Manage resource allocation",
-          // },
         ],
       },
       {
-        title: "Project Analytics",
+        title: "Reports & Analytics",
         collapsible: true,
         defaultExpanded: false,
         items: [
           {
-            label: "Project Dashboard",
+            label: "Project Reports",
             icon: "ChartBarIcon",
-            path: "/dashboard/modules/projects/analytics",
+            path: "/dashboard/modules/projects/reports",
             required: { minLevel: 700 },
-            description: "Project performance dashboard and insights",
+            description: "Monthly project approval reports and analytics",
           },
         ],
       },
@@ -657,6 +701,29 @@ export const moduleSidebarConfig = {
         ],
       },
       {
+        title: "Sales & Marketing Finance",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Sales & Marketing Approvals",
+            icon: "CheckCircleIcon",
+            path: "/dashboard/modules/finance/sales-marketing-approvals",
+            required: { minLevel: 700 },
+            description: "Approve Sales & Marketing expense transactions",
+            hidden: (user) => {
+              const userDepartment = user?.department?.name;
+              const isSuperAdmin = user?.role?.level === 1000;
+              const isFinanceHOD =
+                user?.role?.level === 700 &&
+                userDepartment === "Finance & Accounting";
+
+              return !(isSuperAdmin || isFinanceHOD);
+            },
+          },
+        ],
+      },
+      {
         title: "Financial Reports & History",
         collapsible: true,
         defaultExpanded: false,
@@ -838,54 +905,21 @@ export const moduleSidebarConfig = {
         ],
       },
       {
-        title: "Announcements & Meetings",
+        title: "Announcements & Events",
         items: [
           {
             label: "Announcements",
             icon: "MegaphoneIcon",
             path: "/dashboard/modules/communication/announcements",
-            required: { minLevel: 600 },
+            required: { minLevel: 700, department: "Human Resources" },
             description: "Create and manage announcements",
           },
           {
-            label: "Meeting Management",
-            icon: "CalendarDaysIcon",
-            path: "/dashboard/modules/communication/meetings",
-            required: { minLevel: 300 },
-            description: "Schedule and manage meetings",
-          },
-          {
-            label: "Event Calendar",
+            label: "Events Calendar",
             icon: "CalendarIcon",
             path: "/dashboard/modules/communication/events",
-            required: { minLevel: 300 },
-            description: "View and manage events",
-          },
-        ],
-      },
-      {
-        title: "Communication Tools",
-        items: [
-          {
-            label: "Notification Center",
-            icon: "BellIcon",
-            path: "/dashboard/modules/communication/notifications",
-            required: { minLevel: 300 },
-            description: "Manage notification preferences",
-          },
-          {
-            label: "Communication Logs",
-            icon: "DocumentTextIcon",
-            path: "/dashboard/modules/communication/logs",
-            required: { minLevel: 600 },
-            description: "View communication history",
-          },
-          {
-            label: "Broadcast Messages",
-            icon: "MegaphoneIcon",
-            path: "/dashboard/modules/communication/broadcast",
-            required: { minLevel: 600 },
-            description: "Send broadcast messages",
+            required: { minLevel: 700, department: "Human Resources" },
+            description: "View and manage company events",
           },
         ],
       },
@@ -1015,6 +1049,15 @@ export const getAvailableModules = () => {
 export const moduleExists = (moduleKey) => {
   const exists = moduleKey in moduleSidebarConfig;
   if (!exists) {
+    console.log(
+      `❌ [ModuleConfig] Module '${moduleKey}' not found in moduleSidebarConfig`
+    );
+    console.log(
+      `🔍 [ModuleConfig] Available modules:`,
+      Object.keys(moduleSidebarConfig)
+    );
+  } else {
+    console.log(`✅ [ModuleConfig] Module '${moduleKey}' found`);
   }
   return exists;
 };
@@ -1029,23 +1072,40 @@ export const getModuleNavigationForRole = (
   const moduleConfig = getModuleSidebarConfig(moduleKey);
   if (!moduleConfig) return [];
 
+  console.log(
+    `🔍 [ModuleNavigation] Processing module: ${moduleKey}, roleLevel: ${roleLevel}, userDepartment: ${userDepartment}`
+  );
+
   const accessibleItems = [];
 
   moduleConfig.sections.forEach((section) => {
     const sectionItems = section.items.filter((item) => {
+      console.log(
+        `🔍 [ModuleNavigation] Checking item: ${item.label}, required: ${item.required?.minLevel}, userLevel: ${roleLevel}`
+      );
+
       // SUPER_ADMIN (1000) has access to everything
       if (roleLevel === 1000) {
+        console.log(
+          `✅ [ModuleNavigation] SUPER_ADMIN access granted for: ${item.label}`
+        );
         return true;
       }
 
       // Check minimum level requirement
       if (item.required.minLevel && roleLevel < item.required.minLevel) {
+        console.log(
+          `❌ [ModuleNavigation] Access denied for: ${item.label} - Level ${roleLevel} < ${item.required.minLevel}`
+        );
         return false;
       }
 
       // Check department requirement
       if (item.required.department && userDepartment) {
         if (item.required.department !== userDepartment) {
+          console.log(
+            `❌ [ModuleNavigation] Access denied for: ${item.label} - Department mismatch`
+          );
           return false;
         }
       }
@@ -1053,10 +1113,14 @@ export const getModuleNavigationForRole = (
       // Check hidden property (if it's a function, call it with user object)
       if (item.hidden && typeof item.hidden === "function") {
         if (item.hidden(user)) {
+          console.log(
+            `❌ [ModuleNavigation] Access denied for: ${item.label} - Hidden by function`
+          );
           return false; // Hide this item
         }
       }
 
+      console.log(`✅ [ModuleNavigation] Access granted for: ${item.label}`);
       return true;
     });
 
@@ -1067,5 +1131,10 @@ export const getModuleNavigationForRole = (
       });
     }
   });
+
+  console.log(
+    `🔍 [ModuleNavigation] Final accessible items for ${moduleKey}:`,
+    accessibleItems
+  );
   return accessibleItems;
 };

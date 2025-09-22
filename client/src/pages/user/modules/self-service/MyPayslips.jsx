@@ -6,7 +6,15 @@ import {
   HiFilter,
   HiSearch,
   HiRefresh,
+  HiCurrencyDollar,
 } from "react-icons/hi";
+import {
+  HiXMark,
+  HiChartBar,
+  HiClock,
+  HiCheckCircle,
+  HiExclamationTriangle,
+} from "react-icons/hi2";
 import { toast } from "react-toastify";
 import { userModulesAPI } from "../../../../services/userModules.js";
 import DataTable from "../../../../components/common/DataTable";
@@ -151,6 +159,41 @@ const MyPayslips = () => {
     }).format(amount || 0);
   };
 
+  // Calculate statistics
+  const getPayslipStats = () => {
+    const totalPayslips = payslips.length;
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1;
+
+    const currentYearPayslips = payslips.filter(
+      (p) => p.period?.year === currentYear
+    );
+    const currentMonthPayslips = payslips.filter(
+      (p) => p.period?.year === currentYear && p.period?.month === currentMonth
+    );
+
+    const totalGrossPay = payslips.reduce(
+      (sum, p) => sum + (p.summary?.grossPay || 0),
+      0
+    );
+    const totalNetPay = payslips.reduce(
+      (sum, p) => sum + (p.summary?.netPay || 0),
+      0
+    );
+    const averageNetPay = totalPayslips > 0 ? totalNetPay / totalPayslips : 0;
+
+    return {
+      totalPayslips,
+      currentYearPayslips: currentYearPayslips.length,
+      currentMonthPayslips: currentMonthPayslips.length,
+      totalGrossPay,
+      totalNetPay,
+      averageNetPay,
+    };
+  };
+
+  const stats = getPayslipStats();
+
   const columns = [
     {
       header: "Period",
@@ -250,47 +293,142 @@ const MyPayslips = () => {
   ];
 
   return (
-    <div className="space-y-6 p-4">
-      {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
+      {/* Enhanced Header */}
+      <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-2xl p-8 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">My Payslips</h1>
-            <p className="text-gray-600 mt-1">
-              View and download your personal payslips
+            <h1 className="text-3xl font-bold mb-2">My Payslips</h1>
+            <p className="text-white text-opacity-90 text-lg">
+              View and download your personal payslips with ease
             </p>
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-4">
             <button
               onClick={fetchPersonalPayslips}
               disabled={loading}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              className="bg-white text-[var(--elra-primary)] px-6 py-3 rounded-xl hover:bg-gray-50 transition-all duration-300 flex items-center space-x-3 font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-lg border border-white border-opacity-20"
             >
               <HiRefresh
-                className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`}
+                className={`w-5 h-5 ${loading ? "animate-spin" : ""}`}
               />
-              {loading ? "Loading..." : "Refresh"}
+              <span>{loading ? "Loading..." : "Refresh"}</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Filter My Payslips
-          </h2>
-          <div className="flex items-center space-x-2">
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Total Payslips */}
+        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 mb-1">
+                Total Payslips
+              </p>
+              <p className="text-3xl font-bold text-gray-900">
+                {stats.totalPayslips}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+              <HiDocumentDownload className="w-6 h-6 text-blue-600" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center text-sm">
+            <span className="text-gray-500">All time records</span>
+          </div>
+        </div>
+
+        {/* Current Year Payslips */}
+        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 mb-1">
+                This Year
+              </p>
+              <p className="text-3xl font-bold text-green-600">
+                {stats.currentYearPayslips}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+              <HiCheckCircle className="w-6 h-6 text-green-600" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center text-sm">
+            <span className="text-green-600 font-medium">
+              {new Date().getFullYear()} payslips
+            </span>
+          </div>
+        </div>
+
+        {/* Current Month Payslips */}
+        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 mb-1">
+                This Month
+              </p>
+              <p className="text-3xl font-bold text-yellow-600">
+                {stats.currentMonthPayslips}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
+              <HiClock className="w-6 h-6 text-yellow-600" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center text-sm">
+            <span className="text-gray-500">Current period</span>
+          </div>
+        </div>
+
+        {/* Average Net Pay */}
+        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 mb-1">
+                Avg Net Pay
+              </p>
+              <p className="text-3xl font-bold text-purple-600">
+                {formatCurrency(stats.averageNetPay)}
+              </p>
+            </div>
+            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+              <HiCurrencyDollar className="w-6 h-6 text-purple-600" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center text-sm">
+            <span className="text-gray-500">Per payslip</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Enhanced Filters */}
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-[var(--elra-primary)] rounded-lg flex items-center justify-center">
+              <HiFilter className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Filter Payslips
+              </h2>
+              <p className="text-sm text-gray-500">
+                Search and filter your payslip records
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3">
             <button
               onClick={fetchPersonalPayslips}
               disabled={loading}
-              className="px-4 py-2 text-sm font-medium text-white bg-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              className="bg-[var(--elra-primary)] text-white px-6 py-3 rounded-xl hover:bg-[var(--elra-primary-dark)] transition-all duration-300 font-semibold cursor-pointer flex items-center space-x-3 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <HiSearch
-                className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`}
+                className={`w-5 h-5 ${loading ? "animate-spin" : ""}`}
               />
-              {loading ? "Searching..." : "Search"}
+              <span>{loading ? "Searching..." : "Search"}</span>
             </button>
             <button
               onClick={() => {
@@ -301,15 +439,16 @@ const MyPayslips = () => {
                 setSearchTerm("");
               }}
               disabled={loading}
-              className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-3 rounded-xl text-sm font-medium transition-colors duration-200 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Clear Filters
+              <HiXMark className="w-4 h-4" />
+              <span>Clear</span>
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
               Month
             </label>
             <select
@@ -321,7 +460,7 @@ const MyPayslips = () => {
                     e.target.value === "all" ? "all" : parseInt(e.target.value),
                 }))
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent bg-gray-50 focus:bg-white transition-all duration-300"
             >
               {months.map((month) => (
                 <option key={month.value} value={month.value}>
@@ -331,7 +470,7 @@ const MyPayslips = () => {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
               Year
             </label>
             <select
@@ -343,7 +482,7 @@ const MyPayslips = () => {
                     e.target.value === "all" ? "all" : parseInt(e.target.value),
                 }))
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent bg-gray-50 focus:bg-white transition-all duration-300"
             >
               {years.map((year) => (
                 <option key={year.value} value={year.value}>
@@ -355,15 +494,22 @@ const MyPayslips = () => {
         </div>
       </div>
 
-      {/* Payslips Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
+      {/* Enhanced Payslips Table */}
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">My Payslips</h2>
-            <div className="flex items-center space-x-4">
-              <div className="text-sm text-gray-600">
-                {payslips.length} payslip{payslips.length !== 1 ? "s" : ""}{" "}
-                found
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-[var(--elra-primary)] rounded-lg flex items-center justify-center">
+                <HiDocumentDownload className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  My Payslips
+                </h2>
+                <p className="text-sm text-gray-500">
+                  {payslips.length} payslip{payslips.length !== 1 ? "s" : ""}{" "}
+                  found
+                </p>
               </div>
             </div>
           </div>
@@ -376,14 +522,23 @@ const MyPayslips = () => {
           </div>
         ) : payslips.length === 0 ? (
           <div className="text-center py-12">
-            <HiDocumentDownload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              No Payslips Found
+            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <HiDocumentDownload className="w-12 h-12 text-gray-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              No Payslips Yet
             </h3>
-            <p className="text-gray-600">
+            <p className="text-gray-600 mb-6 max-w-md mx-auto">
               You don't have any payslips yet. Payslips will appear here once
-              they are generated.
+              they are generated by HR.
             </p>
+            <button
+              onClick={fetchPersonalPayslips}
+              className="bg-[var(--elra-primary)] text-white px-6 py-3 rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors flex items-center space-x-2 mx-auto"
+            >
+              <HiRefresh className="w-4 h-4" />
+              <span>Refresh</span>
+            </button>
           </div>
         ) : (
           <DataTable
@@ -400,6 +555,30 @@ const MyPayslips = () => {
               showEdit: false,
               showDelete: false,
               showToggle: false,
+              customActions: (row) => (
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleViewPaySlip(row);
+                    }}
+                    className="p-3 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all duration-300 shadow-sm hover:shadow-md"
+                    title="View Payslip"
+                  >
+                    <HiEye className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDownloadPaySlip(row);
+                    }}
+                    className="p-3 text-green-600 hover:bg-green-600 hover:text-white rounded-xl transition-all duration-300 shadow-sm hover:shadow-md"
+                    title="Download Payslip"
+                  >
+                    <HiDocumentDownload className="w-5 h-5" />
+                  </button>
+                </div>
+              ),
             }}
             onRowClick={(payslip) => {
               // Optional: Add row click functionality if needed

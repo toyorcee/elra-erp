@@ -624,7 +624,7 @@ const PayrollApprovals = () => {
             </div>
             <div className="w-full bg-white bg-opacity-20 rounded-full h-3">
               <div
-                className="bg-white rounded-full h-3 transition-all duration-500"
+                className="bg-gradient-to-r from-green-400 to-green-500 rounded-full h-3 transition-all duration-500 shadow-sm"
                 style={{
                   width: `${
                     financeStats.totalBudget > 0

@@ -11,6 +11,7 @@ import {
   approvePayroll,
   rejectPayroll,
   processApprovedPayroll,
+  processApprovedPayrollV2,
   getPayrollSummary,
   getSavedPayrolls,
   getEmployeePayrollBreakdown,
@@ -85,7 +86,7 @@ router.post(
   checkPayrollAccess,
   resendToFinance
 );
-router.post("/process-approved/:approvalId", processApprovedPayroll);
+router.post("/process/:approvalId", processApprovedPayrollV2);
 
 // Payslip management routes
 router.post("/resend-payslips", resendPayslips);

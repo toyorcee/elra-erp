@@ -92,6 +92,7 @@ const PayrollProcessing = () => {
 
   const handleFormSuccess = (payrollData) => {
     fetchSavedPayrolls();
+    fetchSavedPreviews();
     setIsFormOpen(false);
   };
 
@@ -192,11 +193,7 @@ const PayrollProcessing = () => {
       );
 
       if (response.success) {
-        toast.success(
-          `✅ Payroll preview resent to Finance HOD! New Approval ID: ${
-            response.data?.approvalId || selectedResendPreview.approvalId
-          }`
-        );
+        // Toast removed - backend handles success message
 
         setShowResendConfirmationModal(false);
         setSelectedResendPreview(null);
@@ -305,7 +302,7 @@ const PayrollProcessing = () => {
         return;
       }
 
-      const payrollId = payroll._id; 
+      const payrollId = payroll._id;
       const payslipUrl = `/api/payroll/payslips/${payrollId}/view/${employeeId}`;
       const fullUrl = `${window.location.origin}${payslipUrl}?t=${Date.now()}`;
 
@@ -1208,42 +1205,48 @@ const PayrollProcessing = () => {
                                 : "N/A"}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() =>
-                                  handleViewPayrollDetails(payroll)
-                                }
-                                className="group/btn px-3 py-2 text-xs font-semibold text-[var(--elra-primary)] bg-[var(--elra-primary)]/10 rounded-lg hover:bg-[var(--elra-primary)] hover:text-white transition-all duration-200 flex items-center space-x-1"
-                              >
-                                <HiEye className="w-3 h-3" />
-                                <span>View</span>
-                              </button>
-                              <button
-                                onClick={() => handleViewPayslip(payroll)}
-                                className="group/btn px-3 py-2 text-xs font-semibold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-600 hover:text-white transition-all duration-200 flex items-center space-x-1"
-                                title="View payslip"
-                              >
-                                <HiEye className="w-3 h-3" />
-                                <span>Payslip</span>
-                              </button>
-                              <button
-                                onClick={() =>
-                                  handleResendPayslips(payroll._id)
-                                }
-                                disabled={resendingPayslips}
-                                className="group/btn px-3 py-2 text-xs font-semibold text-green-600 bg-green-50 rounded-lg hover:bg-green-600 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
-                                title="Resend payslip"
-                              >
-                                <HiRefresh
-                                  className={`w-3 h-3 ${
-                                    resendingPayslips ? "animate-spin" : ""
-                                  }`}
-                                />
-                                <span>
-                                  {resendingPayslips ? "Sending..." : "Resend"}
-                                </span>
-                              </button>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col space-y-1">
+                              <div className="flex items-center space-x-1">
+                                <button
+                                  onClick={() =>
+                                    handleViewPayrollDetails(payroll)
+                                  }
+                                  className="group/btn px-2 py-1 text-xs font-semibold text-[var(--elra-primary)] bg-[var(--elra-primary)]/10 rounded-lg hover:bg-[var(--elra-primary)] hover:text-white transition-all duration-200 flex items-center space-x-1"
+                                >
+                                  <HiEye className="w-3 h-3" />
+                                  <span>View</span>
+                                </button>
+                                <button
+                                  onClick={() => handleViewPayslip(payroll)}
+                                  className="group/btn px-2 py-1 text-xs font-semibold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-600 hover:text-white transition-all duration-200 flex items-center space-x-1"
+                                  title="View payslip"
+                                >
+                                  <HiEye className="w-3 h-3" />
+                                  <span>Payslip</span>
+                                </button>
+                              </div>
+                              <div className="flex justify-center">
+                                <button
+                                  onClick={() =>
+                                    handleResendPayslips(payroll._id)
+                                  }
+                                  disabled={resendingPayslips}
+                                  className="group/btn px-2 py-1 text-xs font-semibold text-green-600 bg-green-50 rounded-lg hover:bg-green-600 hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                                  title="Resend payslip"
+                                >
+                                  <HiRefresh
+                                    className={`w-3 h-3 ${
+                                      resendingPayslips ? "animate-spin" : ""
+                                    }`}
+                                  />
+                                  <span>
+                                    {resendingPayslips
+                                      ? "Sending..."
+                                      : "Resend"}
+                                  </span>
+                                </button>
+                              </div>
                             </div>
                           </td>
                         </tr>

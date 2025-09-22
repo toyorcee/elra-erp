@@ -628,7 +628,8 @@ companyWalletSchema.methods.allocateFunds = function (
 // Method to approve allocation
 companyWalletSchema.methods.approveAllocation = function (
   allocationId,
-  approvedBy
+  approvedBy,
+  session = null
 ) {
   const allocation = this.allocations.find(
     (alloc) => alloc.allocationId.toString() === allocationId.toString()
@@ -689,10 +690,9 @@ companyWalletSchema.methods.approveAllocation = function (
   this.metadata.lastUpdated = new Date();
   this.metadata.lastUpdatedBy = approvedBy;
 
-  return this.save();
+  return this.save({ session });
 };
 
-// Method to reject allocation
 companyWalletSchema.methods.rejectAllocation = function (
   allocationId,
   reason,
@@ -763,7 +763,8 @@ companyWalletSchema.methods.rejectAllocation = function (
 companyWalletSchema.methods.processPayroll = function (
   amount,
   payrollPeriod,
-  processedBy
+  processedBy,
+  session = null
 ) {
   const payrollBudget = this.budgetCategories?.payroll;
 
@@ -798,7 +799,7 @@ companyWalletSchema.methods.processPayroll = function (
   this.metadata.lastUpdated = new Date();
   this.metadata.lastUpdatedBy = processedBy;
 
-  return this.save();
+  return this.save({ session });
 };
 
 // Method to add funds with flexible budget allocation

@@ -173,7 +173,10 @@ class PayrollService {
           id: employee._id,
           name: `${employee.firstName} ${employee.lastName}`,
           employeeId: employee.employeeId,
-          department: employee.department?.name || "N/A",
+          department: {
+            _id: employee.department?._id || null,
+            name: employee.department?.name || "N/A",
+          },
           role: employee.role?.name || "N/A",
           avatar: employee.avatar,
         },
@@ -185,12 +188,12 @@ class PayrollService {
         baseSalary: {
           grade: salaryGrade.grade,
           name: salaryGrade.name,
-          customBaseSalary: employee.customBaseSalary,
-          effectiveBaseSalary: baseSalary.effectiveBaseSalary,
-          actualBaseSalary: baseSalary.actualBaseSalary,
-          stepIncrement: baseSalary.stepIncrement,
-          gradeAllowances: baseSalary.gradeAllowances,
-          totalGradeAllowances: baseSalary.totalGradeAllowances,
+          customBaseSalary: employee.customBaseSalary || 0,
+          effectiveBaseSalary: baseSalary.effectiveBaseSalary || 0,
+          actualBaseSalary: baseSalary.actualBaseSalary || 0,
+          stepIncrement: baseSalary.stepIncrement || 0,
+          gradeAllowances: baseSalary.gradeAllowances || {},
+          totalGradeAllowances: baseSalary.totalGradeAllowances || 0,
         },
         allowances: {
           total: allowances.totalAllowances,
@@ -374,12 +377,12 @@ class PayrollService {
       });
 
       return {
-        effectiveBaseSalary,
-        stepIncrement,
-        gradeAllowances,
-        customAllowancesTotal,
-        totalGradeAllowances,
-        actualBaseSalary,
+        effectiveBaseSalary: effectiveBaseSalary || 0,
+        stepIncrement: stepIncrement || 0,
+        gradeAllowances: gradeAllowances || {},
+        customAllowancesTotal: customAllowancesTotal || 0,
+        totalGradeAllowances: totalGradeAllowances || 0,
+        actualBaseSalary: actualBaseSalary || 0,
       };
     } catch (error) {
       console.error("Error calculating base salary:", error);

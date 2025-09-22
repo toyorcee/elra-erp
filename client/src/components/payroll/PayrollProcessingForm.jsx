@@ -356,19 +356,37 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
             ? "approved by finance"
             : "in review";
 
+        const duplicateEmployeeText =
+          formData.scope === "individual" && selectedEmployees.length === 1
+            ? "The selected employee"
+            : "Some employees in your selection";
+        const selectText =
+          formData.scope === "individual" && selectedEmployees.length === 1
+            ? "select a different employee"
+            : "select different employees";
+
         toast.error(
-          `Cannot create payroll preview: Some employees in your selection have already been included in a payroll preview for ${periodName} ${year} (${frequency}). ` +
-            `Status: ${statusText}. Approval ID: ${duplicatePreview.approvalId}. Please select different employees or create for a different period.`
+          `Cannot create payroll preview: ${duplicateEmployeeText} have already been included in a payroll preview for ${periodName} ${year} (${frequency}). ` +
+            `Status: ${statusText}. Approval ID: ${duplicatePreview.approvalId}. Please ${selectText} or create for a different period.`
         );
-        return true; // Duplicate found
+        return true;
       }
 
       if (duplicatePayroll) {
         const periodName = months.find((m) => m.value === month)?.label;
 
+        const duplicatePayrollEmployeeText =
+          formData.scope === "individual" && selectedEmployees.length === 1
+            ? "The selected employee has"
+            : "Some employees in your selection have";
+        const selectPayrollText =
+          formData.scope === "individual" && selectedEmployees.length === 1
+            ? "select a different employee"
+            : "select different employees";
+
         toast.error(
-          `Cannot create payroll preview: Some employees in your selection have already been processed in a payroll for ${periodName} ${year} (${frequency}). ` +
-            `Payroll ID: ${duplicatePayroll._id}. Please select different employees or create for a different period.`
+          `Cannot create payroll preview: ${duplicatePayrollEmployeeText} already been processed in a payroll for ${periodName} ${year} (${frequency}). ` +
+            `Payroll ID: ${duplicatePayroll._id}. Please ${selectPayrollText} or create for a different period.`
         );
         return true; // Duplicate found
       }
@@ -607,8 +625,10 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
       setProcessingStatus("previewed");
 
       if (errors.length > 0) {
+        const errorEmployeeText =
+          errors.length === 1 ? "employee" : "employees";
         toast.warning(
-          `Payroll preview generated with ${errors.length} employee(s) having issues`
+          `Payroll preview generated with ${errors.length} ${errorEmployeeText} having issues`
         );
       } else {
         toast.success("Payroll preview generated successfully!");
@@ -623,6 +643,11 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
   };
 
   const handleProcessPayroll = async () => {
+    if (loading || processingStatus === "processing") {
+      console.log("🚫 [PayrollProcessingForm] Prevented double execution");
+      return;
+    }
+
     if (!validateForm()) {
       toast.error("Please fix the validation errors");
       return;
@@ -636,6 +661,7 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
     try {
       setLoading(true);
       setProcessingStatus("processing");
+      console.log("🚀 [PayrollProcessingForm] Starting payroll submission...");
 
       // Submit for finance approval instead of direct processing
       // Prepare the payroll data for submission with proper structure
@@ -669,24 +695,7 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
 
       setPayrollBatchResult(result.data);
 
-      if (result.data?.processingSummary) {
-        const summary = result.data.processingSummary;
-        const scopeDescription = getScopeDescription(
-          formData.scope,
-          formData.scopeId
-        );
-        toast.success(
-          `✅ Payroll submitted for finance approval! ${scopeDescription} Approval ID: ${result.data?.approval?.approvalId}`
-        );
-      } else if (result.data?.approval?.approvalId) {
-        toast.success(
-          `✅ Payroll submitted for finance approval! Approval ID: ${result.data.approval.approvalId}`
-        );
-      } else {
-        toast.success(
-          "✅ Payroll submitted for finance approval successfully!"
-        );
-      }
+      // Toast removed - backend handles success message
 
       setTimeout(() => {
         console.log("🎉 [SUCCESS] Setting showSuccessOverlay to true");
@@ -739,9 +748,7 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
 
       setPayrollBatchResult(result.data);
 
-      toast.success(
-        `✅ Payroll resent for finance approval! New Approval ID: ${result.data?.approval?.approvalId}`
-      );
+      // Toast removed - backend handles success message
     } catch (error) {
       toast.error(error.message || "Error resending payroll");
       console.error("Payroll resend error:", error);
@@ -971,7 +978,9 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
         const department = row.employee?.department;
         if (!department)
           return <span className="text-gray-500">No Department</span>;
-        return department;
+        return typeof department === "string"
+          ? department
+          : department?.name || "N/A";
       },
     },
     {
@@ -2380,12 +2389,26 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                             "No ID"}
                         </p>
                         <p className="text-white/70 text-xs mt-1">
-                          {selectedPayrollDetail.employee?.department ||
-                            "No Department"}
+                          {typeof selectedPayrollDetail.employee?.department ===
+                          "string"
+                            ? selectedPayrollDetail.employee?.department
+                            : selectedPayrollDetail.employee?.department
+                                ?.name || "No Department"}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => {
+                          setShowDetailModal(false);
+                          setSelectedPayrollDetail(null);
+                        }}
+                        className="text-white/80 hover:text-white p-2 rounded-lg hover:bg-white/20 transition-all duration-200"
+                        aria-label="Back to payroll preview"
+                        title="Back to payroll preview"
+                      >
+                        <HiChevronLeft className="w-6 h-6" />
+                      </button>
                       <button
                         onClick={() => {
                           setShowDetailModal(false);
@@ -2441,8 +2464,11 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                       <div className="flex items-center gap-4 text-sm text-gray-500">
                         <span className="flex items-center gap-1">
                           <HiUserGroup className="w-4 h-4" />
-                          {selectedPayrollDetail.employee?.department ||
-                            "No Department"}
+                          {typeof selectedPayrollDetail.employee?.department ===
+                          "string"
+                            ? selectedPayrollDetail.employee?.department
+                            : selectedPayrollDetail.employee?.department
+                                ?.name || "No Department"}
                         </span>
                         <span className="flex items-center gap-1">
                           <HiBriefcase className="w-4 h-4" />
@@ -3366,7 +3392,11 @@ const PayrollProcessingForm = ({ isOpen, onClose, onSuccess }) => {
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="text-sm text-gray-900">
-                                      {payroll.employee.department || "N/A"}
+                                      {typeof payroll.employee.department ===
+                                      "string"
+                                        ? payroll.employee.department
+                                        : payroll.employee.department?.name ||
+                                          "N/A"}
                                     </div>
                                   </td>
                                   <td className="px-6 py-4 whitespace-nowrap">

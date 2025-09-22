@@ -1236,9 +1236,7 @@ export const userModulesAPI = {
     processApprovedPayroll: async (approvalId) => {
       try {
         console.log("📋 [payrollAPI] Processing approved payroll:", approvalId);
-        const response = await api.post(
-          `/payroll/process-approved/${approvalId}`
-        );
+        const response = await api.post(`/payroll/process/${approvalId}`);
         console.log(
           "✅ [payrollAPI] Process approved payroll response:",
           response.data

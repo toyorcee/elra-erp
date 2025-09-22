@@ -412,7 +412,6 @@ const submitForApproval = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Payroll submitted for finance approval successfully",
       data: {
         approval: {
           approvalId: approvalRequest.approvalId,
@@ -885,23 +884,10 @@ const getPayrollPreview = async (req, res) => {
       req.user._id
     );
 
-    // Create approval request instead of just returning preview
-    const approvalRequest = await PayrollApprovalService.createApprovalRequest(
-      previewResult,
-      req.user._id
-    );
-
     res.status(200).json({
       success: true,
       message: "Payroll preview generated successfully",
-      data: {
-        ...previewResult,
-        approval: {
-          approvalId: approvalRequest.approvalId,
-          status: approvalRequest.approvalStatus,
-          requestedAt: approvalRequest.requestedAt,
-        },
-      },
+      data: previewResult,
     });
   } catch (error) {
     console.error("Error generating payroll preview:", error);
@@ -2740,12 +2726,10 @@ const resendToFinance = async (req, res) => {
         "❌ [NOTIFICATION] Error sending notifications:",
         notificationError
       );
-      // Don't fail the request if notification fails
     }
 
     res.json({
       success: true,
-      message: "Payroll preview resent to Finance HOD successfully",
       data: {
         approvalId: approvalId,
         status: "resent",
@@ -2762,6 +2746,59 @@ const resendToFinance = async (req, res) => {
   }
 };
 
+// @desc    Process approved payroll (deduct funds and generate payslips)
+// @route   POST /api/payroll/process/:approvalId
+// @access  Private (HR HOD, Super Admin)
+const processApprovedPayrollV2 = async (req, res) => {
+  try {
+    const { approvalId } = req.params;
+    const processedBy = req.user._id;
+
+    // Check if user is HR HOD or Super Admin
+    const isHRHOD =
+      req.user.department?.name === "Human Resources" &&
+      req.user.role?.level >= 700;
+    const isSuperAdmin = req.user.role?.level >= 1000;
+
+    if (!isHRHOD && !isSuperAdmin) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Only HR HOD and Super Admin can process payroll.",
+      });
+    }
+
+    // Process the payroll using the service
+    const result = await PayrollApprovalService.processPayroll(
+      approvalId,
+      processedBy
+    );
+
+    console.log(
+      `✅ [PAYROLL_CONTROLLER] Payroll processed successfully: ${approvalId}`
+    );
+
+    res.status(200).json({
+      success: true,
+      message:
+        "Payroll processed successfully. Funds deducted and payslips generated.",
+      data: {
+        approvalId: result.approvalId,
+        status: result.approvalStatus,
+        processedAt: result.processedAt,
+        totalNetPay: result.financialSummary.totalNetPay,
+        totalEmployees: result.financialSummary.totalEmployees,
+      },
+    });
+  } catch (error) {
+    console.error("Error processing approved payroll:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to process payroll",
+    });
+  }
+};
+
 export {
   processPayroll,
   processPayrollWithData,
@@ -2774,6 +2811,7 @@ export {
   approvePayroll,
   rejectPayroll,
   processApprovedPayroll,
+  processApprovedPayrollV2,
   getPayrollSummary,
   getSavedPayrolls,
   getEmployeePayrollBreakdown,

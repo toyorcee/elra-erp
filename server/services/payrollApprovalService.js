@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import PayrollApproval from "../models/PayrollApproval.js";
 import NotificationService from "./notificationService.js";
 import User from "../models/User.js";
@@ -68,20 +69,24 @@ class PayrollApprovalService {
    * Approve payroll by Finance HOD
    */
   async approveByFinance(approvalId, approvedBy, comments = "") {
+    const session = await mongoose.startSession();
+
     try {
-      const approval = await PayrollApproval.findOne({ approvalId });
+      await session.withTransaction(async () => {
+        const approval = await PayrollApproval.findOne({ approvalId }).session(
+          session
+        );
 
-      if (!approval) {
-        throw new Error("Payroll approval request not found");
-      }
+        if (!approval) {
+          throw new Error("Payroll approval request not found");
+        }
 
-      if (approval.approvalStatus !== "pending_finance") {
-        throw new Error("Payroll approval is not in pending finance status");
-      }
+        if (approval.approvalStatus !== "pending_finance") {
+          throw new Error("Payroll approval is not in pending finance status");
+        }
 
-      // Check payroll budget availability
-      try {
-        const ELRAWallet = await import("../models/CompanyWallet.js");
+        // Check payroll budget availability and reserve funds
+        const ELRAWallet = await import("../models/ELRAWallet.js");
         const elraWallet = await ELRAWallet.default.getOrCreateWallet(
           "ELRA_MAIN",
           approvedBy
@@ -101,51 +106,46 @@ class PayrollApprovalService {
           );
         }
 
-        // Check frequency-based limits
-        const frequency = approval.metadata?.frequency || "monthly";
-        const currentDate = new Date();
-
+        // Reserve funds from payroll budget (within transaction)
         await elraWallet.reserveFromCategory(
           "payroll",
           payrollAmount,
           `Payroll allocation for ${approval.period.monthName} ${approval.period.year}`,
           approval.approvalId,
           approval._id,
-          "payroll_funding",
-          approvedBy
+          "payroll",
+          approvedBy,
+          session // Pass session for transaction
         );
 
         console.log(
           `💳 [ELRA WALLET] Reserved ₦${payrollAmount.toLocaleString()} from payroll budget`
         );
-      } catch (walletError) {
-        console.error(
-          "❌ [ELRA WALLET] Error checking/reserving payroll funds:",
-          walletError
-        );
-        throw new Error(`Payroll budget check failed: ${walletError.message}`);
-      }
 
-      // Update finance approval
-      approval.financeApproval = {
-        approvedBy,
-        approvedAt: new Date(),
-        comments,
-        status: "approved",
-      };
+        // Update finance approval (within transaction)
+        approval.financeApproval = {
+          approvedBy,
+          approvedAt: new Date(),
+          comments,
+          status: "approved",
+        };
 
-      approval.approvalStatus = "approved_finance";
-      await approval.save();
+        approval.approvalStatus = "approved_finance";
+        await approval.save({ session });
 
-      // Send HR approval notification
+        console.log(`✅ [PAYROLL_APPROVAL] Finance approved: ${approvalId}`);
+      });
+
+      // After successful transaction, send notification (outside transaction)
+      const approval = await PayrollApproval.findOne({ approvalId });
       await this.sendHRApprovalNotification(approval);
-
-      console.log(`✅ [PAYROLL_APPROVAL] Finance approved: ${approvalId}`);
 
       return approval;
     } catch (error) {
       console.error("Error approving payroll by finance:", error);
       throw error;
+    } finally {
+      await session.endSession();
     }
   }
 
@@ -153,58 +153,59 @@ class PayrollApprovalService {
    * Approve payroll by HR HOD
    */
   async approveByHR(approvalId, approvedBy, comments = "") {
+    const session = await mongoose.startSession();
+
     try {
-      const approval = await PayrollApproval.findOne({ approvalId });
+      await session.withTransaction(async () => {
+        const approval = await PayrollApproval.findOne({ approvalId }).session(
+          session
+        );
 
-      if (!approval) {
-        throw new Error("Payroll approval request not found");
-      }
+        if (!approval) {
+          throw new Error("Payroll approval request not found");
+        }
 
-      if (approval.approvalStatus !== "approved_finance") {
-        throw new Error("Payroll approval is not in approved finance status");
-      }
+        if (approval.approvalStatus !== "approved_finance") {
+          throw new Error("Payroll approval is not in approved finance status");
+        }
 
-      // Approve allocation in company wallet
-      try {
-        const ELRAWallet = await import("../models/CompanyWallet.js");
+        // Approve allocation in company wallet (within transaction)
+        const ELRAWallet = await import("../models/ELRAWallet.js");
         const elraWallet = await ELRAWallet.default.getOrCreateWallet(
           "ELRA_MAIN", // Use ELRA main instance
           approvedBy
         );
 
-        await elraWallet.approveAllocation(approval._id, approvedBy);
+        await elraWallet.approveAllocation(approval._id, approvedBy, session);
 
         console.log(
           `✅ [ELRA WALLET] Approved payroll allocation of ₦${approval.financialSummary.totalNetPay.toLocaleString()}`
         );
-      } catch (walletError) {
-        console.error(
-          "❌ [ELRA WALLET] Error approving allocation:",
-          walletError
-        );
-        throw new Error(`ELRA wallet approval failed: ${walletError.message}`);
-      }
 
-      // Update HR approval
-      approval.hrApproval = {
-        approvedBy,
-        approvedAt: new Date(),
-        comments,
-        status: "approved",
-      };
+        // Update HR approval (within transaction)
+        approval.hrApproval = {
+          approvedBy,
+          approvedAt: new Date(),
+          comments,
+          status: "approved",
+        };
 
-      approval.approvalStatus = "approved_hr";
-      await approval.save();
+        approval.approvalStatus = "approved_hr";
+        await approval.save({ session });
 
-      // Send processing notification
+        console.log(`✅ [PAYROLL_APPROVAL] HR approved: ${approvalId}`);
+      });
+
+      // After successful transaction, send notification (outside transaction)
+      const approval = await PayrollApproval.findOne({ approvalId });
       await this.sendProcessingNotification(approval);
-
-      console.log(`✅ [PAYROLL_APPROVAL] HR approved: ${approvalId}`);
 
       return approval;
     } catch (error) {
       console.error("Error approving payroll by HR:", error);
       throw error;
+    } finally {
+      await session.endSession();
     }
   }
 
@@ -212,20 +213,28 @@ class PayrollApprovalService {
    * Process payroll (deduct from allocated funds)
    */
   async processPayroll(approvalId, processedBy) {
+    const session = await mongoose.startSession();
+
     try {
-      const approval = await PayrollApproval.findOne({ approvalId });
+      await session.withTransaction(async () => {
+        const approval = await PayrollApproval.findOne({ approvalId }).session(
+          session
+        );
 
-      if (!approval) {
-        throw new Error("Payroll approval request not found");
-      }
+        if (!approval) {
+          throw new Error("Payroll approval request not found");
+        }
 
-      if (approval.approvalStatus !== "approved_hr") {
-        throw new Error("Payroll approval is not in approved HR status");
-      }
+        if (
+          approval.approvalStatus !== "approved_hr" &&
+          approval.approvalStatus !== "approved_finance"
+        ) {
+          throw new Error(
+            "Payroll approval is not in approved status (Finance or HR approval required)"
+          );
+        }
 
-      // Process payroll in company wallet
-      try {
-        const ELRAWallet = await import("../models/CompanyWallet.js");
+        const ELRAWallet = await import("../models/ELRAWallet.js");
         const elraWallet = await ELRAWallet.default.getOrCreateWallet(
           "ELRA_MAIN",
           processedBy
@@ -234,33 +243,152 @@ class PayrollApprovalService {
         await elraWallet.processPayroll(
           approval.financialSummary.totalNetPay,
           `${approval.period.monthName} ${approval.period.year}`,
-          processedBy
+          processedBy,
+          session
         );
 
         console.log(
           `✅ [ELRA WALLET] Processed payroll of ₦${approval.financialSummary.totalNetPay.toLocaleString()}`
         );
-      } catch (walletError) {
-        console.error(
-          "❌ [ELRA WALLET] Error processing payroll:",
-          walletError
-        );
-        throw new Error(
-          `ELRA wallet processing failed: ${walletError.message}`
-        );
-      }
 
-      // Update approval status
-      approval.approvalStatus = "processed";
-      approval.processedAt = new Date();
-      approval.processedBy = processedBy;
-      await approval.save();
+        const PayrollService = await import("./payrollService.js");
+        const payrollService = PayrollService.default;
 
-      console.log(`✅ [PAYROLL_APPROVAL] Payroll processed: ${approvalId}`);
+        const payrollResult =
+          await payrollService.savePayrollWithDuplicateHandling(
+            approval.payrollData,
+            processedBy
+          );
+
+        console.log(
+          `✅ [PAYROLL_SERVICE] Generated payroll records for ${payrollResult.processingSummary.successful} employees`
+        );
+
+        // Update approval status (within transaction)
+        approval.approvalStatus = "processed";
+        approval.processedAt = new Date();
+        approval.processedBy = processedBy;
+        await approval.save({ session });
+
+        console.log(`✅ [PAYROLL_APPROVAL] Payroll processed: ${approvalId}`);
+      });
+
+      // After successful transaction, generate payslips and send emails (outside transaction)
+      const approval = await PayrollApproval.findOne({ approvalId });
+      await this.generateAndSendPayslips(approval, processedBy);
 
       return approval;
     } catch (error) {
       console.error("Error processing payroll:", error);
+      throw error;
+    } finally {
+      await session.endSession();
+    }
+  }
+
+  /**
+   * Generate payslips and send emails to employees
+   */
+  async generateAndSendPayslips(approval, processedBy) {
+    try {
+      console.log(
+        `📄 [PAYSLIP_GENERATION] Starting payslip generation for ${approval.approvalId}`
+      );
+
+      const PayslipService = await import("./payslipService.js");
+      const payslipService = new PayslipService.default();
+
+      let successCount = 0;
+      let errorCount = 0;
+      const errors = [];
+
+      // Process each employee's payroll
+      for (const payroll of approval.payrollData.payrolls) {
+        try {
+          // Prepare employee data
+          const employeeData = {
+            _id: payroll.employee.id,
+            firstName: payroll.employee.name.split(" ")[0] || "",
+            lastName: payroll.employee.name.split(" ").slice(1).join(" ") || "",
+            employeeId: payroll.employee.employeeId,
+            email: payroll.employee.email,
+            department: payroll.employee.department,
+          };
+
+          // Prepare payroll data for payslip generation
+          const payslipPayrollData = {
+            period: approval.period,
+            scope: approval.scope,
+            payrolls: [payroll],
+            payrollId: approval._id,
+          };
+
+          // Generate payslip PDF
+          const payslipFile = await payslipService.generatePayslipPDF(
+            payslipPayrollData,
+            employeeData
+          );
+
+          // Save payslip to database
+          await payslipService.savePayslipToDatabase(
+            payslipPayrollData,
+            employeeData,
+            payslipFile,
+            processedBy
+          );
+
+          // Send payslip notification and email
+          await payslipService.sendPayslipNotification(
+            payslipPayrollData,
+            employeeData,
+            payslipFile
+          );
+
+          successCount++;
+          console.log(
+            `✅ [PAYSLIP_GENERATION] Generated payslip for ${payroll.employee.name} (${payroll.employee.employeeId})`
+          );
+        } catch (error) {
+          errorCount++;
+          errors.push({
+            employee: payroll.employee.name,
+            employeeId: payroll.employee.employeeId,
+            error: error.message,
+          });
+          console.error(
+            `❌ [PAYSLIP_GENERATION] Error generating payslip for ${payroll.employee.name}:`,
+            error
+          );
+        }
+      }
+
+      console.log(`📊 [PAYSLIP_GENERATION] Summary:`);
+      console.log(`   ✅ Successful: ${successCount}`);
+      console.log(`   ❌ Failed: ${errorCount}`);
+      console.log(
+        `   📧 Total Employees: ${approval.payrollData.payrolls.length}`
+      );
+
+      if (errors.length > 0) {
+        console.log(`⚠️ [PAYSLIP_GENERATION] Errors encountered:`);
+        errors.forEach((error, index) => {
+          console.log(
+            `   ${index + 1}. ${error.employee} (${error.employeeId}): ${
+              error.error
+            }`
+          );
+        });
+      }
+
+      return {
+        success: true,
+        totalEmployees: approval.payrollData.payrolls.length,
+        successful: successCount,
+        failed: errorCount,
+        errors: errors,
+      };
+    } catch (error) {
+      console.error("Error generating and sending payslips:", error);
       throw error;
     }
   }
@@ -300,7 +428,7 @@ class PayrollApprovalService {
       await approval.save();
 
       try {
-        const ELRAWallet = await import("../models/CompanyWallet.js");
+        const ELRAWallet = await import("../models/ELRAWallet.js");
         const elraWallet = await ELRAWallet.default.getOrCreateWallet(
           "ELRA_MAIN",
           rejectedBy
@@ -365,7 +493,7 @@ class PayrollApprovalService {
 
       // Move funds from reserved to used in ELRA wallet
       try {
-        const ELRAWallet = await import("../models/CompanyWallet.js");
+        const ELRAWallet = await import("../models/ELRAWallet.js");
         const elraWallet = await ELRAWallet.default.getOrCreateWallet(
           "ELRA_MAIN",
           processedBy
@@ -439,8 +567,8 @@ class PayrollApprovalService {
       return await PayrollApproval.findOne({ approvalId })
         .populate({
           path: "requestedBy",
-          select: "firstName lastName email employeeId department",
-          populate: { path: "department", select: "name" }
+          select: "firstName lastName email employeeId department avatar",
+          populate: { path: "department", select: "name" },
         })
         .populate("financeApproval.approvedBy", "firstName lastName email")
         .populate("hrApproval.approvedBy", "firstName lastName email")
@@ -517,11 +645,49 @@ class PayrollApprovalService {
     try {
       const notificationService = new NotificationService();
 
-      // Get HR HOD
-      const hrHOD = await User.findOne({
-        "department.name": "Human Resources",
-        "role.name": "HOD",
+      const Department = await import("../models/Department.js");
+      const Role = await import("../models/Role.js");
+
+      const hrDept = await Department.default.findOne({
+        name: "Human Resources",
       });
+
+      if (!hrDept) {
+        console.error("❌ [NOTIFICATION] Human Resources department not found");
+        return;
+      }
+
+      console.log(`🏢 [NOTIFICATION] Found HR department: ${hrDept._id}`);
+
+      const hodRole = await Role.default.findOne({ name: "HOD" });
+
+      let hrHOD = null;
+
+      if (hodRole) {
+        hrHOD = await User.findOne({
+          role: hodRole._id,
+          department: hrDept._id,
+        });
+
+        console.log(
+          `👥 [NOTIFICATION] Found HR HOD by role ID: ${hrHOD ? "Yes" : "No"}`
+        );
+      }
+
+      if (!hrHOD) {
+        console.log(
+          `🔄 [NOTIFICATION] No HOD found by role ID, trying role level fallback...`
+        );
+        hrHOD = await User.findOne({
+          department: hrDept._id,
+          "role.level": { $gte: 700 },
+        });
+        console.log(
+          `👥 [NOTIFICATION] Found HR HOD by role level: ${
+            hrHOD ? "Yes" : "No"
+          }`
+        );
+      }
 
       if (hrHOD) {
         await notificationService.createNotification({
@@ -538,12 +704,20 @@ class PayrollApprovalService {
           },
         });
 
+        console.log(
+          `📧 [NOTIFICATION] HR approval notification sent to: ${hrHOD.firstName} ${hrHOD.lastName} (${hrHOD.email})`
+        );
+
         // Update notifications sent
         approval.notificationsSent.push({
           type: "hr_approval",
           sentTo: hrHOD._id,
         });
         await approval.save();
+      } else {
+        console.error(
+          "❌ [NOTIFICATION] HR HOD not found - notification not sent"
+        );
       }
     } catch (error) {
       console.error("Error sending HR approval notification:", error);

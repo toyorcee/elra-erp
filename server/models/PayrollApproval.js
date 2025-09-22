@@ -274,8 +274,8 @@ payrollApprovalSchema.statics.getPendingApprovals = async function (
   return await this.find(query)
     .populate({
       path: "requestedBy",
-      select: "firstName lastName email employeeId department",
-      populate: { path: "department", select: "name" }
+      select: "firstName lastName email employeeId department avatar",
+      populate: { path: "department", select: "name" },
     })
     .populate("financeApproval.approvedBy", "firstName lastName email")
     .populate("hrApproval.approvedBy", "firstName lastName email")

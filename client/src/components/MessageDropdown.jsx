@@ -11,9 +11,6 @@ import {
   XMarkIcon,
   CheckIcon,
   CheckCircleIcon,
-  EllipsisVerticalIcon,
-  TrashIcon,
-  ChevronDownIcon,
   ArrowLeftIcon,
 } from "@heroicons/react/24/outline";
 import { formatMessageTime } from "../types/messageTypes";
@@ -69,7 +66,6 @@ const MessageDropdown = ({ isOpen, onClose }) => {
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
-  // Image utility functions
   const getDefaultAvatar = () => {
     return defaultAvatar;
   };
@@ -330,6 +326,12 @@ const MessageDropdown = ({ isOpen, onClose }) => {
     }
   }, [isOpen, loadConversations, getAvailableUsers]);
 
+  // Refresh available users whenever search term changes (policy-aware)
+  useEffect(() => {
+    if (!isOpen) return;
+    getAvailableUsers();
+  }, [isOpen, searchTerm, getAvailableUsers]);
+
   // Scroll to bottom when new messages arrive
   useEffect(() => {
     scrollToBottom();
@@ -367,7 +369,7 @@ const MessageDropdown = ({ isOpen, onClose }) => {
             className="relative w-full max-w-md h-[calc(100vh-4rem)] bg-white rounded-l-2xl shadow-2xl border border-[var(--elra-border-primary)] overflow-hidden message-dropdown"
           >
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-[var(--elra-border-primary)] bg-gradient-to-r from-[var(--elra-secondary-3)] to-white">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--elra-border-primary)] bg-white">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-[var(--elra-primary)] text-white cursor-pointer">
                   <ChatBubbleLeftRightIcon className="h-5 w-5" />
@@ -410,7 +412,7 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                           ? "Search anyone in the organization..."
                           : userRole?.level >= 700
                           ? "Search department users or fellow HODs..."
-                          : "Search HODs and higher roles in your department..."
+                          : "Search peers and higher roles in your department..."
                       }
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
@@ -434,11 +436,66 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                   )}
                 </div>
 
-                {/* Conversations */}
+                {/* Conversations / Available Users */}
                 <div className="flex-1 overflow-y-auto">
                   {isLoading ? (
                     <div className="flex items-center justify-center h-32">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--elra-primary)]"></div>
+                    </div>
+                  ) : searchTerm || availableUsers.length > 0 ? (
+                    // Show available users (policy-filtered) when searching or when list exists
+                    <div className="space-y-1">
+                      {getFilteredAvailableUsers().map((user) => (
+                        <div
+                          key={user._id}
+                          onClick={() => handleStartNewConversation(user)}
+                          className="flex items-center gap-3 p-3 hover:bg-[var(--elra-secondary-3)] cursor-pointer transition-colors border-b border-[var(--elra-border-primary)]"
+                        >
+                          <div className="relative">
+                            <div className="w-8 h-8 rounded-full overflow-hidden">
+                              {getAvatarDisplay(user)}
+                            </div>
+                            <div
+                              className={`absolute -bottom-1 -right-1 w-2 h-2 rounded-full border border-white ${(() => {
+                                const id = user._id;
+                                if (Array.isArray(onlineUsers))
+                                  return onlineUsers.includes(id)
+                                    ? "bg-green-500"
+                                    : "bg-gray-400";
+                                if (onlineUsers instanceof Set)
+                                  return onlineUsers.has(id)
+                                    ? "bg-green-500"
+                                    : "bg-gray-400";
+                                if (
+                                  onlineUsers &&
+                                  typeof onlineUsers === "object"
+                                )
+                                  return onlineUsers[id]
+                                    ? "bg-green-500"
+                                    : "bg-gray-400";
+                                return "bg-gray-400";
+                              })()}`}
+                            ></div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4
+                              className="font-medium text-[var(--elra-text-primary)] text-sm truncate"
+                              title={getDisplayName(user)}
+                            >
+                              {getDisplayName(user)}
+                            </h4>
+                            <p className="text-xs text-[var(--elra-text-secondary)] truncate">
+                              {user.email}
+                            </p>
+                          </div>
+                          <div
+                            className="text-[10px] text-[var(--elra-text-muted)]"
+                            title={formatUserStatus(user)}
+                          >
+                            {formatUserStatus(user)}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ) : filteredConversations.length > 0 ? (
                     <div className="space-y-1">
@@ -464,16 +521,33 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                               {getAvatarDisplay(conversation._id)}
                             </div>
                             <div
-                              className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
-                                onlineUsers.has(conversation._id._id)
-                                  ? "bg-green-500"
-                                  : "bg-gray-400"
-                              }`}
+                              className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${(() => {
+                                const id = conversation._id._id;
+                                if (Array.isArray(onlineUsers))
+                                  return onlineUsers.includes(id)
+                                    ? "bg-green-500"
+                                    : "bg-gray-400";
+                                if (onlineUsers instanceof Set)
+                                  return onlineUsers.has(id)
+                                    ? "bg-green-500"
+                                    : "bg-gray-400";
+                                if (
+                                  onlineUsers &&
+                                  typeof onlineUsers === "object"
+                                )
+                                  return onlineUsers[id]
+                                    ? "bg-green-500"
+                                    : "bg-gray-400";
+                                return "bg-gray-400";
+                              })()}`}
                             ></div>
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
-                              <h4 className="font-medium text-[var(--elra-text-primary)] text-sm truncate">
+                              <h4
+                                className="font-medium text-[var(--elra-text-primary)] text-sm truncate"
+                                title={getDisplayName(conversation._id)}
+                              >
                                 {getDisplayName(conversation._id)}
                               </h4>
                               {unreadCounts[conversation._id._id] > 0 && (
@@ -482,10 +556,18 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-[var(--elra-text-secondary)] truncate">
-                              {conversation.lastMessage?.content ||
-                                "No messages yet"}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-[var(--elra-text-secondary)] truncate">
+                                {conversation.lastMessage?.content ||
+                                  "No messages yet"}
+                              </p>
+                              <span
+                                className="text-[10px] text-[var(--elra-text-muted)] hidden sm:inline"
+                                title={formatUserStatus(conversation._id)}
+                              >
+                                {formatUserStatus(conversation._id)}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -505,7 +587,7 @@ const MessageDropdown = ({ isOpen, onClose }) => {
 
                       {/* Role-based Access Info */}
                       {userRole && (
-                        <div className="w-full mb-6 p-4 bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-secondary-2)] rounded-lg text-white">
+                        <div className="w-full mb-6 p-4 bg-[var(--elra-primary)] rounded-lg text-white shadow-sm">
                           <div className="flex items-center gap-2 mb-2">
                             <span className="text-lg">{roleInfo.icon}</span>
                             <h4 className="font-semibold text-sm">
@@ -548,11 +630,25 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                                     {getAvatarDisplay(user)}
                                   </div>
                                   <div
-                                    className={`absolute -bottom-1 -right-1 w-2 h-2 rounded-full border border-white ${
-                                      onlineUsers.has(user._id)
-                                        ? "bg-green-500"
-                                        : "bg-gray-400"
-                                    }`}
+                                    className={`absolute -bottom-1 -right-1 w-2 h-2 rounded-full border border-white ${(() => {
+                                      const id = user._id;
+                                      if (Array.isArray(onlineUsers))
+                                        return onlineUsers.includes(id)
+                                          ? "bg-green-500"
+                                          : "bg-gray-400";
+                                      if (onlineUsers instanceof Set)
+                                        return onlineUsers.has(id)
+                                          ? "bg-green-500"
+                                          : "bg-gray-400";
+                                      if (
+                                        onlineUsers &&
+                                        typeof onlineUsers === "object"
+                                      )
+                                        return onlineUsers[id]
+                                          ? "bg-green-500"
+                                          : "bg-gray-400";
+                                      return "bg-gray-400";
+                                    })()}`}
                                   ></div>
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -600,11 +696,25 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                                     {getAvatarDisplay(user)}
                                   </div>
                                   <div
-                                    className={`absolute -bottom-1 -right-1 w-2 h-2 rounded-full border border-white ${
-                                      onlineUsers.has(user._id)
-                                        ? "bg-green-500"
-                                        : "bg-gray-400"
-                                    }`}
+                                    className={`absolute -bottom-1 -right-1 w-2 h-2 rounded-full border border-white ${(() => {
+                                      const id = user._id;
+                                      if (Array.isArray(onlineUsers))
+                                        return onlineUsers.includes(id)
+                                          ? "bg-green-500"
+                                          : "bg-gray-400";
+                                      if (onlineUsers instanceof Set)
+                                        return onlineUsers.has(id)
+                                          ? "bg-green-500"
+                                          : "bg-gray-400";
+                                      if (
+                                        onlineUsers &&
+                                        typeof onlineUsers === "object"
+                                      )
+                                        return onlineUsers[id]
+                                          ? "bg-green-500"
+                                          : "bg-gray-400";
+                                      return "bg-gray-400";
+                                    })()}`}
                                   ></div>
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -657,7 +767,7 @@ const MessageDropdown = ({ isOpen, onClose }) => {
               /* Chat Interface */
               <div className="flex flex-col h-full">
                 {/* Chat Header */}
-                <div className="flex items-center justify-between p-4 border-b border-[var(--elra-border-primary)] bg-gradient-to-r from-[var(--elra-secondary-3)] to-white">
+                <div className="flex items-center justify-between p-4 border-b border-[var(--elra-border-primary)] bg-white">
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => setShowChat(false)}
@@ -670,18 +780,35 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                         {getAvatarDisplay(selectedConversation._id)}
                       </div>
                       <div
-                        className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
-                          onlineUsers.has(selectedConversation._id._id)
-                            ? "bg-green-500"
-                            : "bg-gray-400"
-                        }`}
+                        className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${(() => {
+                          const id = selectedConversation._id._id;
+                          if (Array.isArray(onlineUsers))
+                            return onlineUsers.includes(id)
+                              ? "bg-green-500"
+                              : "bg-gray-400";
+                          if (onlineUsers instanceof Set)
+                            return onlineUsers.has(id)
+                              ? "bg-green-500"
+                              : "bg-gray-400";
+                          if (onlineUsers && typeof onlineUsers === "object")
+                            return onlineUsers[id]
+                              ? "bg-green-500"
+                              : "bg-gray-400";
+                          return "bg-gray-400";
+                        })()}`}
                       ></div>
                     </div>
                     <div>
-                      <h4 className="font-medium text-[var(--elra-text-primary)] text-sm">
+                      <h4
+                        className="font-medium text-[var(--elra-text-primary)] text-sm"
+                        title={getDisplayName(selectedConversation._id)}
+                      >
                         {getDisplayName(selectedConversation._id)}
                       </h4>
-                      <p className="text-xs text-[var(--elra-text-secondary)]">
+                      <p
+                        className="text-xs text-[var(--elra-text-secondary)]"
+                        title={formatUserStatus(selectedConversation._id)}
+                      >
                         {formatUserStatus(selectedConversation._id)}
                       </p>
                     </div>

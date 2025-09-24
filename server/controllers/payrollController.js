@@ -2335,9 +2335,20 @@ const downloadPayslip = async (req, res) => {
       });
     }
 
-    // Get the saved payroll data
     const Payroll = (await import("../models/Payroll.js")).default;
-    const savedPayroll = await Payroll.findById(payrollId);
+    const savedPayroll = await Payroll.findById(payrollId)
+      .populate(
+        "employee",
+        "firstName lastName email employeeId department role position jobTitle"
+      )
+      .populate("employee.department", "name code")
+      .populate("employee.role", "name level description")
+      .populate(
+        "payrolls.employee",
+        "firstName lastName email employeeId department role position jobTitle"
+      )
+      .populate("payrolls.employee.department", "name code")
+      .populate("payrolls.employee.role", "name level description");
 
     if (!savedPayroll) {
       return res.status(404).json({

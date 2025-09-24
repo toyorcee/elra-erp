@@ -4,6 +4,7 @@ import {
   HiTrash,
   HiChevronLeft,
   HiChevronRight,
+  HiEye,
 } from "react-icons/hi";
 
 const DataTable = ({
@@ -20,9 +21,11 @@ const DataTable = ({
     onEdit: null,
     onDelete: null,
     onToggle: null,
+    onView: null,
     showEdit: true,
     showDelete: true,
     showToggle: false,
+    showView: false,
   },
   skeletonRows = 5,
   onRowClick = null,
@@ -354,6 +357,18 @@ const DataTable = ({
                         actions.customActions(row)
                       ) : (
                         <>
+                          {actions.showView && actions.onView && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                actions.onView(row);
+                              }}
+                              className="p-2 text-blue-500 hover:bg-blue-500 hover:text-white rounded-lg transition-colors"
+                              title="View"
+                            >
+                              <HiEye className="w-4 h-4" />
+                            </button>
+                          )}
                           {actions.showEdit && actions.onEdit && (
                             <button
                               onClick={(e) => {

@@ -13,6 +13,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { toast } from "react-toastify";
 import { userModulesAPI } from "../../../../../services/userModules.js";
+import defaultAvatar from "../../../../../assets/defaulticon.jpg";
 import { useAuth } from "../../../../../context/AuthContext.jsx";
 import { getActiveDepartments } from "../../../../../services/departments.js";
 
@@ -32,6 +33,15 @@ const LeaveCalendar = () => {
   const [showEventModal, setShowEventModal] = useState(false);
 
   const canViewAllDepartments = user?.role?.level >= 600;
+
+  const getImageUrl = (avatarPath) => {
+    if (!avatarPath) return defaultAvatar;
+    if (avatarPath.startsWith("http")) return avatarPath;
+    const baseUrl = (
+      import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+    ).replace("/api", "");
+    return `${baseUrl}${avatarPath}`;
+  };
 
   // Get current month's start and end dates
   const getMonthDates = (date) => {
@@ -299,7 +309,23 @@ const LeaveCalendar = () => {
                       title={`${event.employee.firstName} ${event.employee.lastName} - ${event.leaveType}`}
                     >
                       <div className="flex items-center space-x-1">
-                        <span>{getLeaveTypeIcon(event.leaveType)}</span>
+                        <span className="w-4 h-4 rounded-full overflow-hidden bg-white/80">
+                          {event.employee?.avatar ? (
+                            <img
+                              src={getImageUrl(event.employee.avatar)}
+                              alt={`${event.employee.firstName} ${event.employee.lastName}`}
+                              className="w-full h-full object-cover"
+                              onError={(e) =>
+                                (e.currentTarget.src = defaultAvatar)
+                              }
+                            />
+                          ) : (
+                            <span className="w-full h-full flex items-center justify-center text-[9px] font-semibold text-gray-800">
+                              {event.employee.firstName?.[0]?.toUpperCase() ||
+                                "?"}
+                            </span>
+                          )}
+                        </span>
                         <span className="truncate">
                           {event.employee.firstName}
                         </span>

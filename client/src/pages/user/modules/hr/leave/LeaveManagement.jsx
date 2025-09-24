@@ -76,7 +76,6 @@ const LeaveManagement = () => {
     department: "",
     search: "",
   });
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
@@ -357,16 +356,11 @@ const LeaveManagement = () => {
         </div>
       ),
       renderer: (row) => (
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-            <CalendarIcon className="w-4 h-4 text-gray-600" />
-          </div>
-          <div>
-            <p className="font-medium text-gray-900">
-              {row.employee?.firstName} {row.employee?.lastName}
-            </p>
-            <p className="text-sm text-gray-500">{row.employee?.email}</p>
-          </div>
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="shrink-0">{getAvatarDisplay(row.employee || {})}</div>
+          <p className="font-medium text-gray-900 truncate min-w-0">
+            {row.employee?.firstName} {row.employee?.lastName}
+          </p>
         </div>
       ),
     },

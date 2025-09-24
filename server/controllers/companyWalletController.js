@@ -687,6 +687,7 @@ export const updateWalletSettings = async (req, res) => {
       userId,
       action: "UPDATE_WALLET_SETTINGS",
       resource: "ELRAWallet",
+      resourceType: "ELRAWallet",
       resourceId: wallet._id,
       details: { notes },
     });
@@ -1360,6 +1361,7 @@ export const exportTransactionHistoryPDF = async (req, res) => {
       userId,
       action: "EXPORT_TRANSACTION_HISTORY_PDF",
       resource: "ELRAWallet",
+      resourceType: "ELRAWallet",
       resourceId: wallet._id,
       details: {
         filters,
@@ -1514,7 +1516,7 @@ export const exportTransactionHistoryWord = async (req, res) => {
 
     if (filters.endDate) {
       const endDate = new Date(filters.endDate);
-      endDate.setHours(23, 59, 59, 999); 
+      endDate.setHours(23, 59, 59, 999);
       filteredTransactions = filteredTransactions.filter(
         (t) => new Date(t.date) <= endDate
       );
@@ -1551,6 +1553,7 @@ export const exportTransactionHistoryWord = async (req, res) => {
       userId,
       action: "EXPORT_TRANSACTION_HISTORY_WORD",
       resource: "ELRAWallet",
+      resourceType: "ELRAWallet",
       resourceId: wallet._id,
       details: {
         filters,

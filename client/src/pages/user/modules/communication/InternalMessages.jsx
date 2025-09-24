@@ -4,30 +4,23 @@ import { useAuth } from "../../../../context/AuthContext";
 import { useSocket } from "../../../../context/SocketContext";
 import { useMessages } from "../../../../hooks/useMessages";
 import { useMessageContext } from "../../../../context/MessageContext";
-import { useDynamicSidebar } from "../../../../context/DynamicSidebarContext";
 import {
   ChatBubbleLeftRightIcon,
   PaperAirplaneIcon,
   MagnifyingGlassIcon,
-  XMarkIcon,
-  CheckIcon,
-  CheckCircleIcon,
   EllipsisVerticalIcon,
-  TrashIcon,
-  ChevronDownIcon,
-  ArrowLeftIcon,
   PlusIcon,
   UserPlusIcon,
 } from "@heroicons/react/24/outline";
 import { formatMessageTime } from "../../../../types/messageTypes";
 import messageService from "../../../../services/messageService";
 import defaultAvatar from "../../../../assets/defaulticon.jpg";
+import Skeleton from "../../../../components/common/Skeleton";
 
 const InternalMessages = () => {
   const { user } = useAuth();
   const { isConnected } = useSocket();
   const { selectedUser, closeMessageDropdown } = useMessageContext();
-  const { setSidebarConfig } = useDynamicSidebar();
 
   const {
     conversations,
@@ -54,6 +47,7 @@ const InternalMessages = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [availableUsers, setAvailableUsers] = useState([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -108,9 +102,7 @@ const InternalMessages = () => {
     ],
   };
 
-  useEffect(() => {
-    setSidebarConfig(communicationSidebarConfig);
-  }, [setSidebarConfig]);
+  // Sidebar for this module is populated automatically by DynamicSidebarContext
 
   // Image utility functions
   const getDefaultAvatar = () => {
@@ -161,12 +153,14 @@ const InternalMessages = () => {
 
   // Send message
   const handleSendMessage = async () => {
-    if (!messageText.trim() || !selectedConversation) return;
+    const content = messageText.trim();
+    if (!content || !selectedConversation) return;
+
+    setMessageText("");
+    setIsTyping(false);
 
     try {
-      await sendNewMessage(selectedConversation._id._id, messageText.trim());
-      setMessageText("");
-      setIsTyping(false);
+      await sendNewMessage(selectedConversation._id._id, content);
     } catch (error) {
       console.error("Error sending message:", error);
     }
@@ -194,12 +188,11 @@ const InternalMessages = () => {
     }
   };
 
-  // Start new conversation
+  // Start new conversation (no endpoint): select user and load history
   const handleStartNewConversation = async (user) => {
     try {
-      const conversation = await messageService.startConversation(user._id);
-      setSelectedConversation(conversation);
-      await loadChatHistory(conversation._id._id);
+      setSelectedConversation({ _id: user });
+      await loadChatHistory(user._id);
     } catch (error) {
       console.error("Error starting conversation:", error);
     }
@@ -209,7 +202,7 @@ const InternalMessages = () => {
   const getAvailableUsers = async () => {
     setIsLoadingUsers(true);
     try {
-      const response = await messageService.getAvailableUsers();
+      const response = await messageService.getAvailableUsers(searchTerm);
       setAvailableUsers(response.data);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -223,6 +216,11 @@ const InternalMessages = () => {
     loadConversations();
     getAvailableUsers();
   }, [loadConversations]);
+
+  // Refresh available users as search changes, to mirror dropdown behavior
+  useEffect(() => {
+    getAvailableUsers();
+  }, [searchTerm]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -284,7 +282,13 @@ const InternalMessages = () => {
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search conversations..."
+              placeholder={
+                user?.role?.level >= 1000
+                  ? "Search anyone in the organization..."
+                  : user?.role?.level >= 700
+                  ? "Search department users or fellow HODs..."
+                  : "Search peers and higher roles in your department..."
+              }
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
@@ -292,15 +296,88 @@ const InternalMessages = () => {
           </div>
         </div>
 
-        {/* Conversations List */}
+        {/* Conversations / Available Users List */}
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
-            <div className="p-4 text-center text-gray-500">
-              Loading conversations...
+            <div className="p-4 space-y-3">
+              {/* Conversation Loading Skeletons */}
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="flex items-center space-x-3 p-3 hover:bg-gray-50 rounded-lg"
+                >
+                  <Skeleton width="w-12" height="h-12" rounded="rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton width="w-24" height="h-4" />
+                    <Skeleton width="w-32" height="h-3" />
+                  </div>
+                  <Skeleton width="w-8" height="h-8" rounded="rounded-full" />
+                </div>
+              ))}
             </div>
-          ) : filteredConversations.length === 0 ? (
-            <div className="p-4 text-center text-gray-500">
-              {searchTerm ? "No conversations found" : "No conversations yet"}
+          ) : searchTerm || availableUsers.length > 0 ? (
+            <div className="space-y-1 p-2">
+              {availableUsers.map((user) => (
+                <motion.div
+                  key={user._id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-gray-50"
+                  onClick={async () => {
+                    try {
+                      await handleStartNewConversation(user);
+                    } catch (e) {
+                      console.error("Failed to start conversation:", e);
+                    }
+                  }}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="relative">
+                      <div className="w-10 h-10 rounded-full overflow-hidden">
+                        {getAvatarDisplay(user)}
+                      </div>
+                      {(() => {
+                        const id = user._id;
+                        let isOnline = false;
+                        if (Array.isArray(onlineUsers)) {
+                          isOnline = onlineUsers.includes(id);
+                        } else if (onlineUsers instanceof Set) {
+                          isOnline = onlineUsers.has(id);
+                        } else if (
+                          onlineUsers &&
+                          typeof onlineUsers === "object"
+                        ) {
+                          isOnline = Boolean(onlineUsers[id]);
+                        }
+                        return isOnline;
+                      })() && (
+                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p
+                          className="text-sm font-medium text-gray-900 truncate"
+                          title={getDisplayName(user)}
+                        >
+                          {getDisplayName(user)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-gray-500 truncate">
+                          {user.email}
+                        </p>
+                        <span
+                          className="text-[10px] text-gray-400 hidden sm:inline"
+                          title={formatUserStatus(user)}
+                        >
+                          {formatUserStatus(user)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
             </div>
           ) : (
             <div className="space-y-1 p-2">
@@ -314,9 +391,14 @@ const InternalMessages = () => {
                       ? "bg-pink-50 border border-pink-200"
                       : "hover:bg-gray-50"
                   }`}
-                  onClick={() => {
+                  onClick={async () => {
                     setSelectedConversation(conversation);
-                    loadChatHistory(conversation._id._id);
+                    setIsLoadingMessages(true);
+                    try {
+                      await loadChatHistory(conversation._id._id);
+                    } finally {
+                      setIsLoadingMessages(false);
+                    }
                   }}
                 >
                   <div className="flex items-center space-x-3">
@@ -324,13 +406,30 @@ const InternalMessages = () => {
                       <div className="w-10 h-10 rounded-full overflow-hidden">
                         {getAvatarDisplay(conversation._id)}
                       </div>
-                      {onlineUsers.includes(conversation._id._id) && (
+                      {(() => {
+                        const id = conversation._id._id;
+                        let isOnline = false;
+                        if (Array.isArray(onlineUsers)) {
+                          isOnline = onlineUsers.includes(id);
+                        } else if (onlineUsers instanceof Set) {
+                          isOnline = onlineUsers.has(id);
+                        } else if (
+                          onlineUsers &&
+                          typeof onlineUsers === "object"
+                        ) {
+                          isOnline = Boolean(onlineUsers[id]);
+                        }
+                        return isOnline;
+                      })() && (
                         <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                        <p
+                          className="text-sm font-medium text-gray-900 truncate"
+                          title={getDisplayName(conversation._id)}
+                        >
                           {getDisplayName(conversation._id)}
                         </p>
                         {unreadCounts[conversation._id._id] > 0 && (
@@ -339,9 +438,18 @@ const InternalMessages = () => {
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 truncate">
-                        {conversation.lastMessage?.content || "No messages yet"}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-gray-500 truncate">
+                          {conversation.lastMessage?.content ||
+                            "No messages yet"}
+                        </p>
+                        <span
+                          className="text-[10px] text-gray-400 hidden sm:inline"
+                          title={formatUserStatus(conversation._id)}
+                        >
+                          {formatUserStatus(conversation._id)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -359,14 +467,39 @@ const InternalMessages = () => {
             <div className="p-4 border-b border-gray-200 bg-white">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-full overflow-hidden">
-                    {getAvatarDisplay(selectedConversation._id)}
+                  <div className="relative w-10 h-10">
+                    <div className="w-10 h-10 rounded-full overflow-hidden">
+                      {getAvatarDisplay(selectedConversation._id)}
+                    </div>
+                    {(() => {
+                      const id = selectedConversation._id._id;
+                      let isOnline = false;
+                      if (Array.isArray(onlineUsers)) {
+                        isOnline = onlineUsers.includes(id);
+                      } else if (onlineUsers instanceof Set) {
+                        isOnline = onlineUsers.has(id);
+                      } else if (
+                        onlineUsers &&
+                        typeof onlineUsers === "object"
+                      ) {
+                        isOnline = Boolean(onlineUsers[id]);
+                      }
+                      return isOnline;
+                    })() && (
+                      <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                    )}
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <h3
+                      className="text-lg font-semibold text-gray-900"
+                      title={getDisplayName(selectedConversation._id)}
+                    >
                       {getDisplayName(selectedConversation._id)}
                     </h3>
-                    <p className="text-sm text-gray-500">
+                    <p
+                      className="text-sm text-gray-500"
+                      title={formatUserStatus(selectedConversation._id)}
+                    >
                       {formatUserStatus(selectedConversation._id)}
                     </p>
                   </div>
@@ -381,48 +514,88 @@ const InternalMessages = () => {
 
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.map((message) => (
-                <motion.div
-                  key={message._id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`flex ${
-                    message.sender._id === user._id
-                      ? "justify-end"
-                      : "justify-start"
-                  }`}
-                >
-                  <div
-                    className={`flex space-x-2 max-w-xs lg:max-w-md ${
-                      message.sender._id === user._id
-                        ? "flex-row-reverse space-x-reverse"
-                        : ""
-                    }`}
-                  >
-                    <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
-                      {getAvatarDisplay(message.sender)}
-                    </div>
+              {isLoadingMessages ? (
+                <div className="space-y-4">
+                  {/* Message Loading Skeletons */}
+                  {[1, 2, 3, 4].map((i) => (
                     <div
-                      className={`px-4 py-2 rounded-lg ${
-                        message.sender._id === user._id
-                          ? "bg-pink-500 text-white"
-                          : "bg-gray-200 text-gray-900"
+                      key={i}
+                      className={`flex ${
+                        i % 2 === 0 ? "justify-end" : "justify-start"
                       }`}
                     >
-                      <p className="text-sm">{message.content}</p>
-                      <p
-                        className={`text-xs mt-1 ${
-                          message.sender._id === user._id
-                            ? "text-pink-100"
-                            : "text-gray-500"
+                      <div
+                        className={`flex space-x-2 max-w-xs lg:max-w-md ${
+                          i % 2 === 0 ? "flex-row-reverse space-x-reverse" : ""
                         }`}
                       >
-                        {formatMessageTime(message.createdAt)}
-                      </p>
+                        <Skeleton
+                          width="w-8"
+                          height="h-8"
+                          rounded="rounded-full"
+                        />
+                        <div
+                          className={`px-4 py-2 rounded-lg ${
+                            i % 2 === 0 ? "bg-pink-200" : "bg-gray-200"
+                          }`}
+                        >
+                          <Skeleton width="w-32" height="h-4" />
+                          <Skeleton
+                            width="w-16"
+                            height="h-3"
+                            className="mt-1"
+                          />
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
-              ))}
+                  ))}
+                </div>
+              ) : (
+                getMessagesForUser(selectedConversation._id._id).map(
+                  (message) => (
+                    <motion.div
+                      key={message._id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`flex ${
+                        message.sender._id === user._id
+                          ? "justify-end"
+                          : "justify-start"
+                      }`}
+                    >
+                      <div
+                        className={`flex space-x-2 max-w-xs lg:max-w-md ${
+                          message.sender._id === user._id
+                            ? "flex-row-reverse space-x-reverse"
+                            : ""
+                        }`}
+                      >
+                        <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                          {getAvatarDisplay(message.sender)}
+                        </div>
+                        <div
+                          className={`px-4 py-2 rounded-lg ${
+                            message.sender._id === user._id
+                              ? "bg-pink-500 text-white"
+                              : "bg-gray-200 text-gray-900"
+                          }`}
+                        >
+                          <p className="text-sm">{message.content}</p>
+                          <p
+                            className={`text-xs mt-1 ${
+                              message.sender._id === user._id
+                                ? "text-pink-100"
+                                : "text-gray-500"
+                            }`}
+                          >
+                            {formatMessageTime(message.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )
+                )
+              )}
               <div ref={messagesEndRef} />
             </div>
 

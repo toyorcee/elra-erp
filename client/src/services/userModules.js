@@ -796,6 +796,21 @@ export const userModulesAPI = {
         throw error;
       }
     },
+    // Get department calendar (HOD view)
+    getDepartmentCalendar: async (params = {}) => {
+      try {
+        const response = await api.get("/leave/department-calendar", {
+          params,
+        });
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [leaveAPI] Error fetching department calendar:",
+          error
+        );
+        throw error;
+      }
+    },
     // Get leave requests (role-based)
     getRequests: async (params = {}) => {
       try {

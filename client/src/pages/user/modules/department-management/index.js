@@ -6,3 +6,5 @@ export { default as TeamManagement } from "./TeamManagement";
 export { default as Analytics } from "./Analytics";
 export { default as UserManagement } from "./UserManagement";
 export { default as CreateDepartmentProject } from "./CreateDepartmentProject";
+export { default as DepartmentLeaveCalendar } from "./DepartmentLeaveCalendar";
+export { default as DepartmentAnnouncements } from "./DepartmentAnnouncements";

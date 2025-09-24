@@ -45,12 +45,12 @@ import {
   Analytics,
   UserManagement,
   CreateDepartmentProject,
+  DepartmentLeaveCalendar,
+  DepartmentAnnouncements,
 } from "./pages/user/modules/department-management";
 import {
   Communication,
   InternalMessages,
-  TeamChats,
-  FileSharing,
   Announcements,
   EventsCalendar,
 } from "./pages/user/modules/communication";
@@ -277,6 +277,10 @@ const AppRoutes = () => {
           element={<DeptLeaveManagement />}
         />
         <Route
+          path="modules/department-management/leave-calendar"
+          element={<DepartmentLeaveCalendar />}
+        />
+        <Route
           path="modules/department-management/team-management"
           element={<TeamManagement />}
         />
@@ -288,6 +292,11 @@ const AppRoutes = () => {
           path="modules/department-management/users"
           element={<UserManagement />}
         />
+        {/* Department Announcements (HOD) */}
+        <Route
+          path="modules/department-management/announcements"
+          element={<DepartmentAnnouncements />}
+        />
         <Route
           path="modules/department-management/create-department-project"
           element={<CreateDepartmentProject />}
@@ -298,8 +307,7 @@ const AppRoutes = () => {
           path="modules/communication/messages"
           element={<InternalMessages />}
         />
-        <Route path="modules/communication/teams" element={<TeamChats />} />
-        <Route path="modules/communication/files" element={<FileSharing />} />
+        {/* TeamChats and FileSharing disabled */}
         <Route
           path="modules/communication/announcements"
           element={<Announcements />}

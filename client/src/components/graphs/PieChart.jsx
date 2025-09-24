@@ -11,12 +11,12 @@ const PieChart = ({
   showLegend = true,
   colors = [
     "#2563EB",
-    "#059669", 
-    "#D97706", 
-    "#DC2626", 
-    "#7C3AED", 
-    "#0891B2", 
-    "#65A30D", 
+    "#059669",
+    "#D97706",
+    "#DC2626",
+    "#7C3AED",
+    "#0891B2",
+    "#65A30D",
     "#EA580C",
   ],
   className = "",
@@ -72,7 +72,9 @@ const PieChart = ({
             const value = context.parsed;
             const total = context.dataset.data.reduce((a, b) => a + b, 0);
             const percentage = ((value / total) * 100).toFixed(1);
-            return `${label}: ${value.toLocaleString()} (${percentage}%)`;
+            return `${label}: NGN ${value.toLocaleString(
+              "en-NG"
+            )} (${percentage}%)`;
           },
         },
       },

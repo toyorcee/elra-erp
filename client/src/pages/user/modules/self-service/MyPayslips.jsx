@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  HiDocumentDownload,
   HiEye,
   HiCalendar,
   HiFilter,
@@ -27,7 +26,6 @@ const MyPayslips = () => {
     year: "all",
   });
   const [searchTerm, setSearchTerm] = useState("");
-  const [downloadingPayslip, setDownloadingPayslip] = useState(null);
   const [viewingPayslip, setViewingPayslip] = useState(null);
 
   const months = [
@@ -115,39 +113,6 @@ const MyPayslips = () => {
       toast.error("Failed to open payslip");
     } finally {
       setViewingPayslip(null);
-    }
-  };
-
-  const handleDownloadPaySlip = async (payslip) => {
-    const payslipKey = `${payslip.payrollId}-${payslip.employee?.id}`;
-    try {
-      setDownloadingPayslip(payslipKey);
-      const fileName = `${payslip.employee?.name?.replace(/\s+/g, "_")}_${
-        payslip.period?.monthName
-      }_${payslip.period?.year}_payslip.pdf`;
-
-      const response = await userModulesAPI.payroll.downloadPayslip(
-        payslip.payrollId,
-        payslip.employee?.id
-      );
-
-      const url = window.URL.createObjectURL(response);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-
-      document.body.appendChild(link);
-      link.click();
-
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast.success("Payslip downloaded successfully!");
-    } catch (error) {
-      console.error("Error downloading payslip:", error);
-      toast.error("Failed to download payslip");
-    } finally {
-      setDownloadingPayslip(null);
     }
   };
 
@@ -245,51 +210,6 @@ const MyPayslips = () => {
         </span>
       ),
     },
-    {
-      header: "Actions",
-      accessor: "actions",
-      renderer: (payslip) => (
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => handleViewPaySlip(payslip)}
-            disabled={
-              loading ||
-              viewingPayslip === `${payslip.payrollId}-${payslip.employee?.id}`
-            }
-            className="text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            title="View Payslip"
-          >
-            <HiEye
-              className={`w-4 h-4 ${
-                viewingPayslip ===
-                `${payslip.payrollId}-${payslip.employee?.id}`
-                  ? "animate-spin"
-                  : ""
-              }`}
-            />
-          </button>
-          <button
-            onClick={() => handleDownloadPaySlip(payslip)}
-            disabled={
-              loading ||
-              downloadingPayslip ===
-                `${payslip.payrollId}-${payslip.employee?.id}`
-            }
-            className="text-green-600 hover:text-green-800 p-1 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            title="Download Payslip"
-          >
-            <HiDocumentDownload
-              className={`w-4 h-4 ${
-                downloadingPayslip ===
-                `${payslip.payrollId}-${payslip.employee?.id}`
-                  ? "animate-spin"
-                  : ""
-              }`}
-            />
-          </button>
-        </div>
-      ),
-    },
   ];
 
   return (
@@ -332,7 +252,7 @@ const MyPayslips = () => {
               </p>
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-              <HiDocumentDownload className="w-6 h-6 text-blue-600" />
+              <HiCalendar className="w-6 h-6 text-blue-600" />
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
@@ -500,7 +420,7 @@ const MyPayslips = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-[var(--elra-primary)] rounded-lg flex items-center justify-center">
-                <HiDocumentDownload className="w-4 h-4 text-white" />
+                <HiCalendar className="w-4 h-4 text-white" />
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">
@@ -523,7 +443,7 @@ const MyPayslips = () => {
         ) : payslips.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <HiDocumentDownload className="w-12 h-12 text-gray-400" />
+              <HiCalendar className="w-12 h-12 text-gray-400" />
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
               No Payslips Yet
@@ -546,7 +466,7 @@ const MyPayslips = () => {
             columns={columns}
             loading={loading}
             emptyState={{
-              icon: <HiDocumentDownload className="w-12 h-12 text-gray-400" />,
+              icon: <HiCalendar className="w-12 h-12 text-gray-400" />,
               title: "No Payslips Found",
               description:
                 "You don't have any payslips yet. Payslips will appear here once they are generated.",
@@ -562,20 +482,21 @@ const MyPayslips = () => {
                       e.stopPropagation();
                       handleViewPaySlip(row);
                     }}
-                    className="p-3 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all duration-300 shadow-sm hover:shadow-md"
+                    disabled={
+                      loading ||
+                      viewingPayslip === `${row.payrollId}-${row.employee?.id}`
+                    }
+                    className="p-3 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-all duration-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                     title="View Payslip"
                   >
-                    <HiEye className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDownloadPaySlip(row);
-                    }}
-                    className="p-3 text-green-600 hover:bg-green-600 hover:text-white rounded-xl transition-all duration-300 shadow-sm hover:shadow-md"
-                    title="Download Payslip"
-                  >
-                    <HiDocumentDownload className="w-5 h-5" />
+                    <HiEye
+                      className={`w-5 h-5 ${
+                        viewingPayslip ===
+                        `${row.payrollId}-${row.employee?.id}`
+                          ? "animate-spin"
+                          : ""
+                      }`}
+                    />
                   </button>
                 </div>
               ),

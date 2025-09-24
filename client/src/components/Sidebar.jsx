@@ -114,21 +114,12 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     try {
       setLoadingModules(true);
       const response = await userModulesAPI.getUserModules();
-      console.log("🔍 [Sidebar] Raw API response:", response);
 
       if (response.success && response.data) {
         const transformedModules = userModulesAPI.transformModules(
           response.data
         );
         setBackendModules(transformedModules);
-        console.log(
-          "✅ [Sidebar] Transformed modules loaded:",
-          transformedModules.length
-        );
-        console.log(
-          "🔍 [Sidebar] First transformed module:",
-          transformedModules[0]
-        );
       }
     } catch (error) {
       console.error("❌ [Sidebar] Error fetching backend modules:", error);
@@ -144,16 +135,9 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
   }, [user]);
 
   const getAccessibleModules = () => {
-    console.log("🔍 [Sidebar] getAccessibleModules called");
-    console.log("🔍 [Sidebar] backendModules:", backendModules);
-
     if (backendModules && backendModules.length > 0) {
-      console.log("🔍 [Sidebar] Processing backend modules...");
-
       return backendModules
         .map((module, index) => {
-          console.log(`🔍 [Sidebar] Processing module ${index}:`, module);
-
           const moduleName = module.name || module.title;
           if (!module.code || !moduleName) {
             console.warn(
@@ -174,14 +158,12 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             permissions: module.permissions,
           };
 
-          console.log(`✅ [Sidebar] Created sidebar module:`, sidebarModule);
           return sidebarModule;
         })
         .filter(Boolean);
     }
 
     // Fallback to frontend filtering
-    console.log("🔍 [Sidebar] No backend modules, using fallback...");
     const userRoleLevel = user?.role?.level || user?.roleLevel || 300;
     const userDepartment = user?.department?.name || null;
     const userPermissions = user?.permissions || [];
@@ -199,7 +181,6 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
       ? fallbackNavigation.filter((item) => item.section === "erp")
       : [];
 
-    console.log("🔍 [Sidebar] Fallback modules:", fallbackModules);
     return fallbackModules;
   };
 

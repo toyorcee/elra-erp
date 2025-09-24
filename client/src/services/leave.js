@@ -22,6 +22,11 @@ export const leaveRequests = {
     return response.data;
   },
 
+  getDepartmentHistory: async () => {
+    const response = await api.get("/leave/department-history");
+    return response.data;
+  },
+
   create: async (leaveData) => {
     const response = await api.post("/leave", leaveData);
     return response.data;
@@ -33,8 +38,22 @@ export const leaveRequests = {
   },
 
   approve: async (id, action, comment) => {
-    const response = await api.put(`/leave/${id}/approve`, { action, comment });
-    return response.data;
+    console.log("🔍 [leaveService] Calling approve API:", {
+      id,
+      action,
+      comment,
+    });
+    try {
+      const response = await api.put(`/leave/${id}/approve`, {
+        action,
+        comment,
+      });
+      console.log("🔍 [leaveService] API response:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("❌ [leaveService] API error:", error);
+      throw error;
+    }
   },
 
   cancel: async (id, reason) => {

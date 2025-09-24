@@ -71,6 +71,8 @@ import budgetAllocationRoutes from "./routes/budgetAllocationRoutes.js";
 import companyWalletRoutes from "./routes/companyWalletRoutes.js";
 import analyticsRoutes from "./routes/analytics.js";
 import salesMarketingFinancialRoutes from "./routes/salesMarketingFinancialRoutes.js";
+import financialReportsRoutes from "./routes/financialReportsRoutes.js";
+import communicationRoutes from "./routes/communication.js";
 
 const isValidObjectId = (id) => {
   return (
@@ -268,6 +270,8 @@ app.use("/api/budget-allocations", budgetAllocationRoutes);
 app.use("/api/elra-wallet", companyWalletRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/sales-marketing", salesMarketingFinancialRoutes);
+app.use("/api/finance/reports", financialReportsRoutes);
+app.use("/api/communication", communicationRoutes);
 
 const io = new SocketIOServer(httpServer, {
   cors: {

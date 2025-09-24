@@ -5,16 +5,21 @@ import {
   HiOutlineCheck,
   HiOutlineXMark,
   HiOutlineEye,
+  HiOutlineClock,
 } from "react-icons/hi2";
 import { useAuth } from "../../../../context/AuthContext";
 import { leaveRequests } from "../../../../services/leave";
 import DataTable from "../../../../components/common/DataTable";
+import defaultAvatar from "../../../../assets/defaulticon.jpg";
 import LeaveDetailsModal from "../../../../components/modals/LeaveDetailsModal";
 
 const LeaveManagement = () => {
   const { user } = useAuth();
   const [leaveRequestsList, setLeaveRequestsList] = useState([]);
+  const [leaveHistoryList, setLeaveHistoryList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("pending");
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
@@ -24,9 +29,19 @@ const LeaveManagement = () => {
   const [rejectionReasonError, setRejectionReasonError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const getImageUrl = (avatarPath) => {
+    if (!avatarPath) return defaultAvatar;
+    if (avatarPath.startsWith("http")) return avatarPath;
+    const baseUrl = (
+      import.meta.env.VITE_API_URL || "http://localhost:5000/api"
+    ).replace("/api", "");
+    return `${baseUrl}${avatarPath}`;
+  };
+
   useEffect(() => {
     if (user) {
       fetchDepartmentLeaveRequests();
+      fetchLeaveHistory();
     }
   }, [user]);
 
@@ -65,6 +80,35 @@ const LeaveManagement = () => {
     }
   };
 
+  const fetchLeaveHistory = async () => {
+    try {
+      setHistoryLoading(true);
+      console.log("🔍 [DepartmentApprovals] Fetching leave history...");
+      const result = await leaveRequests.getDepartmentHistory();
+      console.log("🔍 [DepartmentApprovals] History API response:", result);
+
+      if (result.success) {
+        setLeaveHistoryList(result.data || []);
+        console.log(
+          "🔍 [DepartmentApprovals] Leave history data:",
+          (result.data || []).map((req) => ({
+            id: req.id || req._id,
+            employee: req.employee?.firstName + " " + req.employee?.lastName,
+            status: req.status,
+            reason: req.reason,
+          }))
+        );
+      } else {
+        toast.error(result.message || "Failed to fetch leave history");
+      }
+    } catch (error) {
+      console.error("❌ [DepartmentApprovals] Error fetching history:", error);
+      toast.error("Failed to fetch leave history");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   const handleViewRequest = (request) => {
     setSelectedRequest(request);
     setShowDetailsModal(true);
@@ -86,25 +130,64 @@ const LeaveManagement = () => {
   const handleApproveSubmit = async () => {
     if (!selectedRequest) return;
     setIsSubmitting(true);
+
+    const safetyTimeout = setTimeout(() => {
+      console.log(
+        "⚠️ [DepartmentApprovals] Safety timeout triggered - forcing modal close"
+      );
+      setIsSubmitting(false);
+      setShowApprovalModal(false);
+      setSelectedRequest(null);
+      setApprovalComment("");
+      toast.error(
+        "Request timed out. Please check if the approval was successful."
+      );
+    }, 15000);
+
     try {
+      console.log(
+        "🔍 [DepartmentApprovals] Starting approval for request:",
+        selectedRequest.id || selectedRequest._id
+      );
+
       const result = await leaveRequests.approve(
         selectedRequest.id || selectedRequest._id,
         "approve",
         approvalComment || "Approved by Department HOD"
       );
-      if (result.success) {
+
+      clearTimeout(safetyTimeout); // Clear the safety timeout
+      console.log("🔍 [DepartmentApprovals] Approval API response:", result);
+
+      if (result && result.success) {
+        console.log(
+          "✅ [DepartmentApprovals] Approval successful, refreshing data..."
+        );
         toast.success("Leave request approved successfully");
+
+        // Close modal and reset state
         setShowApprovalModal(false);
         setSelectedRequest(null);
         setApprovalComment("");
-        fetchDepartmentLeaveRequests();
+
+        // Refresh data
+        await fetchDepartmentLeaveRequests();
+        if (activeTab === "history") {
+          await fetchLeaveHistory();
+        }
       } else {
-        throw new Error(result.message || "Failed to approve request");
+        console.error(
+          "❌ [DepartmentApprovals] Approval failed:",
+          result?.message
+        );
+        toast.error(result?.message || "Failed to approve request");
       }
     } catch (error) {
+      clearTimeout(safetyTimeout); // Clear the safety timeout
       console.error("❌ [DepartmentApprovals] Error approving request:", error);
-      toast.error("Failed to approve leave request");
+      toast.error(error.message || "Failed to approve leave request");
     } finally {
+      console.log("🔍 [DepartmentApprovals] Setting isSubmitting to false");
       setIsSubmitting(false);
     }
   };
@@ -128,6 +211,9 @@ const LeaveManagement = () => {
         setSelectedRequest(null);
         setRejectionReason("");
         fetchDepartmentLeaveRequests();
+        if (activeTab === "history") {
+          fetchLeaveHistory();
+        }
       } else {
         throw new Error(result.message || "Failed to reject request");
       }
@@ -163,15 +249,40 @@ const LeaveManagement = () => {
         </div>
       ),
       renderer: (row) => (
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-            <HiOutlineCalendar className="w-4 h-4 text-gray-600" />
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center text-xs font-semibold text-gray-700">
+            {row.employee?.avatar ? (
+              <img
+                src={getImageUrl(row.employee.avatar)}
+                alt={`${row.employee?.firstName || ""} ${
+                  row.employee?.lastName || ""
+                }`}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = defaultAvatar;
+                }}
+              />
+            ) : (
+              <span>
+                {(row.employee?.firstName?.[0] || "").toUpperCase()}
+                {(row.employee?.lastName?.[0] || "").toUpperCase()}
+              </span>
+            )}
           </div>
-          <div>
-            <p className="font-medium text-gray-900">
-              {row.employee?.firstName} {row.employee?.lastName}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="font-medium text-gray-900 truncate">
+                {row.employee?.firstName} {row.employee?.lastName}
+              </p>
+              {row.employee?.employeeId && (
+                <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-700 border border-gray-200">
+                  {row.employee.employeeId}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 truncate">
+              {row.employee?.email || "No email"}
             </p>
-            <p className="text-sm text-gray-500">{row.employee?.email}</p>
           </div>
         </div>
       ),
@@ -379,8 +490,9 @@ const LeaveManagement = () => {
           >
             <HiOutlineEye className="w-4 h-4" />
           </button>
-          {/* Only show Approve/Reject buttons if status is pending AND no approved approvals yet (meaning it hasn't been approved by HOD yet) */}
-          {(row.status === "pending" || row.status === "Pending") &&
+          {/* Only show Approve/Reject buttons if status is pending AND no approved approvals yet (meaning it hasn't been approved by HOD yet) AND we're in pending tab */}
+          {activeTab === "pending" &&
+            (row.status === "pending" || row.status === "Pending") &&
             (!row.approvals ||
               row.approvals.length === 0 ||
               !row.approvals.some(
@@ -461,23 +573,85 @@ const LeaveManagement = () => {
           </div>
         </div>
 
+        {/* Tab Navigation */}
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8 px-6" aria-label="Tabs">
+              <button
+                onClick={() => setActiveTab("pending")}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "pending"
+                    ? "border-[var(--elra-primary)] text-[var(--elra-primary)]"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <HiOutlineClock className="w-4 h-4" />
+                  <span>Pending Requests</span>
+                  {leaveRequestsList.length > 0 && (
+                    <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">
+                      {leaveRequestsList.length}
+                    </span>
+                  )}
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab("history")}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "history"
+                    ? "border-[var(--elra-primary)] text-[var(--elra-primary)]"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <HiOutlineCalendar className="w-4 h-4" />
+                  <span>Request History</span>
+                  {leaveHistoryList.length > 0 && (
+                    <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2 py-1 rounded-full">
+                      {leaveHistoryList.length}
+                    </span>
+                  )}
+                </div>
+              </button>
+            </nav>
+          </div>
+        </div>
+
         {/* DataTable */}
         <div className="bg-white rounded-lg shadow">
-          <DataTable
-            data={leaveRequestsList}
-            columns={columns}
-            loading={loading}
-            actions={{
-              showEdit: false,
-              showDelete: false,
-              showToggle: false,
-            }}
-            emptyMessage={{
-              title: "No leave requests found",
-              description:
-                "No pending leave requests match your current filters",
-            }}
-          />
+          {activeTab === "pending" ? (
+            <DataTable
+              data={leaveRequestsList}
+              columns={columns}
+              loading={loading}
+              actions={{
+                showEdit: false,
+                showDelete: false,
+                showToggle: false,
+              }}
+              emptyMessage={{
+                title: "No pending requests found",
+                description:
+                  "No pending leave requests require your approval at this time",
+              }}
+            />
+          ) : (
+            <DataTable
+              data={leaveHistoryList}
+              columns={columns}
+              loading={historyLoading}
+              actions={{
+                showEdit: false,
+                showDelete: false,
+                showToggle: false,
+              }}
+              emptyMessage={{
+                title: "No request history found",
+                description:
+                  "No completed leave requests found in your department",
+              }}
+            />
+          )}
         </div>
       </div>
 

@@ -788,7 +788,7 @@ companyWalletSchema.methods.processPayroll = function (
 
   this.transactions.push({
     type: "withdrawal",
-    amount: -amount,
+    amount: amount,
     description: `Payroll processed for ${payrollPeriod}`,
     reference: payrollPeriod,
     referenceType: "payroll",

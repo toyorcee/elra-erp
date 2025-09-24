@@ -118,6 +118,31 @@ export const SocketProvider = ({ children }) => {
       console.log("🔴 User offline:", data);
     });
 
+    newSocket.on(SocketEventTypes.COMM_EVENT_CREATED, (evt) => {
+      console.log("📅 Event created via socket:", evt);
+    });
+
+    newSocket.on(SocketEventTypes.COMM_EVENT_UPDATED, (evt) => {
+      console.log("📅 Event updated via socket:", evt);
+    });
+
+    newSocket.on(SocketEventTypes.COMM_EVENT_DELETED, (evt) => {
+      console.log("📅 Event deleted via socket:", evt);
+    });
+
+    // Announcement events
+    newSocket.on(SocketEventTypes.COMM_ANNOUNCEMENT_CREATED, (announcement) => {
+      console.log("📢 Announcement created via socket:", announcement);
+    });
+
+    newSocket.on(SocketEventTypes.COMM_ANNOUNCEMENT_UPDATED, (announcement) => {
+      console.log("📢 Announcement updated via socket:", announcement);
+    });
+
+    newSocket.on(SocketEventTypes.COMM_ANNOUNCEMENT_DELETED, (announcement) => {
+      console.log("📢 Announcement deleted via socket:", announcement);
+    });
+
     newSocket.on("error", (error) => {
       console.error("❌ Socket error:", error);
       toast.error(error.message || "An error occurred");

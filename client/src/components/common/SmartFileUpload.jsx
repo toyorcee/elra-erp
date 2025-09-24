@@ -3,7 +3,6 @@ import {
   CloudArrowUpIcon,
   XMarkIcon,
   DocumentIcon,
-  ExclamationTriangleIcon,
   CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-toastify";
@@ -21,12 +20,12 @@ const SmartFileUpload = ({
   maxSizePerFile = MAX_FILE_SIZE,
   acceptedTypes = ALLOWED_FILE_TYPES,
   className = "",
+  existingCount = 0,
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(new Set());
   const fileInputRef = useRef(null);
 
-  // File type validation - using shared constants
   const getFileTypeInfoForFile = (file) => {
     return getFileTypeInfo(file.type);
   };
@@ -68,17 +67,16 @@ const SmartFileUpload = ({
       const validFiles = [];
       const errors = [];
 
-      // Check if adding these files would exceed the limit
-      if (files.length + fileArray.length > maxFiles) {
+      if (existingCount + files.length + fileArray.length > maxFiles) {
         toast.error(
-          `Maximum ${maxFiles} files allowed. You can upload ${
-            maxFiles - files.length
-          } more files.`
+          `Maximum ${maxFiles} files allowed. You can upload ${Math.max(
+            0,
+            maxFiles - (existingCount + files.length)
+          )} more files.`
         );
         return;
       }
 
-      // Validate each file
       fileArray.forEach((file) => {
         const fileErrors = validateFile(file);
         if (fileErrors.length === 0) {
@@ -93,10 +91,23 @@ const SmartFileUpload = ({
         errors.forEach((error) => toast.error(error));
       }
 
-      // Add valid files
+      // Add valid files (respect maxFiles limit and existing count)
       if (validFiles.length > 0) {
-        // Wrap files in the expected format for inventory completion
-        const wrappedFiles = validFiles.map((file) => ({
+        const remainingSlots = Math.max(
+          0,
+          maxFiles - (existingCount + files.length)
+        );
+        const filesToAdd = validFiles.slice(0, remainingSlots);
+
+        if (validFiles.length > remainingSlots) {
+          toast.warning(
+            `Only ${remainingSlots} more files can be added. ${
+              validFiles.length - remainingSlots
+            } files were skipped.`
+          );
+        }
+
+        const wrappedFiles = filesToAdd.map((file) => ({
           file: file,
           name: file.name,
           size: file.size,
@@ -215,7 +226,7 @@ const SmartFileUpload = ({
               file
             </p>
             <p className="text-[var(--elra-primary)] font-medium">
-              {files.length}/{maxFiles} files selected
+              {existingCount + files.length}/{maxFiles} files selected
             </p>
           </div>
         </div>
@@ -229,7 +240,7 @@ const SmartFileUpload = ({
               <DocumentIcon className="h-4 w-4 mr-1" />
               Selected Files ({files.length})
             </h4>
-            {files.length >= maxFiles && (
+            {existingCount + files.length >= maxFiles && (
               <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
                 Maximum reached
               </span>
@@ -263,8 +274,8 @@ const SmartFileUpload = ({
                         <span className={fileInfo.color}>{fileInfo.name}</span>
                         <span>•</span>
                         <span>
-                          {file.size
-                            ? formatFileSize(file.size)
+                          {file.size || file.file?.size
+                            ? formatFileSize(file.size || file.file?.size)
                             : "Unknown Size"}
                         </span>
                         {isUploading && (

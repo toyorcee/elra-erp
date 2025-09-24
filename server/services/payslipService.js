@@ -450,7 +450,11 @@ class PayslipService {
         : employeeData.name || "Unknown Employee";
 
     doc.text(`Employee: ${employeeName}`, 20, startY);
-    doc.text(`Employee ID: ${employeeData.employeeId}`, 20, startY + 7);
+    doc.text(
+      `Employee ID: ${employeeData.employeeId || employeeData._id || "N/A"}`,
+      20,
+      startY + 7
+    );
 
     let departmentName = "N/A";
     if (employeeData.department) {
@@ -481,10 +485,9 @@ class PayslipService {
     }
     doc.text(`Position: ${position}`, 20, startY + 21);
 
-    // Pay period with better styling
     doc.text(
-      `Period: ${payroll.period?.monthName || payrollData.period.monthName} ${
-        payroll.period?.year || payrollData.period.year
+      `Period: ${payroll.period?.monthName || "N/A"} ${
+        payroll.period?.year || "N/A"
       }`,
       20,
       startY + 28

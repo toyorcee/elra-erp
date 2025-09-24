@@ -68,6 +68,21 @@ export const moduleSidebarConfig = {
         ],
       },
       {
+        title: "Department Communication",
+        collapsible: true,
+        defaultExpanded: true,
+        items: [
+          {
+            label: "Announcements",
+            icon: "MegaphoneIcon",
+            path: "/dashboard/modules/department-management/announcements",
+            required: { minLevel: 700 },
+            description:
+              "Create and manage department-specific announcements (HOD only)",
+          },
+        ],
+      },
+      {
         title: "Leave Management",
         collapsible: true,
         defaultExpanded: false,
@@ -78,6 +93,14 @@ export const moduleSidebarConfig = {
             path: "/dashboard/modules/department-management/leave-management",
             required: { minLevel: 700 },
             description: "Review and approve employee leave requests",
+          },
+          {
+            label: "Department Leave Calendar",
+            icon: "CalendarIcon",
+            path: "/dashboard/modules/department-management/leave-calendar",
+            required: { minLevel: 700 },
+            description:
+              "Visual calendar of approved leaves for your department",
           },
         ],
       },
@@ -894,13 +917,7 @@ export const moduleSidebarConfig = {
             path: "/dashboard/modules/communication/teams",
             required: { minLevel: 300 },
             description: "Collaborate in team chat rooms",
-          },
-          {
-            label: "File Sharing",
-            icon: "DocumentIcon",
-            path: "/dashboard/modules/communication/files",
-            required: { minLevel: 300 },
-            description: "Share files and documents",
+            hidden: () => true,
           },
         ],
       },
@@ -911,15 +928,17 @@ export const moduleSidebarConfig = {
             label: "Announcements",
             icon: "MegaphoneIcon",
             path: "/dashboard/modules/communication/announcements",
-            required: { minLevel: 700, department: "Human Resources" },
-            description: "Create and manage announcements",
+            required: { minLevel: 100 },
+            description:
+              "Company announcements (HR HOD can create; all users can view)",
           },
           {
             label: "Events Calendar",
             icon: "CalendarIcon",
             path: "/dashboard/modules/communication/events",
-            required: { minLevel: 700, department: "Human Resources" },
-            description: "View and manage company events",
+            required: { minLevel: 100 },
+            description:
+              "Company events (HR HOD can create; all users can view)",
           },
         ],
       },

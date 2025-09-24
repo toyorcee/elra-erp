@@ -997,21 +997,6 @@ export const updateUserSalary = async (req, res) => {
 export const getDepartmentUsers = async (req, res) => {
   try {
     const currentUser = req.user;
-
-    console.log(
-      "👥 [DEPARTMENT USERS] Fetching department users for:",
-      currentUser.name
-    );
-    console.log(
-      "👥 [DEPARTMENT USERS] User department:",
-      currentUser.department?.name
-    );
-    console.log(
-      "👥 [DEPARTMENT USERS] User role level:",
-      currentUser.role?.level
-    );
-
-    // Check if user is HOD or Super Admin
     if (currentUser.role.level < 700) {
       return res.status(403).json({
         success: false,

@@ -5,7 +5,10 @@ import Role from "../models/Role.js";
 import Department from "../models/Department.js";
 import Notification from "../models/Notification.js";
 import AuditService from "../services/auditService.js";
+import NotificationService from "../services/notificationService.js";
 import mongoose from "mongoose";
+
+const notificationService = new NotificationService();
 
 // Helper function to get user role name
 const getRoleName = (roleLevel) => {
@@ -230,6 +233,7 @@ const createLeaveRequest = asyncHandler(async (req, res) => {
   // Validate dates
   const start = new Date(startDate);
   const end = new Date(endDate);
+  const now = new Date();
 
   if (start >= end) {
     return res.status(400).json({
@@ -238,10 +242,33 @@ const createLeaveRequest = asyncHandler(async (req, res) => {
     });
   }
 
-  if (start < new Date()) {
+  if (start < now) {
     return res.status(400).json({
       success: false,
       message: "Cannot request leave for past dates",
+    });
+  }
+
+  const activeLeave = await LeaveRequest.findOne({
+    employee: userId,
+    status: "Approved",
+    startDate: { $lte: now },
+    endDate: { $gte: now },
+  });
+
+  if (activeLeave) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "You currently have an active approved leave. You can create a new request after your current leave ends.",
+      data: {
+        currentLeave: {
+          id: activeLeave._id,
+          leaveType: activeLeave.leaveType,
+          startDate: activeLeave.startDate,
+          endDate: activeLeave.endDate,
+        },
+      },
     });
   }
 
@@ -423,24 +450,8 @@ const createLeaveRequest = asyncHandler(async (req, res) => {
     await Notification.create({
       recipient: nextApprover._id,
       type: "LEAVE_REQUEST",
-      title: "New Leave Request Requires Your Approval",
-      message: `${req.user.firstName} ${
-        req.user.lastName
-      } has submitted a leave request that requires your approval as Department HOD.
-
-📋 Request Details:
-• Employee: ${req.user.firstName} ${req.user.lastName} (${getRoleName(
-        req.user.role?.level
-      )})
-• Leave Type: ${leaveType}
-• Duration: ${days} day(s)
-• Period: ${start.toLocaleDateString()} - ${end.toLocaleDateString()}
-• Reason: ${reason}
-
-⏳ Current Status: Awaiting your approval
-✅ Next Step: After your approval, it will go to HR HOD for final approval
-
-Please review and approve/reject this request.`,
+      title: "New Leave Request",
+      message: `${req.user.firstName} ${req.user.lastName} submitted a ${leaveType} leave request (${days} days). Please review and approve.`,
       data: {
         leaveRequestId: leaveRequest._id,
         employeeName: `${req.user.firstName} ${req.user.lastName}`,
@@ -468,24 +479,9 @@ Please review and approve/reject this request.`,
       "✅ [leaveController] Approval request notification created successfully"
     );
 
-    // Create a more informative message for staff (level 600 and below)
-    let requesterMessage = "";
+    // Create a simple message for the requester
     let requesterTitle = "Leave Request Submitted";
-
-    if (req.user.role?.level <= 600) {
-      requesterTitle = "Leave Request Submitted Successfully";
-      requesterMessage = `Your ${leaveType} leave request has been submitted successfully! 🎉
-      
-Your request will go through 2 levels of approval:
-1️⃣ First: ${nextApprover.firstName} ${nextApprover.lastName} (${getRoleName(
-        nextApprover.role?.level
-      )})
-2️⃣ Final: HR Department Head
-
-You'll be notified at each stage. Current status: Awaiting first approval.`;
-    } else {
-      requesterMessage = `Your leave request has been submitted and is pending approval from ${nextApprover.firstName} ${nextApprover.lastName}`;
-    }
+    let requesterMessage = `Your ${leaveType} leave request (${days} days) has been submitted and is pending approval.`;
 
     await Notification.create({
       recipient: userId,
@@ -736,7 +732,7 @@ const getLeaveRequestById = asyncHandler(async (req, res) => {
     userRole?.level === 1000 ||
     leaveRequest.employee._id.equals(userId) ||
     (userRole?.level === 700 &&
-      req.user.department?.name === "Human Resources") || // HR HOD can access all
+      req.user.department?.name === "Human Resources") ||
     (userRole?.level >= 600 &&
       leaveRequest.department._id.equals(req.user.department)) ||
     leaveRequest.currentApprover?._id.equals(userId);
@@ -792,7 +788,8 @@ const approveLeaveRequest = asyncHandler(async (req, res) => {
     });
   }
 
-  const isCurrentApprover = leaveRequest.currentApprover.equals(userId);
+  const isCurrentApprover =
+    leaveRequest.currentApprover && leaveRequest.currentApprover.equals(userId);
 
   const canOverride =
     userRole?.level >= 1000 ||
@@ -873,27 +870,7 @@ const approveLeaveRequest = asyncHandler(async (req, res) => {
           recipient: nextApprover._id,
           type: "LEAVE_REQUEST",
           title: "Leave Request Ready for HR Approval",
-          message: `A leave request from ${employee.firstName} ${
-            employee.lastName
-          } has been approved by their Department HOD and is now ready for your final HR approval.
-
-📋 Request Details:
-• Employee: ${employee.firstName} ${employee.lastName} (${getRoleName(
-            employee.role?.level
-          )})
-• Department: ${employee.department?.name || "Unknown"}
-• Leave Type: ${leaveRequest.leaveType}
-• Duration: ${leaveRequest.days} day(s)
-• Period: ${new Date(leaveRequest.startDate).toLocaleDateString()} - ${new Date(
-            leaveRequest.endDate
-          ).toLocaleDateString()}
-
-✅ Department HOD: ${req.user.firstName} ${req.user.lastName} (${
-            req.user.department?.name || "Unknown"
-          })
-⏳ HR Approval: Pending (You)
-
-This is the final approval step. Please review and approve/reject.`,
+          message: `${employee.firstName} ${employee.lastName}'s ${leaveRequest.leaveType} leave request (${leaveRequest.days} days) has been approved by Department HOD. Ready for your final approval.`,
           data: {
             leaveRequestId: leaveRequest._id,
             employeeName: `${employee.firstName} ${employee.lastName}`,
@@ -960,13 +937,8 @@ Your request is now with ${nextApprover.firstName} ${nextApprover.lastName} (HR 
         await Notification.create({
           recipient: leaveRequest.employee._id,
           type: "LEAVE_RESPONSE",
-          title: "🎉 Leave Request Fully Approved!",
-          message: `Congratulations! Your leave request has been fully approved by ${req.user.firstName} ${req.user.lastName} (HR Department Head).
-
-✅ All approvals completed
-✅ Your leave is now active and ready to use
-
-Enjoy your time off!`,
+          title: "Leave Request Approved",
+          message: `Your leave request has been fully approved. Enjoy your time off!`,
           data: {
             leaveRequestId: leaveRequest._id,
             status: "Approved",
@@ -977,6 +949,37 @@ Enjoy your time off!`,
             comment: "Final approval granted by HR Department Head",
           },
         });
+
+        if (leaveRequest.approvals && leaveRequest.approvals.length > 0) {
+          const departmentHODApproval = leaveRequest.approvals.find(
+            (approval) =>
+              approval.status === "Approved" &&
+              approval.role === "HOD" &&
+              approval.approver.toString() !== req.user._id.toString()
+          );
+
+          if (departmentHODApproval) {
+            await Notification.create({
+              recipient: departmentHODApproval.approver,
+              type: "LEAVE_REQUEST_UPDATE",
+              title: "Leave Request Finalized by HR",
+              message: `A leave request you approved has received final HR approval.`,
+              data: {
+                leaveRequestId: leaveRequest._id,
+                employeeName: `${leaveRequest.employee.firstName} ${leaveRequest.employee.lastName}`,
+                employeeRole: getRoleName(leaveRequest.employee.role?.level),
+                employeeDepartment: leaveRequest.department?.name || "Unknown",
+                leaveType: leaveRequest.leaveType,
+                startDate: leaveRequest.startDate,
+                endDate: leaveRequest.endDate,
+                days: leaveRequest.days,
+                status: "Approved",
+                hrHODName: `${req.user.firstName} ${req.user.lastName}`,
+                isFinalApproval: true,
+              },
+            });
+          }
+        }
       }
     }
   } else {
@@ -1004,8 +1007,6 @@ Enjoy your time off!`,
         userRole?.level === 700 &&
         req.user.department?.name !== "Human Resources"
       ) {
-        // Department HOD approval (first level) - skip notification here since it's already sent above
-        return; // Skip this notification to avoid duplicates
       } else {
         // Other first level approvals
         employeeTitle = "First Level Approval Granted! 🎉";
@@ -1026,16 +1027,11 @@ Your request is now with ${nextApprover.firstName} ${
         userRole?.level === 700 &&
         req.user.department?.name === "Human Resources"
       ) {
-        // HR HOD final approval - skip notification here since it's already sent above
-        return; // Skip this notification to avoid duplicates
+        // HR HOD final approval - skip duplicate notification and continue to response
       } else {
         // Other final approvals
-        employeeTitle = "Leave Request Fully Approved! 🎉";
-        employeeMessage = `Congratulations! Your leave request has been fully approved by ${
-          req.user.firstName
-        } ${req.user.lastName} (${getRoleName(req.user.role?.level)}).
-
-✅ Your leave is now approved and ready to use!`;
+        employeeTitle = "Leave Request Approved";
+        employeeMessage = `Your leave request has been approved. Enjoy your time off!`;
       }
     }
   } else {
@@ -1045,89 +1041,51 @@ Your request is now with ${nextApprover.firstName} ${
       req.user.department?.name === "Human Resources"
     ) {
       // HR HOD rejection (final rejection)
-      employeeTitle = "Leave Request Rejected by HR Department";
-      employeeMessage = `Your leave request has been rejected by ${
-        req.user.firstName
-      } ${req.user.lastName} (HR Department Head).
-
-❌ Status: Rejected at Final Level
-💬 Reason: ${comment || "No reason provided"}
-
-📋 What This Means:
-• Your Department HOD had already approved this request
-• HR Department Head has rejected it as the final authority
-• This is a company-level decision, not a department-level one
-
-🔄 Next Steps:
-• You can submit a new leave request with the necessary changes
-• Consider addressing the feedback provided by HR
-• Contact your Department HOD if you need clarification
-
-💡 Tip: HR rejections usually indicate policy compliance issues or resource constraints.`;
+      employeeTitle = "Leave Request Rejected";
+      employeeMessage = `Your leave request has been rejected. Reason: ${
+        comment || "No reason provided"
+      }`;
     } else if (
       userRole?.level === 700 &&
       req.user.department?.name !== "Human Resources"
     ) {
       // Department HOD rejection (first level rejection)
-      employeeTitle = "Leave Request Rejected by Department Head";
-      employeeMessage = `Your leave request has been rejected by ${
-        req.user.firstName
-      } ${req.user.lastName} (${req.user.department?.name} Department Head).
-
-❌ Status: Rejected at Department Level
-💬 Reason: ${comment || "No reason provided"}
-
-📋 What This Means:
-• This rejection happened before HR review
-• Your request did not proceed to the HR Department
-• This is a department-level decision
-
-🔄 Next Steps:
-• You can submit a new leave request with the necessary changes
-• Consider addressing your Department Head's feedback
-• Ensure your request aligns with department policies
-
-💡 Tip: Department rejections usually indicate scheduling conflicts, workload issues, or department-specific constraints.`;
-    } else {
-      // Other role rejections (fallback)
       employeeTitle = "Leave Request Rejected";
-      employeeMessage = `Your leave request has been rejected by ${
-        req.user.firstName
-      } ${req.user.lastName} (${getRoleName(req.user.role?.level)}).
-
-❌ Status: Rejected
-💬 Reason: ${comment || "No reason provided"}
-
-🔄 Next Steps:
-• You can submit a new leave request with the necessary changes
-• Consider addressing the feedback provided
-• Contact the approver if you need clarification`;
+      employeeMessage = `Your leave request has been rejected by your Department Head. Reason: ${
+        comment || "No reason provided"
+      }`;
+    } else {
+      employeeTitle = "Leave Request Rejected";
+      employeeMessage = `Your leave request has been rejected. Reason: ${
+        comment || "No reason provided"
+      }`;
     }
   }
 
-  await Notification.create({
-    recipient: leaveRequest.employee._id,
-    type: "LEAVE_RESPONSE",
-    title: employeeTitle,
-    message: employeeMessage,
-    data: {
-      leaveRequestId: leaveRequest._id,
-      status: leaveRequest.status,
-      approverName: `${req.user.firstName} ${req.user.lastName}`,
-      approverRole: getRoleName(req.user.role?.level),
-      approverDepartment: req.user.department?.name || "Unknown",
-      comment,
-      isFinalApproval: leaveRequest.status === "Approved",
-      nextApprover: nextApprover
-        ? `${nextApprover.firstName} ${nextApprover.lastName}`
-        : null,
-      nextApproverRole: nextApprover
-        ? getRoleName(nextApprover.role?.level)
-        : null,
-    },
-  });
+  if (employeeMessage && employeeMessage.trim().length > 0) {
+    await Notification.create({
+      recipient: leaveRequest.employee._id,
+      type: "LEAVE_RESPONSE",
+      title: employeeTitle,
+      message: employeeMessage,
+      data: {
+        leaveRequestId: leaveRequest._id,
+        status: leaveRequest.status,
+        approverName: `${req.user.firstName} ${req.user.lastName}`,
+        approverRole: getRoleName(req.user.role?.level),
+        approverDepartment: req.user.department?.name || "Unknown",
+        comment,
+        isFinalApproval: leaveRequest.status === "Approved",
+        nextApprover: nextApprover
+          ? `${nextApprover.firstName} ${nextApprover.lastName}`
+          : null,
+        nextApproverRole: nextApprover
+          ? getRoleName(nextApprover.role?.level)
+          : null,
+      },
+    });
+  }
 
-  // If HR HOD rejects a request, notify the Department HOD who previously approved it
   if (
     action === "reject" &&
     userRole?.level === 700 &&
@@ -1285,11 +1243,25 @@ const updateLeaveRequest = asyncHandler(async (req, res) => {
     });
   }
 
-  // Check if request can be edited (only pending requests)
+  // Check if request can be edited (only pending requests, not approved/rejected)
   if (leaveRequest.status !== "Pending") {
     return res.status(400).json({
       success: false,
       message: "Only pending requests can be edited",
+    });
+  }
+
+  // Check if request has been approved (final approval)
+  const hasFinalApproval =
+    leaveRequest.approvals &&
+    leaveRequest.approvals.some(
+      (approval) => approval.status === "Approved" && approval.level === "final"
+    );
+
+  if (hasFinalApproval) {
+    return res.status(400).json({
+      success: false,
+      message: "Cannot edit leave request that has been finally approved",
     });
   }
 
@@ -1340,6 +1312,44 @@ const updateLeaveRequest = asyncHandler(async (req, res) => {
   leaveRequest.updatedAt = new Date();
 
   await leaveRequest.save();
+
+  try {
+    if (leaveRequest.approvals && leaveRequest.approvals.length > 0) {
+      const approvers = leaveRequest.approvals
+        .filter((approval) => approval.status === "Pending")
+        .map((approval) => approval.approver);
+
+      for (const approverId of approvers) {
+        await notificationService.createNotification({
+          recipient: approverId,
+          type: "LEAVE_REQUEST_UPDATED",
+          title: "Leave Request Updated",
+          message: `${req.user.firstName} ${req.user.lastName} has updated their leave request. Please review the changes.`,
+          data: {
+            leaveRequestId: leaveRequest._id,
+            employeeId: userId,
+            action: "updated",
+            changes: {
+              leaveType,
+              startDate: start,
+              endDate: end,
+              days,
+              reason,
+            },
+          },
+          priority: "medium",
+        });
+      }
+      console.log(
+        "✅ [leaveController] Notified approvers about leave request update"
+      );
+    }
+  } catch (notificationError) {
+    console.error(
+      "❌ [leaveController] Error notifying approvers:",
+      notificationError
+    );
+  }
 
   // Log audit for leave request update
   try {
@@ -1660,7 +1670,7 @@ const getPendingApprovals = asyncHandler(async (req, res) => {
   });
 });
 
-// Get department leave requests for HODs
+// Get department leave requests for HODs (Pending only - primary approvals tab)
 const getDepartmentLeaveRequests = asyncHandler(async (req, res) => {
   const user = req.user;
 
@@ -1674,6 +1684,7 @@ const getDepartmentLeaveRequests = asyncHandler(async (req, res) => {
   }
 
   try {
+    // Pending only for this endpoint
     let query = { status: "Pending" };
 
     // HR HOD can see all department requests
@@ -1738,4 +1749,144 @@ export {
   getPendingApprovals,
   getLeaveTypes,
   getDepartmentLeaveRequests,
+  getDepartmentLeaveHistory,
 };
+
+const getDepartmentLeaveHistory = asyncHandler(async (req, res) => {
+  const user = req.user;
+
+  if (user.role?.level !== 700) {
+    return res.status(403).json({
+      success: false,
+      message:
+        "Access denied. Only Department Heads (HODs) can view department leave history.",
+    });
+  }
+
+  try {
+    const statusFilter = ["Approved", "Rejected", "Cancelled"];
+    const query = { status: { $in: statusFilter } };
+
+    if (user.department?.name !== "Human Resources") {
+      query.department = user.department;
+    }
+
+    const history = await LeaveRequest.find(query)
+      .populate([
+        {
+          path: "employee",
+          select: "firstName lastName email avatar employeeId role",
+        },
+        { path: "department", select: "name" },
+        { path: "approvals.approver", select: "firstName lastName email role" },
+      ])
+      .sort({ updatedAt: -1, createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      data: history,
+      message: `Department leave history retrieved successfully. Found ${history.length} completed requests.`,
+    });
+  } catch (error) {
+    console.error("❌ [getDepartmentLeaveHistory] Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve department leave history",
+      error: error.message,
+    });
+  }
+});
+
+// New: Department calendar view for HODs (date-range, approved-only by default)
+const getDepartmentLeaveCalendar = asyncHandler(async (req, res) => {
+  const user = req.user;
+  const {
+    startDate,
+    endDate,
+    status = "Approved",
+    leaveType,
+    employee,
+    includeFirstLevel = "false",
+  } = req.query;
+
+  if (!startDate || !endDate) {
+    return res.status(400).json({
+      success: false,
+      message: "startDate and endDate are required (ISO strings)",
+    });
+  }
+
+  // Only HODs (>=700) should access; HR HOD sees all departments
+  if (!user?.role || user.role.level < 700) {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. HODs only.",
+    });
+  }
+
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  // Build overlap query
+  const query = {
+    startDate: { $lte: end },
+    endDate: { $gte: start },
+  };
+
+  if (includeFirstLevel === "true") {
+    query.$or = [
+      { status: "Approved" },
+      {
+        status: "Pending",
+        approvals: {
+          $elemMatch: {
+            approver: user._id,
+            status: "Approved",
+          },
+        },
+      },
+    ];
+  } else {
+    query.status = status;
+  }
+
+  if (leaveType) query.leaveType = leaveType;
+  if (employee) query.employee = employee;
+
+  if (user.department?.name !== "Human Resources") {
+    query.department = user.department;
+  }
+
+  try {
+    const results = await LeaveRequest.find(query)
+      .populate([
+        {
+          path: "employee",
+          select: "firstName lastName employeeId avatar department role",
+          populate: [
+            { path: "department", select: "name" },
+            { path: "role", select: "name level" },
+          ],
+        },
+        { path: "department", select: "name" },
+        { path: "approvals.approver", select: "firstName lastName role" },
+      ])
+      .sort({ startDate: 1 })
+      .limit(1000);
+
+    return res.status(200).json({
+      success: true,
+      data: results,
+      message: "Department leave calendar retrieved successfully",
+    });
+  } catch (error) {
+    console.error("❌ [getDepartmentLeaveCalendar] Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve department leave calendar",
+      error: error.message,
+    });
+  }
+});
+
+export { getDepartmentLeaveCalendar };

@@ -12,6 +12,9 @@ import {
   getPendingApprovals,
   getLeaveTypes,
   getDepartmentLeaveRequests,
+  getDepartmentLeaveCalendar,
+  // Added new history controller export
+  getDepartmentLeaveHistory,
 } from "../controllers/leaveController.js";
 import { protect, checkRole } from "../middleware/auth.js";
 
@@ -28,6 +31,12 @@ router.get("/my-requests", checkRole(100), getMyLeaveRequests);
 
 // Department leave requests for HODs only
 router.get("/department-requests", checkRole(700), getDepartmentLeaveRequests);
+
+// Department leave history for HODs only
+router.get("/department-history", checkRole(700), getDepartmentLeaveHistory);
+
+// Department leave calendar (date-range, HODs)
+router.get("/department-calendar", checkRole(700), getDepartmentLeaveCalendar);
 
 router.get("/stats/overview", checkRole(100), getLeaveStats);
 

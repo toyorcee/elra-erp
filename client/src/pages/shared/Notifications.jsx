@@ -18,6 +18,7 @@ import {
   MdClose,
 } from "react-icons/md";
 import { toast } from "react-toastify";
+import AttachmentModal from "../../components/common/AttachmentModal";
 import notificationService from "../../services/notifications";
 
 const Notifications = () => {
@@ -29,6 +30,11 @@ const Notifications = () => {
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [markingAsRead, setMarkingAsRead] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+  const [attachmentModalData, setAttachmentModalData] = useState({
+    attachments: [],
+    title: "",
+  });
   const [showMarkAllModal, setShowMarkAllModal] = useState(false);
   const [notificationToDelete, setNotificationToDelete] = useState(null);
 
@@ -217,6 +223,18 @@ const Notifications = () => {
         return <MdInfo className="text-[var(--elra-primary)]" size={24} />;
       case "FUND_ADDITION":
         return <span className="text-[var(--elra-primary)] text-2xl">💰</span>;
+      case "ANNOUNCEMENT_CREATED":
+        return <span className="text-[var(--elra-primary)] text-2xl">📢</span>;
+      case "ANNOUNCEMENT_UPDATED":
+        return <span className="text-[var(--elra-primary)] text-2xl">📝</span>;
+      case "ANNOUNCEMENT_DELETED":
+        return <span className="text-[var(--elra-primary)] text-2xl">🗑️</span>;
+      case "EVENT_CREATED":
+        return <span className="text-[var(--elra-primary)] text-2xl">📅</span>;
+      case "EVENT_UPDATED":
+        return <span className="text-[var(--elra-primary)] text-2xl">📝</span>;
+      case "EVENT_CANCELLED":
+        return <span className="text-[var(--elra-primary)] text-2xl">❌</span>;
       default:
         return (
           <MdNotifications className="text-[var(--elra-primary)]" size={24} />
@@ -286,6 +304,21 @@ const Notifications = () => {
   const unreadCount = notifications.filter((n) => !n.isRead).length;
   const readCount = notifications.filter((n) => n.isRead).length;
 
+  // Group notifications by recency for better readability
+  const groupByRecency = (items) => {
+    const groups = { today: [], week: [], earlier: [] };
+    const now = new Date();
+    items.forEach((n) => {
+      const created = new Date(n.createdAt);
+      const diffDays = Math.floor((now - created) / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) groups.today.push(n);
+      else if (diffDays <= 7) groups.week.push(n);
+      else groups.earlier.push(n);
+    });
+    return groups;
+  };
+  const grouped = groupByRecency(filteredNotifications);
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -320,14 +353,50 @@ const Notifications = () => {
 
   if (loading) {
     return (
-      <div className="w-full max-w-4xl mx-auto py-6">
-        <h1 className="text-2xl font-bold mb-6 text-[var(--elra-primary)] font-[Poppins]">
-          Notifications
-        </h1>
-        <div className="flex items-center justify-center h-96">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--elra-primary)] mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading notifications...</p>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 overflow-hidden">
+        {/* Header skeleton */}
+        <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-white/20 shadow-sm">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="h-8 w-48 bg-gray-200 rounded-lg animate-pulse" />
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          {/* Stats skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm"
+              >
+                <div className="h-5 w-24 bg-gray-200 rounded mb-3 animate-pulse" />
+                <div className="h-8 w-20 bg-gray-200 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+
+          {/* Filters skeleton */}
+          <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm mb-8">
+            <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
+          </div>
+
+          {/* List skeleton */}
+          <div className="space-y-4">
+            {[...Array(6)].map((_, idx) => (
+              <div
+                key={idx}
+                className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="h-6 w-6 bg-gray-200 rounded animate-pulse" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-5 w-1/3 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-4 w-2/3 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-4 w-1/2 bg-gray-200 rounded animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -495,12 +564,12 @@ const Notifications = () => {
           </div>
         </motion.div>
 
-        {/* Notifications List */}
+        {/* Notifications List (grouped by date) */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="space-y-4"
+          className="space-y-6"
         >
           {filteredNotifications.length === 0 ? (
             <motion.div
@@ -519,98 +588,146 @@ const Notifications = () => {
               </p>
             </motion.div>
           ) : (
-            filteredNotifications.map((notification, index) => (
-              <motion.div
-                key={notification._id}
-                variants={cardVariants}
-                whileHover="hover"
-                onClick={() => handleNotificationClick(notification)}
-                className={`bg-white/80 backdrop-blur-xl rounded-2xl border border-white/30 shadow-xl transition-all duration-300 overflow-hidden cursor-pointer ${
-                  !notification.read
-                    ? "ring-2 ring-[var(--elra-primary)]/20"
-                    : ""
-                }`}
-              >
-                <div className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0">
-                      {getNotificationIcon(notification.type)}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-gray-900 text-lg mb-1">
-                            {notification.title}
-                          </h3>
-                          <p className="text-gray-600 text-sm leading-relaxed">
-                            {notification.message}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-2 ml-4">
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs font-semibold border ${getPriorityColor(
-                              notification.priority || "low"
-                            )}`}
-                          >
-                            {notification.priority || "low"}
-                          </span>
-                          {!notification.read && (
-                            <div className="w-3 h-3 bg-[var(--elra-primary)] rounded-full"></div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between mt-4">
-                        <div className="flex items-center gap-4 text-sm text-gray-500">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-[var(--elra-primary)] flex items-center justify-center text-white font-bold text-sm">
-                              {getSenderDisplay(notification.sender).avatar}
-                            </div>
-                            <span>
-                              {getSenderDisplay(notification.sender).name}
-                            </span>
+            [
+              { key: "today", title: "Today", items: grouped.today },
+              { key: "week", title: "This Week", items: grouped.week },
+              { key: "earlier", title: "Earlier", items: grouped.earlier },
+            ]
+              .filter((g) => g.items.length > 0)
+              .map((group) => (
+                <div key={group.key} className="space-y-4">
+                  <h3 className="text-sm font-semibold text-gray-500 px-1">
+                    {group.title}
+                  </h3>
+                  {group.items.map((notification) => (
+                    <motion.div
+                      key={notification._id}
+                      variants={cardVariants}
+                      whileHover="hover"
+                      onClick={() => handleNotificationClick(notification)}
+                      className={`bg-white/80 backdrop-blur-xl rounded-2xl border border-white/30 shadow-xl transition-all duration-300 overflow-hidden cursor-pointer ${
+                        !notification.read
+                          ? "ring-2 ring-[var(--elra-primary)]/20"
+                          : ""
+                      }`}
+                    >
+                      <div className="p-6">
+                        <div className="flex items-start gap-4">
+                          <div className="flex-shrink-0">
+                            {getNotificationIcon(notification.type)}
                           </div>
-                          <span>{formatTimestamp(notification.createdAt)}</span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          {!notification.isRead && (
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={(e) => markAsRead(notification._id, e)}
-                              disabled={markingAsRead === notification._id}
-                              className="p-2 text-gray-400 hover:text-[var(--elra-primary)] hover:bg-[var(--elra-primary)]/10 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
-                              title="Mark as read"
-                            >
-                              {markingAsRead === notification._id ? (
-                                <div className="w-4 h-4 border-2 border-[var(--elra-primary)] border-t-transparent rounded-full animate-spin"></div>
-                              ) : (
-                                <MdMarkEmailRead size={18} />
-                              )}
-                            </motion.button>
-                          )}
-
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={(e) =>
-                              handleDeleteClick(notification._id, e)
-                            }
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                            title="Delete notification"
-                          >
-                            <MdDelete size={18} />
-                          </motion.button>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-semibold text-gray-900 text-lg">
+                                    {notification.title}
+                                  </h3>
+                                  {!notification.isRead && (
+                                    <span className="px-2 py-0.5 text-xs rounded-full bg-[var(--elra-primary)]/10 text-[var(--elra-primary)] border border-[var(--elra-primary)]/20">
+                                      New
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-gray-600 text-sm leading-relaxed mt-1">
+                                  {notification.message}
+                                </p>
+                                {notification.data?.attachments &&
+                                  notification.data.attachments.length > 0 && (
+                                    <div className="flex items-center gap-2 mt-2">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setAttachmentModalData({
+                                            attachments:
+                                              notification.data.attachments,
+                                            title: notification.title,
+                                          });
+                                          setShowAttachmentModal(true);
+                                        }}
+                                        className="flex items-center gap-1 text-blue-600 hover:text-blue-800 transition-colors"
+                                      >
+                                        <MdDescription size={16} />
+                                        <span className="text-xs font-medium">
+                                          {notification.data.attachments.length}{" "}
+                                          attachment
+                                          {notification.data.attachments
+                                            .length > 1
+                                            ? "s"
+                                            : ""}
+                                        </span>
+                                      </button>
+                                    </div>
+                                  )}
+                              </div>
+                              <div className="flex items-center gap-2 ml-4">
+                                <span
+                                  className={`px-3 py-1 rounded-full text-xs font-semibold border ${getPriorityColor(
+                                    notification.priority || "low"
+                                  )}`}
+                                >
+                                  {notification.priority || "low"}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between mt-4">
+                              <div className="flex items-center gap-4 text-sm text-gray-500">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-8 h-8 rounded-full bg-[var(--elra-primary)] flex items-center justify-center text-white font-bold text-sm">
+                                    {
+                                      getSenderDisplay(notification.sender)
+                                        .avatar
+                                    }
+                                  </div>
+                                  <span>
+                                    {getSenderDisplay(notification.sender).name}
+                                  </span>
+                                </div>
+                                <span>
+                                  {formatTimestamp(notification.createdAt)}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {!notification.isRead && (
+                                  <motion.button
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={(e) =>
+                                      markAsRead(notification._id, e)
+                                    }
+                                    disabled={
+                                      markingAsRead === notification._id
+                                    }
+                                    className="p-2 text-gray-400 hover:text-[var(--elra-primary)] hover:bg-[var(--elra-primary)]/10 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                                    title="Mark as read"
+                                  >
+                                    {markingAsRead === notification._id ? (
+                                      <div className="w-4 h-4 border-2 border-[var(--elra-primary)] border-t-transparent rounded-full animate-spin"></div>
+                                    ) : (
+                                      <MdMarkEmailRead size={18} />
+                                    )}
+                                  </motion.button>
+                                )}
+                                <motion.button
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={(e) =>
+                                    handleDeleteClick(notification._id, e)
+                                  }
+                                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Delete notification"
+                                >
+                                  <MdDelete size={18} />
+                                </motion.button>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
+                    </motion.div>
+                  ))}
                 </div>
-              </motion.div>
-            ))
+              ))
           )}
         </motion.div>
       </div>
@@ -900,6 +1017,14 @@ const Notifications = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Attachment Modal */}
+      <AttachmentModal
+        isOpen={showAttachmentModal}
+        onClose={() => setShowAttachmentModal(false)}
+        attachments={attachmentModalData.attachments}
+        title={attachmentModalData.title}
+      />
     </div>
   );
 };

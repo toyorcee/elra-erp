@@ -83,7 +83,7 @@ const LineChart = ({
           label: function (context) {
             const label = context.dataset.label || "";
             const value = context.parsed.y;
-            return `${label}: ${value.toLocaleString()}`;
+            return `${label}: NGN ${value.toLocaleString("en-NG")}`;
           },
         },
       },
@@ -97,7 +97,7 @@ const LineChart = ({
         },
         ticks: {
           callback: function (value) {
-            return value.toLocaleString();
+            return `NGN ${value.toLocaleString("en-NG")}`;
           },
           font: {
             size: 12,

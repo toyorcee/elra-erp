@@ -790,9 +790,9 @@ const Analytics = () => {
                   {analyticsData.payrollAnalytics?.totalPayrollCost?.toLocaleString() ||
                     0}
                 </div>
-                <div className="text-xs text-gray-600">Total Payroll Cost</div>
+                <div className="text-xs text-gray-600">Total Net Pay</div>
                 <div className="text-xs text-gray-500">
-                  {analyticsData.payrollAnalytics?.payrollRuns || 0} runs
+                  {analyticsData.payrollAnalytics?.employeeCount || 0} employees
                 </div>
               </div>
             </div>

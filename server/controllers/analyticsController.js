@@ -392,15 +392,29 @@ const getLeaveAnalytics = async (departmentId, startDate, endDate) => {
 // Get payroll analytics for a department
 const getPayrollAnalytics = async (departmentId, startDate, endDate) => {
   try {
-    // For HODs: Only get department-scoped payrolls for users in their department
-    const payrolls = await Payroll.find({
+    const deptEmployees = await User.find({
       department: departmentId,
-      scope: "department",
-      // Temporarily remove date filtering to show all payrolls for testing
-      // processingDate: { $gte: startDate, $lte: endDate },
-    }).populate("department", "name");
+      isActive: true,
+    }).select("_id employeeId");
+    const employeeIds = deptEmployees.map((e) => e._id.toString());
+    const employeeCodes = deptEmployees
+      .map((e) => (e.employeeId ? e.employeeId.toString() : null))
+      .filter(Boolean);
 
-    let totalPayrollCost = 0;
+    const payrolls = await Payroll.find({
+      $or: [
+        { scope: "department", department: departmentId },
+        { scope: "company" },
+        { "payrolls.employee": { $in: employeeIds } },
+      ],
+    })
+      .select(
+        "scope department employee payrolls month year frequency baseSalary grossSalary netSalary totalDeductions"
+      )
+      .populate("department", "name")
+      .populate("employee", "_id employeeId department");
+
+    let totalNetPay = 0;
     let employeeCount = 0;
     let averageSalary = 0;
     const frequencyBreakdown = {
@@ -414,13 +428,17 @@ const getPayrollAnalytics = async (departmentId, startDate, endDate) => {
       if (frequencyBreakdown.hasOwnProperty(payroll.frequency)) {
         frequencyBreakdown[payroll.frequency]++;
       }
-      if (payroll.payrolls && payroll.payrolls.length > 0) {
+      if (Array.isArray(payroll.payrolls) && payroll.payrolls.length > 0) {
         payroll.payrolls.forEach((empPayroll) => {
-          totalPayrollCost += empPayroll.baseSalary || 0;
-          totalPayrollCost += empPayroll.housingAllowance || 0;
-          totalPayrollCost += empPayroll.transportAllowance || 0;
-          totalPayrollCost += empPayroll.mealAllowance || 0;
-          totalPayrollCost += empPayroll.otherAllowance || 0;
+          const empObjId = (empPayroll.employee || "").toString();
+          const empCode = (empPayroll.employeeId || "").toString();
+          if (
+            !employeeIds.includes(empObjId) &&
+            !(empCode && employeeCodes.includes(empCode))
+          ) {
+            return;
+          }
+          totalNetPay += empPayroll.netSalary || 0;
 
           if (empPayroll.personalAllowances) {
             empPayroll.personalAllowances.forEach((allowance) => {
@@ -437,12 +455,31 @@ const getPayrollAnalytics = async (departmentId, startDate, endDate) => {
           employeeCount++;
         });
       }
+
+      // Case 2: Top-level per-employee payroll docs
+      else if (payroll.employee) {
+        const topEmpId = (
+          payroll.employee?._id ||
+          payroll.employee ||
+          ""
+        ).toString();
+        const topEmpDept = payroll.employee?.department?.toString();
+        const belongsToDept =
+          employeeIds.includes(topEmpId) ||
+          (topEmpDept && topEmpDept === departmentId.toString());
+
+        if (belongsToDept) {
+          // Count net salary from top-level fields
+          totalNetPay += payroll.netSalary || 0;
+          employeeCount++;
+        }
+      }
     });
 
-    averageSalary = employeeCount > 0 ? totalPayrollCost / employeeCount : 0;
+    averageSalary = employeeCount > 0 ? totalNetPay / employeeCount : 0;
 
     return {
-      totalPayrollCost,
+      totalPayrollCost: totalNetPay,
       employeeCount,
       averageSalary: Math.round(averageSalary),
       payrollRuns: payrolls.length,

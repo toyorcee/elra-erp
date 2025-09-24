@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import { MdClose, MdDelete } from "react-icons/md";
+import AttachmentModal from "./common/AttachmentModal";
 
 const NotificationModal = ({
   notification,
@@ -9,6 +10,8 @@ const NotificationModal = ({
   onMarkAsRead,
   onDelete,
 }) => {
+  const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+
   console.log("🔔 NotificationModal rendering with:", notification);
   if (!notification) return null;
 
@@ -60,6 +63,18 @@ const NotificationModal = ({
         return "📝";
       case "FUND_ADDITION":
         return "💰";
+      case "ANNOUNCEMENT_CREATED":
+        return "📢";
+      case "ANNOUNCEMENT_UPDATED":
+        return "📝";
+      case "ANNOUNCEMENT_DELETED":
+        return "🗑️";
+      case "EVENT_CREATED":
+        return "📅";
+      case "EVENT_UPDATED":
+        return "📝";
+      case "EVENT_CANCELLED":
+        return "❌";
       default:
         return "📢";
     }
@@ -155,6 +170,95 @@ const NotificationModal = ({
                 </p>
               </div>
 
+              {/* Attachments Section */}
+              {notification.data?.attachments &&
+                notification.data.attachments.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold text-gray-900">
+                        Attachments ({notification.data.attachments.length})
+                      </h3>
+                      <button
+                        onClick={() => setShowAttachmentModal(true)}
+                        className="px-4 py-2 text-sm bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors"
+                      >
+                        View All
+                      </button>
+                    </div>
+
+                    {/* Quick preview of first 2 attachments */}
+                    <div className="space-y-2">
+                      {notification.data.attachments
+                        .slice(0, 2)
+                        .map((attachment, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="flex-shrink-0">
+                                {attachment.type === "application/pdf" ? (
+                                  <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                                    <span className="text-red-600 font-bold text-sm">
+                                      PDF
+                                    </span>
+                                  </div>
+                                ) : attachment.type?.startsWith("image/") ? (
+                                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                                    <span className="text-blue-600 font-bold text-sm">
+                                      IMG
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                                    <span className="text-gray-600 font-bold text-sm">
+                                      DOC
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">
+                                  {attachment.name || `Attachment ${index + 1}`}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {attachment.size
+                                    ? `${(attachment.size / 1024).toFixed(
+                                        1
+                                      )} KB`
+                                    : "Unknown size"}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                if (attachment.url) {
+                                  window.open(attachment.url, "_blank");
+                                }
+                              }}
+                              className="px-3 py-1 text-sm bg-[var(--elra-primary)] text-white rounded-md hover:bg-[var(--elra-primary-dark)] transition-colors"
+                            >
+                              View
+                            </button>
+                          </div>
+                        ))}
+
+                      {/* Show "and X more" if there are more than 2 attachments */}
+                      {notification.data.attachments.length > 2 && (
+                        <div className="text-center py-2">
+                          <span className="text-sm text-gray-500">
+                            and {notification.data.attachments.length - 2} more
+                            attachment
+                            {notification.data.attachments.length - 2 > 1
+                              ? "s"
+                              : ""}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-2">Sender</h3>
@@ -230,7 +334,19 @@ const NotificationModal = ({
     </AnimatePresence>
   );
 
-  return createPortal(modalContent, document.body);
+  return createPortal(
+    <>
+      {modalContent}
+      {/* Attachment Modal */}
+      <AttachmentModal
+        isOpen={showAttachmentModal}
+        onClose={() => setShowAttachmentModal(false)}
+        attachments={notification.data?.attachments || []}
+        title={`${notification.title} - Attachments`}
+      />
+    </>,
+    document.body
+  );
 };
 
 export default NotificationModal;

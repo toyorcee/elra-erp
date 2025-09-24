@@ -462,3 +462,160 @@ export const rejectSalesMarketingTransaction = async (transactionId, data) => {
     throw error;
   }
 };
+
+// ===== FINANCIAL REPORTS API =====
+
+// Get comprehensive financial reports
+export const getFinancialReportsData = async (params = {}) => {
+  try {
+    const response = await api.get("/finance/reports/comprehensive", {
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching financial reports:", error);
+    throw error;
+  }
+};
+
+// Get financial trends and projections
+export const getFinancialTrends = async (params = {}) => {
+  try {
+    const response = await api.get("/finance/reports/trends", { params });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching financial trends:", error);
+    throw error;
+  }
+};
+
+// Get budget performance data
+export const getBudgetPerformance = async (params = {}) => {
+  try {
+    const response = await api.get("/finance/reports/budget-performance", {
+      params,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching budget performance:", error);
+    throw error;
+  }
+};
+
+// Get financial KPIs
+export const getFinancialKPIs = async (params = {}) => {
+  try {
+    const response = await api.get("/finance/reports/kpis", { params });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching financial KPIs:", error);
+    throw error;
+  }
+};
+
+// Get financial alerts
+export const getFinancialAlerts = async (params = {}) => {
+  try {
+    const response = await api.get("/finance/reports/alerts", { params });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching financial alerts:", error);
+    throw error;
+  }
+};
+
+// Export financial reports as PDF
+export const exportFinancialReportsPDF = async (params = {}) => {
+  try {
+    const response = await api.post("/finance/reports/export/pdf", params, {
+      responseType: "blob",
+    });
+
+    // Create blob and download
+    const blob = new Blob([response.data], { type: "application/pdf" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().split("T")[0];
+    link.download = `financial_reports_${timestamp}.pdf`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    return {
+      success: true,
+      message: "Financial reports PDF exported successfully",
+    };
+  } catch (error) {
+    console.error("Error exporting financial reports PDF:", error);
+    throw error;
+  }
+};
+
+// Export financial reports as Word/HTML
+export const exportFinancialReportsWord = async (params = {}) => {
+  try {
+    const response = await api.post("/finance/reports/export/word", params, {
+      responseType: "blob",
+    });
+
+    // Create blob and download
+    const blob = new Blob([response.data], { type: "text/html" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().split("T")[0];
+    link.download = `financial_reports_${timestamp}.html`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    return {
+      success: true,
+      message: "Financial reports Word document exported successfully",
+    };
+  } catch (error) {
+    console.error("Error exporting financial reports Word document:", error);
+    throw error;
+  }
+};
+
+// Export financial reports as CSV
+export const exportFinancialReportsCSV = async (params = {}) => {
+  try {
+    const response = await api.post("/finance/reports/export/csv", params, {
+      responseType: "blob",
+    });
+
+    // Create blob and download
+    const blob = new Blob([response.data], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().split("T")[0];
+    link.download = `financial_reports_${timestamp}.csv`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    return {
+      success: true,
+      message: "Financial reports CSV exported successfully",
+    };
+  } catch (error) {
+    console.error("Error exporting financial reports CSV:", error);
+    throw error;
+  }
+};

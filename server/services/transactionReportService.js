@@ -29,13 +29,23 @@ class TransactionReportService {
       const fileName = `transaction_report_${timestamp}.pdf`;
       const filePath = path.join(this.reportsDir, fileName);
 
+      // Get the actual wallet data for accurate budget allocation
+      const wallet = await ELRAWallet.findOne({ elraInstance: "ELRA_MAIN" });
+      const walletBudgetData = wallet?.budgetCategories || {};
+
       const doc = new jsPDF({
         orientation: "portrait",
         unit: "mm",
         format: "a4",
       });
 
-      this.generateReportContent(doc, transactions, filters, userInfo);
+      this.generateReportContent(
+        doc,
+        transactions,
+        filters,
+        userInfo,
+        walletBudgetData
+      );
 
       const pdfBytes = doc.output("arraybuffer");
       fs.writeFileSync(filePath, Buffer.from(pdfBytes));
@@ -57,7 +67,13 @@ class TransactionReportService {
   /**
    * Generate the PDF content
    */
-  generateReportContent(doc, transactions, filters, userInfo) {
+  generateReportContent(
+    doc,
+    transactions,
+    filters,
+    userInfo,
+    walletBudgetData = {}
+  ) {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     let yPosition = 20;
@@ -189,6 +205,15 @@ class TransactionReportService {
       yPosition
     );
     yPosition += 15;
+
+    // Budget Allocation & Utilization Summary
+    this.addBudgetAllocationSection(
+      doc,
+      transactions,
+      yPosition,
+      walletBudgetData
+    );
+    yPosition = this.getCurrentYPosition(doc);
 
     // Transaction table
     if (transactions.length > 0) {
@@ -336,10 +361,15 @@ class TransactionReportService {
       const fileName = `transaction_report_${timestamp}.html`;
       const filePath = path.join(this.reportsDir, fileName);
 
+      // Get the actual wallet data for accurate budget allocation
+      const wallet = await ELRAWallet.findOne({ elraInstance: "ELRA_MAIN" });
+      const walletBudgetData = wallet?.budgetCategories || {};
+
       const htmlContent = this.generateWordReportHTML(
         transactions,
         filters,
-        userInfo
+        userInfo,
+        walletBudgetData
       );
       fs.writeFileSync(filePath, htmlContent);
 
@@ -361,7 +391,12 @@ class TransactionReportService {
   /**
    * Generate HTML content for Word export
    */
-  generateWordReportHTML(transactions, filters, userInfo) {
+  generateWordReportHTML(
+    transactions,
+    filters,
+    userInfo,
+    walletBudgetData = {}
+  ) {
     const totalTransactions = transactions.length;
     const totalDeposits = transactions
       .filter((t) => t.type === "deposit")
@@ -456,6 +491,8 @@ class TransactionReportService {
         </ul>
     </div>
 
+    ${this.generateBudgetAllocationHTML(walletBudgetData)}
+
     <h3>Transaction Details:</h3>
     ${
       transactions.length > 0
@@ -532,10 +569,15 @@ class TransactionReportService {
       const fileName = `transaction_report_${timestamp}.csv`;
       const filePath = path.join(this.reportsDir, fileName);
 
+      // Get the actual wallet data for accurate budget allocation
+      const wallet = await ELRAWallet.findOne({ elraInstance: "ELRA_MAIN" });
+      const walletBudgetData = wallet?.budgetCategories || {};
+
       const csvContent = this.generateCSVContent(
         transactions,
         filters,
-        userInfo
+        userInfo,
+        walletBudgetData
       );
       fs.writeFileSync(filePath, csvContent);
 
@@ -557,7 +599,7 @@ class TransactionReportService {
   /**
    * Generate CSV content
    */
-  generateCSVContent(transactions, filters, userInfo) {
+  generateCSVContent(transactions, filters, userInfo, walletBudgetData = {}) {
     const headers = [
       "Date",
       "Time",
@@ -580,8 +622,380 @@ class TransactionReportService {
       `NGN ${this.formatCurrency(transaction.balanceAfter)}`,
     ]);
 
-    const csvRows = [headers, ...rows];
+    // Add budget allocation summary using actual wallet data
+    const budgetData = this.getWalletBudgetData(walletBudgetData);
+    const summaryRows = [
+      [],
+      ["BUDGET ALLOCATION & UTILIZATION SUMMARY"],
+      [],
+      ["Category", "Allocated", "Used", "Available", "Utilization %"],
+      [
+        "Payroll",
+        budgetData.payroll.allocated,
+        budgetData.payroll.used,
+        budgetData.payroll.available,
+        budgetData.payroll.allocated > 0
+          ? (
+              (budgetData.payroll.used / budgetData.payroll.allocated) *
+              100
+            ).toFixed(1)
+          : 0,
+      ],
+      [
+        "Operational",
+        budgetData.operational.allocated,
+        budgetData.operational.used,
+        budgetData.operational.available,
+        budgetData.operational.allocated > 0
+          ? (
+              (budgetData.operational.used / budgetData.operational.allocated) *
+              100
+            ).toFixed(1)
+          : 0,
+      ],
+      [
+        "Projects",
+        budgetData.projects.allocated,
+        budgetData.projects.used,
+        budgetData.projects.available,
+        budgetData.projects.allocated > 0
+          ? (
+              (budgetData.projects.used / budgetData.projects.allocated) *
+              100
+            ).toFixed(1)
+          : 0,
+      ],
+      [
+        "TOTAL",
+        budgetData.total.allocated,
+        budgetData.total.used,
+        budgetData.total.available,
+        budgetData.total.allocated > 0
+          ? (
+              (budgetData.total.used / budgetData.total.allocated) *
+              100
+            ).toFixed(1)
+          : 0,
+      ],
+      [],
+      ["FUND FLOW SUMMARY"],
+      [],
+      ["Metric", "Amount"],
+      [
+        "Total Funds Added",
+        transactions
+          .filter((t) => t.type === "deposit")
+          .reduce((sum, t) => sum + t.amount, 0),
+      ],
+      [
+        "Total Allocations",
+        transactions
+          .filter((t) => t.type === "allocation")
+          .reduce((sum, t) => sum + t.amount, 0),
+      ],
+      [
+        "Total Withdrawals",
+        transactions
+          .filter((t) => t.type === "withdrawal")
+          .reduce((sum, t) => sum + t.amount, 0),
+      ],
+      [
+        "Flow Efficiency %",
+        transactions
+          .filter((t) => t.type === "deposit")
+          .reduce((sum, t) => sum + t.amount, 0) > 0
+          ? (
+              (transactions
+                .filter(
+                  (t) => t.type === "withdrawal" && t.status === "approved"
+                )
+                .reduce((sum, t) => sum + t.amount, 0) /
+                transactions
+                  .filter((t) => t.type === "deposit")
+                  .reduce((sum, t) => sum + t.amount, 0)) *
+              100
+            ).toFixed(1)
+          : 0,
+      ],
+    ];
+
+    const csvRows = [headers, ...rows, ...summaryRows];
     return csvRows.map((row) => row.join(",")).join("\n");
+  }
+
+  /**
+   * Add budget allocation and utilization section to the report
+   */
+  addBudgetAllocationSection(
+    doc,
+    transactions,
+    yPosition,
+    walletBudgetData = {}
+  ) {
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Use actual wallet budget data instead of calculating from transactions
+    const budgetData = this.getWalletBudgetData(walletBudgetData);
+
+    // Section header
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Budget Allocation & Utilization:", 20, yPosition);
+    yPosition += 8;
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+
+    // Budget categories summary
+    const categories = ["payroll", "operational", "projects"];
+    categories.forEach((category) => {
+      const data = budgetData[category];
+      if (data.allocated > 0) {
+        const utilization =
+          data.allocated > 0
+            ? ((data.used / data.allocated) * 100).toFixed(1)
+            : 0;
+
+        doc.text(
+          `${category.charAt(0).toUpperCase() + category.slice(1)} Budget:`,
+          25,
+          yPosition
+        );
+        doc.text(
+          `Allocated: NGN ${this.formatCurrency(data.allocated)}`,
+          80,
+          yPosition
+        );
+        doc.text(`Used: NGN ${this.formatCurrency(data.used)}`, 130, yPosition);
+        doc.text(`Utilization: ${utilization}%`, 170, yPosition);
+        yPosition += 5;
+      }
+    });
+
+    yPosition += 5;
+
+    // Overall utilization
+    const totalAllocated = budgetData.total.allocated;
+    const totalUsed = budgetData.total.used;
+    const overallUtilization =
+      totalAllocated > 0 ? ((totalUsed / totalAllocated) * 100).toFixed(1) : 0;
+
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      `Overall Budget Utilization: ${overallUtilization}%`,
+      25,
+      yPosition
+    );
+    yPosition += 8;
+
+    // Fund flow summary
+    doc.setFont("helvetica", "normal");
+    doc.text("Fund Flow Summary:", 25, yPosition);
+    yPosition += 5;
+
+    const totalDeposits = transactions
+      .filter((t) => t.type === "deposit")
+      .reduce((sum, t) => sum + t.amount, 0);
+    const totalWithdrawals = transactions
+      .filter((t) => t.type === "withdrawal")
+      .reduce((sum, t) => sum + t.amount, 0);
+    const totalAllocations = transactions
+      .filter((t) => t.type === "allocation")
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    doc.text(
+      `• Total Funds Added: NGN ${this.formatCurrency(totalDeposits)}`,
+      30,
+      yPosition
+    );
+    yPosition += 5;
+    doc.text(
+      `• Total Allocations: NGN ${this.formatCurrency(totalAllocations)}`,
+      30,
+      yPosition
+    );
+    yPosition += 5;
+    doc.text(
+      `• Total Withdrawals: NGN ${this.formatCurrency(totalWithdrawals)}`,
+      30,
+      yPosition
+    );
+    yPosition += 5;
+
+    // Calculate flow efficiency using only approved withdrawals (same logic as app page)
+    const approvedWithdrawals = transactions
+      .filter((t) => t.type === "withdrawal" && t.status === "approved")
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const flowEfficiency =
+      totalDeposits > 0
+        ? ((approvedWithdrawals / totalDeposits) * 100).toFixed(1)
+        : 0;
+    doc.text(`• Flow Efficiency: ${flowEfficiency}%`, 30, yPosition);
+    yPosition += 10;
+
+    // Store current Y position for the calling method
+    this.currentYPosition = yPosition;
+  }
+
+  /**
+   * Calculate budget allocation data from transactions
+   */
+  calculateBudgetAllocation(transactions) {
+    const budgetData = {
+      payroll: { allocated: 0, used: 0, available: 0 },
+      operational: { allocated: 0, used: 0, available: 0 },
+      projects: { allocated: 0, used: 0, available: 0 },
+      total: { allocated: 0, used: 0, available: 0 },
+    };
+
+    transactions.forEach((transaction) => {
+      const category = transaction.budgetCategory;
+      if (category && budgetData[category]) {
+        if (transaction.type === "allocation") {
+          budgetData[category].allocated += transaction.amount;
+          budgetData.total.allocated += transaction.amount;
+        } else if (
+          transaction.type === "withdrawal" &&
+          transaction.status === "approved"
+        ) {
+          budgetData[category].used += transaction.amount;
+          budgetData.total.used += transaction.amount;
+        }
+      }
+    });
+
+    // Calculate available amounts
+    Object.keys(budgetData).forEach((key) => {
+      if (key !== "total") {
+        budgetData[key].available =
+          budgetData[key].allocated - budgetData[key].used;
+      }
+    });
+    budgetData.total.available =
+      budgetData.total.allocated - budgetData.total.used;
+
+    return budgetData;
+  }
+
+  /**
+   * Get current Y position for layout management
+   */
+  getCurrentYPosition(doc) {
+    return this.currentYPosition || 0;
+  }
+
+  /**
+   * Get wallet budget data in the correct format
+   */
+  getWalletBudgetData(walletBudgetData) {
+    const budgetData = {
+      payroll: { allocated: 0, used: 0, available: 0 },
+      operational: { allocated: 0, used: 0, available: 0 },
+      projects: { allocated: 0, used: 0, available: 0 },
+      total: { allocated: 0, used: 0, available: 0 },
+    };
+
+    // Map wallet budget data to our format
+    if (walletBudgetData.payroll) {
+      budgetData.payroll = {
+        allocated: walletBudgetData.payroll.allocated || 0,
+        used: walletBudgetData.payroll.used || 0,
+        available: walletBudgetData.payroll.available || 0,
+      };
+    }
+
+    if (walletBudgetData.operational) {
+      budgetData.operational = {
+        allocated: walletBudgetData.operational.allocated || 0,
+        used: walletBudgetData.operational.used || 0,
+        available: walletBudgetData.operational.available || 0,
+      };
+    }
+
+    if (walletBudgetData.projects) {
+      budgetData.projects = {
+        allocated: walletBudgetData.projects.allocated || 0,
+        used: walletBudgetData.projects.used || 0,
+        available: walletBudgetData.projects.available || 0,
+      };
+    }
+
+    // Calculate totals
+    budgetData.total.allocated =
+      budgetData.payroll.allocated +
+      budgetData.operational.allocated +
+      budgetData.projects.allocated;
+    budgetData.total.used =
+      budgetData.payroll.used +
+      budgetData.operational.used +
+      budgetData.projects.used;
+    budgetData.total.available =
+      budgetData.total.allocated - budgetData.total.used;
+
+    return budgetData;
+  }
+
+  /**
+   * Generate budget allocation HTML section for Word export
+   */
+  generateBudgetAllocationHTML(walletBudgetData) {
+    const budgetData = this.getWalletBudgetData(walletBudgetData);
+
+    const categories = ["payroll", "operational", "projects"];
+    let categoryRows = "";
+
+    categories.forEach((category) => {
+      const data = budgetData[category];
+      if (data.allocated > 0) {
+        const utilization =
+          data.allocated > 0
+            ? ((data.used / data.allocated) * 100).toFixed(1)
+            : 0;
+        categoryRows += `
+            <tr>
+                <td>${category.charAt(0).toUpperCase() + category.slice(1)}</td>
+                <td>NGN ${this.formatCurrency(data.allocated)}</td>
+                <td>NGN ${this.formatCurrency(data.used)}</td>
+                <td>NGN ${this.formatCurrency(data.available)}</td>
+                <td>${utilization}%</td>
+            </tr>`;
+      }
+    });
+
+    const totalAllocated = budgetData.total.allocated;
+    const totalUsed = budgetData.total.used;
+    const overallUtilization =
+      totalAllocated > 0 ? ((totalUsed / totalAllocated) * 100).toFixed(1) : 0;
+
+    return `
+    <div class="summary">
+        <h3>Budget Allocation & Utilization:</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Allocated</th>
+                    <th>Used</th>
+                    <th>Available</th>
+                    <th>Utilization %</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${categoryRows}
+                <tr style="font-weight: bold; background-color: #e8f5e8;">
+                    <td>TOTAL</td>
+                    <td>NGN ${this.formatCurrency(totalAllocated)}</td>
+                    <td>NGN ${this.formatCurrency(totalUsed)}</td>
+                    <td>NGN ${this.formatCurrency(
+                      budgetData.total.available
+                    )}</td>
+                    <td>${overallUtilization}%</td>
+                </tr>
+            </tbody>
+        </table>
+        <p style="margin-top: 10px;"><strong>Overall Budget Utilization:</strong> ${overallUtilization}%</p>
+    </div>`;
   }
 }
 

@@ -67,6 +67,12 @@ export const SocketEventTypes = {
   USER_ONLINE: "userOnline",
   USER_OFFLINE: "userOffline",
   MESSAGE_DELETED: "messageDeleted",
+  COMM_EVENT_CREATED: "communication:eventCreated",
+  COMM_EVENT_UPDATED: "communication:eventUpdated",
+  COMM_EVENT_DELETED: "communication:eventDeleted",
+  COMM_ANNOUNCEMENT_CREATED: "communication:announcementCreated",
+  COMM_ANNOUNCEMENT_UPDATED: "communication:announcementUpdated",
+  COMM_ANNOUNCEMENT_DELETED: "communication:announcementDeleted",
 };
 
 // Message status types

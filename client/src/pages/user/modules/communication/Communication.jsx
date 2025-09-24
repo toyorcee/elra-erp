@@ -1,21 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   ChatBubbleLeftRightIcon,
-  UsersIcon,
-  DocumentIcon,
   MegaphoneIcon,
-  PlusIcon,
   ArrowRightIcon,
   CalendarIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../../../context/AuthContext";
-import { useDynamicSidebar } from "../../../../context/DynamicSidebarContext";
 
 const Communication = () => {
   const { user } = useAuth();
-  const { setSidebarConfig } = useDynamicSidebar();
   const navigate = useNavigate();
 
   // Communication module sidebar configuration
@@ -37,20 +32,13 @@ const Communication = () => {
             required: { minLevel: 300 },
             description: "Send and receive internal messages",
           },
-          {
-            label: "Team Chats",
-            icon: "UsersIcon",
-            path: "/dashboard/modules/communication/teams",
-            required: { minLevel: 300 },
-            description: "Collaborate in team chat rooms",
-          },
-          {
-            label: "File Sharing",
-            icon: "DocumentIcon",
-            path: "/dashboard/modules/communication/files",
-            required: { minLevel: 300 },
-            description: "Share files and documents",
-          },
+          // {
+          //   label: "Team Chats",
+          //   icon: "UsersIcon",
+          //   path: "/dashboard/modules/communication/teams",
+          //   required: { minLevel: 300 },
+          //   description: "Collaborate in team chat rooms",
+          // },
         ],
       },
       {
@@ -68,9 +56,7 @@ const Communication = () => {
     ],
   };
 
-  useEffect(() => {
-    setSidebarConfig(communicationSidebarConfig);
-  }, [setSidebarConfig]);
+  // Sidebar for this module is populated automatically by DynamicSidebarContext
 
   const navigationItems = [
     {
@@ -82,24 +68,6 @@ const Communication = () => {
       path: "/dashboard/modules/communication/messages",
       color: "pink",
       stats: "12 active conversations",
-    },
-    {
-      id: "teams",
-      label: "Team Chats",
-      icon: UsersIcon,
-      description: "Collaborate in team chat rooms and group discussions",
-      path: "/dashboard/modules/communication/teams",
-      color: "blue",
-      stats: "5 active teams",
-    },
-    {
-      id: "files",
-      label: "File Sharing",
-      icon: DocumentIcon,
-      description: "Share files and documents with your team",
-      path: "/dashboard/modules/communication/files",
-      color: "green",
-      stats: "47 shared files",
     },
     {
       id: "announcements",
@@ -304,7 +272,7 @@ const Communication = () => {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
             Quick Actions
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <button
               onClick={() =>
                 navigate("/dashboard/modules/communication/messages")
@@ -317,32 +285,14 @@ const Communication = () => {
               </span>
             </button>
             <button
-              onClick={() => navigate("/dashboard/modules/communication/files")}
-              className="flex items-center justify-center p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-            >
-              <DocumentIcon className="h-5 w-5 text-blue-600 mr-2" />
-              <span className="text-sm font-medium text-blue-700">
-                Share File
-              </span>
-            </button>
-            <button
               onClick={() =>
                 navigate("/dashboard/modules/communication/announcements")
               }
-              className="flex items-center justify-center p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
-            >
-              <MegaphoneIcon className="h-5 w-5 text-green-600 mr-2" />
-              <span className="text-sm font-medium text-green-700">
-                Create Announcement
-              </span>
-            </button>
-            <button
-              onClick={() => navigate("/dashboard/modules/communication/teams")}
               className="flex items-center justify-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
             >
-              <UsersIcon className="h-5 w-5 text-purple-600 mr-2" />
+              <MegaphoneIcon className="h-5 w-5 text-purple-600 mr-2" />
               <span className="text-sm font-medium text-purple-700">
-                Start Team Chat
+                Create Announcement
               </span>
             </button>
             <button

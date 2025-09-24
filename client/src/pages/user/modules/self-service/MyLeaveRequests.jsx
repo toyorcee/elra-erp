@@ -288,6 +288,17 @@ const MyLeaveRequests = () => {
 
   const stats = getLeaveStats();
 
+  const isOnActiveApprovedLeave = React.useMemo(() => {
+    const now = new Date();
+    return requests.some((r) => {
+      const status = (r.status || "").toLowerCase();
+      if (status !== "approved") return false;
+      const start = new Date(r.startDate);
+      const end = new Date(r.endDate);
+      return !isNaN(start) && !isNaN(end) && start <= now && now <= end;
+    });
+  }, [requests]);
+
   const columns = [
     {
       header: "Leave Type",
@@ -308,11 +319,11 @@ const MyLeaveRequests = () => {
       header: "Period",
       accessor: "period",
       renderer: (request) => (
-        <div>
-          <div className="text-sm text-gray-900">
+        <div className="text-sm">
+          <p className="font-medium text-gray-900">
             {formatDate(request.startDate)} - {formatDate(request.endDate)}
-          </div>
-          <div className="text-xs text-gray-500">{request.days} day(s)</div>
+          </p>
+          <p className="text-gray-500">{request.days} day(s)</p>
         </div>
       ),
       skeletonRenderer: () => (
@@ -326,11 +337,12 @@ const MyLeaveRequests = () => {
       header: "Reason",
       accessor: "reason",
       renderer: (request) => (
-        <div
-          className="text-sm text-gray-700 max-w-xs break-words leading-relaxed"
-          title={request.reason}
-        >
-          {request.reason}
+        <div className="max-w-xs">
+          <p className="text-sm text-gray-900 break-words">
+            {request.reason && request.reason.length > 50
+              ? `${request.reason.substring(0, 50)}...`
+              : request.reason}
+          </p>
         </div>
       ),
       skeletonRenderer: () => (
@@ -359,25 +371,41 @@ const MyLeaveRequests = () => {
       renderer: (request) => {
         if (request.status === "approved" || request.status === "rejected") {
           return (
-            <div className="text-sm text-gray-500">
-              {request.status === "approved" ? "Completed" : "Rejected"}
+            <div className="text-sm">
+              <span
+                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                  request.status === "approved"
+                    ? "bg-green-100 text-green-800"
+                    : "bg-red-100 text-red-800"
+                }`}
+              >
+                {request.status === "approved" ? "Completed" : "Rejected"}
+              </span>
             </div>
           );
         }
 
         if (request.currentApprover) {
           return (
-            <div className="text-sm text-blue-600 font-medium">
-              {request.currentApprover.firstName}{" "}
-              {request.currentApprover.lastName}
-              <div className="text-xs text-gray-500">
+            <div className="text-sm">
+              <p className="font-medium text-blue-600 truncate">
+                {request.currentApprover.firstName}{" "}
+                {request.currentApprover.lastName}
+              </p>
+              <p className="text-xs text-gray-500 truncate">
                 {request.currentApprover.role?.name || "HOD"}
-              </div>
+              </p>
             </div>
           );
         }
 
-        return <div className="text-sm text-gray-500">Pending Assignment</div>;
+        return (
+          <div className="text-sm">
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+              Pending Assignment
+            </span>
+          </div>
+        );
       },
       skeletonRenderer: () => (
         <div>
@@ -425,7 +453,7 @@ const MyLeaveRequests = () => {
               <HiEye className="w-4 h-4" />
             </button>
 
-            {/* Edit button - only for Pending requests with NO approvals */}
+            {/* Edit button - only for Pending requests with NO approvals started */}
             {(request.status === "pending" || request.status === "Pending") &&
               (!request.approvals || request.approvals.length === 0) && (
                 <button
@@ -531,7 +559,6 @@ const MyLeaveRequests = () => {
     }
   };
 
-  // Show loading spinner while authentication is being initialized
   if (!initialized || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50">
@@ -545,7 +572,6 @@ const MyLeaveRequests = () => {
     );
   }
 
-  // Show error if not authenticated
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-pink-50">
@@ -588,13 +614,19 @@ const MyLeaveRequests = () => {
             </p>
           </div>
           <div className="flex items-center space-x-4">
-            <button
-              onClick={handleNewRequest}
-              className="bg-[var(--elra-primary)] text-white px-6 py-3 rounded-xl hover:bg-[var(--elra-primary-dark)] transition-all duration-300 flex items-center space-x-3 font-semibold shadow-lg"
-            >
-              <HiPlus className="w-5 h-5" />
-              <span>New Request</span>
-            </button>
+            {!isOnActiveApprovedLeave ? (
+              <button
+                onClick={handleNewRequest}
+                className="bg-[var(--elra-primary)] text-white px-6 py-3 rounded-xl hover:bg-[var(--elra-primary-dark)] transition-all duration-300 flex items-center space-x-3 font-semibold shadow-lg"
+              >
+                <HiPlus className="w-5 h-5" />
+                <span>New Request</span>
+              </button>
+            ) : (
+              <div className="px-4 py-2 rounded-xl bg-yellow-50 text-yellow-700 text-sm font-medium shadow-sm">
+                You are currently on approved leave. New requests are disabled.
+              </div>
+            )}
             <button
               onClick={fetchLeaveRequests}
               disabled={loading}
@@ -875,7 +907,7 @@ const MyLeaveRequests = () => {
                 ? "You haven't submitted any leave requests yet. Create your first request to get started."
                 : "No requests match your current filters. Try adjusting your search criteria."}
             </p>
-            {requests.length === 0 && (
+            {requests.length === 0 && !isOnActiveApprovedLeave && (
               <button
                 onClick={handleNewRequest}
                 className="bg-[var(--elra-primary)] text-white px-6 py-3 rounded-xl hover:bg-[var(--elra-primary-dark)] transition-all duration-300 flex items-center space-x-2 mx-auto font-semibold"

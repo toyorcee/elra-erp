@@ -25,34 +25,34 @@ export const moduleSidebarConfig = {
           },
         ],
       },
-      {
-        title: "Departmental Projects Management",
-        collapsible: true,
-        defaultExpanded: true,
-        items: [
-          {
-            label: "Create Department Project",
-            icon: "PlusCircleIcon",
-            path: "/dashboard/modules/department-management/create-department-project",
-            required: { minLevel: 700 },
-            description: "Create new projects for your department",
-          },
-          {
-            label: "Pending Approvals",
-            icon: "ClockIcon",
-            path: "/dashboard/modules/department-management/project-approvals",
-            required: { minLevel: 700 },
-            description: "Review and approve department project requests",
-          },
-          {
-            label: "Approval History",
-            icon: "DocumentCheckIcon",
-            path: "/dashboard/modules/department-management/approval-history",
-            required: { minLevel: 700 },
-            description: "View all project approval decisions and history",
-          },
-        ],
-      },
+      // {
+      //   title: "Departmental Projects Management",
+      //   collapsible: true,
+      //   defaultExpanded: true,
+      //   items: [
+      //     {
+      //       label: "Create Department Project",
+      //       icon: "PlusCircleIcon",
+      //       path: "/dashboard/modules/department-management/create-department-project",
+      //       required: { minLevel: 700 },
+      //       description: "Create new projects for your department",
+      //     },
+      //     {
+      //       label: "Pending Approvals",
+      //       icon: "ClockIcon",
+      //       path: "/dashboard/modules/department-management/project-approvals",
+      //       required: { minLevel: 700 },
+      //       description: "Review and approve department project requests",
+      //     },
+      //     {
+      //       label: "Approval History",
+      //       icon: "DocumentCheckIcon",
+      //       path: "/dashboard/modules/department-management/approval-history",
+      //       required: { minLevel: 700 },
+      //       description: "View all project approval decisions and history",
+      //     },
+      //   ],
+      // },
       {
         title: "User Management",
         collapsible: true,

@@ -11,6 +11,8 @@ import {
   EllipsisVerticalIcon,
   PlusIcon,
   UserPlusIcon,
+  CheckIcon,
+  CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import { formatMessageTime } from "../../../../types/messageTypes";
 import messageService from "../../../../services/messageService";
@@ -581,15 +583,28 @@ const InternalMessages = () => {
                           }`}
                         >
                           <p className="text-sm">{message.content}</p>
-                          <p
-                            className={`text-xs mt-1 ${
+                          <div
+                            className={`flex items-center justify-between mt-1 text-xs ${
                               message.sender._id === user._id
                                 ? "text-pink-100"
                                 : "text-gray-500"
                             }`}
                           >
-                            {formatMessageTime(message.createdAt)}
-                          </p>
+                            <span>{formatMessageTime(message.createdAt)}</span>
+                            {message.sender._id === (user._id || user.id) && (
+                              <div className="flex items-center gap-1">
+                                {message.status === "sent" && (
+                                  <CheckIcon className="h-3 w-3" />
+                                )}
+                                {message.status === "delivered" && (
+                                  <CheckCircleIcon className="h-3 w-3" />
+                                )}
+                                {message.status === "read" && (
+                                  <CheckCircleIcon className="h-3 w-3 text-pink-100" />
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </motion.div>

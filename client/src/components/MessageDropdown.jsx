@@ -12,6 +12,8 @@ import {
   CheckIcon,
   CheckCircleIcon,
   ArrowLeftIcon,
+  PaperClipIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import { formatMessageTime } from "../types/messageTypes";
 import messageService from "../services/messageService";
@@ -45,6 +47,7 @@ const MessageDropdown = ({ isOpen, onClose }) => {
     markMessagesAsReadForUser,
     getTotalUnreadCount,
     getMessagesForUser,
+    deleteMessageById,
     formatUserStatus,
     getUserDisplayName: getDisplayName,
     getUserInitials: getInitials,
@@ -62,6 +65,11 @@ const MessageDropdown = ({ isOpen, onClose }) => {
   const [userRole, setUserRole] = useState(null);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [showAllRecent, setShowAllRecent] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -112,15 +120,87 @@ const MessageDropdown = ({ isOpen, onClose }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // File upload functions
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      // Check file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        alert("File size must be less than 10MB");
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+  };
+
+  const handleDeleteMessage = (message) => {
+    setMessageToDelete(message);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteMessage = async () => {
+    if (!messageToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      // Use the deleteMessageById function from useMessages hook
+      // This will handle both the API call and local state update
+      await deleteMessageById(messageToDelete._id);
+      setShowDeleteConfirm(false);
+      setMessageToDelete(null);
+    } catch (error) {
+      console.error("Error deleting message:", error);
+      alert("Failed to delete message. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const cancelDeleteMessage = () => {
+    setShowDeleteConfirm(false);
+    setMessageToDelete(null);
+  };
+
   // Send message
   const handleSendMessage = async () => {
-    if (!messageText.trim() || !selectedConversation) return;
+    const content = messageText.trim();
+    if ((!content && !selectedFile) || !selectedConversation) return;
+
+    const messageContent =
+      content || (selectedFile ? `📎 ${selectedFile.name}` : "");
+    setMessageText("");
+    setSelectedFile(null);
+    setIsTyping(false);
 
     try {
-      await sendNewMessage(selectedConversation._id._id, messageText.trim());
-      setMessageText("");
+      let documentId = null;
 
-      setIsTyping(false);
+      // Upload file if selected
+      if (selectedFile) {
+        setIsUploadingFile(true);
+        try {
+          const uploadResponse = await messageService.uploadMessageFile(
+            selectedFile
+          );
+          documentId = uploadResponse.data.documentId;
+        } catch (error) {
+          console.error("Error uploading file:", error);
+          alert("Failed to upload file. Please try again.");
+          setIsUploadingFile(false);
+          return;
+        }
+        setIsUploadingFile(false);
+      }
+
+      await sendNewMessage(
+        selectedConversation._id._id,
+        messageContent,
+        documentId
+      );
     } catch (error) {
       console.error("Error sending message:", error);
     }
@@ -840,6 +920,28 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                                 }`}
                               >
                                 <p className="text-sm">{message.content}</p>
+                                {message.document && (
+                                  <div className="mt-2 p-2 bg-white bg-opacity-20 rounded-lg">
+                                    <div className="flex items-center space-x-2">
+                                      <PaperClipIcon className="h-4 w-4" />
+                                      <span className="text-sm font-medium">
+                                        {message.document.originalFileName ||
+                                          message.document.title}
+                                      </span>
+                                      <button
+                                        onClick={() =>
+                                          window.open(
+                                            `/api/documents/${message.document._id}/view`,
+                                            "_blank"
+                                          )
+                                        }
+                                        className="text-xs bg-white bg-opacity-30 px-2 py-1 rounded hover:bg-opacity-50"
+                                      >
+                                        View
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
                                 <div
                                   className={`flex items-center justify-between mt-1 text-xs ${
                                     isOwnMessage
@@ -856,11 +958,26 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                                         <CheckIcon className="h-3 w-3" />
                                       )}
                                       {message.status === "delivered" && (
-                                        <CheckCircleIcon className="h-3 w-3" />
+                                        <div className="flex">
+                                          <CheckIcon className="h-3 w-3" />
+                                          <CheckIcon className="h-3 w-3 -ml-1" />
+                                        </div>
                                       )}
                                       {message.status === "read" && (
-                                        <CheckCircleIcon className="h-3 w-3 text-[var(--elra-secondary-3)]" />
+                                        <div className="flex">
+                                          <CheckIcon className="h-3 w-3 text-blue-500" />
+                                          <CheckIcon className="h-3 w-3 text-blue-500 -ml-1" />
+                                        </div>
                                       )}
+                                      <button
+                                        onClick={() =>
+                                          handleDeleteMessage(message)
+                                        }
+                                        className="ml-2 p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors"
+                                        title="Delete message"
+                                      >
+                                        <TrashIcon className="h-3 w-3" />
+                                      </button>
                                     </div>
                                   )}
                                 </div>
@@ -888,7 +1005,39 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                 </div>
 
                 <div className="p-4 border-t border-[var(--elra-border-primary)] bg-white">
+                  {/* Selected File Preview */}
+                  {selectedFile && (
+                    <div className="mb-3 p-2 bg-gray-50 rounded-lg flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <PaperClipIcon className="h-4 w-4 text-gray-500" />
+                        <span className="text-sm text-gray-700">
+                          {selectedFile.name}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                        </span>
+                      </div>
+                      <button
+                        onClick={handleRemoveFile}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <XMarkIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2">
+                    {/* File Upload Button */}
+                    <label className="flex items-center justify-center p-2 border border-[var(--elra-border-primary)] rounded-lg hover:bg-gray-50 cursor-pointer">
+                      <PaperClipIcon className="h-4 w-4 text-gray-500" />
+                      <input
+                        type="file"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif"
+                      />
+                    </label>
+
                     <input
                       type="text"
                       value={messageText}
@@ -908,11 +1057,20 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                     />
                     <button
                       onClick={handleSendMessage}
-                      disabled={!messageText.trim()}
+                      disabled={
+                        (!messageText.trim() && !selectedFile) ||
+                        isUploadingFile
+                      }
                       className="p-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                     >
-                      <PaperAirplaneIcon className="h-4 w-4" />
-                      <span className="text-xs font-medium">Send</span>
+                      {isUploadingFile ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      ) : (
+                        <>
+                          <PaperAirplaneIcon className="h-4 w-4" />
+                          <span className="text-xs font-medium">Send</span>
+                        </>
+                      )}
                     </button>
                   </div>
 
@@ -944,6 +1102,58 @@ const MessageDropdown = ({ isOpen, onClose }) => {
             )}
           </motion.div>
         </motion.div>
+      </AnimatePresence>
+
+      {/* Delete Message Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
+            >
+              <div className="p-6">
+                <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
+                  <TrashIcon className="h-6 w-6 text-red-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+                  Delete Message
+                </h3>
+                <p className="text-sm text-gray-600 text-center mb-6">
+                  Are you sure you want to delete this message? This action
+                  cannot be undone.
+                </p>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={cancelDeleteMessage}
+                    disabled={isDeleting}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDeleteMessage}
+                    disabled={isDeleting}
+                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                  >
+                    {isDeleting ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      "Delete"
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </>
   );

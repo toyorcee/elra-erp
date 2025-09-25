@@ -135,6 +135,35 @@ class MessageService {
       throw error;
     }
   }
+
+  // Upload file for message
+  async uploadMessageFile(file) {
+    try {
+      const formData = new FormData();
+      formData.append("document", file);
+
+      const response = await api.post(`/messages/upload-file`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error uploading message file:", error);
+      throw error;
+    }
+  }
+
+  // Delete a message
+  async deleteMessage(messageId) {
+    try {
+      const response = await api.delete(`/messages/${messageId}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting message:", error);
+      throw error;
+    }
+  }
 }
 
 export default new MessageService();

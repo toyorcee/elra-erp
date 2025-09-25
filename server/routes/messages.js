@@ -1,5 +1,6 @@
 import express from "express";
 import { protect } from "../middleware/auth.js";
+import { uploadDocument, handleUploadError } from "../middleware/upload.js";
 import {
   getChatHistory,
   getConversations,
@@ -12,6 +13,7 @@ import {
   deleteMessage,
   updateTypingStatus,
   getAvailableUsers,
+  uploadMessageFile,
 } from "../controllers/messageController.js";
 
 const router = express.Router();
@@ -51,5 +53,13 @@ router.delete("/:id", deleteMessage);
 
 // Update typing status
 router.patch("/typing", updateTypingStatus);
+
+// Upload file for message
+router.post(
+  "/upload-file",
+  uploadDocument,
+  handleUploadError,
+  uploadMessageFile
+);
 
 export default router;

@@ -2778,18 +2778,22 @@ export const viewDocument = async (req, res) => {
 
     // Handle both relative and absolute paths
     let filePath;
+    console.log("📄 [viewDocument] Document fileUrl:", document.fileUrl);
+
     if (
       document.fileUrl.startsWith("/C:") ||
       document.fileUrl.startsWith("C:")
     ) {
       // Absolute Windows path - use as is
       filePath = document.fileUrl.replace(/^\//, "");
+      console.log("📄 [viewDocument] Using absolute path:", filePath);
     } else {
       // Relative path - construct full path
       const normalizedFileUrl = document.fileUrl
         .replace(/\\/g, "/")
         .replace(/^\//, "");
       filePath = path.join(__dirname, "..", normalizedFileUrl);
+      console.log("📄 [viewDocument] Using relative path:", filePath);
     }
 
     // Check if file exists

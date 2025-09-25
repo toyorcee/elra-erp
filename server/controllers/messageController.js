@@ -1,5 +1,6 @@
 import Message from "../models/Message.js";
 import User from "../models/User.js";
+import Document from "../models/Document.js";
 
 function getSocketIdByUserId(userId) {
   return null;
@@ -86,7 +87,7 @@ export const getChatHistory = async (req, res) => {
       .limit(parseInt(limit))
       .populate("sender", "name email avatar firstName lastName")
       .populate("recipient", "name email avatar firstName lastName")
-      .populate("document", "title reference");
+      .populate("document", "title reference originalFileName fileName");
 
     const total = await Message.countDocuments({
       $or: [
@@ -238,7 +239,7 @@ export const getConversations = async (req, res) => {
         },
         {
           path: "lastMessage.document",
-          select: "title reference",
+          select: "title reference originalFileName fileName",
           model: "Document",
         },
       ]
@@ -290,7 +291,10 @@ export const sendMessage = async (req, res) => {
     await message.populate("sender", "name email avatar firstName lastName");
     await message.populate("recipient", "name email avatar firstName lastName");
     if (documentId) {
-      await message.populate("document", "title reference");
+      await message.populate(
+        "document",
+        "title reference originalFileName fileName"
+      );
     }
 
     await createMessageNotification(message, recipient);
@@ -496,11 +500,21 @@ export const deleteMessage = async (req, res) => {
     const currentUser = req.user;
     const { id } = req.params;
 
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "Message ID is required",
+      });
+    }
+
     const message = await Message.findOne({
       _id: id,
       sender: currentUser._id,
       isActive: true,
-    });
+    })
+      .populate("sender", "firstName lastName email")
+      .populate("recipient", "firstName lastName email")
+      .populate("document", "title originalFileName fileName fileUrl");
 
     if (!message) {
       return res.status(404).json({
@@ -509,20 +523,37 @@ export const deleteMessage = async (req, res) => {
       });
     }
 
+    // Soft delete the message with additional metadata
     message.isActive = false;
+    message.deletedAt = new Date();
+    message.deletedBy = currentUser._id;
     await message.save();
+
+    // Handle file attachment cleanup
+    if (message.document) {
+      console.log(`📄 [deleteMessage] Message had attachment: ${message.document.originalFileName}`);
+      // Note: We don't delete the file immediately as it might be referenced elsewhere
+      // A cleanup job can handle orphaned files later
+    }
 
     // Emit message deletion to recipient if online
     if (global.io) {
-      global.io.to(message.recipient.toString()).emit("messageDeleted", {
+      global.io.to(message.recipient._id.toString()).emit("messageDeleted", {
         messageId: message._id,
         deletedBy: currentUser._id,
+        deletedAt: message.deletedAt,
       });
     }
+
+    console.log(`✅ [deleteMessage] Message ${id} deleted by user ${currentUser._id}`);
 
     res.json({
       success: true,
       message: "Message deleted successfully",
+      data: {
+        messageId: message._id,
+        deletedAt: message.deletedAt,
+      },
     });
   } catch (error) {
     console.error("Delete message error:", error);
@@ -715,6 +746,58 @@ export const getAvailableUsers = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch available users",
+    });
+  }
+};
+
+// Upload file for message
+export const uploadMessageFile = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No file uploaded",
+      });
+    }
+
+    // Create document record
+    const document = new Document({
+      title: req.file.originalname,
+      description: `File shared in message`,
+      fileName: req.file.filename,
+      originalFileName: req.file.originalname,
+      fileUrl: req.file.path.replace(/\\/g, "/"),
+      fileSize: req.file.size,
+      mimeType: req.file.mimetype,
+      documentType: "other",
+      category: "administrative",
+      customCategory: "message_attachment",
+      createdBy: currentUser._id,
+      uploadedBy: currentUser._id,
+      isPublic: false,
+      status: "approved", // Message attachments are auto-approved
+      reviewStatus: "approved",
+    });
+
+    await document.save();
+
+    res.json({
+      success: true,
+      data: {
+        documentId: document._id,
+        fileName: document.originalFileName,
+        fileSize: document.fileSize,
+        mimeType: document.mimeType,
+        fileUrl: document.fileUrl,
+      },
+    });
+  } catch (error) {
+    console.error("Error uploading message file:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to upload file",
     });
   }
 };

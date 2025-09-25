@@ -329,10 +329,12 @@ export const useMessages = () => {
     [conversations]
   );
 
-  // Get messages for a user
+  // Get messages for a user (filter out inactive messages)
   const getMessagesForUser = useCallback(
     (userId) => {
-      return messages[userId] || [];
+      const userMessages = messages[userId] || [];
+      // Filter out inactive/deleted messages
+      return userMessages.filter((message) => message.isActive !== false);
     },
     [messages]
   );

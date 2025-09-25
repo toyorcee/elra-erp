@@ -13,6 +13,9 @@ import {
   UserPlusIcon,
   CheckIcon,
   CheckCircleIcon,
+  PaperClipIcon,
+  XMarkIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import { formatMessageTime } from "../../../../types/messageTypes";
 import messageService from "../../../../services/messageService";
@@ -37,6 +40,7 @@ const InternalMessages = () => {
     markMessagesAsReadForUser,
     getTotalUnreadCount,
     getMessagesForUser,
+    deleteMessageById,
     formatUserStatus,
     getUserDisplayName: getDisplayName,
     getUserInitials: getInitials,
@@ -46,10 +50,14 @@ const InternalMessages = () => {
   const [messageText, setMessageText] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [isTyping, setIsTyping] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [availableUsers, setAvailableUsers] = useState([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -154,15 +162,86 @@ const InternalMessages = () => {
   };
 
   // Send message
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      // Check file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        alert("File size must be less than 10MB");
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+  };
+
+  const handleDeleteMessage = (message) => {
+    setMessageToDelete(message);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteMessage = async () => {
+    if (!messageToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      // Use the deleteMessageById function from useMessages hook
+      // This will handle both the API call and local state update
+      await deleteMessageById(messageToDelete._id);
+
+      setShowDeleteConfirm(false);
+      setMessageToDelete(null);
+    } catch (error) {
+      console.error("Error deleting message:", error);
+      alert("Failed to delete message. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const cancelDeleteMessage = () => {
+    setShowDeleteConfirm(false);
+    setMessageToDelete(null);
+  };
+
   const handleSendMessage = async () => {
     const content = messageText.trim();
-    if (!content || !selectedConversation) return;
+    if ((!content && !selectedFile) || !selectedConversation) return;
 
+    const messageContent =
+      content || (selectedFile ? `📎 ${selectedFile.name}` : "");
     setMessageText("");
+    setSelectedFile(null);
     setIsTyping(false);
 
     try {
-      await sendNewMessage(selectedConversation._id._id, content);
+      let documentId = null;
+
+      // Upload file if selected
+      if (selectedFile) {
+        setIsUploadingFile(true);
+        try {
+          const uploadResponse = await messageService.uploadMessageFile(
+            selectedFile
+          );
+          documentId = uploadResponse.data.documentId;
+        } catch (error) {
+          console.error("Error uploading file:", error);
+          alert("Failed to upload file. Please try again.");
+          setIsUploadingFile(false);
+          return;
+        }
+        setIsUploadingFile(false);
+      }
+
+      await sendNewMessage(
+        selectedConversation._id._id,
+        messageContent,
+        documentId
+      );
     } catch (error) {
       console.error("Error sending message:", error);
     }
@@ -293,8 +372,16 @@ const InternalMessages = () => {
               }
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              className="w-full pl-10 pr-10 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
             />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <XMarkIcon className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -317,72 +404,90 @@ const InternalMessages = () => {
                 </div>
               ))}
             </div>
-          ) : searchTerm || availableUsers.length > 0 ? (
+          ) : searchTerm ? (
             <div className="space-y-1 p-2">
-              {availableUsers.map((user) => (
-                <motion.div
-                  key={user._id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-gray-50"
-                  onClick={async () => {
-                    try {
-                      await handleStartNewConversation(user);
-                    } catch (e) {
-                      console.error("Failed to start conversation:", e);
-                    }
-                  }}
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="relative">
-                      <div className="w-10 h-10 rounded-full overflow-hidden">
-                        {getAvatarDisplay(user)}
+              <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
+                <h3 className="text-sm font-medium text-gray-700">
+                  Available Users ({availableUsers.length})
+                </h3>
+              </div>
+              {availableUsers.length > 0 ? (
+                availableUsers.map((user) => (
+                  <motion.div
+                    key={user._id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-gray-50"
+                    onClick={async () => {
+                      try {
+                        await handleStartNewConversation(user);
+                      } catch (e) {
+                        console.error("Failed to start conversation:", e);
+                      }
+                    }}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="relative">
+                        <div className="w-10 h-10 rounded-full overflow-hidden">
+                          {getAvatarDisplay(user)}
+                        </div>
+                        {(() => {
+                          const id = user._id;
+                          let isOnline = false;
+                          if (Array.isArray(onlineUsers)) {
+                            isOnline = onlineUsers.includes(id);
+                          } else if (onlineUsers instanceof Set) {
+                            isOnline = onlineUsers.has(id);
+                          } else if (
+                            onlineUsers &&
+                            typeof onlineUsers === "object"
+                          ) {
+                            isOnline = Boolean(onlineUsers[id]);
+                          }
+                          return isOnline;
+                        })() && (
+                          <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                        )}
                       </div>
-                      {(() => {
-                        const id = user._id;
-                        let isOnline = false;
-                        if (Array.isArray(onlineUsers)) {
-                          isOnline = onlineUsers.includes(id);
-                        } else if (onlineUsers instanceof Set) {
-                          isOnline = onlineUsers.has(id);
-                        } else if (
-                          onlineUsers &&
-                          typeof onlineUsers === "object"
-                        ) {
-                          isOnline = Boolean(onlineUsers[id]);
-                        }
-                        return isOnline;
-                      })() && (
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p
+                            className="text-sm font-medium text-gray-900 truncate"
+                            title={getDisplayName(user)}
+                          >
+                            {getDisplayName(user)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-gray-500 truncate">
+                            {user.email}
+                          </p>
+                          <span
+                            className="text-[10px] text-gray-400 hidden sm:inline"
+                            title={formatUserStatus(user)}
+                          >
+                            {formatUserStatus(user)}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <p
-                          className="text-sm font-medium text-gray-900 truncate"
-                          title={getDisplayName(user)}
-                        >
-                          {getDisplayName(user)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs text-gray-500 truncate">
-                          {user.email}
-                        </p>
-                        <span
-                          className="text-[10px] text-gray-400 hidden sm:inline"
-                          title={formatUserStatus(user)}
-                        >
-                          {formatUserStatus(user)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                ))
+              ) : (
+                <div className="p-4 text-center text-gray-500">
+                  <p className="text-sm">
+                    No users found matching your search.
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-1 p-2">
+              <div className="px-3 py-2 bg-gray-50 border-b border-gray-100">
+                <h3 className="text-sm font-medium text-gray-700">
+                  Recent Conversations ({filteredConversations.length})
+                </h3>
+              </div>
               {filteredConversations.map((conversation) => (
                 <motion.div
                   key={conversation._id._id}
@@ -456,6 +561,14 @@ const InternalMessages = () => {
                   </div>
                 </motion.div>
               ))}
+              {filteredConversations.length === 0 && (
+                <div className="p-4 text-center text-gray-500">
+                  <p className="text-sm">No conversations yet.</p>
+                  <p className="text-xs mt-1">
+                    Search for users to start a conversation.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -554,61 +667,101 @@ const InternalMessages = () => {
                 </div>
               ) : (
                 getMessagesForUser(selectedConversation._id._id).map(
-                  (message) => (
-                    <motion.div
-                      key={message._id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className={`flex ${
-                        message.sender._id === user._id
-                          ? "justify-end"
-                          : "justify-start"
-                      }`}
-                    >
-                      <div
-                        className={`flex space-x-2 max-w-xs lg:max-w-md ${
-                          message.sender._id === user._id
-                            ? "flex-row-reverse space-x-reverse"
-                            : ""
+                  (message) => {
+                    const isOwnMessage =
+                      message.sender._id === (user._id || user.id);
+
+                    return (
+                      <motion.div
+                        key={message._id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex ${
+                          isOwnMessage ? "justify-end" : "justify-start"
                         }`}
                       >
-                        <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
-                          {getAvatarDisplay(message.sender)}
-                        </div>
                         <div
-                          className={`px-4 py-2 rounded-lg ${
-                            message.sender._id === user._id
-                              ? "bg-pink-500 text-white"
-                              : "bg-gray-200 text-gray-900"
+                          className={`flex space-x-2 max-w-xs lg:max-w-md ${
+                            isOwnMessage
+                              ? "flex-row-reverse space-x-reverse"
+                              : ""
                           }`}
                         >
-                          <p className="text-sm">{message.content}</p>
+                          <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                            {getAvatarDisplay(message.sender)}
+                          </div>
                           <div
-                            className={`flex items-center justify-between mt-1 text-xs ${
-                              message.sender._id === user._id
-                                ? "text-pink-100"
-                                : "text-gray-500"
+                            className={`px-4 py-2 rounded-lg ${
+                              isOwnMessage
+                                ? "bg-[var(--elra-primary)] text-white"
+                                : "bg-gray-200 text-gray-900"
                             }`}
                           >
-                            <span>{formatMessageTime(message.createdAt)}</span>
-                            {message.sender._id === (user._id || user.id) && (
-                              <div className="flex items-center gap-1">
-                                {message.status === "sent" && (
-                                  <CheckIcon className="h-3 w-3" />
-                                )}
-                                {message.status === "delivered" && (
-                                  <CheckCircleIcon className="h-3 w-3" />
-                                )}
-                                {message.status === "read" && (
-                                  <CheckCircleIcon className="h-3 w-3 text-pink-100" />
-                                )}
+                            <p className="text-sm">{message.content}</p>
+                            {message.document && (
+                              <div className="mt-2 p-2 bg-white bg-opacity-20 rounded-lg">
+                                <div className="flex items-center space-x-2">
+                                  <PaperClipIcon className="h-4 w-4" />
+                                  <span className="text-sm font-medium">
+                                    {message.document.originalFileName ||
+                                      message.document.title}
+                                  </span>
+                                  <button
+                                    onClick={() =>
+                                      window.open(
+                                        `/api/documents/${message.document._id}/view`,
+                                        "_blank"
+                                      )
+                                    }
+                                    className="text-xs bg-white bg-opacity-30 px-2 py-1 rounded hover:bg-opacity-50"
+                                  >
+                                    View
+                                  </button>
+                                </div>
                               </div>
                             )}
+                            <div
+                              className={`flex items-center justify-between mt-1 text-xs ${
+                                isOwnMessage
+                                  ? "text-[var(--elra-secondary-3)]"
+                                  : "text-gray-500"
+                              }`}
+                            >
+                              <span>
+                                {formatMessageTime(message.createdAt)}
+                              </span>
+                              {isOwnMessage && (
+                                <div className="flex items-center gap-1">
+                                  {message.status === "sent" && (
+                                    <CheckIcon className="h-3 w-3" />
+                                  )}
+                                  {message.status === "delivered" && (
+                                    <div className="flex">
+                                      <CheckIcon className="h-3 w-3" />
+                                      <CheckIcon className="h-3 w-3 -ml-1" />
+                                    </div>
+                                  )}
+                                  {message.status === "read" && (
+                                    <div className="flex">
+                                      <CheckIcon className="h-3 w-3 text-blue-500" />
+                                      <CheckIcon className="h-3 w-3 text-blue-500 -ml-1" />
+                                    </div>
+                                  )}
+                                  <button
+                                    onClick={() => handleDeleteMessage(message)}
+                                    className="ml-2 p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors"
+                                    title="Delete message"
+                                  >
+                                    <TrashIcon className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </motion.div>
-                  )
+                      </motion.div>
+                    );
+                  }
                 )
               )}
               <div ref={messagesEndRef} />
@@ -616,7 +769,39 @@ const InternalMessages = () => {
 
             {/* Message Input */}
             <div className="p-4 border-t border-gray-200 bg-white">
+              {/* Selected File Preview */}
+              {selectedFile && (
+                <div className="mb-3 p-3 bg-gray-50 rounded-lg flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <PaperClipIcon className="h-5 w-5 text-gray-500" />
+                    <span className="text-sm text-gray-700">
+                      {selectedFile.name}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleRemoveFile}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <XMarkIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
               <div className="flex space-x-2">
+                {/* File Upload Button */}
+                <label className="flex items-center justify-center px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <PaperClipIcon className="h-5 w-5 text-gray-500" />
+                  <input
+                    type="file"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif"
+                  />
+                </label>
+
                 <div className="flex-1 relative">
                   <textarea
                     value={messageText}
@@ -644,10 +829,16 @@ const InternalMessages = () => {
                 </div>
                 <button
                   onClick={handleSendMessage}
-                  disabled={!messageText.trim()}
+                  disabled={
+                    (!messageText.trim() && !selectedFile) || isUploadingFile
+                  }
                   className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  <PaperAirplaneIcon className="h-5 w-5" />
+                  {isUploadingFile ? (
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  ) : (
+                    <PaperAirplaneIcon className="h-5 w-5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -674,6 +865,58 @@ const InternalMessages = () => {
           </div>
         )}
       </div>
+
+      {/* Delete Message Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-[9999] p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
+            >
+              <div className="p-6">
+                <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
+                  <TrashIcon className="h-6 w-6 text-red-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+                  Delete Message
+                </h3>
+                <p className="text-sm text-gray-600 text-center mb-6">
+                  Are you sure you want to delete this message? This action
+                  cannot be undone.
+                </p>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={cancelDeleteMessage}
+                    disabled={isDeleting}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDeleteMessage}
+                    disabled={isDeleting}
+                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                  >
+                    {isDeleting ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      "Delete"
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

@@ -12,13 +12,25 @@ const complianceSchema = new mongoose.Schema(
       type: String,
       required: [true, "Compliance category is required"],
       enum: [
-        "Legal",
-        "Safety",
-        "Privacy",
-        "Environmental",
-        "Financial",
+        "Leasing Regulations",
+        "Financial Compliance",
+        "Risk Management",
+        "Customer Protection",
+        "Anti-Money Laundering",
+        "Data Protection & Privacy",
+        "Operational Standards",
+        "Reporting Requirements",
+        "Audit & Monitoring",
         "Other",
       ],
+    },
+    customCategory: {
+      type: String,
+      trim: true,
+      maxlength: [200, "Custom category cannot exceed 200 characters"],
+      required: function () {
+        return this.category === "Other";
+      },
     },
     status: {
       type: String,
@@ -65,17 +77,17 @@ const complianceSchema = new mongoose.Schema(
       ref: "User",
       required: [true, "Creator is required"],
     },
-    attachments: [
-      {
-        filename: String,
-        originalName: String,
-        path: String,
-        uploadedAt: {
-          type: Date,
-          default: Date.now,
-        },
-      },
-    ],
+    complianceProgram: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ComplianceProgram",
+      required: [true, "Compliance program is required"],
+    },
+    complianceScope: {
+      type: String,
+      enum: ["hr", "legal", "general"],
+      default: "hr",
+      required: true,
+    },
     isActive: {
       type: Boolean,
       default: true,

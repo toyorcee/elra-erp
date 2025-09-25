@@ -21,7 +21,6 @@ import {
   BriefcaseIcon,
   ShoppingBagIcon,
   EnvelopeIcon,
-  MapPinIcon,
   ClockIcon,
   ArrowTrendingUpIcon,
   ArrowRightOnRectangleIcon,
@@ -68,9 +67,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [pinnedItems, setPinnedItems] = useState([]);
   const [isHovered, setIsHovered] = useState(false);
-  const [isPinned, setIsPinned] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState({});
   const [isTransitioning, setIsTransitioning] = useState(false);
 
@@ -224,25 +221,23 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
   const roleInfo = getRoleInfo(userRoleLevel);
 
   const handleMouseEnter = () => {
-    if (!isMobile && !isOpen && !isPinned) {
+    if (!isMobile && !isOpen) {
       setIsHovered(true);
     }
   };
 
   const handleMouseLeave = () => {
-    if (!isMobile && !isOpen && !isPinned) {
+    if (!isMobile && !isOpen) {
       setIsHovered(false);
     }
   };
 
-  const shouldShowExpanded = isOpen || isPinned || (isHovered && !isPinned);
+  const shouldShowExpanded = isOpen || isHovered;
 
-  // Handle sidebar toggle with smooth transitions
   const handleToggle = () => {
     setIsTransitioning(true);
     onToggle();
 
-    // Close all sections when collapsing
     if (isOpen) {
       const allSections = {};
       Object.keys(sections).forEach((section) => {
@@ -251,35 +246,9 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
       setCollapsedSections(allSections);
     }
 
-    // Reset transitioning state after animation completes
     setTimeout(() => {
       setIsTransitioning(false);
     }, 300);
-  };
-
-  const togglePin = (itemId) => {
-    setPinnedItems((prev) =>
-      prev.includes(itemId)
-        ? prev.filter((id) => id !== itemId)
-        : [...prev, itemId]
-    );
-  };
-
-  const toggleSidebarPin = () => {
-    const newPinnedState = !isPinned;
-    setIsPinned(newPinnedState);
-
-    if (newPinnedState) {
-      if (!isOpen) {
-        onToggle();
-      }
-      setIsHovered(false);
-    } else {
-      if (isOpen && !isMobile) {
-        onToggle();
-      }
-      setIsHovered(false);
-    }
   };
 
   const toggleSectionCollapse = (sectionTitle, event) => {
@@ -300,7 +269,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     if (collapsedSections.hasOwnProperty(sectionTitle)) {
       return collapsedSections[sectionTitle];
     }
-    return !shouldShowExpanded; // Collapse by default when sidebar is closed
+    return !shouldShowExpanded;
   };
 
   React.useEffect(() => {
@@ -395,7 +364,6 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
       HiOutlineShoppingBag: ShoppingBagIcon,
       HiOutlinePhone: PhoneIcon,
       HiOutlineMail: EnvelopeIcon,
-      HiOutlineLocationMarker: MapPinIcon,
       HiOutlineClock: ClockIcon,
       HiOutlineTrendingUp: ArrowTrendingUpIcon,
       HiOutlineDocumentReport: ChartBarIcon,
@@ -432,7 +400,6 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
   const renderNavItem = (item) => {
     const IconComponent = getIconComponent(item.icon);
     const isItemActive = isActive(item.path);
-    const isPinned = pinnedItems.includes(item.label);
     const isMostSpecific = getMostSpecificActiveItem() === item.path;
 
     const handleClick = () => {
@@ -486,31 +453,10 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                     Active
                   </span>
                 )}
-                {isPinned && (
-                  <MapPinIcon
-                    className={`h-4 w-4 ${
-                      isItemActive
-                        ? "text-white"
-                        : "text-gray-600 group-hover:text-[var(--elra-primary)]"
-                    }`}
-                  />
-                )}
               </div>
             </>
           )}
         </Link>
-        {shouldShowExpanded && item.section !== "erp" && (
-          <button
-            onClick={() => togglePin(item.label)}
-            className={`absolute right-2 top-1/2 transform -translate-y-1/2 p-1 rounded-md transition-all duration-200 cursor-pointer ${
-              isPinned
-                ? "text-[var(--elra-primary)]"
-                : "text-gray-400 hover:text-[var(--elra-primary)]"
-            }`}
-          >
-            <MapPinIcon className={`h-4 w-4 ${isPinned ? "rotate-45" : ""}`} />
-          </button>
-        )}
       </div>
     );
   };
@@ -519,11 +465,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     if (!items || items.length === 0) return null;
     if (!hasSectionAccess(userRoleLevel, sectionKey)) return null;
 
-    // Check if this section contains the active item
-    const hasActiveItem = items.some((item) => isActive(item.path));
     const isCollapsed = isSectionCollapsed(sectionTitle, false);
-
-    // Add extra margin-top for ERP Modules section
     const extraMarginTop = sectionKey === "erp" ? "mt-8" : "";
 
     return (
@@ -567,12 +509,13 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex flex-col items-center p-2 rounded-lg transition-all duration-200 cursor-pointer ${
+                className={`flex flex-col items-center p-2 rounded-lg transition-all duration-200 cursor-pointer min-h-[60px] justify-center ${
                   isItemActive
                     ? "bg-[var(--elra-primary)] text-white shadow-lg"
                     : "text-gray-700 hover:bg-gray-100 hover:text-[var(--elra-primary)]"
                 }`}
                 title={item.label}
+                style={{ height: "60px" }}
               >
                 <IconComponent className="h-5 w-5 mb-1" />
                 <span className="text-xs text-center leading-tight truncate w-full">
@@ -593,7 +536,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     );
   };
 
-  // Group navigation items by section using the filtered navigation
+  // Group navigation items by section
   const sections = {
     main: navigation.filter((item) => item.section === "main"),
     erp: navigation.filter((item) => item.section === "erp"),
@@ -628,13 +571,17 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             : ""
         } ${
           !isOpen && !isMobile ? "lg:translate-x-0" : ""
-        } shadow-2xl shadow-gray-200/20 overflow-hidden`}
+        } shadow-2xl shadow-gray-200/20`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        style={{
+          minHeight: "100vh",
+          height: "100vh",
+          overflowY: "auto",
+        }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 bg-white">
-          {/* Section Title when expanded or hovered */}
+        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 bg-white sticky top-0 z-10">
           {shouldShowExpanded && (
             <div className="flex items-center">
               <span className="font-bold text-[var(--elra-primary)] text-lg">
@@ -645,52 +592,37 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             </div>
           )}
 
-          {/* Show hamburger when collapsed, pin when expanded */}
-          {shouldShowExpanded ? (
-            <button
-              onClick={toggleSidebarPin}
-              className={`p-2 rounded-xl transition-all duration-200 hover:scale-110 cursor-pointer ${
-                isPinned
-                  ? "text-[var(--elra-primary)]"
-                  : "text-gray-500 hover:text-[var(--elra-primary)]"
-              }`}
-              title={isPinned ? "Unpin sidebar" : "Pin sidebar"}
-            >
-              <MapPinIcon
-                className={`h-5 w-5 ${isPinned ? "rotate-45" : ""}`}
-              />
-            </button>
-          ) : (
-            <button
-              onClick={handleToggle}
-              className="p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer"
-              title="Expand sidebar"
-            >
-              <Bars3Icon className="h-5 w-5" />
-            </button>
-          )}
-
-          {/* Only show hamburger on mobile */}
-          <button
-            onClick={handleToggle}
-            className="p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer lg:hidden"
-          >
-            {isOpen ? (
-              <XMarkIcon className="h-5 w-5" />
+          <div className="flex items-center space-x-1">
+            {shouldShowExpanded ? (
+              <button
+                onClick={handleToggle}
+                className="p-2 rounded-xl text-gray-500 hover:text-[var(--elra-primary)] hover:bg-gray-100 transition-all duration-200 hover:scale-110 cursor-pointer"
+                title="Collapse sidebar"
+              >
+                <ChevronDownIcon className="h-5 w-5 transform rotate-90" />
+              </button>
             ) : (
-              <Bars3Icon className="h-5 w-5" />
+              <button
+                onClick={handleToggle}
+                className="p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer"
+                title="Expand sidebar"
+              >
+                <Bars3Icon className="h-5 w-5" />
+              </button>
             )}
-          </button>
 
-          {/* Desktop toggle button - only show when expanded */}
-          {shouldShowExpanded && (
+            {/* Mobile toggle button */}
             <button
               onClick={handleToggle}
-              className="hidden lg:block p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer"
+              className="p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer lg:hidden"
             >
-              <XMarkIcon className="h-5 w-5" />
+              {isOpen ? (
+                <XMarkIcon className="h-5 w-5" />
+              ) : (
+                <Bars3Icon className="h-5 w-5" />
+              )}
             </button>
-          )}
+          </div>
         </div>
 
         {/* User Profile */}
@@ -733,28 +665,23 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
 
         {/* Navigation */}
         <div
-          className="flex-1 px-4 py-6 space-y-1 overflow-y-auto sidebar-scroll flex flex-col"
+          className="px-4 py-6 space-y-1 sidebar-scroll"
           style={{
             maxHeight: "calc(100vh - 200px)",
-            overflowY: shouldShowExpanded ? "auto" : "hidden",
+            overflowY: "auto",
           }}
         >
-          <div className="flex-1">
-            {/* Dashboard at the top - only show when expanded */}
+          <div className="space-y-1">
             {shouldShowExpanded && sections.main.map(renderNavItem)}
 
-            {/* ERP Modules - special rendering when collapsed */}
             {shouldShowExpanded
               ? renderSection("erp", "ERP Modules", sections.erp)
               : renderCollapsedERPModules()}
 
-            {/* Other sections - only show when expanded */}
             {shouldShowExpanded && (
               <>
-                {/* Render module-specific navigation when in module view */}
                 {isModuleView && currentModule && (
                   <>
-                    {/* Module Header */}
                     <div className="mb-6 mt-4">
                       <button
                         onClick={(e) =>
@@ -773,105 +700,76 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                       </button>
                     </div>
 
-                    {/* Module-specific items */}
                     {!isSectionCollapsed("Module Features", false) && (
                       <div className="space-y-4">
-                        {moduleSidebarItems.map((section, sectionIndex) => {
-                          const isCollapsed = isSectionCollapsed(
-                            section.title,
-                            section.defaultExpanded
-                          );
-                          const hasActiveItem = section.items.some((item) =>
-                            isActive(item.path)
-                          );
-
-                          return (
-                            <div key={sectionIndex} className="mb-4">
-                              <button
-                                onClick={(e) =>
-                                  toggleSectionCollapse(section.title, e)
-                                }
-                                className="w-full px-4 text-xs font-semibold text-[var(--elra-primary)] uppercase tracking-wider mb-2 py-2 rounded-lg flex items-center justify-between transition-all duration-200 cursor-pointer hover:bg-gray-100"
-                              >
-                                <span>{section.title}</span>
-                                {section.collapsible && (
-                                  <div className="flex items-center space-x-2">
-                                    {isCollapsed ? (
-                                      <ChevronRightIcon className="h-4 w-4 transition-transform duration-200" />
-                                    ) : (
-                                      <ChevronDownIcon className="h-4 w-4 transition-transform duration-200" />
-                                    )}
-                                  </div>
-                                )}
-                              </button>
-                              {(!section.collapsible || !isCollapsed) && (
-                                <div className="space-y-1 ml-4">
-                                  {section.items.map((item, itemIndex) => {
-                                    const IconComponent = getIconComponent(
-                                      item.icon
-                                    );
-                                    const isItemActive = isActive(item.path);
-
-                                    return (
-                                      <div key={itemIndex} className="relative">
-                                        <Link
-                                          to={item.path}
-                                          className={`group flex items-center px-4 py-2 text-xs font-medium rounded-lg transition-all duration-300 cursor-pointer ${
-                                            isItemActive
-                                              ? "bg-[var(--elra-primary)] text-white font-semibold shadow-lg"
-                                              : "text-gray-700 hover:bg-gray-100 hover:text-[var(--elra-primary)]"
-                                          } ${
-                                            !shouldShowExpanded &&
-                                            "justify-center"
-                                          }`}
-                                        >
-                                          <div className="relative">
-                                            <IconComponent
-                                              className={`h-4 w-4 ${
-                                                isItemActive
-                                                  ? "text-white"
-                                                  : "text-gray-600 group-hover:text-[var(--elra-primary)]"
-                                              } ${
-                                                !shouldShowExpanded && "mx-auto"
-                                              } transition-transform duration-200 group-hover:scale-110`}
-                                            />
-                                          </div>
-                                          {shouldShowExpanded && (
-                                            <span className="ml-3 flex-1">
-                                              {item.label}
-                                            </span>
-                                          )}
-                                        </Link>
-                                      </div>
-                                    );
-                                  })}
+                        {moduleSidebarItems.map((section, sectionIndex) => (
+                          <div key={sectionIndex} className="mb-4">
+                            <button
+                              onClick={(e) =>
+                                toggleSectionCollapse(section.title, e)
+                              }
+                              className="w-full px-4 text-xs font-semibold text-[var(--elra-primary)] uppercase tracking-wider mb-2 py-2 rounded-lg flex items-center justify-between transition-all duration-200 cursor-pointer hover:bg-gray-100"
+                            >
+                              <span>{section.title}</span>
+                              {section.collapsible && (
+                                <div className="flex items-center space-x-2">
+                                  {isSectionCollapsed(
+                                    section.title,
+                                    section.defaultExpanded
+                                  ) ? (
+                                    <ChevronRightIcon className="h-4 w-4 transition-transform duration-200" />
+                                  ) : (
+                                    <ChevronDownIcon className="h-4 w-4 transition-transform duration-200" />
+                                  )}
                                 </div>
                               )}
-                            </div>
-                          );
-                        })}
+                            </button>
+                            {(!section.collapsible ||
+                              !isSectionCollapsed(
+                                section.title,
+                                section.defaultExpanded
+                              )) && (
+                              <div className="space-y-1 ml-4">
+                                {section.items.map((item, itemIndex) => {
+                                  const IconComponent = getIconComponent(
+                                    item.icon
+                                  );
+                                  const isItemActive = isActive(item.path);
+
+                                  return (
+                                    <div key={itemIndex} className="relative">
+                                      <Link
+                                        to={item.path}
+                                        className={`group flex items-center px-4 py-2 text-xs font-medium rounded-lg transition-all duration-300 cursor-pointer ${
+                                          isItemActive
+                                            ? "bg-[var(--elra-primary)] text-white font-semibold shadow-lg"
+                                            : "text-gray-700 hover:bg-gray-100 hover:text-[var(--elra-primary)]"
+                                        }`}
+                                      >
+                                        <IconComponent
+                                          className={`h-4 w-4 ${
+                                            isItemActive
+                                              ? "text-white"
+                                              : "text-gray-600 group-hover:text-[var(--elra-primary)]"
+                                          } transition-transform duration-200 group-hover:scale-110`}
+                                        />
+                                        <span className="ml-3 flex-1">
+                                          {item.label}
+                                        </span>
+                                      </Link>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </>
                 )}
 
-                {/* System section after module features */}
                 {renderSection("system", "System", sections.system)}
-
-                {/* Pinned Items */}
-                {pinnedItems.length > 0 && (
-                  <div className="mb-6">
-                    <h3 className="px-4 text-xs font-bold text-[var(--elra-primary)] uppercase tracking-wider mb-3 py-2 rounded-lg">
-                      Pinned
-                    </h3>
-                    {pinnedItems.map((itemLabel) => {
-                      const item = sidebarConfig.find(
-                        (nav) => nav.label === itemLabel
-                      );
-                      return item ? renderNavItem(item) : null;
-                    })}
-                  </div>
-                )}
               </>
             )}
           </div>

@@ -6,7 +6,7 @@ import { MdVisibility, MdVisibilityOff } from "react-icons/md";
 import { useAuth } from "../../context/AuthContext";
 import { authAPI } from "../../services/api";
 import ELRALogo from "../../components/ELRALogo";
-import elraImage from "../../assets/ERPModuleLogin.jpeg";
+import elraImage from "../../assets/elrabg.jpeg";
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });
@@ -104,17 +104,16 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-gray-50 md:bg-cover md:bg-center relative">
-      {/* Background image only visible on medium screens and above */}
-      <div className="hidden md:block absolute inset-0 bg-white/20 z-0"></div>
-      <div
-        className="hidden md:block absolute inset-0 z-0"
-        style={{ backgroundImage: `url(${elraImage})` }}
-      ></div>
+    <div
+      className="min-h-screen flex items-center justify-center px-4 py-8 bg-cover bg-center relative"
+      style={{ backgroundImage: `url(${elraImage})` }}
+    >
+      {/* Overlay for readability */}
+      <div className="absolute inset-0 bg-white/30 z-0"></div>
 
       {/* Content */}
       <div className="relative z-10 w-full max-w-md">
-        {/* Logo big on top with its own white backing */}
+        {/* Logo */}
         <div className="flex justify-center mb-6 md:mb-8">
           <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl shadow-lg">
             <ELRALogo className="h-10 md:h-14 w-auto" />

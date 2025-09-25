@@ -80,7 +80,14 @@ import {
   SalesMarketingReports,
 } from "./pages/user/modules/sales-marketing";
 import ProcurementManagement from "./pages/user/modules/procurement/ProcurementManagement";
-import { PendingReviews, ComplianceHistory } from "./pages/user/modules/legal";
+import {
+  LegalDashboard,
+  PendingReviews,
+  ComplianceHistory,
+  LegalPolicies,
+  LegalCompliance,
+  ComplianceItems,
+} from "./pages/user/modules/legal";
 import SystemSetupOnboarding from "./pages/shared/SystemSetupOnboarding";
 import DashboardLayout from "./layouts/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -376,7 +383,20 @@ const AppRoutes = () => {
         />
 
         {/* Legal Module Routes */}
-        <Route path="modules/legal/reviews" element={<PendingReviews />} />
+        <Route path="modules/legal" element={<LegalDashboard />} />
+        <Route path="modules/legal/policies" element={<LegalPolicies />} />
+        <Route
+          path="modules/legal/compliance-programs"
+          element={<LegalCompliance />}
+        />
+        <Route
+          path="modules/legal/compliance-items"
+          element={<ComplianceItems />}
+        />
+        <Route
+          path="modules/legal/pending-reviews"
+          element={<PendingReviews />}
+        />
         <Route
           path="modules/legal/compliance-history"
           element={<ComplianceHistory />}

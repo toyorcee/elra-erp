@@ -8,15 +8,32 @@ const policySchema = new mongoose.Schema(
       trim: true,
       maxlength: [200, "Title cannot exceed 200 characters"],
     },
+    // Optional raw custom category label when category is 'Other'
+    customCategory: {
+      type: String,
+      trim: true,
+      default: undefined,
+    },
     category: {
       type: String,
       required: [true, "Policy category is required"],
       enum: [
+        // HR Categories
         "Behavioral",
         "Benefits",
         "Work Arrangements",
         "Safety",
         "Compensation",
+        // Legal/ELRA Categories
+        "Leasing Regulations",
+        "Financial Compliance",
+        "Risk Management",
+        "Customer Protection",
+        "Anti-Money Laundering",
+        "Data Protection & Privacy",
+        "Operational Standards",
+        "Reporting Requirements",
+        "Audit & Monitoring",
         "Other",
       ],
     },
@@ -49,6 +66,20 @@ const policySchema = new mongoose.Schema(
       ref: "Department",
       required: false,
     },
+    // Policy Scope: HR (employee-focused) or Legal (project/client-focused)
+    policyScope: {
+      type: String,
+      enum: ["hr", "legal", "general"],
+      default: "hr",
+      required: true,
+    },
+    // For legal policies, specify which project scopes they apply to
+    applicableProjectScopes: [
+      {
+        type: String,
+        enum: ["personal", "departmental", "external"],
+      },
+    ],
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

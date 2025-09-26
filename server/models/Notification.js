@@ -145,6 +145,7 @@ const notificationSchema = new mongoose.Schema(
         "complaint_resolved",
         "complaint_note_added",
         "complaint_feedback_submitted",
+        "complaint_reminder",
       ],
       required: true,
     },

@@ -1,6 +1,5 @@
 import api from "./api";
 
-// Complaint API functions
 export const complaintAPI = {
   getComplaints: async (params = {}) => {
     try {
@@ -12,7 +11,6 @@ export const complaintAPI = {
     }
   },
 
-  // Get single complaint by ID
   getComplaintById: async (id) => {
     try {
       const response = await api.get(`/customer-care/complaints/${id}`);
@@ -23,7 +21,6 @@ export const complaintAPI = {
     }
   },
 
-  // Create new complaint
   createComplaint: async (complaintData) => {
     try {
       const response = await api.post(
@@ -37,7 +34,6 @@ export const complaintAPI = {
     }
   },
 
-  // Update complaint status
   updateComplaintStatus: async (id, statusData) => {
     try {
       const response = await api.put(
@@ -51,7 +47,6 @@ export const complaintAPI = {
     }
   },
 
-  // Add note to complaint
   addComplaintNote: async (id, noteData) => {
     try {
       const response = await api.post(
@@ -65,7 +60,6 @@ export const complaintAPI = {
     }
   },
 
-  // Submit feedback for resolved complaint
   submitFeedback: async (id, feedbackData) => {
     try {
       const response = await api.post(
@@ -79,7 +73,6 @@ export const complaintAPI = {
     }
   },
 
-  // Get team members for assignment (HODs only)
   getTeamMembers: async () => {
     try {
       const response = await api.get("/customer-care/team-members");
@@ -90,7 +83,6 @@ export const complaintAPI = {
     }
   },
 
-  // Assign complaint to team member (HODs only)
   assignComplaint: async (complaintId, assignmentData) => {
     try {
       const response = await api.post(
@@ -103,11 +95,21 @@ export const complaintAPI = {
       throw error;
     }
   },
+
+  sendReminderNotification: async (complaintId) => {
+    try {
+      const response = await api.post(
+        `/customer-care/complaints/${complaintId}/reminder`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error sending reminder notification:", error);
+      throw error;
+    }
+  },
 };
 
-// Statistics API functions
 export const statisticsAPI = {
-  // Get complaint statistics
   getStatistics: async (params = {}) => {
     try {
       const response = await api.get("/customer-care/statistics", { params });
@@ -118,7 +120,6 @@ export const statisticsAPI = {
     }
   },
 
-  // Get complaint trends
   getTrends: async (params = {}) => {
     try {
       const response = await api.get("/customer-care/trends", { params });
@@ -129,7 +130,6 @@ export const statisticsAPI = {
     }
   },
 
-  // Get department breakdown
   getDepartmentBreakdown: async () => {
     try {
       const response = await api.get("/customer-care/department-breakdown");
@@ -140,7 +140,6 @@ export const statisticsAPI = {
     }
   },
 
-  // Get category breakdown
   getCategoryBreakdown: async () => {
     try {
       const response = await api.get("/customer-care/category-breakdown");
@@ -152,9 +151,7 @@ export const statisticsAPI = {
   },
 };
 
-// Utility functions
 export const complaintUtils = {
-  // Format complaint status for display
   formatStatus: (status) => {
     const statusMap = {
       pending: {
@@ -192,7 +189,6 @@ export const complaintUtils = {
     );
   },
 
-  // Format priority for display
   formatPriority: (priority) => {
     const priorityMap = {
       low: {
@@ -216,7 +212,6 @@ export const complaintUtils = {
     );
   },
 
-  // Format category for display
   formatCategory: (category) => {
     const categoryMap = {
       technical: { label: "Technical Issues", icon: "💻" },
@@ -229,7 +224,6 @@ export const complaintUtils = {
     return categoryMap[category] || { label: category, icon: "📝" };
   },
 
-  // Calculate age in days
   calculateAge: (submittedAt) => {
     const now = new Date();
     const submitted = new Date(submittedAt);
@@ -238,10 +232,69 @@ export const complaintUtils = {
     return diffDays;
   },
 
-  // Check if complaint is overdue
   isOverdue: (slaDeadline, status) => {
     if (!slaDeadline || status === "resolved" || status === "closed")
       return false;
     return new Date() > new Date(slaDeadline);
+  },
+
+  updateComplaintStatus: async (complaintId, status) => {
+    try {
+      const response = await api.put(
+        `/customer-care/complaints/${complaintId}/status`,
+        {
+          status,
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error updating complaint status:", error);
+      throw error;
+    }
+  },
+
+  saveSession: async (sessionData) => {
+    try {
+      const response = await api.post("/customer-care/sessions", sessionData);
+      return response.data;
+    } catch (error) {
+      console.error("Error saving session:", error);
+      throw error;
+    }
+  },
+
+  getSessionsByComplaint: async (complaintId) => {
+    try {
+      const response = await api.get(
+        `/customer-care/sessions/complaint/${complaintId}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error getting sessions by complaint:", error);
+      throw error;
+    }
+  },
+
+  // Get sessions by responder
+  getSessionsByResponder: async (responderId) => {
+    try {
+      const response = await api.get(
+        `/customer-care/sessions/responder/${responderId}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error getting sessions by responder:", error);
+      throw error;
+    }
+  },
+
+  getActiveSessions: async () => {
+    try {
+      const response = await api.get("/customer-care/sessions/active");
+      return response.data;
+    } catch (error) {
+      console.error("Error getting active sessions:", error);
+      throw error;
+    }
   },
 };

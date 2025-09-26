@@ -1,6 +1,8 @@
 import Complaint from "../models/Complaint.js";
 import User from "../models/User.js";
 import Department from "../models/Department.js";
+import Session from "../models/Session.js";
+import Notification from "../models/Notification.js";
 import mongoose from "mongoose";
 
 export const getComplaints = async (req, res) => {
@@ -126,13 +128,11 @@ export const getComplaintById = async (req, res) => {
       });
     }
 
-    // Check if user can access this complaint
     const user = req.user;
     const isCustomerCareUser =
       user.department?.name === "Customer Service" ||
       user.department?.name === "Customer Care";
 
-    // Customer Care staff can see all complaints
     if (
       !isCustomerCareUser &&
       complaint.submittedBy._id.toString() !== user._id.toString()
@@ -163,7 +163,6 @@ export const createComplaint = async (req, res) => {
     const { title, description, category, priority, department, tags } =
       req.body;
 
-    // Validate required fields
     if (!title || !description || !category) {
       return res.status(400).json({
         success: false,
@@ -184,29 +183,33 @@ export const createComplaint = async (req, res) => {
 
     await complaint.save();
 
-    // Populate the created complaint
     await complaint.populate([
       { path: "submittedBy", select: "firstName lastName email" },
       { path: "department", select: "name" },
     ]);
 
-    // Create notifications for HODs and submitter
     try {
       const Notification = (await import("../models/Notification.js")).default;
       const User = (await import("../models/User.js")).default;
 
-      const customerCareHODs = await User.find({
-        $or: [
-          { "department.name": "Customer Service" },
-          { "department.name": "Customer Care" },
-        ],
-        $or: [{ "role.level": { $gte: 700 } }, { isSuperadmin: true }],
-      }).select("_id firstName lastName email");
+      const allHODs = await User.find({
+        isActive: true,
+      })
+        .populate("role", "name level")
+        .select("_id firstName lastName email role isSuperadmin")
+        .then((users) =>
+          users.filter(
+            (user) =>
+              (user.role &&
+                (user.role.name === "HOD" || user.role.level >= 700)) ||
+              user.isSuperadmin
+          )
+        );
 
       const notifications = [];
 
-      const hodNotifications = customerCareHODs.map((user) => ({
-        user: user._id,
+      const hodNotifications = allHODs.map((user) => ({
+        recipient: user._id,
         type: "complaint_submitted",
         title: "New Complaint Requires Assignment",
         message: `New complaint "${title}" submitted by ${complaint.submittedBy.firstName} ${complaint.submittedBy.lastName}. Please assign to a team member.`,
@@ -221,7 +224,7 @@ export const createComplaint = async (req, res) => {
       }));
 
       const submitterNotification = {
-        user: complaint.submittedBy._id,
+        recipient: complaint.submittedBy._id,
         type: "complaint_confirmation",
         title: "Complaint Submitted Successfully",
         message: `Your complaint "${title}" has been submitted and will be reviewed by our Customer Care team. You'll receive updates on its progress.`,
@@ -238,16 +241,12 @@ export const createComplaint = async (req, res) => {
 
       if (notifications.length > 0) {
         await Notification.insertMany(notifications);
-        console.log(
-          `✅ [CUSTOMER CARE] Created ${notifications.length} notifications: ${hodNotifications.length} for HODs, 1 for submitter`
-        );
       }
     } catch (notificationError) {
       console.error(
         "❌ [CUSTOMER CARE] Error creating notifications:",
         notificationError
       );
-      // Don't fail the complaint creation if notifications fail
     }
 
     res.status(201).json({
@@ -762,15 +761,11 @@ export const assignComplaint = async (req, res) => {
       };
 
       await Notification.create(assignmentNotification);
-      console.log(
-        `✅ [CUSTOMER CARE] Assignment notification sent to team member`
-      );
     } catch (notificationError) {
       console.error(
         "❌ [CUSTOMER CARE] Error creating assignment notification:",
         notificationError
       );
-      // Don't fail the assignment if notifications fail
     }
 
     res.status(200).json({
@@ -783,6 +778,252 @@ export const assignComplaint = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error assigning complaint",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Save chat session
+// @route   POST /api/customer-care/sessions
+// @access  Private (Customer Care)
+export const saveSession = async (req, res) => {
+  try {
+    const {
+      complaintId,
+      responderId,
+      responderName,
+      sessionTranscript,
+      startTime,
+      endTime,
+      status,
+      resolution,
+      notes,
+    } = req.body;
+
+    const responder = await User.findById(responderId);
+    const responderDepartment =
+      responder?.department?.name || "Unknown Department";
+
+    const session = await Session.create({
+      complaintId,
+      responderId,
+      responderName,
+      responderDepartment,
+      sessionTranscript,
+      startTime: new Date(startTime),
+      endTime: new Date(endTime),
+      status,
+      resolution: resolution || "pending",
+      notes: notes || "",
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Session saved successfully",
+      data: session,
+    });
+  } catch (error) {
+    console.error("❌ [CUSTOMER CARE] Error saving session:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to save session",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get sessions by complaint
+// @route   GET /api/customer-care/sessions/complaint/:complaintId
+// @access  Private (Customer Care)
+export const getSessionsByComplaint = async (req, res) => {
+  try {
+    const { complaintId } = req.params;
+
+    const sessions = await Session.getSessionsByComplaint(complaintId);
+
+    res.status(200).json({
+      success: true,
+      message: "Sessions retrieved successfully",
+      data: sessions,
+    });
+  } catch (error) {
+    console.error("❌ [CUSTOMER CARE] Error getting sessions:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get sessions",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get sessions by responder
+// @route   GET /api/customer-care/sessions/responder/:responderId
+// @access  Private (Customer Care)
+export const getSessionsByResponder = async (req, res) => {
+  try {
+    const { responderId } = req.params;
+
+    const sessions = await Session.getSessionsByResponder(responderId);
+
+    res.status(200).json({
+      success: true,
+      message: "Sessions retrieved successfully",
+      data: sessions,
+    });
+  } catch (error) {
+    console.error("❌ [CUSTOMER CARE] Error getting sessions:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get sessions",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get active sessions
+// @route   GET /api/customer-care/sessions/active
+// @access  Private (Customer Care)
+export const getActiveSessions = async (req, res) => {
+  try {
+    const sessions = await Session.getActiveSessions();
+
+    res.status(200).json({
+      success: true,
+      message: "Active sessions retrieved successfully",
+      data: sessions,
+    });
+  } catch (error) {
+    console.error("❌ [CUSTOMER CARE] Error getting active sessions:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get active sessions",
+      error: error.message,
+    });
+  }
+};
+
+export const sendReminderNotification = async (req, res) => {
+  try {
+    const { complaintId } = req.params;
+    const userId = req.user._id;
+
+    const complaint = await Complaint.findById(complaintId)
+      .populate("submittedBy", "firstName lastName email")
+      .populate("assignedTo", "firstName lastName email")
+      .populate("department", "name");
+
+    if (!complaint) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found",
+      });
+    }
+
+    const customerCareHODs = await User.find({
+      isActive: true,
+      department: complaint.department._id,
+    })
+      .populate("role", "name level")
+      .select("_id firstName lastName email role")
+      .then((users) =>
+        users.filter(
+          (user) =>
+            user.role && (user.role.name === "HOD" || user.role.level >= 700)
+        )
+      );
+
+    const customerCareStaff = await User.find({
+      isActive: true,
+      department: complaint.department._id,
+    })
+      .populate("role", "name level")
+      .select("_id firstName lastName email role")
+      .then((users) =>
+        users.filter(
+          (user) => user.role && user.role.level >= 300 && user.role.level < 700
+        )
+      );
+
+    const notifications = [];
+
+    const hodNotifications = customerCareHODs.map((user) => ({
+      recipient: user._id,
+      type: "complaint_reminder",
+      title: "Complaint Reminder - No Feedback Yet",
+      message: `User ${complaint.submittedBy.firstName} ${complaint.submittedBy.lastName} hasn't received feedback on complaint ${complaint.complaintNumber}. Please check and provide an update.`,
+      data: {
+        complaintId: complaint._id,
+        complaintNumber: complaint.complaintNumber,
+        submittedBy: complaint.submittedBy._id,
+        status: complaint.status,
+        priority: complaint.priority,
+        requiresUrgentAttention: true,
+      },
+      isRead: false,
+    }));
+
+    if (complaint.assignedTo) {
+      const assignedNotification = {
+        recipient: complaint.assignedTo._id,
+        type: "complaint_reminder",
+        title: "Your Assigned Complaint Needs Attention",
+        message: `The user is waiting for feedback on complaint ${complaint.complaintNumber}. Please provide an update soon.`,
+        data: {
+          complaintId: complaint._id,
+          complaintNumber: complaint.complaintNumber,
+          submittedBy: complaint.submittedBy._id,
+          status: complaint.status,
+          priority: complaint.priority,
+          isAssignedToYou: true,
+        },
+        isRead: false,
+      };
+      notifications.push(assignedNotification);
+    }
+
+    if (!complaint.assignedTo && customerCareStaff.length > 0) {
+      const staffNotifications = customerCareStaff.slice(0, 3).map((user) => ({
+        recipient: user._id,
+        type: "complaint_reminder",
+        title: "Complaint Needs Attention",
+        message: `Complaint ${complaint.complaintNumber} needs attention. User is waiting for feedback.`,
+        data: {
+          complaintId: complaint._id,
+          complaintNumber: complaint.complaintNumber,
+          submittedBy: complaint.submittedBy._id,
+          status: complaint.status,
+          priority: complaint.priority,
+          needsAssignment: true,
+        },
+        isRead: false,
+      }));
+      notifications.push(...staffNotifications);
+    }
+
+    notifications.push(...hodNotifications);
+
+    if (notifications.length > 0) {
+      await Notification.insertMany(notifications);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Reminder notifications sent successfully",
+      data: {
+        complaintId: complaint._id,
+        complaintNumber: complaint.complaintNumber,
+        notificationsSent: notifications.length,
+        status: complaint.status,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "❌ [CUSTOMER CARE] Error sending reminder notification:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Error sending reminder notification",
       error: error.message,
     });
   }

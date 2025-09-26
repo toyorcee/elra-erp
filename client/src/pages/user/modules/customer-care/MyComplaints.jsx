@@ -4,11 +4,6 @@ import {
   HiTicket,
   HiArrowLeft,
   HiHome,
-  HiUser,
-  HiCalendar,
-  HiClock,
-  HiCheckCircle,
-  HiExclamationTriangle,
   HiChatBubbleOvalLeftEllipsis,
   HiEye,
   HiPlus,
@@ -69,8 +64,7 @@ const MyComplaints = () => {
     return priorityInfo.bgColor;
   };
 
-  const handleContinueChat = (complaint) => {
-    console.log("🚀 Continue Chat clicked for complaint:", complaint);
+  const handleCheckStatus = (complaint) => {
     const chatButton = document.querySelector("[data-chat-button]");
     if (chatButton) {
       sessionStorage.setItem("prefetchedComplaintId", complaint._id);
@@ -268,12 +262,12 @@ const MyComplaints = () => {
                     {(complaint.status === "pending" ||
                       complaint.status === "in_progress") && (
                       <button
-                        onClick={() => handleContinueChat(complaint)}
-                        className="flex items-center space-x-1 px-3 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
-                        title="Continue Chat about this complaint"
+                        onClick={() => handleCheckStatus(complaint)}
+                        className="flex items-center space-x-1 px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
+                        title="Check status and continue conversation about this complaint"
                       >
                         <HiChatBubbleOvalLeftEllipsis className="w-4 h-4" />
-                        <span>Continue Chat</span>
+                        <span>Check Status</span>
                       </button>
                     )}
                     <button

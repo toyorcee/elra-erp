@@ -13,6 +13,11 @@ import {
   submitFeedback,
   getTeamMembers,
   assignComplaint,
+  saveSession,
+  getSessionsByComplaint,
+  getSessionsByResponder,
+  getActiveSessions,
+  sendReminderNotification,
 } from "../controllers/customerCareController.js";
 
 const router = express.Router();
@@ -49,17 +54,35 @@ router.get(
   getCategoryBreakdown
 );
 
-// Submit feedback for resolved complaint
 router.post(
   "/complaints/:id/feedback",
   checkCustomerCareAccess,
   submitFeedback
 );
 
-// Get team members for assignment (HODs only)
 router.get("/team-members", checkCustomerCareAccess, getTeamMembers);
 
-// Assign complaint to team member (HODs only)
 router.post("/complaints/:id/assign", checkCustomerCareAccess, assignComplaint);
+
+router.post("/sessions", checkCustomerCareAccess, saveSession);
+
+router.get(
+  "/sessions/complaint/:complaintId",
+  checkCustomerCareAccess,
+  getSessionsByComplaint
+);
+
+// Get sessions by responder
+router.get(
+  "/sessions/responder/:responderId",
+  checkCustomerCareAccess,
+  getSessionsByResponder
+);
+
+// Get active sessions
+router.get("/sessions/active", checkCustomerCareAccess, getActiveSessions);
+
+// Send reminder notification for complaint
+router.post("/complaints/:complaintId/reminder", sendReminderNotification);
 
 export default router;

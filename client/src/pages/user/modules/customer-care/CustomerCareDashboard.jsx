@@ -40,18 +40,15 @@ const CustomerCareDashboard = () => {
   const [recentComplaints, setRecentComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Check if user is from Customer Care department
   const isCustomerCareUser =
     user?.department?.name === "Customer Service" ||
     user?.department?.name === "Customer Care";
 
-  // Fetch data on component mount
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
 
-        // Fetch statistics
         const statsResponse = await statisticsAPI.getStatistics();
         if (statsResponse.success) {
           setStats(statsResponse.data);
@@ -103,7 +100,6 @@ const CustomerCareDashboard = () => {
     }
   };
 
-  // Render different content based on user department
   if (!isCustomerCareUser) {
     return (
       <div className="space-y-6 p-4">
@@ -115,13 +111,121 @@ const CustomerCareDashboard = () => {
           </p>
         </div>
 
+        {/* Stats Cards for Regular Users */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* My Complaints Count */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg border border-blue-200 p-6 hover:shadow-xl transition-all duration-300"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">
+                  My Complaints
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-blue-900 mt-2">
+                  {recentComplaints.length}
+                </p>
+                <p className="text-sm text-blue-600 mt-1">Total submitted</p>
+              </div>
+              <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
+                <HiDocumentText className="h-8 w-8 text-white" />
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Pending Complaints */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl shadow-lg border border-yellow-200 p-6 hover:shadow-xl transition-all duration-300"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-yellow-700 uppercase tracking-wide">
+                  Pending
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-yellow-900 mt-2">
+                  {
+                    recentComplaints.filter((c) => c.status === "pending")
+                      .length
+                  }
+                </p>
+                <p className="text-sm text-yellow-600 mt-1">
+                  Awaiting response
+                </p>
+              </div>
+              <div className="p-4 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg">
+                <HiClock className="h-8 w-8 text-white" />
+              </div>
+            </div>
+          </motion.div>
+
+          {/* In Progress */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl shadow-lg border border-purple-200 p-6 hover:shadow-xl transition-all duration-300"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-purple-700 uppercase tracking-wide">
+                  In Progress
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-purple-900 mt-2">
+                  {
+                    recentComplaints.filter((c) => c.status === "in_progress")
+                      .length
+                  }
+                </p>
+                <p className="text-sm text-purple-600 mt-1">Being handled</p>
+              </div>
+              <div className="p-4 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
+                <HiExclamationTriangle className="h-8 w-8 text-white" />
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Resolved */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-lg border border-green-200 p-6 hover:shadow-xl transition-all duration-300"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-green-700 uppercase tracking-wide">
+                  Resolved
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-green-900 mt-2">
+                  {
+                    recentComplaints.filter((c) => c.status === "resolved")
+                      .length
+                  }
+                </p>
+                <p className="text-sm text-green-600 mt-1">
+                  Successfully closed
+                </p>
+              </div>
+              <div className="p-4 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
+                <HiCheckCircle className="h-8 w-8 text-white" />
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
         {/* Quick Actions for Regular Users */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+            transition={{ delay: 0.5 }}
+            className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 hover:shadow-xl transition-all duration-300"
           >
             <div className="flex items-center space-x-4 mb-4">
               <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl">
@@ -129,7 +233,7 @@ const CustomerCareDashboard = () => {
               </div>
               <div>
                 <h3 className="text-xl font-bold text-gray-900">
-                  Submit a Complaint
+                  Make a Complaint
                 </h3>
                 <p className="text-gray-600">Report an issue or concern</p>
               </div>
@@ -143,15 +247,15 @@ const CustomerCareDashboard = () => {
               className="inline-flex items-center space-x-2 px-6 py-3 bg-[var(--elra-primary)] text-white rounded-xl font-semibold hover:bg-[var(--elra-primary-dark)] transition-colors"
             >
               <HiPlus className="w-5 h-5" />
-              <span>Submit Complaint</span>
+              <span>Make Complaint</span>
             </Link>
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+            transition={{ delay: 0.6 }}
+            className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 hover:shadow-xl transition-all duration-300"
           >
             <div className="flex items-center space-x-4 mb-4">
               <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl">
@@ -185,11 +289,13 @@ const CustomerCareDashboard = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.7 }}
           className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
         >
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">My Complaints</h2>
+            <h2 className="text-xl font-bold text-gray-900">
+              Recent Complaints
+            </h2>
             <Link
               to="/dashboard/modules/customer-care/my-complaints"
               className="text-sm text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] font-medium"
@@ -200,9 +306,12 @@ const CustomerCareDashboard = () => {
           {recentComplaints.length > 0 ? (
             <div className="space-y-3">
               {recentComplaints.slice(0, 3).map((complaint) => (
-                <div
+                <motion.div
                   key={complaint._id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.8 }}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
                 >
                   <div>
                     <p className="font-medium text-gray-900">
@@ -226,7 +335,7 @@ const CustomerCareDashboard = () => {
                   >
                     {complaintUtils.formatStatus(complaint.status).label}
                   </span>
-                </div>
+                </motion.div>
               ))}
             </div>
           ) : (
@@ -246,7 +355,7 @@ const CustomerCareDashboard = () => {
                 className="inline-flex items-center space-x-2 px-6 py-3 bg-[var(--elra-primary)] text-white rounded-xl font-semibold hover:bg-[var(--elra-primary-dark)] transition-colors"
               >
                 <HiPlus className="w-5 h-5" />
-                <span>Submit Your First Complaint</span>
+                <span>Make Your First Complaint</span>
               </Link>
             </div>
           )}

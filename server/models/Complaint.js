@@ -18,7 +18,22 @@ const complaintSchema = new mongoose.Schema(
     category: {
       type: String,
       required: [true, "Complaint category is required"],
-      enum: ["technical", "payroll", "equipment", "access", "hr", "other"],
+      enum: [
+        "technical", 
+        "payroll", 
+        "hr", 
+        "customer_care", 
+        "sales", 
+        "procurement", 
+        "inventory", 
+        "equipment", 
+        "access", 
+        "policy", 
+        "training", 
+        "facilities", 
+        "security", 
+        "other"
+      ],
       default: "other",
     },
     priority: {

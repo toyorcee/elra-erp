@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   HiTicket,
@@ -11,6 +11,8 @@ import {
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import { complaintAPI } from "../../../../services/customerCareAPI";
+import { getActiveDepartments } from "../../../../services/departments";
+import AnimatedBubbles from "../../../../components/ui/AnimatedBubbles";
 
 const SubmitComplaint = () => {
   const [formData, setFormData] = useState({
@@ -22,14 +24,24 @@ const SubmitComplaint = () => {
   });
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [departments, setDepartments] = useState([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
 
   const categories = [
-    { value: "technical", label: "Technical Issues", icon: "💻" },
-    { value: "payroll", label: "Payroll & Finance", icon: "💰" },
-    { value: "equipment", label: "Equipment Request", icon: "🖥️" },
-    { value: "access", label: "Access Issues", icon: "🔐" },
-    { value: "hr", label: "HR Related", icon: "👥" },
-    { value: "other", label: "Other", icon: "📝" },
+    { value: "technical", label: "Technical Issues" },
+    { value: "payroll", label: "Payroll & Finance" },
+    { value: "hr", label: "Human Resources" },
+    { value: "customer_care", label: "Customer Care" },
+    { value: "sales", label: "Sales & Marketing" },
+    { value: "procurement", label: "Procurement" },
+    { value: "inventory", label: "Inventory Management" },
+    { value: "equipment", label: "Equipment Request" },
+    { value: "access", label: "Access Issues" },
+    { value: "policy", label: "Policy & Procedures" },
+    { value: "training", label: "Training & Development" },
+    { value: "facilities", label: "Facilities & Maintenance" },
+    { value: "security", label: "Security & Safety" },
+    { value: "other", label: "Other" },
   ];
 
   const priorities = [
@@ -41,6 +53,42 @@ const SubmitComplaint = () => {
     },
     { value: "high", label: "High", color: "text-red-600 bg-red-100" },
   ];
+
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        setDepartmentsLoading(true);
+        console.log("🔄 [SubmitComplaint] Fetching departments...");
+        const response = await getActiveDepartments();
+        console.log("📡 [SubmitComplaint] Departments API response:", response);
+
+        if (response.success && response.data && response.data.departments) {
+          console.log(
+            "✅ [SubmitComplaint] Departments data:",
+            response.data.departments
+          );
+          setDepartments(response.data.departments);
+        } else {
+          console.warn(
+            "⚠️ [SubmitComplaint] Departments API response structure:",
+            response
+          );
+          setDepartments([]);
+        }
+      } catch (error) {
+        console.error(
+          "❌ [SubmitComplaint] Error fetching departments:",
+          error
+        );
+        toast.error("Failed to load departments");
+        setDepartments([]);
+      } finally {
+        setDepartmentsLoading(false);
+      }
+    };
+
+    fetchDepartments();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -159,7 +207,7 @@ const SubmitComplaint = () => {
               <HiTicket className="w-8 h-8" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold">Submit a Complaint</h1>
+              <h1 className="text-3xl font-bold">Make a Complaint</h1>
               <p className="text-white/80 mt-1">
                 Report an issue or concern to our Customer Care team
               </p>
@@ -217,7 +265,7 @@ const SubmitComplaint = () => {
                 <option value="">Select a category</option>
                 {categories.map((category) => (
                   <option key={category.value} value={category.value}>
-                    {category.icon} {category.label}
+                    {category.label}
                   </option>
                 ))}
               </select>
@@ -255,25 +303,35 @@ const SubmitComplaint = () => {
           </div>
 
           {/* Department */}
-          <div>
+          <div className="relative">
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Related Department
             </label>
-            <select
-              value={formData.department}
-              onChange={(e) =>
-                setFormData({ ...formData, department: e.target.value })
-              }
-              className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-            >
-              <option value="">Select department (optional)</option>
-              <option value="IT">Information Technology</option>
-              <option value="Finance">Finance & Accounting</option>
-              <option value="HR">Human Resources</option>
-              <option value="Operations">Operations</option>
-              <option value="Sales">Sales & Marketing</option>
-              <option value="Legal">Legal & Compliance</option>
-            </select>
+            <div className="relative">
+              <select
+                value={formData.department}
+                onChange={(e) =>
+                  setFormData({ ...formData, department: e.target.value })
+                }
+                className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                disabled={departmentsLoading}
+              >
+                <option value="">Select department (optional)</option>
+                {Array.isArray(departments) &&
+                  departments.map((dept) => (
+                    <option key={dept._id} value={dept._id}>
+                      {dept.name}
+                    </option>
+                  ))}
+              </select>
+
+              {/* Animated Bubbles Loading Indicator */}
+              <AnimatedBubbles
+                isVisible={departmentsLoading}
+                variant="bubbles"
+                className="bg-white/80 rounded-xl"
+              />
+            </div>
           </div>
 
           {/* Description */}
@@ -308,7 +366,7 @@ const SubmitComplaint = () => {
               ) : (
                 <>
                   <HiPaperAirplane className="w-5 h-5" />
-                  <span>Submit Complaint</span>
+                  <span>Make Complaint</span>
                 </>
               )}
             </button>
@@ -321,21 +379,30 @@ const SubmitComplaint = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200"
+        className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl p-6 text-white"
       >
         <div className="flex items-start space-x-3">
-          <div className="p-2 bg-blue-500 rounded-lg">
-            <HiExclamationTriangle className="w-5 h-5 text-white" />
+          <div className="p-3 bg-white/20 rounded-xl">
+            <HiExclamationTriangle className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900 mb-2">Need Help?</h3>
-            <p className="text-sm text-gray-600 mb-3">
+            <h3 className="font-bold text-white text-lg mb-2">Need Help?</h3>
+            <p className="text-white/90 mb-3">
               If you need immediate assistance, you can also:
             </p>
-            <ul className="text-sm text-gray-600 space-y-1">
-              <li>• Use the floating chat button for quick help</li>
-              <li>• Contact your department head directly</li>
-              <li>• Call the internal support line</li>
+            <ul className="text-white/90 space-y-2">
+              <li className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                <span>Contact your department head directly</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                <span>Call the internal support line</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                <span>Submit a support ticket through the system</span>
+              </li>
             </ul>
           </div>
         </div>

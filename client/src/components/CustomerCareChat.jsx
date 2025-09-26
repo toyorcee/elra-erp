@@ -25,6 +25,12 @@ const CustomerCareChat = () => {
   const [chatSession, setChatSession] = useState([]);
   const [isComplaintMode, setIsComplaintMode] = useState(false);
   const [finalComplaintMessage, setFinalComplaintMessage] = useState("");
+  const [complaintTitle, setComplaintTitle] = useState("");
+  const [complaintCategory, setComplaintCategory] = useState("");
+  const [complaintPriority, setComplaintPriority] = useState("");
+  const [complaintStep, setComplaintStep] = useState("category");
+  const [showCategoryButtons, setShowCategoryButtons] = useState(false);
+  const [showPriorityButtons, setShowPriorityButtons] = useState(false);
   const [userHistory, setUserHistory] = useState(null);
   const [showHistoryOptions, setShowHistoryOptions] = useState(false);
   const [conversationState, setConversationState] = useState("idle");
@@ -146,7 +152,7 @@ const CustomerCareChat = () => {
       id: Date.now(),
       type: "bot",
       message:
-        "Hi! I'm here to help with your concerns. How can I assist you today?",
+        "Hi! 👋 I'm here to help with your concerns. How can I assist you today?",
       timestamp: new Date().toISOString(),
     };
     setMessages([defaultMessage]);
@@ -165,7 +171,7 @@ const CustomerCareChat = () => {
           id: 1,
           type: "bot",
           message:
-            "Hi! I'm here to help with your concerns. How can I assist you today?",
+            "Hi! 👋 I'm here to help with your concerns. How can I assist you today?",
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -521,7 +527,7 @@ const CustomerCareChat = () => {
         id: Date.now(),
         type: "bot",
         message:
-          "⚠️ Your message contains inappropriate content. Please keep your communication professional and related to work issues only. If you have a legitimate complaint, please describe it properly.",
+          "😕 Your message contains inappropriate content. Please keep your communication professional and related to work issues only. If you have a legitimate complaint, please describe it properly.",
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, abuseMessage]);
@@ -553,6 +559,160 @@ const CustomerCareChat = () => {
     if (messageText.toLowerCase().includes("submit") && isComplaintMode) {
       await handleSubmitComplaintFromSession();
       return;
+    }
+
+    // 2. Handle complaint step-by-step collection
+    if (isComplaintMode) {
+      if (complaintStep === "title") {
+        setComplaintTitle(messageText);
+
+        setTimeout(() => {
+          const botResponse = {
+            id: Date.now() + 1,
+            type: "bot",
+            message:
+              `Perfect! I've set the title as "${messageText}". 🎯 Now, how urgent is this issue? Please choose:` +
+              " 🟢 Low - Can wait a few days (e.g., general questions, minor issues)" +
+              " 🟡 Medium - Normal priority (e.g., standard requests, moderate issues)" +
+              " 🔴 High - Needs attention soon (e.g., urgent problems, blocking work)" +
+              " Just type: Low, Medium, or High",
+            timestamp: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, botResponse]);
+          setComplaintStep("priority");
+          setShowPriorityButtons(true);
+          setIsTyping(false);
+        }, 1000);
+        return;
+      }
+
+      if (complaintStep === "category") {
+        // Parse category from user response
+        const categoryText = messageText.toLowerCase();
+        let selectedCategory = "other";
+
+        if (categoryText.includes("technical")) selectedCategory = "technical";
+        else if (
+          categoryText.includes("payroll") ||
+          categoryText.includes("finance")
+        )
+          selectedCategory = "payroll";
+        else if (
+          categoryText.includes("hr") ||
+          categoryText.includes("human resources")
+        )
+          selectedCategory = "hr";
+        else if (categoryText.includes("customer care"))
+          selectedCategory = "customer_care";
+        else if (
+          categoryText.includes("sales") ||
+          categoryText.includes("marketing")
+        )
+          selectedCategory = "sales";
+        else if (categoryText.includes("procurement"))
+          selectedCategory = "procurement";
+        else if (categoryText.includes("inventory"))
+          selectedCategory = "inventory";
+        else if (categoryText.includes("equipment"))
+          selectedCategory = "equipment";
+        else if (categoryText.includes("access")) selectedCategory = "access";
+        else if (categoryText.includes("policy")) selectedCategory = "policy";
+        else if (categoryText.includes("training"))
+          selectedCategory = "training";
+        else if (categoryText.includes("facilities"))
+          selectedCategory = "facilities";
+        else if (categoryText.includes("security"))
+          selectedCategory = "security";
+        else if (
+          categoryText.includes("projects") ||
+          categoryText.includes("tasks")
+        )
+          selectedCategory = "projects";
+        else if (
+          categoryText.includes("documents") ||
+          categoryText.includes("files")
+        )
+          selectedCategory = "documents";
+
+        setComplaintCategory(selectedCategory);
+
+        // Ask for details next
+        setTimeout(() => {
+          const botResponse = {
+            id: Date.now() + 1,
+            type: "bot",
+            message:
+              `Great! I've categorized this as **${selectedCategory
+                .replace("_", " ")
+                .toUpperCase()}**. 🎉` +
+              " Now, please tell me more details about your complaint - what exactly happened and how can we help resolve it?",
+            timestamp: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, botResponse]);
+          setComplaintStep("details");
+          setShowCategoryButtons(false);
+          setIsTyping(false);
+        }, 1000);
+        return;
+      }
+
+      if (complaintStep === "details") {
+        // User provided the details
+        setFinalComplaintMessage(messageText);
+
+        // Ask for title next
+        setTimeout(() => {
+          const botResponse = {
+            id: Date.now() + 1,
+            type: "bot",
+            message:
+              "Thank you for the details! 📝 Now I need a clear title for your complaint." +
+              " Please give me a short, descriptive title (e.g., 'Salary Calculation Error', 'Computer Not Working', 'Leave Request Issue')." +
+              " This will help our team quickly understand what the complaint is about.",
+            timestamp: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, botResponse]);
+          setComplaintStep("title");
+          setIsTyping(false);
+        }, 1000);
+        return;
+      }
+
+      if (complaintStep === "priority") {
+        // Parse priority from user response
+        const priorityText = messageText.toLowerCase();
+        let selectedPriority = "medium";
+
+        if (priorityText.includes("low")) selectedPriority = "low";
+        else if (priorityText.includes("medium")) selectedPriority = "medium";
+        else if (priorityText.includes("high")) selectedPriority = "high";
+
+        setComplaintPriority(selectedPriority);
+
+        // Ready to submit
+        setTimeout(() => {
+          const botResponse = {
+            id: Date.now() + 1,
+            type: "bot",
+            message:
+              `Perfect! I've set the priority as **${selectedPriority.toUpperCase()}**. 🎯` +
+              " Complaint Summary:" +
+              ` 📋 Title: ${complaintTitle}` +
+              ` 📝 Description: ${finalComplaintMessage}` +
+              ` 📂 Category: ${complaintCategory
+                .replace("_", " ")
+                .toUpperCase()}` +
+              ` ⚡ Priority: ${selectedPriority.toUpperCase()}` +
+              " Ready to submit! Type 'submit' to send this complaint to our Customer Care team. 🚀",
+            timestamp: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, botResponse]);
+          setComplaintStep("submit");
+          setShowPriorityButtons(false);
+          setIsTyping(false);
+        }, 1000);
+        return;
+      }
     }
 
     // 2. SECOND PRIORITY: Check for feedback-related keywords
@@ -644,7 +804,7 @@ const CustomerCareChat = () => {
           id: Date.now(),
           type: "bot",
           message:
-            "You're very welcome! 😊 I'm here to help with any work-related issues or complaints. Is there anything else I can assist you with?",
+            "You're very welcome! 😉 I'm here to help with any work-related issues or complaints. Is there anything else I can assist you with?",
           timestamp: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, thankYouResponse]);
@@ -714,11 +874,26 @@ const CustomerCareChat = () => {
       ) {
         setConversationState("new_complaint");
         setTimeout(() => {
+          setIsComplaintMode(true);
+          setComplaintStep("category");
+          setShowCategoryButtons(true);
           const botResponse = {
             id: Date.now() + 1,
             type: "bot",
             message:
-              "Great! I'll help you submit a new complaint. Please tell me what issue you'd like to report.",
+              "Great! I'll help you submit a new complaint. 🎯 What's your complaint about? Please choose one:" +
+              " 💰 Salary & Pay - Payroll issues, deductions, bonuses, allowances" +
+              " 🏖️ Leave & Time Off - Leave requests, attendance, time tracking" +
+              " 🖥️ Equipment & IT - Computer problems, equipment requests, technical issues" +
+              " 👥 HR & Policies - Employee relations, policies, recruitment" +
+              " 🛒 Procurement - Purchasing, vendor issues, purchase orders" +
+              " 📦 Inventory - Stock, supplies, equipment tracking" +
+              " 📊 Projects & Tasks - Project issues, task assignments" +
+              " 🎧 Customer Service - Service issues, support tickets" +
+              " 🔐 Access & Security - Login problems, permissions, security" +
+              " 📄 Documents & Files - File access, document requests" +
+              " ❓ Other - Anything else not listed above" +
+              " Just tell me what it's about (e.g., 'Salary' or 'Leave' or 'Equipment')",
             timestamp: new Date().toISOString(),
           };
           setMessages((prev) => [...prev, botResponse]);
@@ -835,7 +1010,7 @@ const CustomerCareChat = () => {
         id: Date.now() + 1,
         type: "bot",
         message:
-          "I'm here to help you with work-related issues and complaints. If you have a specific problem or concern, please describe it and I'll help you submit a formal complaint. You can also ask me about the status of existing complaints.",
+          "I'm here to help you with work-related issues and complaints. 🤝 If you have a specific problem or concern, please describe it and I'll help you submit a formal complaint. You can also ask me about the status of existing complaints.",
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, botResponse]);
@@ -903,11 +1078,27 @@ const CustomerCareChat = () => {
     ) {
       setConversationState("new_complaint");
       setTimeout(() => {
+        setIsComplaintMode(true);
+        setComplaintStep("category");
+        setShowCategoryButtons(true);
+        setShowPriorityButtons(false);
         const botResponse = {
           id: Date.now() + 1,
           type: "bot",
           message:
-            "Great! I'll help you submit a new complaint. Please tell me what issue you'd like to report.",
+            "Great! I'll help you submit a new complaint. 🎯 What's your complaint about? Please choose one:" +
+            " 💰 Salary & Pay - Payroll issues, deductions, bonuses, allowances" +
+            " 🏖️ Leave & Time Off - Leave requests, attendance, time tracking" +
+            " 🖥️ Equipment & IT - Computer problems, equipment requests, technical issues" +
+            " 👥 HR & Policies - Employee relations, policies, recruitment" +
+            " 🛒 Procurement - Purchasing, vendor issues, purchase orders" +
+            " 📦 Inventory - Stock, supplies, equipment tracking" +
+            " 📊 Projects & Tasks - Project issues, task assignments" +
+            " 🎧 Customer Service - Service issues, support tickets" +
+            " 🔐 Access & Security - Login problems, permissions, security" +
+            " 📄 Documents & Files - File access, document requests" +
+            " ❓ Other - Anything else not listed above" +
+            " Just tell me what it's about (e.g., 'Salary' or 'Leave' or 'Equipment')",
           timestamp: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, botResponse]);
@@ -971,11 +1162,26 @@ const CustomerCareChat = () => {
     ) {
       setTimeout(() => {
         setIsComplaintMode(true);
+        setComplaintStep("category");
+        setShowCategoryButtons(true);
+        setShowPriorityButtons(false);
         const botResponse = {
           id: Date.now() + 1,
           type: "bot",
           message:
-            "Great! I'll help you submit your complaint. Please tell me more details about your complaint - what exactly happened and how can we help resolve it?",
+            "Great! I'll help you submit your complaint. 🎯 What's your complaint about? Please choose one:" +
+            " 💰 Salary & Pay - Payroll issues, deductions, bonuses, allowances" +
+            " 🏖️ Leave & Time Off - Leave requests, attendance, time tracking" +
+            " 🖥️ Equipment & IT - Computer problems, equipment requests, technical issues" +
+            " 👥 HR & Policies - Employee relations, policies, recruitment" +
+            " 🛒 Procurement - Purchasing, vendor issues, purchase orders" +
+            " 📦 Inventory - Stock, supplies, equipment tracking" +
+            " 📊 Projects & Tasks - Project issues, task assignments" +
+            " 🎧 Customer Service - Service issues, support tickets" +
+            " 🔐 Access & Security - Login problems, permissions, security" +
+            " 📄 Documents & Files - File access, document requests" +
+            " ❓ Other - Anything else not listed above" +
+            " Just tell me what it's about (e.g., 'Salary' or 'Leave' or 'Equipment')",
           timestamp: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, botResponse]);
@@ -1021,10 +1227,13 @@ const CustomerCareChat = () => {
           id: Date.now() + 1,
           type: "bot",
           message:
-            "Thank you for the details. Would you like me to submit this complaint now? Type 'submit' to send it to our Customer Care team.",
+            "Thank you for the details! 📝 Now I need a clear title for your complaint." +
+            " Please give me a short, descriptive title (e.g., 'Salary Calculation Error', 'Computer Not Working', 'Leave Request Issue')." +
+            " This will help our team quickly understand what the complaint is about.",
           timestamp: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, botResponse]);
+        setComplaintStep("title");
         setIsTyping(false);
       }, 1500);
     } else {
@@ -1033,7 +1242,7 @@ const CustomerCareChat = () => {
           id: Date.now() + 1,
           type: "bot",
           message:
-            "Thank you for your message. I'm here to help! If you have a specific concern or complaint, please let me know and I can help you submit it formally.",
+            "Thank you for your message. I'm here to help! 😊 If you have a specific concern or complaint, please let me know and I can help you submit it formally.",
           timestamp: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, botResponse]);
@@ -1065,11 +1274,26 @@ const CustomerCareChat = () => {
   const handleStartNewComplaint = () => {
     sessionStorage.removeItem("prefetchedComplaintId");
 
+    setIsComplaintMode(true);
+    setComplaintStep("category");
+    setShowCategoryButtons(true);
     const newComplaintMessage = {
       id: Date.now(),
       type: "bot",
       message:
-        "Great! I'll help you submit a new complaint. Please tell me what issue you'd like to report.",
+        "Great! I'll help you submit a new complaint. 🎯 What's your complaint about? Please choose one:" +
+        " 💰 Salary & Pay - Payroll issues, deductions, bonuses, allowances" +
+        " 🏖️ Leave & Time Off - Leave requests, attendance, time tracking" +
+        " 🖥️ Equipment & IT - Computer problems, equipment requests, technical issues" +
+        " 👥 HR & Policies - Employee relations, policies, recruitment" +
+        " 🛒 Procurement - Purchasing, vendor issues, purchase orders" +
+        " 📦 Inventory - Stock, supplies, equipment tracking" +
+        " 📊 Projects & Tasks - Project issues, task assignments" +
+        " 🎧 Customer Service - Service issues, support tickets" +
+        " 🔐 Access & Security - Login problems, permissions, security" +
+        " 📄 Documents & Files - File access, document requests" +
+        " ❓ Other - Anything else not listed above" +
+        " Just tell me what it's about (e.g., 'Salary' or 'Leave' or 'Equipment')",
       timestamp: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, newComplaintMessage]);
@@ -1086,6 +1310,7 @@ const CustomerCareChat = () => {
       setIsSubmittingComplaint(true);
 
       const title =
+        complaintTitle ||
         finalComplaintMessage ||
         chatSession.find((msg) => msg.type === "user")?.message ||
         `Customer Care Complaint - ${new Date().toLocaleDateString()}`;
@@ -1101,12 +1326,13 @@ const CustomerCareChat = () => {
       const userDepartment = user?.department?.name || "Unknown Department";
 
       const getImageUrl = (avatarPath) => {
-        if (!avatarPath) return "/default-avatar.png";
+        if (!avatarPath) return "/defaulticon.jpg";
         if (avatarPath.startsWith("http")) return avatarPath;
 
-        const baseUrl = (
-          import.meta.env.VITE_API_URL || "http://localhost:5000/api"
-        ).replace("/api", "");
+        const baseUrl = (import.meta.env.VITE_API_URL || "/api").replace(
+          "/api",
+          ""
+        );
         return `${baseUrl}${avatarPath}`;
       };
 
@@ -1123,11 +1349,15 @@ ${finalComplaintMessage || "User complaint details from chat session"}
 FULL CONVERSATION CONTEXT:
 ${sessionText}`;
 
+      // Clean description - just the actual complaint message
+      const cleanDescription =
+        finalComplaintMessage || "User complaint details from chat session";
+
       const complaintData = {
         title,
-        description,
-        category: "other",
-        priority: "medium",
+        description: cleanDescription,
+        category: complaintCategory || "other",
+        priority: complaintPriority || "medium",
       };
 
       const response = await complaintAPI.createComplaint(complaintData);
@@ -1155,22 +1385,28 @@ ${sessionText}`;
           );
         }
 
-        toast.success("Complaint submitted successfully!");
+        toast.success("Complaint submitted successfully! 🎉");
 
         const successMessage = {
           id: Date.now(),
           type: "bot",
-          message: `✅ Complaint submitted successfully! Your complaint number is: ${
+          message: `🎉 Complaint submitted successfully! Your complaint number is: ${
             response.data.complaintNumber || "CC-XXXXXX"
-          }. You'll receive a confirmation email shortly.`,
+          }. You can check for updates on your tickets or you'll be notified when resolved. 😊`,
           timestamp: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, successMessage]);
 
         setIsComplaintMode(false);
         setChatSession([]);
+        setComplaintTitle("");
+        setComplaintCategory("");
+        setComplaintPriority("");
+        setComplaintStep("category");
+        setShowCategoryButtons(false);
+        setShowPriorityButtons(false);
       } else {
-        toast.error("Failed to submit complaint. Please try again.");
+        toast.error("Failed to submit complaint. Please try again. 😔");
       }
     } catch (error) {
       console.error("Error submitting complaint:", error);
@@ -1199,7 +1435,7 @@ ${sessionText}`;
       const response = await complaintAPI.createComplaint(complaintData);
 
       if (response.success) {
-        toast.success("Complaint submitted successfully!");
+        toast.success("Complaint submitted successfully! 🎉");
 
         const successMessage = {
           id: Date.now(),
@@ -1211,7 +1447,7 @@ ${sessionText}`;
         };
         setMessages((prev) => [...prev, successMessage]);
       } else {
-        toast.error("Failed to submit complaint. Please try again.");
+        toast.error("Failed to submit complaint. Please try again. 😔");
       }
     } catch (error) {
       console.error("Error submitting complaint:", error);
@@ -1385,6 +1621,136 @@ ${sessionText}`;
                   </motion.div>
                 ))}
 
+                {/* Category Selection Buttons */}
+                {showCategoryButtons && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex justify-start"
+                  >
+                    <div className="bg-blue-50 p-4 rounded-2xl max-w-[80%]">
+                      <p className="text-sm font-medium text-blue-800 mb-3">
+                        🎯 Quick Select Category:
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          {
+                            key: "technical",
+                            label: "💻 Technical",
+                            emoji: "💻",
+                          },
+                          { key: "payroll", label: "💰 Payroll", emoji: "💰" },
+                          { key: "hr", label: "👥 HR", emoji: "👥" },
+                          {
+                            key: "customer_care",
+                            label: "🎧 Customer Care",
+                            emoji: "🎧",
+                          },
+                          { key: "sales", label: "📈 Sales", emoji: "📈" },
+                          {
+                            key: "procurement",
+                            label: "🛒 Procurement",
+                            emoji: "🛒",
+                          },
+                          {
+                            key: "inventory",
+                            label: "📦 Inventory",
+                            emoji: "📦",
+                          },
+                          {
+                            key: "equipment",
+                            label: "🖥️ Equipment",
+                            emoji: "🖥️",
+                          },
+                          { key: "access", label: "🔐 Access", emoji: "🔐" },
+                          { key: "policy", label: "📋 Policy", emoji: "📋" },
+                          {
+                            key: "training",
+                            label: "🎓 Training",
+                            emoji: "🎓",
+                          },
+                          {
+                            key: "facilities",
+                            label: "🏢 Facilities",
+                            emoji: "🏢",
+                          },
+                          {
+                            key: "security",
+                            label: "🛡️ Security",
+                            emoji: "🛡️",
+                          },
+                          {
+                            key: "projects",
+                            label: "📊 Projects",
+                            emoji: "📊",
+                          },
+                          {
+                            key: "documents",
+                            label: "📄 Documents",
+                            emoji: "📄",
+                          },
+                          { key: "other", label: "❓ Other", emoji: "❓" },
+                        ].map((category) => (
+                          <button
+                            key={category.key}
+                            onClick={() => {
+                              setComplaintCategory(category.key);
+                              setNewMessage(category.label);
+                              setShowCategoryButtons(false);
+                              // Trigger the message handling
+                              setTimeout(() => {
+                                handleSendMessage();
+                              }, 100);
+                            }}
+                            className="p-2 text-xs bg-white hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors text-blue-700"
+                          >
+                            {category.emoji}{" "}
+                            {category.label.split(" ")[1] || category.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Priority Selection Buttons */}
+                {showPriorityButtons && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex justify-start"
+                  >
+                    <div className="bg-green-50 p-4 rounded-2xl max-w-[80%]">
+                      <p className="text-sm font-medium text-green-800 mb-3">
+                        ⚡ Quick Select Priority:
+                      </p>
+                      <div className="flex space-x-2">
+                        {[
+                          { key: "low", label: "🟢 Low", emoji: "🟢" },
+                          { key: "medium", label: "🟡 Medium", emoji: "🟡" },
+                          { key: "high", label: "🔴 High", emoji: "🔴" },
+                        ].map((priority) => (
+                          <button
+                            key={priority.key}
+                            onClick={() => {
+                              setComplaintPriority(priority.key);
+                              setNewMessage(priority.label);
+                              setShowPriorityButtons(false);
+                              // Trigger the message handling
+                              setTimeout(() => {
+                                handleSendMessage();
+                              }, 100);
+                            }}
+                            className="p-3 text-sm bg-white hover:bg-green-100 border border-green-200 rounded-lg transition-colors text-green-700 font-medium"
+                          >
+                            {priority.emoji} {priority.label.split(" ")[1]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
                 {isTyping && (
                   <motion.div
                     initial={{ opacity: 0 }}
@@ -1407,6 +1773,27 @@ ${sessionText}`;
                   </motion.div>
                 )}
                 <div ref={messagesEndRef} />
+
+                {/* Quick Actions */}
+                {!isComplaintMode && (
+                  <div className="p-4 border-t bg-gray-50">
+                    <p className="text-sm font-medium text-gray-700 mb-3">
+                      Quick Actions:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {quickActions.map((action, index) => (
+                        <button
+                          key={index}
+                          onClick={action.action}
+                          className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                        >
+                          <action.icon className="w-4 h-4 text-gray-600" />
+                          {action.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Message Input */}

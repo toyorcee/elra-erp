@@ -3,6 +3,7 @@ import User from "../models/User.js";
 import Department from "../models/Department.js";
 import Session from "../models/Session.js";
 import Notification from "../models/Notification.js";
+import notificationService from "../services/notificationService.js";
 import mongoose from "mongoose";
 
 export const getComplaints = async (req, res) => {
@@ -70,10 +71,10 @@ export const getComplaints = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const complaints = await Complaint.find(filter)
-      .populate("submittedBy", "firstName lastName email")
-      .populate("assignedTo", "firstName lastName email")
+      .populate("submittedBy", "firstName lastName email avatar")
+      .populate("assignedTo", "firstName lastName email avatar")
       .populate("department", "name")
-      .populate("resolvedBy", "firstName lastName")
+      .populate("resolvedBy", "firstName lastName avatar")
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit));
@@ -114,10 +115,10 @@ export const getComplaintById = async (req, res) => {
     const { id } = req.params;
 
     const complaint = await Complaint.findById(id)
-      .populate("submittedBy", "firstName lastName email department")
-      .populate("assignedTo", "firstName lastName email")
+      .populate("submittedBy", "firstName lastName email department avatar")
+      .populate("assignedTo", "firstName lastName email avatar")
       .populate("department", "name")
-      .populate("resolvedBy", "firstName lastName")
+      .populate("resolvedBy", "firstName lastName avatar")
       .populate("notes.addedBy", "firstName lastName")
       .populate("attachments");
 
@@ -190,19 +191,27 @@ export const createComplaint = async (req, res) => {
     try {
       const Notification = (await import("../models/Notification.js")).default;
       const User = (await import("../models/User.js")).default;
+      const Department = (await import("../models/Department.js")).default;
 
-      const customerCareHODs = await User.find({
-        isActive: true,
-        department: complaint.department._id,
-      })
-        .populate("role", "name level")
-        .select("_id firstName lastName email role")
-        .then((users) =>
-          users.filter(
-            (user) =>
-              user.role && (user.role.name === "HOD" || user.role.level >= 700)
-          )
-        );
+      const customerCareDept = await Department.findOne({
+        $or: [{ name: "Customer Service" }, { name: "Customer Care" }],
+      });
+
+      const customerCareHODs = customerCareDept
+        ? await User.find({
+            isActive: true,
+            department: customerCareDept._id,
+          })
+            .populate("role", "name level")
+            .select("_id firstName lastName email role")
+            .then((users) =>
+              users.filter(
+                (user) =>
+                  user.role &&
+                  (user.role.name === "HOD" || user.role.level >= 700)
+              )
+            )
+        : [];
 
       const superadmins = await User.find({
         isActive: true,
@@ -244,10 +253,35 @@ export const createComplaint = async (req, res) => {
         isRead: false,
       };
 
-      notifications.push(...hodNotifications, submitterNotification);
+      // Send notifications using proper service
+      console.log(
+        `📧 [CUSTOMER CARE] Sending ${hodNotifications.length} HOD notifications and 1 submitter notification`
+      );
 
-      if (notifications.length > 0) {
-        await Notification.insertMany(notifications);
+      for (const notification of hodNotifications) {
+        try {
+          await notificationService.createNotification(notification);
+          console.log(
+            `✅ [CUSTOMER CARE] HOD notification sent to: ${notification.recipient}`
+          );
+        } catch (error) {
+          console.error(
+            `❌ [CUSTOMER CARE] Failed to send HOD notification:`,
+            error
+          );
+        }
+      }
+
+      try {
+        await notificationService.createNotification(submitterNotification);
+        console.log(
+          `✅ [CUSTOMER CARE] Submitter notification sent to: ${submitterNotification.recipient}`
+        );
+      } catch (error) {
+        console.error(
+          `❌ [CUSTOMER CARE] Failed to send submitter notification:`,
+          error
+        );
       }
     } catch (notificationError) {
       console.error(
@@ -285,24 +319,92 @@ export const updateComplaintStatus = async (req, res) => {
       });
     }
 
-    // Update status
     if (status) {
       await complaint.updateStatus(status, req.user._id, resolution);
     }
 
-    // Update assignment
     if (assignedTo) {
       complaint.assignedTo = assignedTo;
       await complaint.save();
     }
 
-    // Populate updated complaint
     await complaint.populate([
       { path: "submittedBy", select: "firstName lastName email" },
       { path: "assignedTo", select: "firstName lastName email" },
       { path: "department", select: "name" },
       { path: "resolvedBy", select: "firstName lastName" },
     ]);
+
+    if (status === "resolved" && status !== complaint.status) {
+      console.log(
+        `🎯 [CUSTOMER CARE] Complaint ${complaint._id} being resolved by ${req.user.firstName} ${req.user.lastName}`
+      );
+
+      try {
+        // Notify the complaint creator
+        const creatorNotificationData = {
+          recipient: complaint.submittedBy._id,
+          type: "complaint_resolved",
+          title: "Your Complaint Has Been Resolved! 🎉",
+          message: `Great news! Your complaint "${complaint.title}" has been resolved by our Customer Care team. Thank you for your patience.`,
+          priority: "high",
+          data: {
+            complaintId: complaint._id,
+            complaintNumber: complaint.complaintNumber,
+            status: "resolved",
+            resolvedBy: req.user._id,
+            resolvedAt: new Date(),
+          },
+        };
+
+        console.log(
+          `📧 [CUSTOMER CARE] Creating notification for complaint creator: ${complaint.submittedBy.firstName} ${complaint.submittedBy.lastName} (ID: ${complaint.submittedBy._id})`
+        );
+        await notificationService.createNotification(creatorNotificationData);
+        console.log(
+          `✅ [CUSTOMER CARE] Creator notification sent to: ${complaint.submittedBy.firstName} ${complaint.submittedBy.lastName}`
+        );
+
+        // Notify the HOD who resolved it (if they're not the same person)
+        if (req.user._id.toString() !== complaint.submittedBy._id.toString()) {
+          const hodNotificationData = {
+            recipient: req.user._id,
+            type: "complaint_resolution_confirmation",
+            title: "Complaint Resolution Confirmed ✅",
+            message: `You have successfully resolved the complaint "${complaint.title}" submitted by ${complaint.submittedBy.firstName} ${complaint.submittedBy.lastName}.`,
+            priority: "medium",
+            data: {
+              complaintId: complaint._id,
+              complaintNumber: complaint.complaintNumber,
+              status: "resolved",
+              submittedBy: complaint.submittedBy._id,
+              resolvedAt: new Date(),
+            },
+          };
+
+          console.log(
+            `📧 [CUSTOMER CARE] Creating notification for HOD: ${req.user.firstName} ${req.user.lastName} (ID: ${req.user._id})`
+          );
+          await notificationService.createNotification(hodNotificationData);
+          console.log(
+            `✅ [CUSTOMER CARE] HOD notification sent to: ${req.user.firstName} ${req.user.lastName}`
+          );
+        } else {
+          console.log(
+            `ℹ️ [CUSTOMER CARE] Creator and resolver are the same person, skipping HOD notification`
+          );
+        }
+
+        console.log(
+          `🎉 [CUSTOMER CARE] SUCCESS: All resolution notifications sent!`
+        );
+      } catch (notificationError) {
+        console.error(
+          "❌ [CUSTOMER CARE] Error creating resolution notifications:",
+          notificationError
+        );
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -922,8 +1024,8 @@ export const sendReminderNotification = async (req, res) => {
     const userId = req.user._id;
 
     const complaint = await Complaint.findById(complaintId)
-      .populate("submittedBy", "firstName lastName email")
-      .populate("assignedTo", "firstName lastName email")
+      .populate("submittedBy", "firstName lastName email avatar")
+      .populate("assignedTo", "firstName lastName email avatar")
       .populate("department", "name");
 
     if (!complaint) {
@@ -1014,10 +1116,43 @@ export const sendReminderNotification = async (req, res) => {
       notifications.push(...staffNotifications);
     }
 
-    notifications.push(...hodNotifications);
+    // Send notifications using proper service
+    console.log(
+      `📧 [CUSTOMER CARE] Sending ${hodNotifications.length} reminder notifications`
+    );
 
-    if (notifications.length > 0) {
-      await Notification.insertMany(notifications);
+    for (const notification of hodNotifications) {
+      try {
+        await notificationService.createNotification(notification);
+        console.log(
+          `✅ [CUSTOMER CARE] Reminder notification sent to: ${notification.recipient}`
+        );
+      } catch (error) {
+        console.error(
+          `❌ [CUSTOMER CARE] Failed to send reminder notification:`,
+          error
+        );
+      }
+    }
+
+    if (staffNotifications && staffNotifications.length > 0) {
+      console.log(
+        `📧 [CUSTOMER CARE] Sending ${staffNotifications.length} staff reminder notifications`
+      );
+
+      for (const notification of staffNotifications) {
+        try {
+          await notificationService.createNotification(notification);
+          console.log(
+            `✅ [CUSTOMER CARE] Staff reminder notification sent to: ${notification.recipient}`
+          );
+        } catch (error) {
+          console.error(
+            `❌ [CUSTOMER CARE] Failed to send staff reminder notification:`,
+            error
+          );
+        }
+      }
     }
 
     res.status(200).json({

@@ -3,17 +3,14 @@ import { motion } from "framer-motion";
 import {
   HiTicket,
   HiUser,
-  HiCalendar,
   HiClock,
   HiCheckCircle,
   HiExclamationTriangle,
-  HiChatBubbleOvalLeftEllipsis,
   HiEye,
-  HiPencil,
-  HiTrash,
   HiArrowPath,
   HiArrowLeft,
   HiHome,
+  HiXMark,
 } from "react-icons/hi2";
 import { Link } from "react-router-dom";
 import {
@@ -21,11 +18,136 @@ import {
   complaintUtils,
 } from "../../../../services/customerCareAPI";
 import { toast } from "react-toastify";
+import defaultAvatar from "../../../../assets/defaulticon.jpg";
 
 const ComplaintManagement = () => {
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [pendingStatusChange, setPendingStatusChange] = useState(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const getDefaultAvatar = () => {
+    return defaultAvatar;
+  };
+
+  const getImageUrl = (avatarPath) => {
+    if (!avatarPath) {
+      return getDefaultAvatar();
+    }
+    if (avatarPath.startsWith("http")) {
+      return avatarPath;
+    }
+
+    const baseUrl = (import.meta.env.VITE_API_URL || "/api").replace(
+      "/api",
+      ""
+    );
+    const finalUrl = `${baseUrl}${avatarPath}`;
+
+    return finalUrl;
+  };
+
+  const getAvatarDisplay = (user) => {
+    if (!user) return null;
+
+    const avatarUrl = user.avatar
+      ? getImageUrl(user.avatar)
+      : getDefaultAvatar();
+
+    return (
+      <img
+        src={avatarUrl}
+        alt={`${user.firstName} ${user.lastName}`}
+        className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-lg"
+        onError={(e) => {
+          e.target.src = getDefaultAvatar();
+        }}
+      />
+    );
+  };
+
+  const getCleanDescription = (description) => {
+    if (!description) return "No description provided";
+
+    // Remove the raw data dump and return clean description
+    if (description.includes("COMPLAINT SUBMITTED BY:")) {
+      // Extract just the clean description part
+      const parts = description.split("COMPLAINT DETAILS:");
+      if (parts.length > 1) {
+        return parts[1].split("FULL CONVERSATION CONTEXT:")[0].trim();
+      }
+    }
+
+    return description;
+  };
+
+  const handleViewDetails = (complaint) => {
+    setSelectedComplaint(complaint);
+    setShowDetailsModal(true);
+  };
+
+  const handleStatusChange = (complaintId, newStatus) => {
+    const complaint = complaints.find((c) => c._id === complaintId);
+    setPendingStatusChange({ complaintId, newStatus, complaint });
+    setShowConfirmationModal(true);
+  };
+
+  const confirmStatusChange = async () => {
+    if (!pendingStatusChange) return;
+
+    try {
+      setUpdatingStatus(true);
+      const response = await complaintAPI.updateComplaintStatus(
+        pendingStatusChange.complaintId,
+        { status: pendingStatusChange.newStatus }
+      );
+
+      if (response.success) {
+        toast.success(
+          `Complaint status updated to ${pendingStatusChange.newStatus
+            .replace("_", " ")
+            .toUpperCase()} successfully!`
+        );
+
+        // Update the complaint in the local state
+        setComplaints((prev) =>
+          prev.map((complaint) =>
+            complaint._id === pendingStatusChange.complaintId
+              ? { ...complaint, status: pendingStatusChange.newStatus }
+              : complaint
+          )
+        );
+
+        setShowConfirmationModal(false);
+        setPendingStatusChange(null);
+      } else {
+        toast.error("Failed to update complaint status");
+      }
+    } catch (error) {
+      console.error("Error updating complaint status:", error);
+      toast.error("Failed to update complaint status");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const cancelStatusChange = () => {
+    setShowConfirmationModal(false);
+    setPendingStatusChange(null);
+  };
 
   useEffect(() => {
     const fetchComplaints = async () => {
@@ -121,20 +243,6 @@ const ComplaintManagement = () => {
   const getPriorityColor = (priority) => {
     const priorityInfo = complaintUtils.formatPriority(priority);
     return priorityInfo.bgColor;
-  };
-
-  const handleStatusChange = (complaintId, newStatus) => {
-    setComplaints((prev) =>
-      prev.map((complaint) =>
-        complaint.id === complaintId
-          ? {
-              ...complaint,
-              status: newStatus,
-              lastUpdated: new Date().toISOString().split("T")[0],
-            }
-          : complaint
-      )
-    );
   };
 
   if (loading) {
@@ -350,7 +458,7 @@ const ComplaintManagement = () => {
                     <select
                       value={complaint.status}
                       onChange={(e) =>
-                        handleStatusChange(complaint.id, e.target.value)
+                        handleStatusChange(complaint._id, e.target.value)
                       }
                       className={`px-3 py-1 text-sm font-semibold rounded-full border-0 ${getStatusColor(
                         complaint.status
@@ -359,6 +467,7 @@ const ComplaintManagement = () => {
                       <option value="pending">Pending</option>
                       <option value="in_progress">In Progress</option>
                       <option value="resolved">Resolved</option>
+                      <option value="closed">Closed</option>
                     </select>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -372,19 +481,17 @@ const ComplaintManagement = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">
-                      {complaint.assignedTo}
+                      {complaint.assignedTo ? complaint.assignedTo : "Not Set"}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-2">
-                      <button className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-colors">
+                      <button
+                        onClick={() => handleViewDetails(complaint)}
+                        className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-colors"
+                        title="View Details"
+                      >
                         <HiEye className="w-4 h-4" />
-                      </button>
-                      <button className="p-2 bg-green-100 hover:bg-green-200 text-green-600 rounded-lg transition-colors">
-                        <HiPencil className="w-4 h-4" />
-                      </button>
-                      <button className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg transition-colors">
-                        <HiTrash className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
@@ -394,6 +501,280 @@ const ComplaintManagement = () => {
           </table>
         </div>
       </motion.div>
+
+      {/* View Details Modal - Beautiful Elra Branded */}
+      {showDetailsModal && selectedComplaint && (
+        <div className="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-100"
+          >
+            {/* Header with Gradient */}
+            <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-t-2xl p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-white/20 rounded-xl">
+                    <HiTicket className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">Complaint Details</h2>
+                    <p className="text-white/80 text-sm">
+                      Complaint #
+                      {selectedComplaint.complaintNumber ||
+                        selectedComplaint._id?.slice(-6).toUpperCase()}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <HiXMark className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              {/* Status and Priority Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-blue-500 rounded-lg">
+                      <HiCheckCircle className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-blue-700">
+                        Status
+                      </p>
+                      <span
+                        className={`px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(
+                          selectedComplaint.status
+                        )}`}
+                      >
+                        {selectedComplaint.status
+                          ?.replace("_", " ")
+                          .toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-4 border border-yellow-200">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-yellow-500 rounded-lg">
+                      <HiExclamationTriangle className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-yellow-700">
+                        Priority
+                      </p>
+                      <span
+                        className={`px-3 py-1 text-sm font-semibold rounded-full ${getPriorityColor(
+                          selectedComplaint.priority
+                        )}`}
+                      >
+                        {selectedComplaint.priority?.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border border-purple-200">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 bg-purple-500 rounded-lg">
+                      <HiTicket className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-purple-700">
+                        Category
+                      </p>
+                      <p className="text-sm font-semibold text-purple-900">
+                        {selectedComplaint.category
+                          ?.replace("_", " ")
+                          .toUpperCase()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Title Section */}
+              <div className="mb-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-2">
+                  Complaint Title
+                </h3>
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                  <p className="text-gray-900 font-medium text-lg">
+                    {selectedComplaint.title}
+                  </p>
+                </div>
+              </div>
+
+              {/* Description Section */}
+              <div className="mb-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-2">
+                  Description
+                </h3>
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                  <p className="text-gray-900 whitespace-pre-wrap leading-relaxed">
+                    {getCleanDescription(selectedComplaint.description)}
+                  </p>
+                </div>
+              </div>
+
+              {/* User Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200">
+                  <h4 className="text-lg font-bold text-green-800 mb-4 flex items-center">
+                    <HiUser className="w-5 h-5 mr-2" />
+                    Submitted By
+                  </h4>
+                  <div className="flex items-center space-x-4">
+                    {getAvatarDisplay(selectedComplaint.submittedBy)}
+                    <div>
+                      <p className="font-semibold text-green-900">
+                        {selectedComplaint.submittedBy?.firstName}{" "}
+                        {selectedComplaint.submittedBy?.lastName}
+                      </p>
+                      <p className="text-sm text-green-700">
+                        {selectedComplaint.department?.name || "N/A"}
+                      </p>
+                      <p className="text-xs text-green-600">
+                        {formatDate(selectedComplaint.submittedAt)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
+                  <h4 className="text-lg font-bold text-blue-800 mb-4 flex items-center">
+                    <HiUser className="w-5 h-5 mr-2" />
+                    Assignment
+                  </h4>
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
+                      <HiUser className="w-6 h-6 text-gray-500" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-blue-900">
+                        {selectedComplaint.assignedTo || "Not Assigned"}
+                      </p>
+                      <p className="text-sm text-blue-700">
+                        {selectedComplaint.assignedTo
+                          ? "Assigned"
+                          : "Pending Assignment"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <div className="flex justify-end pt-6 border-t border-gray-200">
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className="px-6 py-3 bg-[var(--elra-primary)] text-white hover:bg-[var(--elra-primary-dark)] rounded-xl transition-colors font-medium"
+                >
+                  Close Details
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Status Change Confirmation Modal */}
+      {showConfirmationModal && pendingStatusChange && (
+        <div className="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-xl shadow-2xl max-w-md w-full"
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Confirm Status Change
+                </h2>
+                <button
+                  onClick={cancelStatusChange}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <HiXMark className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="text-center">
+                  <p className="text-gray-600 mb-2">
+                    Are you sure you want to change the status of:
+                  </p>
+                  <p className="font-semibold text-gray-900 text-lg">
+                    "{pendingStatusChange.complaint.title}"
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    From:{" "}
+                    <span className="font-medium capitalize">
+                      {pendingStatusChange.complaint.status?.replace("_", " ")}
+                    </span>{" "}
+                    → To:{" "}
+                    <span className="font-medium capitalize text-[var(--elra-primary)]">
+                      {pendingStatusChange.newStatus.replace("_", " ")}
+                    </span>
+                  </p>
+                </div>
+
+                {/* Special message for resolved status */}
+                {pendingStatusChange.newStatus === "resolved" && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0">
+                        <HiCheckCircle className="w-5 h-5 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-green-800">
+                          Resolution Notification
+                        </p>
+                        <p className="text-sm text-green-700 mt-1">
+                          {pendingStatusChange.complaint.submittedBy?.firstName}{" "}
+                          {pendingStatusChange.complaint.submittedBy?.lastName}{" "}
+                          will be notified that their complaint has been
+                          resolved.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    onClick={cancelStatusChange}
+                    className="flex-1 px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                    disabled={updatingStatus}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmStatusChange}
+                    disabled={updatingStatus}
+                    className="flex-1 px-4 py-2 bg-[var(--elra-primary)] text-white hover:bg-[var(--elra-primary-dark)] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    {updatingStatus ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Updating...</span>
+                      </>
+                    ) : (
+                      <span>Confirm Change</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };

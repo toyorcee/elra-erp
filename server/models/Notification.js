@@ -143,6 +143,7 @@ const notificationSchema = new mongoose.Schema(
         "complaint_assigned",
         "complaint_status_updated",
         "complaint_resolved",
+        "complaint_resolution_confirmation",
         "complaint_note_added",
         "complaint_feedback_submitted",
         "complaint_reminder",

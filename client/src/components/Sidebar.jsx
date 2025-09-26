@@ -306,8 +306,9 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     if (path === "/dashboard") {
       return (
         currentPath === "/dashboard" ||
+        currentPath === "/dashboard/" ||
         (currentPath.startsWith("/dashboard") &&
-          !currentPath.startsWith("/dashboard/modules/"))
+          !currentPath.includes("/modules/"))
       );
     }
 

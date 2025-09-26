@@ -285,7 +285,7 @@ export const moduleSidebarConfig = {
             icon: "DocumentTextIcon",
             path: "/dashboard/modules/customer-care/complaints",
             required: { minLevel: 300 },
-            description: "View and manage all staff complaints",
+            description: "View all staff complaints",
             hidden: (user) => {
               const isCustomerCareUser =
                 user?.department?.name === "Customer Service" ||
@@ -298,7 +298,7 @@ export const moduleSidebarConfig = {
             icon: "Cog6ToothIcon",
             path: "/dashboard/modules/customer-care/management",
             required: { minLevel: 300 },
-            description: "Manage complaint status and assignments",
+            description: "Manage complaint status, assignments, and updates",
             hidden: (user) => {
               const isCustomerCareUser =
                 user?.department?.name === "Customer Service" ||

@@ -38,6 +38,20 @@ const CustomerCareChat = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Add/remove body class when chat is open/closed
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add("chat-modal-open");
+    } else {
+      document.body.classList.remove("chat-modal-open");
+    }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.classList.remove("chat-modal-open");
+    };
+  }, [isOpen]);
+
   useEffect(() => {
     if (isOpen && user && !userHistory) {
       const prefetchedComplaintId = sessionStorage.getItem(

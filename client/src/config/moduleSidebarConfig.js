@@ -216,6 +216,67 @@ export const moduleSidebarConfig = {
     ],
   },
 
+  // ===== CUSTOMER CARE MODULE =====
+  customerCare: {
+    label: "Customer Care",
+    icon: "ChatBubbleLeftRightIcon",
+    path: "/dashboard/modules/customer-care",
+    color: "text-[var(--elra-primary)]",
+    bgColor: "bg-[var(--elra-secondary-3)]",
+    borderColor: "border-[var(--elra-primary)]",
+    sections: [
+      {
+        title: "Dashboard & Overview",
+        collapsible: true,
+        defaultExpanded: true,
+        items: [
+          {
+            label: "Dashboard",
+            icon: "HomeIcon",
+            path: "/dashboard/modules/customer-care",
+            required: { minLevel: 0 },
+            description: "Customer care dashboard and overview",
+          },
+        ],
+      },
+      {
+        title: "Complaint Management",
+        collapsible: true,
+        defaultExpanded: true,
+        items: [
+          {
+            label: "All Complaints",
+            icon: "DocumentTextIcon",
+            path: "/dashboard/modules/customer-care/complaints",
+            required: { minLevel: 0 },
+            description: "View and manage all staff complaints",
+          },
+          {
+            label: "Complaint Management",
+            icon: "Cog6ToothIcon",
+            path: "/dashboard/modules/customer-care/management",
+            required: { minLevel: 300 },
+            description: "Manage complaint status and assignments",
+          },
+        ],
+      },
+      {
+        title: "Reports & Analytics",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Reports",
+            icon: "ChartBarIcon",
+            path: "/dashboard/modules/customer-care/reports",
+            required: { minLevel: 300 },
+            description: "View customer care analytics and reports",
+          },
+        ],
+      },
+    ],
+  },
+
   // ===== HR MANAGEMENT MODULE =====
   hr: {
     label: "HR Management",

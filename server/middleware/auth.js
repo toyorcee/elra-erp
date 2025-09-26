@@ -733,11 +733,11 @@ export const checkFinanceAccess = async (req, res, next) => {
 // Specific middleware for payroll approval access
 export const checkPayrollApprovalAccess = async (req, res, next) => {
   try {
-      const user = req.user;
+    const user = req.user;
 
     if (!user) {
       return res.status(401).json({
-          success: false,
+        success: false,
         message: "Authentication required",
       });
     }
@@ -798,11 +798,11 @@ export const checkSalesMarketingAccess = async (req, res, next) => {
       user.role?.level === 700;
 
     if (!isSalesMarketing && !isFinanceHOD) {
-    return res.status(403).json({
-      success: false,
-      message:
+      return res.status(403).json({
+        success: false,
+        message:
           "Access denied. Sales & Marketing department or Finance HOD access required.",
-    });
+      });
     }
 
     next();
@@ -853,8 +853,67 @@ export const checkSalesMarketingApprovalAccess = async (req, res, next) => {
     console.error("Sales & Marketing approval access check error:", error);
     return res.status(500).json({
       success: false,
-        message:
+      message:
         "Internal server error during sales & marketing approval access check",
+    });
+  }
+};
+
+// Check Customer Care access
+export const checkCustomerCareAccess = async (req, res, next) => {
+  try {
+    const user = req.user;
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    // Super Admin has access to everything
+    if (user.role.level >= 1000 || user.isSuperadmin) {
+      return next();
+    }
+
+    // Check if user is Customer Care department
+    const isCustomerCareUser =
+      user.department?.name === "Customer Service" ||
+      user.department?.name === "Customer Care";
+
+    // Customer Care HOD (level 700+) can manage all complaints
+    if (user.role.level >= 700 && isCustomerCareUser) {
+      return next();
+    }
+
+    // Customer Care staff (level 300+) can view and manage assigned complaints
+    if (user.role.level >= 300 && isCustomerCareUser) {
+      return next();
+    }
+
+    // Regular users can only submit complaints and view their own
+    if (user.role.level >= 300) {
+      // For GET requests, filter to only their own complaints
+      if (req.method === "GET") {
+        req.userFilter = { submittedBy: user._id };
+      }
+      // For POST requests, ensure they're submitting for themselves
+      if (req.method === "POST") {
+        req.body.submittedBy = user._id;
+      }
+      return next();
+    }
+
+    return res.status(403).json({
+      success: false,
+      message:
+        "Access denied. Insufficient permissions for Customer Care operations.",
+    });
+  } catch (error) {
+    console.error("❌ [CUSTOMER CARE ACCESS] Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error checking customer care permissions",
     });
   }
 };

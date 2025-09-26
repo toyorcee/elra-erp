@@ -5,6 +5,7 @@ import Sidebar from "../components/Sidebar";
 import ProfileMenu from "../components/ProfileMenu";
 import NotificationBell from "../components/NotificationBell";
 import MessageDropdown from "../components/MessageDropdown";
+import CustomerCareChat from "../components/CustomerCareChat";
 import PasswordChangeModal from "../components/common/PasswordChangeModal";
 import { useAuth } from "../context/AuthContext";
 import { useMessages } from "../hooks/useMessages";
@@ -161,12 +162,12 @@ const DashboardLayout = () => {
     setShowUnreadMessagesDropdown(!showUnreadMessagesDropdown);
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
         showUnreadMessagesDropdown &&
-        !event.target.closest(".message-dropdown-container")
+        !event.target.closest(".message-dropdown-container") &&
+        !event.target.closest(".message-icon-button")
       ) {
         setShowUnreadMessagesDropdown(false);
       }
@@ -230,7 +231,7 @@ const DashboardLayout = () => {
                 <div className="relative">
                   <button
                     onClick={toggleUnreadMessagesDropdown}
-                    className="p-2 rounded-xl text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] transition-all duration-200 hover:scale-105 relative cursor-pointer"
+                    className="message-icon-button p-2 rounded-xl text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] transition-all duration-200 hover:scale-105 relative cursor-pointer"
                   >
                     <ChatBubbleLeftRightIcon className="h-6 w-6" />
                     <span
@@ -258,7 +259,7 @@ const DashboardLayout = () => {
                                 setShowUnreadMessagesDropdown(false);
                                 setShowMessageDropdown(true);
                               }}
-                              className="flex items-center gap-1 text-xs text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] font-medium transition-colors"
+                              className="flex items-center gap-1 text-xs text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] font-medium transition-colors cursor-pointer"
                               title="Open Full Chat"
                             >
                               <ChatBubbleLeftRightIcon className="w-3 h-3" />
@@ -351,6 +352,9 @@ const DashboardLayout = () => {
           isOpen={showMessageDropdown}
           onClose={() => setShowMessageDropdown(false)}
         />
+
+        {/* Customer Care Floating Chat Button */}
+        <CustomerCareChat />
 
         {/* Main Content Area */}
         <div className="flex flex-1 pt-16 min-h-screen">

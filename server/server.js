@@ -76,6 +76,7 @@ import analyticsRoutes from "./routes/analytics.js";
 import salesMarketingFinancialRoutes from "./routes/salesMarketingFinancialRoutes.js";
 import financialReportsRoutes from "./routes/financialReportsRoutes.js";
 import communicationRoutes from "./routes/communication.js";
+import customerCareRoutes from "./routes/customerCare.js";
 
 const isValidObjectId = (id) => {
   return (
@@ -278,6 +279,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/sales-marketing", salesMarketingFinancialRoutes);
 app.use("/api/finance/reports", financialReportsRoutes);
 app.use("/api/communication", communicationRoutes);
+app.use("/api/customer-care", customerCareRoutes);
 
 const io = new SocketIOServer(httpServer, {
   cors: {

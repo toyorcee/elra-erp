@@ -14,6 +14,8 @@ import {
   ArrowLeftIcon,
   PaperClipIcon,
   TrashIcon,
+  ExclamationTriangleIcon,
+  TicketIcon,
 } from "@heroicons/react/24/outline";
 import { formatMessageTime } from "../types/messageTypes";
 import messageService from "../services/messageService";
@@ -33,6 +35,11 @@ const MessageDropdown = ({ isOpen, onClose }) => {
   const { user } = useAuth();
   const { isConnected } = useSocket();
   const { selectedUser, closeMessageDropdown } = useMessageContext();
+
+  // Check if user is from Customer Care department
+  const isCustomerCareUser =
+    user?.department?.name === "Customer Service" ||
+    user?.department?.name === "Customer Care";
 
   const {
     conversations,
@@ -472,7 +479,7 @@ const MessageDropdown = ({ isOpen, onClose }) => {
               </div>
               <button
                 onClick={handleClose}
-                className="p-2 text-[var(--elra-text-muted)] hover:text-[var(--elra-text-primary)] transition-colors"
+                className="p-2 text-[var(--elra-text-muted)] hover:text-[var(--elra-text-primary)] transition-colors cursor-pointer"
               >
                 <XMarkIcon className="h-5 w-5" />
               </button>
@@ -523,7 +530,6 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--elra-primary)]"></div>
                     </div>
                   ) : searchTerm || availableUsers.length > 0 ? (
-                    // Show available users (policy-filtered) when searching or when list exists
                     <div className="space-y-1">
                       {getFilteredAvailableUsers().map((user) => (
                         <div
@@ -589,6 +595,25 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                           Start New Conversation
                         </button>
                       </div>
+
+                      {/* Customer Care Option - Only show for non-Customer Care users */}
+                      {!isCustomerCareUser && (
+                        <div className="p-3 border-b border-[var(--elra-border-primary)]">
+                          <button
+                            onClick={() => {
+                              // Open Customer Care chat
+                              window.open(
+                                "/dashboard/modules/customer-care/submit-complaint",
+                                "_blank"
+                              );
+                            }}
+                            className="w-full flex items-center justify-center gap-2 p-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg hover:from-orange-600 hover:to-red-600 transition-colors font-medium text-sm"
+                          >
+                            <ExclamationTriangleIcon className="h-4 w-4" />
+                            Contact Customer Care
+                          </button>
+                        </div>
+                      )}
 
                       {filteredConversations.map((conversation) => (
                         <div
@@ -750,6 +775,39 @@ const MessageDropdown = ({ isOpen, onClose }) => {
                                 </div>
                               </div>
                             ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Customer Care Option for Empty State */}
+                      {!isCustomerCareUser && (
+                        <div className="w-full mb-6">
+                          <div className="p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg border border-orange-200">
+                            <div className="flex items-center space-x-3 mb-3">
+                              <div className="p-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg">
+                                <ExclamationTriangleIcon className="w-5 h-5 text-white" />
+                              </div>
+                              <div>
+                                <h4 className="font-semibold text-gray-900">
+                                  Need Help?
+                                </h4>
+                                <p className="text-sm text-gray-600">
+                                  Contact Customer Care for support
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                window.open(
+                                  "/dashboard/modules/customer-care/submit-complaint",
+                                  "_blank"
+                                );
+                              }}
+                              className="w-full flex items-center justify-center gap-2 p-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg hover:from-orange-600 hover:to-red-600 transition-colors font-medium text-sm"
+                            >
+                              <TicketIcon className="h-4 w-4" />
+                              Submit Complaint
+                            </button>
                           </div>
                         </div>
                       )}

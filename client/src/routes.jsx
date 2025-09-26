@@ -28,6 +28,13 @@ import PayrollProcessing from "./pages/user/modules/payroll/PayrollProcessing";
 import PaySlips from "./pages/user/modules/payroll/PaySlips";
 import MyPayslips from "./pages/user/modules/self-service/MyPayslips";
 import SubmitTicket from "./pages/user/modules/self-service/SubmitTicket";
+import {
+  CustomerCareDashboard,
+  StaffComplaints,
+  ComplaintManagement,
+  CustomerCareReports,
+} from "./pages/user/modules/customer-care";
+import SubmitComplaint from "./pages/user/modules/customer-care/SubmitComplaint";
 import MyTickets from "./pages/user/modules/self-service/MyTickets";
 import ITSupport from "./pages/user/modules/self-service/ITSupport";
 import EquipmentRequests from "./pages/user/modules/self-service/EquipmentRequests";
@@ -264,6 +271,28 @@ const AppRoutes = () => {
         <Route
           path="modules/self-service/project-tasks"
           element={<MyProjectTasks />}
+        />
+
+        {/* Customer Care Module Routes */}
+        <Route
+          path="modules/customer-care"
+          element={<CustomerCareDashboard />}
+        />
+        <Route
+          path="modules/customer-care/complaints"
+          element={<StaffComplaints />}
+        />
+        <Route
+          path="modules/customer-care/management"
+          element={<ComplaintManagement />}
+        />
+        <Route
+          path="modules/customer-care/reports"
+          element={<CustomerCareReports />}
+        />
+        <Route
+          path="modules/customer-care/submit-complaint"
+          element={<SubmitComplaint />}
         />
 
         {/* Department Management Module Routes */}

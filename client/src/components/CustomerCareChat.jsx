@@ -18,15 +18,7 @@ const CustomerCareChat = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: "bot",
-      message:
-        "Hi! I'm here to help with your concerns. How can I assist you today?",
-      timestamp: new Date().toISOString(),
-    },
-  ]);
+  const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false);
@@ -48,11 +40,25 @@ const CustomerCareChat = () => {
 
   useEffect(() => {
     if (isOpen && user && !userHistory) {
-      checkUserHistory();
+      const prefetchedComplaintId = sessionStorage.getItem(
+        "prefetchedComplaintId"
+      );
+      if (!prefetchedComplaintId) {
+        checkUserHistory();
+      } else {
+        return;
+      }
     }
   }, [isOpen, user]);
 
   const checkUserHistory = async () => {
+    const prefetchedComplaintId = sessionStorage.getItem(
+      "prefetchedComplaintId"
+    );
+    if (prefetchedComplaintId) {
+      return; 
+    }
+
     try {
       const complaintsResponse = await complaintAPI.getComplaints({
         submittedByMe: true,
@@ -134,17 +140,24 @@ const CustomerCareChat = () => {
   };
 
   const resetChat = () => {
+    const prefetchedComplaintId = sessionStorage.getItem(
+      "prefetchedComplaintId"
+    );
     sessionStorage.removeItem("prefetchedComplaintId");
 
-    setMessages([
-      {
-        id: 1,
-        type: "bot",
-        message:
-          "Hi! I'm here to help with your concerns. How can I assist you today?",
-        timestamp: new Date().toISOString(),
-      },
-    ]);
+    if (!prefetchedComplaintId) {
+      setMessages([
+        {
+          id: 1,
+          type: "bot",
+          message:
+            "Hi! I'm here to help with your concerns. How can I assist you today?",
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    } else {
+      setMessages([]);
+    }
     setNewMessage("");
     setIsTyping(false);
     setIsSubmittingComplaint(false);
@@ -168,6 +181,8 @@ const CustomerCareChat = () => {
   }, []);
 
   const fetchComplaintDetails = async (complaintId) => {
+    setIsTyping(true);
+
     try {
       const response = await complaintAPI.getComplaintById(complaintId);
 
@@ -184,6 +199,14 @@ const CustomerCareChat = () => {
         setMessages((prev) => [...prev, prefetchedMessage]);
       } else {
         console.error("❌ API response not successful:", response);
+        const fallbackMessage = {
+          id: Date.now(),
+          type: "bot",
+          message:
+            "I see you want to continue discussing a complaint. How can I help you with this issue?",
+          timestamp: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, fallbackMessage]);
       }
     } catch (error) {
       console.error("❌ Error fetching complaint details:", error);
@@ -195,6 +218,8 @@ const CustomerCareChat = () => {
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, fallbackMessage]);
+    } finally {
+      setIsTyping(false);
     }
   };
 
@@ -258,11 +283,6 @@ const CustomerCareChat = () => {
       "naked",
       "dick",
       "pussy",
-      "money",
-      "cash",
-      "naira",
-      "dollar",
-      "payment",
       "pay me",
       "scam",
       "fraud",
@@ -277,7 +297,6 @@ const CustomerCareChat = () => {
       "experiment",
       "repeat",
       "again",
-      "same",
       "copy",
       "paste",
     ];
@@ -427,16 +446,16 @@ const CustomerCareChat = () => {
 
         switch (complaint.status) {
           case "pending":
-            botMessage = `I've checked your complaint "${complaint.title}" (${complaint.complaintNumber}). Current status: pending. I've sent a reminder to the Customer Care team. They should respond within 24-48 hours. Are there any other issues I can help you with?`;
+            botMessage = `I've checked your complaint "${complaint.title}" (${complaint.complaintNumber}). Current status: 🟡 **PENDING** - I've sent a reminder to the Customer Care team. They should respond within 24-48 hours. Are there any other issues I can help you with?`;
             break;
           case "in_progress":
-            botMessage = `I've checked your complaint "${complaint.title}" (${complaint.complaintNumber}). Current status: in progress. I've sent a reminder to the assigned team member. They should provide an update soon. Are there any other issues I can help you with?`;
+            botMessage = `I've checked your complaint "${complaint.title}" (${complaint.complaintNumber}). Current status: 🔵 **IN PROGRESS** - I've sent a reminder to the assigned team member. They should provide an update soon. Are there any other issues I can help you with?`;
             break;
           case "resolved":
-            botMessage = `Great news! Your complaint "${complaint.title}" (${complaint.complaintNumber}) has been resolved. If you haven't received the resolution details, I'll send a reminder to the team to follow up with you directly. Are there any other issues I can help you with?`;
+            botMessage = `Great news! Your complaint "${complaint.title}" (${complaint.complaintNumber}) has been 🟢 **RESOLVED**! If you haven't received the resolution details, I'll send a reminder to the team to follow up with you directly. Are there any other issues I can help you with?`;
             break;
           case "closed":
-            botMessage = `Your complaint "${complaint.title}" (${complaint.complaintNumber}) has been closed. If you have any questions about the resolution, I can help you get in touch with the Customer Care team. Are there any other issues I can help you with?`;
+            botMessage = `Your complaint "${complaint.title}" (${complaint.complaintNumber}) has been ⚫ **CLOSED**. If you have any questions about the resolution, I can help you get in touch with the Customer Care team. Are there any other issues I can help you with?`;
             break;
           default:
             botMessage = `I've checked your complaint "${complaint.title}" (${complaint.complaintNumber}). I've sent a reminder notification to the Customer Care team about your concern. Are there any other issues I can help you with?`;
@@ -576,14 +595,56 @@ const CustomerCareChat = () => {
       }
     }
 
+    // 2.5. Check for thank you keywords
+    const thankYouKeywords = [
+      "thank you",
+      "thanks",
+      "thank u",
+      "tanks",
+      "tnx",
+      "thx",
+      "appreciate",
+      "grateful",
+      "bless",
+      "blessed",
+      "appreciation",
+      "well done",
+      "good job",
+      "nice work",
+      "excellent",
+      "great help",
+      "helpful",
+      "useful",
+      "amazing",
+      "wonderful",
+      "fantastic",
+    ];
+
+    const isThankYou = thankYouKeywords.some((keyword) =>
+      messageText.toLowerCase().includes(keyword)
+    );
+
+    if (isThankYou) {
+      setTimeout(() => {
+        const thankYouResponse = {
+          id: Date.now(),
+          type: "bot",
+          message:
+            "You're very welcome! 😊 I'm here to help with any work-related issues or complaints. Is there anything else I can assist you with?",
+          timestamp: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, thankYouResponse]);
+        setIsTyping(false);
+      }, 1000);
+      return;
+    }
+
     // 3. THIRD PRIORITY: Handle conversation state choices
     if (conversationState === "waiting_for_choice") {
-      // User wants to continue existing complaint
       if (
         messageText.toLowerCase().includes("continue") ||
         messageText.toLowerCase().includes("yes") ||
         messageText.toLowerCase().includes("related") ||
-        messageText.toLowerCase().includes("same issue") ||
         messageText.toLowerCase().includes("na") ||
         messageText.toLowerCase().includes("abi") ||
         messageText.toLowerCase().includes("sha") ||
@@ -772,7 +833,6 @@ const CustomerCareChat = () => {
       (messageText.toLowerCase().includes("continue") ||
         messageText.toLowerCase().includes("yes") ||
         messageText.toLowerCase().includes("related") ||
-        messageText.toLowerCase().includes("same issue") ||
         messageText.toLowerCase().includes("na") ||
         messageText.toLowerCase().includes("abi") ||
         messageText.toLowerCase().includes("sha") ||
@@ -784,7 +844,6 @@ const CustomerCareChat = () => {
         messageText.toLowerCase().includes("that one") ||
         messageText.toLowerCase().includes("same thing") ||
         messageText.toLowerCase().includes("same problem") ||
-        messageText.toLowerCase().includes("same issue") ||
         messageText.toLowerCase().includes("that issue") ||
         messageText.toLowerCase().includes("that complaint"))
     ) {

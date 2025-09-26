@@ -7,6 +7,7 @@ import {
   HiChatBubbleOvalLeftEllipsis,
   HiEye,
   HiPlus,
+  HiXMark,
 } from "react-icons/hi2";
 import { Link } from "react-router-dom";
 import {
@@ -22,6 +23,8 @@ const MyComplaints = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [selectedComplaint, setSelectedComplaint] = useState(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   useEffect(() => {
     const fetchMyComplaints = async () => {
@@ -74,6 +77,11 @@ const MyComplaints = () => {
     } else {
       console.error("❌ Chat button not found");
     }
+  };
+
+  const handleViewDetails = (complaint) => {
+    setSelectedComplaint(complaint);
+    setShowDetailsModal(true);
   };
 
   const handlePageChange = (page) => {
@@ -271,12 +279,14 @@ const MyComplaints = () => {
                       </button>
                     )}
                     <button
-                      onClick={() => {
-                        // View complaint details
-                        console.log("View complaint:", complaint._id);
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleViewDetails(complaint);
                       }}
-                      className="p-2 text-gray-400 hover:text-[var(--elra-primary)] transition-colors"
+                      className="p-2 text-gray-400 hover:text-[var(--elra-primary)] transition-colors cursor-pointer"
                       title="View Details"
+                      type="button"
                     >
                       <HiEye className="w-5 h-5" />
                     </button>
@@ -363,6 +373,283 @@ const MyComplaints = () => {
           </motion.div>
         )}
       </motion.div>
+
+      {/* Complaint Details Modal */}
+      {showDetailsModal && selectedComplaint && (
+        <div 
+          className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowDetailsModal(false);
+            }
+          }}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden"
+          >
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="p-3 bg-white/20 rounded-xl">
+                    <HiTicket className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">Complaint Details</h2>
+                    <p className="text-white/90 text-sm">
+                      #{selectedComplaint.complaintNumber}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className="p-2 rounded-full hover:bg-white/20 transition-colors"
+                >
+                  <HiXMark className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <div className="space-y-6">
+                {/* Title and Status */}
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                    {selectedComplaint.title}
+                  </h3>
+                  <div className="flex items-center space-x-3">
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm font-medium ${
+                        complaintUtils.formatStatus(selectedComplaint.status)
+                          .bgColor
+                      } ${
+                        complaintUtils.formatStatus(selectedComplaint.status)
+                          .textColor
+                      }`}
+                    >
+                      {
+                        complaintUtils.formatStatus(selectedComplaint.status)
+                          .label
+                      }
+                    </span>
+                    <span
+                      className={`px-3 py-1 rounded-full text-sm font-medium ${
+                        complaintUtils.formatPriority(
+                          selectedComplaint.priority
+                        ).bgColor
+                      } ${
+                        complaintUtils.formatPriority(
+                          selectedComplaint.priority
+                        ).textColor
+                      }`}
+                    >
+                      {
+                        complaintUtils.formatPriority(
+                          selectedComplaint.priority
+                        ).label
+                      }
+                    </span>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 mb-3">
+                    Description
+                  </h4>
+                  <p className="text-gray-700 bg-gray-50 p-4 rounded-xl">
+                    {selectedComplaint.description}
+                  </p>
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-3">
+                      Complaint Information
+                    </h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Complaint ID:</span>
+                        <span className="font-medium">
+                          {selectedComplaint.complaintNumber}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Category:</span>
+                        <span className="font-medium capitalize">
+                          {selectedComplaint.category.replace("_", " ")}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Submitted:</span>
+                        <span className="font-medium">
+                          {new Date(
+                            selectedComplaint.submittedAt
+                          ).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Last Updated:</span>
+                        <span className="font-medium">
+                          {new Date(
+                            selectedComplaint.lastUpdated
+                          ).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-3">
+                      Status Information
+                    </h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Current Status:</span>
+                        <span
+                          className={`px-2 py-1 rounded text-sm font-medium ${
+                            complaintUtils.formatStatus(
+                              selectedComplaint.status
+                            ).bgColor
+                          } ${
+                            complaintUtils.formatStatus(
+                              selectedComplaint.status
+                            ).textColor
+                          }`}
+                        >
+                          {
+                            complaintUtils.formatStatus(
+                              selectedComplaint.status
+                            ).label
+                          }
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Priority:</span>
+                        <span
+                          className={`px-2 py-1 rounded text-sm font-medium ${
+                            complaintUtils.formatPriority(
+                              selectedComplaint.priority
+                            ).bgColor
+                          } ${
+                            complaintUtils.formatPriority(
+                              selectedComplaint.priority
+                            ).textColor
+                          }`}
+                        >
+                          {
+                            complaintUtils.formatPriority(
+                              selectedComplaint.priority
+                            ).label
+                          }
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">SLA Status:</span>
+                        <span
+                          className={`px-2 py-1 rounded text-sm font-medium ${
+                            selectedComplaint.slaStatus === "on_time"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {selectedComplaint.slaStatus === "on_time"
+                            ? "On Time"
+                            : "Overdue"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Age:</span>
+                        <span className="font-medium">
+                          {selectedComplaint.ageInDays} days
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes Section */}
+                {selectedComplaint.notes &&
+                  selectedComplaint.notes.length > 0 && (
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900 mb-3">
+                        Notes & Updates
+                      </h4>
+                      <div className="space-y-3">
+                        {selectedComplaint.notes.map((note, index) => (
+                          <div
+                            key={index}
+                            className="bg-blue-50 p-4 rounded-xl"
+                          >
+                            <div className="flex justify-between items-start mb-2">
+                              <span className="text-sm font-medium text-blue-900">
+                                {note.addedBy?.firstName}{" "}
+                                {note.addedBy?.lastName}
+                              </span>
+                              <span className="text-xs text-blue-600">
+                                {new Date(note.addedAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <p className="text-blue-800">{note.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                {/* Resolution Section */}
+                {selectedComplaint.resolution && (
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-3">
+                      Resolution
+                    </h4>
+                    <div className="bg-green-50 p-4 rounded-xl">
+                      <p className="text-green-800">
+                        {selectedComplaint.resolution}
+                      </p>
+                      {selectedComplaint.resolvedAt && (
+                        <p className="text-sm text-green-600 mt-2">
+                          Resolved on:{" "}
+                          {new Date(
+                            selectedComplaint.resolvedAt
+                          ).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-gray-50 px-6 py-4 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Close
+              </button>
+              {(selectedComplaint.status === "pending" ||
+                selectedComplaint.status === "in_progress") && (
+                <button
+                  onClick={() => {
+                    setShowDetailsModal(false);
+                    handleCheckStatus(selectedComplaint);
+                  }}
+                  className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors"
+                >
+                  Check Status
+                </button>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };

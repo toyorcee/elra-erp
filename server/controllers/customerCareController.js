@@ -3,7 +3,6 @@ import User from "../models/User.js";
 import Department from "../models/Department.js";
 import mongoose from "mongoose";
 
-// Get all complaints with filtering and pagination
 export const getComplaints = async (req, res) => {
   try {
     const {
@@ -14,45 +13,47 @@ export const getComplaints = async (req, res) => {
       category,
       department,
       assignedTo,
+      assignedToMe,
+      submittedByMe,
       search,
       sortBy = "submittedAt",
       sortOrder = "desc",
     } = req.query;
 
-    // Build filter object
     const filter = {};
 
-    // Apply user-based filtering
     if (req.userFilter) {
       Object.assign(filter, req.userFilter);
     }
 
-    // Apply status filter
     if (status) {
       filter.status = status;
     }
 
-    // Apply priority filter
     if (priority) {
       filter.priority = priority;
     }
 
-    // Apply category filter
     if (category) {
       filter.category = category;
     }
 
-    // Apply department filter
     if (department) {
       filter.department = department;
     }
 
-    // Apply assigned to filter
     if (assignedTo) {
       filter.assignedTo = assignedTo;
     }
 
-    // Apply search filter
+    if (assignedToMe === "true") {
+      filter.assignedTo = req.user._id;
+    }
+
+    if (submittedByMe === "true") {
+      filter.submittedBy = req.user._id;
+    }
+
     if (search) {
       filter.$or = [
         { title: { $regex: search, $options: "i" } },
@@ -61,14 +62,11 @@ export const getComplaints = async (req, res) => {
       ];
     }
 
-    // Build sort object
     const sort = {};
     sort[sortBy] = sortOrder === "desc" ? -1 : 1;
 
-    // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Get complaints with pagination
     const complaints = await Complaint.find(filter)
       .populate("submittedBy", "firstName lastName email")
       .populate("assignedTo", "firstName lastName email")
@@ -78,10 +76,8 @@ export const getComplaints = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit));
 
-    // Get total count
     const total = await Complaint.countDocuments(filter);
 
-    // Calculate pagination info
     const totalPages = Math.ceil(total / parseInt(limit));
     const hasNextPage = page < totalPages;
     const hasPrevPage = page > 1;
@@ -193,6 +189,66 @@ export const createComplaint = async (req, res) => {
       { path: "submittedBy", select: "firstName lastName email" },
       { path: "department", select: "name" },
     ]);
+
+    // Create notifications for HODs and submitter
+    try {
+      const Notification = (await import("../models/Notification.js")).default;
+      const User = (await import("../models/User.js")).default;
+
+      const customerCareHODs = await User.find({
+        $or: [
+          { "department.name": "Customer Service" },
+          { "department.name": "Customer Care" },
+        ],
+        $or: [{ "role.level": { $gte: 700 } }, { isSuperadmin: true }],
+      }).select("_id firstName lastName email");
+
+      const notifications = [];
+
+      const hodNotifications = customerCareHODs.map((user) => ({
+        user: user._id,
+        type: "complaint_submitted",
+        title: "New Complaint Requires Assignment",
+        message: `New complaint "${title}" submitted by ${complaint.submittedBy.firstName} ${complaint.submittedBy.lastName}. Please assign to a team member.`,
+        data: {
+          complaintId: complaint._id,
+          submittedBy: complaint.submittedBy._id,
+          category: category,
+          priority: priority || "medium",
+          requiresAssignment: true,
+        },
+        isRead: false,
+      }));
+
+      const submitterNotification = {
+        user: complaint.submittedBy._id,
+        type: "complaint_confirmation",
+        title: "Complaint Submitted Successfully",
+        message: `Your complaint "${title}" has been submitted and will be reviewed by our Customer Care team. You'll receive updates on its progress.`,
+        data: {
+          complaintId: complaint._id,
+          category: category,
+          priority: priority || "medium",
+          complaintNumber: complaint.complaintNumber,
+        },
+        isRead: false,
+      };
+
+      notifications.push(...hodNotifications, submitterNotification);
+
+      if (notifications.length > 0) {
+        await Notification.insertMany(notifications);
+        console.log(
+          `✅ [CUSTOMER CARE] Created ${notifications.length} notifications: ${hodNotifications.length} for HODs, 1 for submitter`
+        );
+      }
+    } catch (notificationError) {
+      console.error(
+        "❌ [CUSTOMER CARE] Error creating notifications:",
+        notificationError
+      );
+      // Don't fail the complaint creation if notifications fail
+    }
 
     res.status(201).json({
       success: true,
@@ -346,7 +402,7 @@ export const getComplaintStatistics = async (req, res) => {
             $avg: {
               $divide: [
                 { $subtract: ["$resolvedAt", "$submittedAt"] },
-                1000 * 60 * 60 * 24, 
+                1000 * 60 * 60 * 24,
               ],
             },
           },
@@ -606,6 +662,127 @@ export const submitFeedback = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error submitting feedback",
+      error: error.message,
+    });
+  }
+};
+
+// Get team members for assignment
+export const getTeamMembers = async (req, res) => {
+  try {
+    const User = (await import("../models/User.js")).default;
+
+    const teamMembers = await User.find({
+      $or: [
+        { "department.name": "Customer Service" },
+        { "department.name": "Customer Care" },
+      ],
+      role: { $gte: 300, $lt: 700 },
+    })
+      .populate("role", "name level")
+      .populate("department", "name")
+      .select("firstName lastName email role department");
+
+    const membersWithCounts = await Promise.all(
+      teamMembers.map(async (member) => {
+        const assignedCount = await Complaint.countDocuments({
+          assignedTo: member._id,
+          status: { $nin: ["resolved", "closed"] },
+        });
+
+        return {
+          ...member.toObject(),
+          assignedComplaints: assignedCount,
+        };
+      })
+    );
+
+    res.status(200).json({
+      success: true,
+      data: membersWithCounts,
+    });
+  } catch (error) {
+    console.error("❌ [CUSTOMER CARE] Error getting team members:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching team members",
+      error: error.message,
+    });
+  }
+};
+
+export const assignComplaint = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { assignedTo } = req.body;
+
+    const complaint = await Complaint.findById(id);
+    if (!complaint) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found",
+      });
+    }
+
+    if (complaint.assignedTo) {
+      return res.status(400).json({
+        success: false,
+        message: "Complaint is already assigned",
+      });
+    }
+
+    complaint.assignedTo = assignedTo;
+    complaint.status = "in_progress";
+    complaint.lastUpdated = new Date();
+    await complaint.save();
+
+    await complaint.populate([
+      { path: "submittedBy", select: "firstName lastName email" },
+      { path: "assignedTo", select: "firstName lastName email" },
+      { path: "department", select: "name" },
+    ]);
+
+    try {
+      const Notification = (await import("../models/Notification.js")).default;
+
+      const assignmentNotification = {
+        user: assignedTo,
+        type: "complaint_assigned",
+        title: "New Complaint Assigned",
+        message: `You have been assigned a new complaint: "${complaint.title}"`,
+        data: {
+          complaintId: complaint._id,
+          complaintTitle: complaint.title,
+          complaintCategory: complaint.category,
+          complaintPriority: complaint.priority,
+          submittedBy: complaint.submittedBy._id,
+          assignedBy: req.user._id,
+        },
+        isRead: false,
+      };
+
+      await Notification.create(assignmentNotification);
+      console.log(
+        `✅ [CUSTOMER CARE] Assignment notification sent to team member`
+      );
+    } catch (notificationError) {
+      console.error(
+        "❌ [CUSTOMER CARE] Error creating assignment notification:",
+        notificationError
+      );
+      // Don't fail the assignment if notifications fail
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Complaint assigned successfully",
+      data: complaint,
+    });
+  } catch (error) {
+    console.error("❌ [CUSTOMER CARE] Error assigning complaint:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error assigning complaint",
       error: error.message,
     });
   }

@@ -57,11 +57,11 @@ const CustomerCareDashboard = () => {
           setStats(statsResponse.data);
         }
 
-        // Fetch recent complaints
         const complaintsResponse = await complaintAPI.getComplaints({
           limit: 5,
           sortBy: "submittedAt",
           sortOrder: "desc",
+          submittedByMe: !isCustomerCareUser,
         });
         if (complaintsResponse.success) {
           setRecentComplaints(complaintsResponse.data.complaints);
@@ -163,13 +163,21 @@ const CustomerCareDashboard = () => {
               </div>
             </div>
             <p className="text-gray-600 mb-4">
-              Need immediate assistance? Use the floating chat button to get
-              instant help from our Customer Care team.
+              Need immediate assistance? Get instant help from our Customer Care
+              team.
             </p>
-            <div className="text-sm text-gray-500">
-              💡 Look for the chat button in the bottom-right corner of your
-              screen
-            </div>
+            <button
+              onClick={() => {
+                const chatButton = document.querySelector("[data-chat-button]");
+                if (chatButton) {
+                  chatButton.click();
+                }
+              }}
+              className="inline-flex items-center space-x-2 px-6 py-3 bg-green-500 text-white rounded-xl font-semibold hover:bg-green-600 transition-colors"
+            >
+              <HiChatBubbleLeftRight className="w-5 h-5" />
+              <span>Start Live Chat</span>
+            </button>
           </motion.div>
         </div>
 
@@ -180,28 +188,68 @@ const CustomerCareDashboard = () => {
           transition={{ delay: 0.3 }}
           className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
         >
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
-            My Complaints
-          </h2>
-          <div className="text-center py-8">
-            <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4">
-              <HiTicket className="w-8 h-8 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              No complaints yet
-            </h3>
-            <p className="text-gray-600 mb-4">
-              You haven't submitted any complaints yet. Use the button above to
-              submit your first complaint.
-            </p>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900">My Complaints</h2>
             <Link
-              to="/dashboard/modules/customer-care/submit-complaint"
-              className="inline-flex items-center space-x-2 px-6 py-3 bg-[var(--elra-primary)] text-white rounded-xl font-semibold hover:bg-[var(--elra-primary-dark)] transition-colors"
+              to="/dashboard/modules/customer-care/my-complaints"
+              className="text-sm text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] font-medium"
             >
-              <HiPlus className="w-5 h-5" />
-              <span>Submit Your First Complaint</span>
+              View All →
             </Link>
           </div>
+          {recentComplaints.length > 0 ? (
+            <div className="space-y-3">
+              {recentComplaints.slice(0, 3).map((complaint) => (
+                <div
+                  key={complaint._id}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                >
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      {complaint.title}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {complaint.complaintNumber} •{" "}
+                      {new Date(complaint.submittedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <span
+                    className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                      complaint.status === "pending"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : complaint.status === "in_progress"
+                        ? "bg-blue-100 text-blue-800"
+                        : complaint.status === "resolved"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
+                    {complaintUtils.formatStatus(complaint.status).label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4">
+                <HiTicket className="w-8 h-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                No complaints yet
+              </h3>
+              <p className="text-gray-600 mb-4">
+                You haven't submitted any complaints yet. Use the button above
+                to submit your first complaint.
+              </p>
+              <Link
+                to="/dashboard/modules/customer-care/submit-complaint"
+                className="inline-flex items-center space-x-2 px-6 py-3 bg-[var(--elra-primary)] text-white rounded-xl font-semibold hover:bg-[var(--elra-primary-dark)] transition-colors"
+              >
+                <HiPlus className="w-5 h-5" />
+                <span>Submit Your First Complaint</span>
+              </Link>
+            </div>
+          )}
         </motion.div>
       </div>
     );

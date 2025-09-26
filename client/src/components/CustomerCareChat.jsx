@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   HiChatBubbleLeftRight,
@@ -28,6 +28,57 @@ const CustomerCareChat = () => {
   const [newMessage, setNewMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false);
+
+  useEffect(() => {
+    const prefetchedComplaintId = sessionStorage.getItem(
+      "prefetchedComplaintId"
+    );
+    console.log(
+      "🔍 Checking for prefetched complaint ID:",
+      prefetchedComplaintId
+    );
+
+    if (prefetchedComplaintId) {
+      console.log("✅ Found prefetched complaint ID, fetching details...");
+      fetchComplaintDetails(prefetchedComplaintId);
+      sessionStorage.removeItem("prefetchedComplaintId");
+    }
+  }, []);
+
+  const fetchComplaintDetails = async (complaintId) => {
+    try {
+      console.log("🔄 Fetching complaint details for ID:", complaintId);
+      const response = await complaintAPI.getComplaintById(complaintId);
+      console.log("📡 API Response:", response);
+
+      if (response.success) {
+        const complaint = response.data;
+        console.log("📋 Complaint data:", complaint);
+
+        const prefetchedMessage = {
+          id: Date.now(),
+          type: "bot",
+          message: `I see you want to continue discussing your complaint "${complaint.title}" (${complaint.complaintNumber}). Current status: ${complaint.status}. How can I help you with this issue?`,
+          timestamp: new Date().toISOString(),
+        };
+
+        console.log("💬 Adding prefetched message:", prefetchedMessage);
+        setMessages((prev) => [...prev, prefetchedMessage]);
+      } else {
+        console.error("❌ API response not successful:", response);
+      }
+    } catch (error) {
+      console.error("❌ Error fetching complaint details:", error);
+      const fallbackMessage = {
+        id: Date.now(),
+        type: "bot",
+        message:
+          "I see you want to continue discussing a complaint. How can I help you with this issue?",
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, fallbackMessage]);
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!newMessage.trim()) return;
@@ -69,7 +120,6 @@ const CustomerCareChat = () => {
         setIsTyping(false);
       }, 1500);
     } else {
-      // General response
       setTimeout(() => {
         const botResponse = {
           id: Date.now() + 1,
@@ -174,7 +224,6 @@ const CustomerCareChat = () => {
     user?.department?.name === "Customer Service" ||
     user?.department?.name === "Customer Care";
 
-  // Don't show chat for Customer Care users (they have their own dashboard)
   if (isCustomerCareUser) {
     return null;
   }
@@ -183,6 +232,7 @@ const CustomerCareChat = () => {
     <>
       {/* Floating Chat Button */}
       <motion.button
+        data-chat-button
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         whileHover={{ scale: 1.1 }}

@@ -236,6 +236,42 @@ export const moduleSidebarConfig = {
             path: "/dashboard/modules/customer-care",
             required: { minLevel: 0 },
             description: "Customer care dashboard and overview",
+            hidden: (user) => {
+              return false;
+            },
+          },
+        ],
+      },
+      {
+        title: "Complaint Submission",
+        collapsible: true,
+        defaultExpanded: true,
+        items: [
+          {
+            label: "Submit Complaint",
+            icon: "PlusIcon",
+            path: "/dashboard/modules/customer-care/submit-complaint",
+            required: { minLevel: 300 },
+            description: "Submit a new complaint or service request",
+            hidden: (user) => {
+              const isCustomerCareUser =
+                user?.department?.name === "Customer Service" ||
+                user?.department?.name === "Customer Care";
+              return isCustomerCareUser;
+            },
+          },
+          {
+            label: "My Complaints",
+            icon: "TicketIcon",
+            path: "/dashboard/modules/customer-care/my-complaints",
+            required: { minLevel: 300 },
+            description: "View your submitted complaints and their status",
+            hidden: (user) => {
+              const isCustomerCareUser =
+                user?.department?.name === "Customer Service" ||
+                user?.department?.name === "Customer Care";
+              return isCustomerCareUser;
+            },
           },
         ],
       },
@@ -248,8 +284,14 @@ export const moduleSidebarConfig = {
             label: "All Complaints",
             icon: "DocumentTextIcon",
             path: "/dashboard/modules/customer-care/complaints",
-            required: { minLevel: 0 },
+            required: { minLevel: 300 },
             description: "View and manage all staff complaints",
+            hidden: (user) => {
+              const isCustomerCareUser =
+                user?.department?.name === "Customer Service" ||
+                user?.department?.name === "Customer Care";
+              return !isCustomerCareUser;
+            },
           },
           {
             label: "Complaint Management",
@@ -257,6 +299,47 @@ export const moduleSidebarConfig = {
             path: "/dashboard/modules/customer-care/management",
             required: { minLevel: 300 },
             description: "Manage complaint status and assignments",
+            hidden: (user) => {
+              const isCustomerCareUser =
+                user?.department?.name === "Customer Service" ||
+                user?.department?.name === "Customer Care";
+              return !isCustomerCareUser;
+            },
+          },
+          {
+            label: "My Assignments",
+            icon: "ClipboardDocumentListIcon",
+            path: "/dashboard/modules/customer-care/assignments",
+            required: { minLevel: 300 },
+            description: "View complaints assigned to you by HODs",
+            hidden: (user) => {
+              const isCustomerCareUser =
+                user?.department?.name === "Customer Service" ||
+                user?.department?.name === "Customer Care";
+              const isHOD = user?.role?.level >= 700;
+              return !isCustomerCareUser || isHOD;
+            },
+          },
+        ],
+      },
+      {
+        title: "HOD Management",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Assign Complaints",
+            icon: "UserGroupIcon",
+            path: "/dashboard/modules/customer-care/assign-complaints",
+            required: { minLevel: 700 },
+            description: "Assign complaints to team members",
+            hidden: (user) => {
+              const isCustomerCareUser =
+                user?.department?.name === "Customer Service" ||
+                user?.department?.name === "Customer Care";
+              const isHOD = user?.role?.level >= 700;
+              return !(isCustomerCareUser && isHOD);
+            },
           },
         ],
       },
@@ -271,6 +354,12 @@ export const moduleSidebarConfig = {
             path: "/dashboard/modules/customer-care/reports",
             required: { minLevel: 300 },
             description: "View customer care analytics and reports",
+            hidden: (user) => {
+              const isCustomerCareUser =
+                user?.department?.name === "Customer Service" ||
+                user?.department?.name === "Customer Care";
+              return !isCustomerCareUser;
+            },
           },
         ],
       },

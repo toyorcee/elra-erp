@@ -35,6 +35,9 @@ import {
   CustomerCareReports,
 } from "./pages/user/modules/customer-care";
 import SubmitComplaint from "./pages/user/modules/customer-care/SubmitComplaint";
+import MyAssignments from "./pages/user/modules/customer-care/MyAssignments";
+import AssignComplaints from "./pages/user/modules/customer-care/AssignComplaints";
+import MyComplaints from "./pages/user/modules/customer-care/MyComplaints";
 import MyTickets from "./pages/user/modules/self-service/MyTickets";
 import ITSupport from "./pages/user/modules/self-service/ITSupport";
 import EquipmentRequests from "./pages/user/modules/self-service/EquipmentRequests";
@@ -293,6 +296,18 @@ const AppRoutes = () => {
         <Route
           path="modules/customer-care/submit-complaint"
           element={<SubmitComplaint />}
+        />
+        <Route
+          path="modules/customer-care/assignments"
+          element={<MyAssignments />}
+        />
+        <Route
+          path="modules/customer-care/assign-complaints"
+          element={<AssignComplaints />}
+        />
+        <Route
+          path="modules/customer-care/my-complaints"
+          element={<MyComplaints />}
         />
 
         {/* Department Management Module Routes */}

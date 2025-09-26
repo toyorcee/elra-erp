@@ -11,6 +11,8 @@ import {
   getDepartmentBreakdown,
   getCategoryBreakdown,
   submitFeedback,
+  getTeamMembers,
+  assignComplaint,
 } from "../controllers/customerCareController.js";
 
 const router = express.Router();
@@ -53,5 +55,11 @@ router.post(
   checkCustomerCareAccess,
   submitFeedback
 );
+
+// Get team members for assignment (HODs only)
+router.get("/team-members", checkCustomerCareAccess, getTeamMembers);
+
+// Assign complaint to team member (HODs only)
+router.post("/complaints/:id/assign", checkCustomerCareAccess, assignComplaint);
 
 export default router;

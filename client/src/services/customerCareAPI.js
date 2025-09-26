@@ -78,6 +78,31 @@ export const complaintAPI = {
       throw error;
     }
   },
+
+  // Get team members for assignment (HODs only)
+  getTeamMembers: async () => {
+    try {
+      const response = await api.get("/customer-care/team-members");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching team members:", error);
+      throw error;
+    }
+  },
+
+  // Assign complaint to team member (HODs only)
+  assignComplaint: async (complaintId, assignmentData) => {
+    try {
+      const response = await api.post(
+        `/customer-care/complaints/${complaintId}/assign`,
+        assignmentData
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error assigning complaint:", error);
+      throw error;
+    }
+  },
 };
 
 // Statistics API functions

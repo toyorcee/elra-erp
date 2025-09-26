@@ -10,6 +10,8 @@ import {
   HiChatBubbleOvalLeftEllipsis,
   HiUser,
   HiCalendar,
+  HiArrowLeft,
+  HiHome,
 } from "react-icons/hi2";
 import { Link } from "react-router-dom";
 import {
@@ -75,7 +77,20 @@ const StaffComplaints = () => {
 
   return (
     <div className="space-y-6 p-4">
-      {/* Header */}
+      {/* Breadcrumb Navigation */}
+      <div className="flex items-center space-x-2 text-sm text-gray-600 mb-4">
+        <Link
+          to="/dashboard/modules/customer-care"
+          className="flex items-center space-x-1 hover:text-[var(--elra-primary)] transition-colors"
+        >
+          <HiHome className="w-4 h-4" />
+          <span>Customer Care</span>
+        </Link>
+        <span>/</span>
+        <span className="text-gray-900 font-medium">All Complaints</span>
+      </div>
+
+      {/* Header with Back Button */}
       <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
@@ -84,13 +99,22 @@ const StaffComplaints = () => {
               View and manage all staff complaints and service requests
             </p>
           </div>
-          <Link
-            to="/dashboard/modules/customer-care/submit-complaint"
-            className="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center space-x-2"
-          >
-            <HiPlus className="w-5 h-5" />
-            <span>Submit Complaint</span>
-          </Link>
+          <div className="flex items-center space-x-3">
+            <Link
+              to="/dashboard/modules/customer-care"
+              className="flex items-center space-x-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl transition-colors"
+            >
+              <HiArrowLeft className="w-5 h-5" />
+              <span>Back to Dashboard</span>
+            </Link>
+            <Link
+              to="/dashboard/modules/customer-care/submit-complaint"
+              className="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center space-x-2"
+            >
+              <HiPlus className="w-5 h-5" />
+              <span>Submit Complaint</span>
+            </Link>
+          </div>
         </div>
       </div>
 

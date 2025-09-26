@@ -202,7 +202,7 @@ const StaffComplaints = () => {
                   <div className="flex items-center space-x-6 text-sm text-gray-500">
                     <div className="flex items-center space-x-1">
                       <HiUser className="w-4 h-4" />
-                      <span>Dept: {complaint.department}</span>
+                      <span>Dept: {complaint.department?.name || "N/A"}</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <HiCalendar className="w-4 h-4" />

@@ -254,7 +254,7 @@ const AssignComplaints = () => {
                       {teamMembers.map((member) => (
                         <option key={member._id} value={member._id}>
                           {member.firstName} {member.lastName} (
-                          {member.role?.name})
+                          {member.role?.name || "Staff"})
                         </option>
                       ))}
                     </select>
@@ -301,4 +301,3 @@ const AssignComplaints = () => {
 };
 
 export default AssignComplaints;
-

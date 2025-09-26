@@ -871,33 +871,28 @@ export const checkCustomerCareAccess = async (req, res, next) => {
       });
     }
 
-    // Super Admin has access to everything
     if (user.role.level >= 1000 || user.isSuperadmin) {
       return next();
     }
 
-    // Check if user is Customer Care department
     const isCustomerCareUser =
       user.department?.name === "Customer Service" ||
       user.department?.name === "Customer Care";
 
-    // Customer Care HOD (level 700+) can manage all complaints
-    if (user.role.level >= 700 && isCustomerCareUser) {
+    if (isCustomerCareUser) {
       return next();
     }
 
-    // Customer Care staff (level 300+) can view and manage assigned complaints
-    if (user.role.level >= 300 && isCustomerCareUser) {
-      return next();
-    }
-
-    // Regular users can only submit complaints and view their own
     if (user.role.level >= 300) {
-      // For GET requests, filter to only their own complaints
       if (req.method === "GET") {
-        req.userFilter = { submittedBy: user._id };
+        if (user.role.level >= 700 && user.department) {
+          req.userFilter = {
+            department: user.department._id || user.department,
+          };
+        } else {
+          req.userFilter = { submittedBy: user._id };
+        }
       }
-      // For POST requests, ensure they're submitting for themselves
       if (req.method === "POST") {
         req.body.submittedBy = user._id;
       }

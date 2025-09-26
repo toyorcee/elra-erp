@@ -56,7 +56,7 @@ const CustomerCareChat = () => {
       "prefetchedComplaintId"
     );
     if (prefetchedComplaintId) {
-      return; 
+      return;
     }
 
     try {

@@ -170,7 +170,6 @@ export const createComplaint = async (req, res) => {
       });
     }
 
-    // Create complaint
     const complaint = new Complaint({
       title,
       description,
@@ -192,33 +191,40 @@ export const createComplaint = async (req, res) => {
       const Notification = (await import("../models/Notification.js")).default;
       const User = (await import("../models/User.js")).default;
 
-      const allHODs = await User.find({
+      const customerCareHODs = await User.find({
         isActive: true,
+        department: complaint.department._id,
       })
         .populate("role", "name level")
-        .select("_id firstName lastName email role isSuperadmin")
+        .select("_id firstName lastName email role")
         .then((users) =>
           users.filter(
             (user) =>
-              (user.role &&
-                (user.role.name === "HOD" || user.role.level >= 700)) ||
-              user.isSuperadmin
+              user.role && (user.role.name === "HOD" || user.role.level >= 700)
           )
         );
+
+      const superadmins = await User.find({
+        isActive: true,
+        isSuperadmin: true,
+      }).select("_id firstName lastName email role isSuperadmin");
+
+      const allHODs = [...customerCareHODs, ...superadmins];
 
       const notifications = [];
 
       const hodNotifications = allHODs.map((user) => ({
         recipient: user._id,
         type: "complaint_submitted",
-        title: "New Complaint Requires Assignment",
-        message: `New complaint "${title}" submitted by ${complaint.submittedBy.firstName} ${complaint.submittedBy.lastName}. Please assign to a team member.`,
+        title: "New Complaint Awaiting Review",
+        message: `New complaint "${title}" submitted by ${complaint.submittedBy.firstName} ${complaint.submittedBy.lastName}. Please review and assign to a team member.`,
         data: {
           complaintId: complaint._id,
           submittedBy: complaint.submittedBy._id,
           category: category,
           priority: priority || "medium",
           requiresAssignment: true,
+          status: "pending_review",
         },
         isRead: false,
       }));
@@ -227,12 +233,13 @@ export const createComplaint = async (req, res) => {
         recipient: complaint.submittedBy._id,
         type: "complaint_confirmation",
         title: "Complaint Submitted Successfully",
-        message: `Your complaint "${title}" has been submitted and will be reviewed by our Customer Care team. You'll receive updates on its progress.`,
+        message: `Your complaint "${title}" has been submitted and is awaiting review by our Customer Care HOD. You'll receive updates once it's assigned to a team member.`,
         data: {
           complaintId: complaint._id,
           category: category,
           priority: priority || "medium",
           complaintNumber: complaint.complaintNumber,
+          status: "pending_review",
         },
         isRead: false,
       };
@@ -676,11 +683,15 @@ export const getTeamMembers = async (req, res) => {
         { "department.name": "Customer Service" },
         { "department.name": "Customer Care" },
       ],
-      role: { $gte: 300, $lt: 700 },
     })
       .populate("role", "name level")
       .populate("department", "name")
-      .select("firstName lastName email role department");
+      .select("firstName lastName email role department")
+      .then((users) =>
+        users.filter(
+          (user) => user.role && user.role.level >= 300 && user.role.level < 700
+        )
+      );
 
     const membersWithCounts = await Promise.all(
       teamMembers.map(async (member) => {
@@ -745,7 +756,7 @@ export const assignComplaint = async (req, res) => {
       const Notification = (await import("../models/Notification.js")).default;
 
       const assignmentNotification = {
-        user: assignedTo,
+        recipient: assignedTo,
         type: "complaint_assigned",
         title: "New Complaint Assigned",
         message: `You have been assigned a new complaint: "${complaint.title}"`,
@@ -800,7 +811,10 @@ export const saveSession = async (req, res) => {
       notes,
     } = req.body;
 
-    const responder = await User.findById(responderId);
+    const responder = await User.findById(responderId).populate(
+      "department",
+      "name"
+    );
     const responderDepartment =
       responder?.department?.name || "Unknown Department";
 

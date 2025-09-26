@@ -243,8 +243,8 @@ const MyComplaints = () => {
                     </p>
                     {complaint.assignedTo && (
                       <p className="text-sm text-blue-600">
-                        Assigned to: {complaint.assignedTo.firstName}{" "}
-                        {complaint.assignedTo.lastName}
+                        Assigned to: {complaint.assignedTo?.firstName}{" "}
+                        {complaint.assignedTo?.lastName}
                       </p>
                     )}
                   </div>

@@ -12,8 +12,6 @@ import {
   HiChatBubbleOvalLeftEllipsis,
   HiChartBar,
   HiPaperAirplane,
-  HiArrowTrendingUp,
-  HiArrowTrendingDown,
 } from "react-icons/hi2";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../../../context/AuthContext";
@@ -44,6 +42,8 @@ const CustomerCareDashboard = () => {
     user?.department?.name === "Customer Service" ||
     user?.department?.name === "Customer Care";
 
+  const isHOD = user?.role?.level >= 700;
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -58,7 +58,7 @@ const CustomerCareDashboard = () => {
           limit: 5,
           sortBy: "submittedAt",
           sortOrder: "desc",
-          submittedByMe: !isCustomerCareUser,
+          submittedByMe: !isCustomerCareUser && !isHOD,
         });
         if (complaintsResponse.success) {
           setRecentComplaints(complaintsResponse.data.complaints);
@@ -107,7 +107,9 @@ const CustomerCareDashboard = () => {
         <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl p-6 text-white">
           <h1 className="text-3xl font-bold mb-2">Customer Care</h1>
           <p className="text-white/80">
-            Submit complaints and get help from our Customer Care team
+            {isHOD
+              ? "Monitor department complaints and service requests"
+              : "Submit complaints and get help from our Customer Care team"}
           </p>
         </div>
 
@@ -123,12 +125,14 @@ const CustomerCareDashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">
-                  My Complaints
+                  {isHOD ? "Department Complaints" : "My Complaints"}
                 </p>
                 <p className="text-2xl sm:text-3xl font-bold text-blue-900 mt-2">
                   {recentComplaints.length}
                 </p>
-                <p className="text-sm text-blue-600 mt-1">Total submitted</p>
+                <p className="text-sm text-blue-600 mt-1">
+                  {isHOD ? "Total in department" : "Total submitted"}
+                </p>
               </div>
               <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
                 <HiDocumentText className="h-8 w-8 text-white" />
@@ -155,7 +159,7 @@ const CustomerCareDashboard = () => {
                   }
                 </p>
                 <p className="text-sm text-yellow-600 mt-1">
-                  Awaiting response
+                  {isHOD ? "Department pending" : "Awaiting response"}
                 </p>
               </div>
               <div className="p-4 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg">
@@ -182,7 +186,9 @@ const CustomerCareDashboard = () => {
                       .length
                   }
                 </p>
-                <p className="text-sm text-purple-600 mt-1">Being handled</p>
+                <p className="text-sm text-purple-600 mt-1">
+                  {isHOD ? "Department in progress" : "Being handled"}
+                </p>
               </div>
               <div className="p-4 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
                 <HiExclamationTriangle className="h-8 w-8 text-white" />
@@ -209,7 +215,7 @@ const CustomerCareDashboard = () => {
                   }
                 </p>
                 <p className="text-sm text-green-600 mt-1">
-                  Successfully closed
+                  {isHOD ? "Department resolved" : "Successfully closed"}
                 </p>
               </div>
               <div className="p-4 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
@@ -294,7 +300,7 @@ const CustomerCareDashboard = () => {
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-900">
-              Recent Complaints
+              {isHOD ? "Recent Department Complaints" : "Recent Complaints"}
             </h2>
             <Link
               to="/dashboard/modules/customer-care/my-complaints"
@@ -389,7 +395,7 @@ const CustomerCareDashboard = () => {
                 Total Complaints
               </p>
               <p className="text-2xl sm:text-3xl font-bold text-blue-900 mt-2 break-all leading-tight">
-                {stats.totalComplaints}
+                {stats.total || stats.totalComplaints}
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
@@ -411,7 +417,7 @@ const CustomerCareDashboard = () => {
                 Pending
               </p>
               <p className="text-2xl sm:text-3xl font-bold text-yellow-900 mt-2 break-all leading-tight">
-                {stats.pendingComplaints}
+                {stats.pending || stats.pendingComplaints}
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg">
@@ -433,7 +439,7 @@ const CustomerCareDashboard = () => {
                 Resolved
               </p>
               <p className="text-2xl sm:text-3xl font-bold text-green-900 mt-2 break-all leading-tight">
-                {stats.resolvedComplaints}
+                {stats.resolved || stats.resolvedComplaints}
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
@@ -555,7 +561,7 @@ const CustomerCareDashboard = () => {
                     {complaint.title}
                   </h3>
                   <p className="text-sm text-gray-600">
-                    Department: {complaint.department}
+                    Department: {complaint.department?.name || "N/A"}
                   </p>
                   <p className="text-sm text-gray-500">
                     Created: {complaint.createdAt}

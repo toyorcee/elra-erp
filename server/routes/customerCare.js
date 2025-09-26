@@ -83,6 +83,6 @@ router.get(
 router.get("/sessions/active", checkCustomerCareAccess, getActiveSessions);
 
 // Send reminder notification for complaint
-router.post("/complaints/:complaintId/reminder", sendReminderNotification);
+router.post("/complaints/:complaintId/reminder", checkCustomerCareAccess, sendReminderNotification);
 
 export default router;

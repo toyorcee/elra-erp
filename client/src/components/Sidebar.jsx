@@ -264,7 +264,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     }, 50);
   };
 
-  const isSectionCollapsed = (sectionTitle, defaultExpanded = false) => {
+  const isSectionCollapsed = (sectionTitle, _defaultExpanded = false) => {
     if (collapsedSections.hasOwnProperty(sectionTitle)) {
       return collapsedSections[sectionTitle];
     }
@@ -277,7 +277,6 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     }
   }, [currentModule, isModuleView]);
 
-  // Auto-collapse sections when sidebar is closed
   useEffect(() => {
     if (!shouldShowExpanded) {
       const allSections = {};
@@ -298,24 +297,32 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
   };
 
   const isActive = (path) => {
-    // Exact match takes priority
-    if (location.pathname === path) {
-      return true;
-    }
+    const currentPath = location.pathname;
 
-    if (path.startsWith("/dashboard/modules/")) {
-      return location.pathname === path;
+    if (currentPath === path) {
+      return true;
     }
 
     if (path === "/dashboard") {
       return (
-        location.pathname === "/dashboard" ||
-        (location.pathname.startsWith("/dashboard") &&
-          !location.pathname.startsWith("/dashboard/modules/"))
+        currentPath === "/dashboard" ||
+        (currentPath.startsWith("/dashboard") &&
+          !currentPath.startsWith("/dashboard/modules/"))
       );
     }
 
-    return location.pathname.startsWith(path + "/");
+    if (path.startsWith("/dashboard/modules/")) {
+      const moduleName = path.split("/").pop();
+
+      const isModuleActive = currentPath.startsWith(
+        `/dashboard/modules/${moduleName}`
+      );
+
+      return isModuleActive;
+    }
+
+    // For other paths, check if current path starts with the path
+    return currentPath.startsWith(path + "/");
   };
 
   // Get the most specific active item for visual feedback
@@ -412,16 +419,16 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
         <Link
           to={item.path}
           onClick={handleClick}
-          className={`group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-300 relative cursor-pointer ${
+          className={`group flex items-center px-4 py-3 text-sm font-medium rounded-md transition-all duration-200 relative cursor-pointer ${
             isItemActive
-              ? "bg-[var(--elra-primary)] text-white font-semibold shadow-lg"
+              ? "bg-[var(--elra-primary)] text-white font-semibold"
               : "text-gray-700 hover:bg-gray-100 hover:text-[var(--elra-primary)]"
           } ${!shouldShowExpanded && "justify-center"}`}
         >
           {/* Active indicator */}
           {isItemActive && (
             <div
-              className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl bg-[var(--elra-primary-dark)]`}
+              className={`absolute left-0 top-0 bottom-0 w-1 bg-[var(--elra-primary-dark)]`}
             />
           )}
           <div className="relative">
@@ -472,7 +479,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
         {shouldShowExpanded && (
           <button
             onClick={(e) => toggleSectionCollapse(sectionTitle, e)}
-            className={`w-full px-4 text-sm font-bold uppercase tracking-wider mb-3 py-3 rounded-lg flex items-center justify-between transition-all duration-200 text-[var(--elra-primary)] cursor-pointer hover:bg-gray-100`}
+            className={`w-full px-4 text-sm font-bold uppercase tracking-wider mb-3 py-3 flex items-center justify-between transition-all duration-200 text-[var(--elra-primary)] cursor-pointer hover:bg-gray-100`}
           >
             <div className="flex items-center">
               <span>{sectionTitle.toUpperCase()}</span>
@@ -508,9 +515,9 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex flex-col items-center p-2 rounded-lg transition-all duration-200 cursor-pointer min-h-[60px] justify-center ${
+                className={`flex flex-col items-center p-2 rounded-md transition-all duration-200 cursor-pointer min-h-[60px] justify-center ${
                   isItemActive
-                    ? "bg-[var(--elra-primary)] text-white shadow-lg"
+                    ? "bg-[var(--elra-primary)] text-white"
                     : "text-gray-700 hover:bg-gray-100 hover:text-[var(--elra-primary)]"
                 }`}
                 title={item.label}
@@ -595,7 +602,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             {shouldShowExpanded ? (
               <button
                 onClick={handleToggle}
-                className="p-2 rounded-xl text-gray-500 hover:text-[var(--elra-primary)] hover:bg-gray-100 transition-all duration-200 hover:scale-110 cursor-pointer"
+                className="p-2 text-gray-500 hover:text-[var(--elra-primary)] hover:bg-gray-100 transition-all duration-200 cursor-pointer"
                 title="Collapse sidebar"
               >
                 <ChevronDownIcon className="h-5 w-5 transform rotate-90" />
@@ -603,7 +610,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             ) : (
               <button
                 onClick={handleToggle}
-                className="p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer"
+                className="p-2 text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 cursor-pointer"
                 title="Expand sidebar"
               >
                 <Bars3Icon className="h-5 w-5" />
@@ -739,9 +746,9 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                                     <div key={itemIndex} className="relative">
                                       <Link
                                         to={item.path}
-                                        className={`group flex items-center px-4 py-2 text-xs font-medium rounded-lg transition-all duration-300 cursor-pointer ${
+                                        className={`group flex items-center px-4 py-2 text-xs font-medium rounded-md transition-all duration-200 cursor-pointer ${
                                           isItemActive
-                                            ? "bg-[var(--elra-primary)] text-white font-semibold shadow-lg"
+                                            ? "bg-[var(--elra-primary)] text-white font-semibold"
                                             : "text-gray-700 hover:bg-gray-100 hover:text-[var(--elra-primary)]"
                                         }`}
                                       >

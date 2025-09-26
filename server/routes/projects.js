@@ -51,6 +51,10 @@ import {
   checkExternalProjectCreate,
 } from "../middleware/projectPermissions.js";
 import {
+  checkProjectManagementAccess,
+  checkExternalProjectCreateAccess,
+} from "../middleware/projectManagementAccess.js";
+import {
   checkDepartmentalProjectAccess,
   checkDepartmentalProjectEdit,
   checkDepartmentalProjectDelete,
@@ -193,8 +197,12 @@ router.get("/categories", protect, getProjectCategories);
 // Get next project code - STAFF+ (300+)
 router.get("/next-code", checkRole(300), getNextProjectCode);
 
-// Get next external project code - Project Management HOD only
-router.get("/next-external-code", checkRole(700), getNextExternalProjectCode);
+// Get next external project code - Project Management HOD or Super Admin
+router.get(
+  "/next-external-code",
+  checkProjectManagementAccess,
+  getNextExternalProjectCode
+);
 
 // Get project statistics - Manager+
 router.get("/stats", checkRole(600), getProjectStats);
@@ -287,7 +295,7 @@ router.post(
   protect,
   checkPersonalProjectCreate,
   checkRole(300),
-  checkExternalProjectCreate,
+  checkExternalProjectCreateAccess,
   checkDepartmentalProjectCreate,
   validateProject,
   createProject

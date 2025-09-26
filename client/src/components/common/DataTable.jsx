@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   HiPencil,
   HiTrash,
@@ -35,10 +35,32 @@ const DataTable = ({
   searchable = false,
   sortable = false,
   onItemsPerPageChange = null,
+  responsive = true,
+  cardBreakpoint = "md",
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (!responsive) return;
+
+    const checkScreenSize = () => {
+      const breakpoints = {
+        sm: 640,
+        md: 768,
+        lg: 1024,
+        xl: 1280,
+      };
+      const currentBreakpoint = breakpoints[cardBreakpoint] || 768;
+      setIsMobile(window.innerWidth < currentBreakpoint);
+    };
+
+    checkScreenSize();
+    window.addEventListener("resize", checkScreenSize);
+    return () => window.removeEventListener("resize", checkScreenSize);
+  }, [responsive, cardBreakpoint]);
 
   // Filter data based on search term
   const filteredData = useMemo(() => {
@@ -117,6 +139,173 @@ const DataTable = ({
   React.useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
+
+  // Card renderer for mobile view
+  const renderCard = (row, rowIndex) => {
+    const hasActions =
+      actions.showEdit ||
+      actions.showDelete ||
+      actions.showToggle ||
+      actions.showView ||
+      actions.customActions;
+
+    return (
+      <div
+        key={row._id || rowIndex}
+        className={`bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 ${
+          onRowClick ? "cursor-pointer" : ""
+        } ${
+          typeof rowClassName === "function" ? rowClassName(row) : rowClassName
+        }`}
+        onClick={onRowClick ? () => onRowClick(row) : undefined}
+      >
+        <div className="p-4">
+          {/* Card Header - Primary Info */}
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex-1 min-w-0">
+              {columns.slice(0, 2).map((column, colIndex) => {
+                const value = column.renderer
+                  ? column.renderer(row)
+                  : row[column.accessor] || row[column.key] || "";
+                return (
+                  <div key={colIndex} className="mb-1">
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      {column.header}
+                    </span>
+                    <div className="text-sm font-semibold text-gray-900 truncate">
+                      {value}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Status/Status-like column */}
+            {columns.length > 2 && (
+              <div className="ml-4 flex-shrink-0">
+                {(() => {
+                  const statusColumn =
+                    columns.find(
+                      (col) =>
+                        col.header.toLowerCase().includes("status") ||
+                        col.header.toLowerCase().includes("state") ||
+                        col.header.toLowerCase().includes("priority")
+                    ) || columns[2];
+
+                  const statusValue = statusColumn.renderer
+                    ? statusColumn.renderer(row)
+                    : row[statusColumn.accessor] || row[statusColumn.key] || "";
+
+                  return (
+                    <div className="text-right">
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        {statusColumn.header}
+                      </span>
+                      <div className="text-sm font-medium text-gray-900">
+                        {statusValue}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+
+          {/* Additional Fields */}
+          {columns.length > 3 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              {columns.slice(3, 5).map((column, colIndex) => {
+                const value = column.renderer
+                  ? column.renderer(row)
+                  : row[column.accessor] || row[column.key] || "";
+                return (
+                  <div key={colIndex}>
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      {column.header}
+                    </span>
+                    <div className="text-sm text-gray-900 truncate">
+                      {value}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Actions */}
+          {hasActions && (
+            <div className="flex items-center justify-end space-x-2 pt-3 border-t border-gray-100">
+              {actions.customActions ? (
+                actions.customActions(row)
+              ) : (
+                <>
+                  {actions.showView && actions.onView && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        actions.onView(row);
+                      }}
+                      className="p-2 text-blue-500 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors"
+                      title="View"
+                    >
+                      <HiEye className="w-4 h-4" />
+                    </button>
+                  )}
+                  {actions.showEdit && actions.onEdit && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        actions.onEdit(row);
+                      }}
+                      className="p-2 text-[var(--elra-primary)] hover:bg-[var(--elra-primary)] hover:bg-opacity-10 rounded-lg transition-colors"
+                      title="Edit"
+                    >
+                      <HiPencil className="w-4 h-4" />
+                    </button>
+                  )}
+                  {actions.showToggle && actions.onToggle && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        actions.onToggle(row);
+                      }}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:ring-offset-2 ${
+                        row.isActive
+                          ? "bg-[var(--elra-primary)]"
+                          : "bg-gray-200"
+                      }`}
+                      title={row.isActive ? "Deactivate" : "Activate"}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          row.isActive ? "translate-x-6" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  )}
+                  {actions.showDelete && actions.onDelete && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        actions.onDelete(
+                          row._id || row.id,
+                          row.name || row.grade
+                        );
+                      }}
+                      className="p-2 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
+                      title="Delete"
+                    >
+                      <HiTrash className="w-4 h-4" />
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
   if (loading) {
     return (
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
@@ -287,147 +476,156 @@ const DataTable = ({
         </div>
       )}
 
-      <div className="overflow-x-auto max-w-full">
-        <table className="w-full table-fixed min-w-0">
-          <thead className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white">
-            <tr>
-              {columns.map((column, index) => (
-                <th
-                  key={index}
-                  className={`px-6 py-4 text-left font-semibold ${
-                    column.align === "center" ? "text-center" : ""
-                  } ${
-                    sortable
-                      ? "cursor-pointer hover:bg-[var(--elra-primary-dark)]"
-                      : ""
-                  } ${column.width || "w-auto"}`}
-                  onClick={
-                    sortable ? () => handleSort(column.accessor) : undefined
-                  }
-                >
-                  <div className="flex items-center space-x-1">
-                    <span>{column.header}</span>
-                    {sortable && sortConfig.key === column.accessor && (
-                      <span className="text-xs">
-                        {sortConfig.direction === "asc" ? "↑" : "↓"}
-                      </span>
-                    )}
-                  </div>
-                </th>
-              ))}
-              {actions.showEdit ||
-              actions.showDelete ||
-              actions.showToggle ||
-              actions.customActions ? (
-                <th className="px-6 py-4 text-center font-semibold w-24">
-                  Actions
-                </th>
-              ) : null}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {paginatedData.map((row, rowIndex) => (
-              <tr
-                key={row._id || rowIndex}
-                className={`${
-                  typeof rowClassName === "function"
-                    ? rowClassName(row)
-                    : rowClassName
-                } ${
-                  onRowClick ? "cursor-pointer" : ""
-                } hover:bg-gray-50 transition-colors`}
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
-              >
-                {columns.map((column, colIndex) => (
-                  <td key={colIndex} className="px-6 py-4">
-                    {column.renderer
-                      ? column.renderer(row)
-                      : typeof row[column.accessor] === "object"
-                      ? JSON.stringify(row[column.accessor])
-                      : row[column.accessor] || row[column.key] || ""}
-                  </td>
-                ))}
-                {(actions.showEdit ||
-                  actions.showDelete ||
-                  actions.showToggle ||
-                  actions.customActions) && (
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-center space-x-2">
-                      {actions.customActions ? (
-                        actions.customActions(row)
-                      ) : (
-                        <>
-                          {actions.showView && actions.onView && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                actions.onView(row);
-                              }}
-                              className="p-2 text-blue-500 hover:bg-blue-500 hover:text-white rounded-lg transition-colors"
-                              title="View"
-                            >
-                              <HiEye className="w-4 h-4" />
-                            </button>
-                          )}
-                          {actions.showEdit && actions.onEdit && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                actions.onEdit(row);
-                              }}
-                              className="p-2 text-[var(--elra-primary)] hover:bg-[var(--elra-primary)] hover:text-white rounded-lg transition-colors"
-                              title="Edit"
-                            >
-                              <HiPencil className="w-4 h-4" />
-                            </button>
-                          )}
-                          {actions.showToggle && actions.onToggle && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                actions.onToggle(row);
-                              }}
-                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:ring-offset-2 ${
-                                row.isActive
-                                  ? "bg-[var(--elra-primary)]"
-                                  : "bg-gray-200"
-                              }`}
-                              title={row.isActive ? "Deactivate" : "Activate"}
-                            >
-                              <span
-                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                  row.isActive
-                                    ? "translate-x-6"
-                                    : "translate-x-1"
-                                }`}
-                              />
-                            </button>
-                          )}
-                          {actions.showDelete && actions.onDelete && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                actions.onDelete(
-                                  row._id || row.id,
-                                  row.name || row.grade
-                                );
-                              }}
-                              className="p-2 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-colors"
-                              title="Delete"
-                            >
-                              <HiTrash className="w-4 h-4" />
-                            </button>
-                          )}
-                        </>
+      {/* Responsive Content */}
+      {responsive && isMobile ? (
+        // Mobile Card View
+        <div className="p-4 space-y-4">
+          {paginatedData.map((row, rowIndex) => renderCard(row, rowIndex))}
+        </div>
+      ) : (
+        // Desktop Table View
+        <div className="overflow-x-auto max-w-full">
+          <table className="w-full table-fixed min-w-0">
+            <thead className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white">
+              <tr>
+                {columns.map((column, index) => (
+                  <th
+                    key={index}
+                    className={`px-6 py-4 text-left font-semibold ${
+                      column.align === "center" ? "text-center" : ""
+                    } ${
+                      sortable
+                        ? "cursor-pointer hover:bg-[var(--elra-primary-dark)]"
+                        : ""
+                    } ${column.width || "w-auto"}`}
+                    onClick={
+                      sortable ? () => handleSort(column.accessor) : undefined
+                    }
+                  >
+                    <div className="flex items-center space-x-1">
+                      <span>{column.header}</span>
+                      {sortable && sortConfig.key === column.accessor && (
+                        <span className="text-xs">
+                          {sortConfig.direction === "asc" ? "↑" : "↓"}
+                        </span>
                       )}
                     </div>
-                  </td>
-                )}
+                  </th>
+                ))}
+                {actions.showEdit ||
+                actions.showDelete ||
+                actions.showToggle ||
+                actions.customActions ? (
+                  <th className="px-6 py-4 text-center font-semibold w-24">
+                    Actions
+                  </th>
+                ) : null}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {paginatedData.map((row, rowIndex) => (
+                <tr
+                  key={row._id || rowIndex}
+                  className={`${
+                    typeof rowClassName === "function"
+                      ? rowClassName(row)
+                      : rowClassName
+                  } ${
+                    onRowClick ? "cursor-pointer" : ""
+                  } hover:bg-gray-50 transition-colors`}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                >
+                  {columns.map((column, colIndex) => (
+                    <td key={colIndex} className="px-6 py-4">
+                      {column.renderer
+                        ? column.renderer(row)
+                        : typeof row[column.accessor] === "object"
+                        ? JSON.stringify(row[column.accessor])
+                        : row[column.accessor] || row[column.key] || ""}
+                    </td>
+                  ))}
+                  {(actions.showEdit ||
+                    actions.showDelete ||
+                    actions.showToggle ||
+                    actions.customActions) && (
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center space-x-2">
+                        {actions.customActions ? (
+                          actions.customActions(row)
+                        ) : (
+                          <>
+                            {actions.showView && actions.onView && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  actions.onView(row);
+                                }}
+                                className="p-2 text-blue-500 hover:bg-blue-500 hover:text-white rounded-lg transition-colors"
+                                title="View"
+                              >
+                                <HiEye className="w-4 h-4" />
+                              </button>
+                            )}
+                            {actions.showEdit && actions.onEdit && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  actions.onEdit(row);
+                                }}
+                                className="p-2 text-[var(--elra-primary)] hover:bg-[var(--elra-primary)] hover:text-white rounded-lg transition-colors"
+                                title="Edit"
+                              >
+                                <HiPencil className="w-4 h-4" />
+                              </button>
+                            )}
+                            {actions.showToggle && actions.onToggle && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  actions.onToggle(row);
+                                }}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:ring-offset-2 ${
+                                  row.isActive
+                                    ? "bg-[var(--elra-primary)]"
+                                    : "bg-gray-200"
+                                }`}
+                                title={row.isActive ? "Deactivate" : "Activate"}
+                              >
+                                <span
+                                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                    row.isActive
+                                      ? "translate-x-6"
+                                      : "translate-x-1"
+                                  }`}
+                                />
+                              </button>
+                            )}
+                            {actions.showDelete && actions.onDelete && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  actions.onDelete(
+                                    row._id || row.id,
+                                    row.name || row.grade
+                                  );
+                                }}
+                                className="p-2 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-colors"
+                                title="Delete"
+                              >
+                                <HiTrash className="w-4 h-4" />
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Pagination Footer */}
       {pagination && (

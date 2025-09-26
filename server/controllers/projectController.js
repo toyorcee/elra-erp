@@ -690,17 +690,21 @@ export const createProject = async (req, res) => {
 
     // Add project items requirements for external projects
     if (req.body.projectScope === "external") {
-      // Only Project Management HOD can create external projects
+      // Only Project Management HOD or Super Admin can create external projects
       const isProjectManagementHOD =
         currentUser.department?.name === "Project Management" &&
         currentUser.role.level >= 700;
+      const isSuperAdmin =
+        currentUser.role.level >= 1000 || currentUser.isSuperadmin;
 
-      if (!isProjectManagementHOD) {
+      if (!isProjectManagementHOD && !isSuperAdmin) {
         return res.status(403).json({
           success: false,
           message:
-            "Access denied. Only Project Management HOD can create external projects.",
-          errors: ["Only Project Management HOD can create external projects"],
+            "Access denied. Only Project Management HOD or Super Admin can create external projects.",
+          errors: [
+            "Only Project Management HOD or Super Admin can create external projects",
+          ],
         });
       }
 
@@ -2900,7 +2904,13 @@ export const getComprehensiveProjectData = async (req, res) => {
       sort: { createdAt: -1 },
     };
 
-    const projects = await Project.paginate(query, options);
+    // Manual pagination (avoids dependency on paginate plugin)
+    const totalDocs = await Project.countDocuments(query);
+    const projects = await Project.find(query)
+      .populate(options.populate)
+      .sort(options.sort)
+      .skip((options.page - 1) * options.limit)
+      .limit(options.limit);
 
     // Get additional statistics
     const totalStats = await Project.aggregate([
@@ -2938,12 +2948,12 @@ export const getComprehensiveProjectData = async (req, res) => {
     res.status(200).json({
       success: true,
       data: {
-        projects: projects.docs,
+        projects: projects,
         pagination: {
-          page: projects.page,
-          limit: projects.limit,
-          totalPages: projects.totalPages,
-          totalDocs: projects.totalDocs,
+          page: options.page,
+          limit: options.limit,
+          totalPages: Math.ceil(totalDocs / options.limit) || 0,
+          totalDocs: totalDocs,
         },
         statistics: {
           total: totalStats[0] || {

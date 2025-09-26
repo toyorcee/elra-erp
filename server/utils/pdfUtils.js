@@ -89,34 +89,7 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
       format: "a4",
     });
 
-    // Helper function to add new page if needed
-    const addPageIfNeeded = (requiredSpace) => {
-      let currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 55;
-
-      const pageHeight = doc.internal.pageSize.height;
-      const margin = 60;
-
-      if (currentY + requiredSpace > pageHeight - margin) {
-        doc.addPage();
-
-        doc.setGState(new doc.GState({ opacity: 0.05 }));
-        doc.setTextColor(100, 100, 100);
-        doc.setFontSize(100);
-        const pageWidth = doc.internal.pageSize.width;
-        const newPageHeight = doc.internal.pageSize.height;
-        doc.text("ELRA", pageWidth / 2, newPageHeight / 2, {
-          align: "center",
-          angle: 30,
-          renderingMode: "fill",
-        });
-        doc.setGState(new doc.GState({ opacity: 1 }));
-
-        return 30; // Start further down on new page
-      }
-      return currentY;
-    };
-
-    // Set watermark with reduced opacity and size
+    // Set watermark with reduced opacity and size (same as payslip)
     doc.setGState(new doc.GState({ opacity: 0.05 }));
     doc.setTextColor(100, 100, 100);
     doc.setFontSize(100);
@@ -135,7 +108,7 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
     // Reset opacity for rest of the content
     doc.setGState(new doc.GState({ opacity: 1 }));
 
-    // Header (same branding as vendor receipt)
+    // Header (same branding as payslip)
     const elraGreen = [13, 100, 73];
     doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
     doc.setFontSize(32);
@@ -157,79 +130,112 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
 
     let yPosition = 55;
 
-    // Project Information Section
-    yPosition = addPageIfNeeded(50); // Check if we need a new page
+    // Project Information Section - Using table format like payslip
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("Project Information", 20, yPosition);
     yPosition += 15;
 
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Project Name: ${projectData.name}`, 20, yPosition);
-    yPosition += 10;
-    doc.text(`Project Code: ${projectData.code || "TBD"}`, 20, yPosition);
-    yPosition += 10;
-    doc.text(
-      `Category: ${projectData.category || "Not specified"}`,
-      20,
-      yPosition
-    );
-    yPosition += 10;
-    doc.text(
-      `Priority: ${
-        projectData.priority ? projectData.priority.toUpperCase() : "Medium"
-      }`,
-      20,
-      yPosition
-    );
-    yPosition += 10;
-    doc.text(
-      `Start Date: ${new Date(projectData.startDate).toLocaleDateString()}`,
-      20,
-      yPosition
-    );
-    yPosition += 10;
-    doc.text(
-      `End Date: ${new Date(projectData.endDate).toLocaleDateString()}`,
-      20,
-      yPosition
-    );
-    yPosition += 10;
-    doc.text(
-      `Total Budget: ₦${new Intl.NumberFormat().format(projectData.budget)}`,
-      20,
-      yPosition
-    );
-    yPosition += 20;
+    // Create project information table
+    const projectInfoData = [
+      ["Project Name", projectData.name],
+      ["Project Code", projectData.code || "TBD"],
+      ["Category", projectData.category || "Not specified"],
+      [
+        "Priority",
+        projectData.priority ? projectData.priority.toUpperCase() : "Medium",
+      ],
+      ["Start Date", new Date(projectData.startDate).toLocaleDateString()],
+      ["End Date", new Date(projectData.endDate).toLocaleDateString()],
+      [
+        "Total Budget",
+        `₦${new Intl.NumberFormat().format(projectData.budget)}`,
+      ],
+    ];
 
-    // Client Information Section
-    yPosition = addPageIfNeeded(50); // Check if we need a new page
+    autoTable(doc, {
+      head: [["Field", "Value"]],
+      body: projectInfoData,
+      startY: yPosition,
+      theme: "grid",
+      headStyles: {
+        fillColor: elraGreen,
+        fontSize: 12,
+        fontStyle: "bold",
+        textColor: [255, 255, 255],
+        cellPadding: 6,
+      },
+      styles: {
+        fontSize: 11,
+        cellPadding: 6,
+        lineWidth: 0.5,
+        lineColor: [50, 50, 50],
+      },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 60 },
+        1: { cellWidth: "auto" },
+      },
+      alternateRowStyles: {
+        fillColor: [248, 249, 250],
+      },
+      margin: { left: 20, right: 20 },
+      tableWidth: "auto",
+    });
+
+    yPosition = doc.lastAutoTable.finalY + 20;
+
+    // Client Information Section - Using table format
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("Client Information", 20, yPosition);
     yPosition += 15;
 
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Client Name: ${clientData.clientName}`, 20, yPosition);
-    yPosition += 10;
-    doc.text(`Company: ${clientData.clientCompany}`, 20, yPosition);
-    yPosition += 10;
-    doc.text(`Email: ${clientData.clientEmail}`, 20, yPosition);
-    yPosition += 10;
+    // Create client information table
+    const clientInfoData = [
+      ["Client Name", clientData.clientName],
+      ["Company", clientData.clientCompany],
+      ["Email", clientData.clientEmail],
+    ];
+
     if (clientData.clientPhone) {
-      doc.text(`Phone: ${clientData.clientPhone}`, 20, yPosition);
-      yPosition += 10;
+      clientInfoData.push(["Phone", clientData.clientPhone]);
     }
     if (clientData.clientAddress) {
-      doc.text(`Address: ${clientData.clientAddress}`, 20, yPosition);
-      yPosition += 10;
+      clientInfoData.push(["Address", clientData.clientAddress]);
     }
-    yPosition += 20;
 
-    // Budget Allocation Section
-    yPosition = addPageIfNeeded(80);
+    autoTable(doc, {
+      head: [["Field", "Value"]],
+      body: clientInfoData,
+      startY: yPosition,
+      theme: "grid",
+      headStyles: {
+        fillColor: elraGreen,
+        fontSize: 12,
+        fontStyle: "bold",
+        textColor: [255, 255, 255],
+        cellPadding: 6,
+      },
+      styles: {
+        fontSize: 11,
+        cellPadding: 6,
+        lineWidth: 0.5,
+        lineColor: [50, 50, 50],
+      },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 60 },
+        1: { cellWidth: "auto" },
+      },
+      alternateRowStyles: {
+        fillColor: [248, 249, 250],
+      },
+      margin: { left: 20, right: 20 },
+      tableWidth: "auto",
+    });
+
+    yPosition = doc.lastAutoTable.finalY + 20;
+
+    // Budget Allocation Section - Using table format
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("Budget Allocation Agreement", 20, yPosition);
@@ -281,7 +287,7 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
       startY: yPosition,
       theme: "grid",
       headStyles: {
-        fillColor: [13, 100, 73],
+        fillColor: elraGreen,
         fontSize: 12,
         fontStyle: "bold",
         textColor: [255, 255, 255],
@@ -307,9 +313,8 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
 
     yPosition = doc.lastAutoTable.finalY + 20;
 
-    // Project Items Section
+    // Project Items Section - Using improved table format
     if (projectData.projectItems && projectData.projectItems.length > 0) {
-      yPosition = addPageIfNeeded(100);
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
       doc.text("Project Items & Deliverables", 20, yPosition);
@@ -339,40 +344,38 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
         ];
       });
 
-      // Add table with better formatting and wider columns
+      // Add table with payslip-style formatting
       autoTable(doc, {
         head: [["#", "Item Name", "Qty", "Unit Price", "Total", "Timeline"]],
         body: tableData,
         startY: yPosition,
-        styles: {
+        theme: "grid",
+        headStyles: {
+          fillColor: elraGreen,
           fontSize: 12,
+          fontStyle: "bold",
+          textColor: [255, 255, 255],
+          cellPadding: 6,
+        },
+        styles: {
+          fontSize: 11,
           cellPadding: 6,
           lineWidth: 0.5,
           lineColor: [50, 50, 50],
-          halign: "left",
-          valign: "middle",
         },
-        headStyles: {
-          fillColor: [13, 100, 73],
-          textColor: 255,
-          fontSize: 13,
-          fontStyle: "bold",
-          halign: "center",
-          cellPadding: 7,
+        columnStyles: {
+          0: { cellWidth: 18, halign: "center" }, // #
+          1: { fontStyle: "bold", cellWidth: 85 }, // Item Name
+          2: { cellWidth: 25, halign: "center" }, // Qty
+          3: { cellWidth: 40, halign: "right" }, // Unit Price
+          4: { cellWidth: 40, halign: "right" }, // Total
+          5: { cellWidth: 45 }, // Timeline
         },
         alternateRowStyles: {
           fillColor: [248, 249, 250],
         },
-        columnStyles: {
-          0: { cellWidth: 18, halign: "center" }, // #
-          1: { cellWidth: 85 }, // Item Name - much wider
-          2: { cellWidth: 25, halign: "center" }, // Qty
-          3: { cellWidth: 40, halign: "right" }, // Unit Price
-          4: { cellWidth: 40, halign: "right" }, // Total
-          5: { cellWidth: 45 }, // Timeline - wider
-        },
-        margin: { left: 15, right: 15 },
-        tableWidth: "wrap",
+        margin: { left: 20, right: 20 },
+        tableWidth: "auto",
         showHead: "everyPage",
         pageBreak: "auto",
         didDrawPage: function (data) {
@@ -409,63 +412,109 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
       yPosition += 15;
     }
 
-    // Vendor Information Section (if vendor exists)
+    // Vendor Information Section (if vendor exists) - Using table format
     if (projectData.hasVendor && projectData.vendorName) {
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
       doc.text("Vendor Information", 20, yPosition);
-      yPosition += 10;
+      yPosition += 15;
 
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Vendor Name: ${projectData.vendorName}`, 20, yPosition);
-      yPosition += 7;
+      // Create vendor information table
+      const vendorInfoData = [["Vendor Name", projectData.vendorName]];
+
       if (projectData.vendorEmail) {
-        doc.text(`Vendor Email: ${projectData.vendorEmail}`, 20, yPosition);
-        yPosition += 7;
+        vendorInfoData.push(["Vendor Email", projectData.vendorEmail]);
       }
       if (projectData.vendorPhone) {
-        doc.text(`Vendor Phone: ${projectData.vendorPhone}`, 20, yPosition);
-        yPosition += 7;
+        vendorInfoData.push(["Vendor Phone", projectData.vendorPhone]);
       }
       if (projectData.vendorAddress) {
-        doc.text(`Vendor Address: ${projectData.vendorAddress}`, 20, yPosition);
-        yPosition += 7;
+        vendorInfoData.push(["Vendor Address", projectData.vendorAddress]);
       }
       if (projectData.deliveryAddress) {
-        doc.text(
-          `Delivery Address: ${projectData.deliveryAddress}`,
-          20,
-          yPosition
-        );
-        yPosition += 7;
+        vendorInfoData.push(["Delivery Address", projectData.deliveryAddress]);
       }
-      yPosition += 10;
+
+      autoTable(doc, {
+        head: [["Field", "Value"]],
+        body: vendorInfoData,
+        startY: yPosition,
+        theme: "grid",
+        headStyles: {
+          fillColor: elraGreen,
+          fontSize: 12,
+          fontStyle: "bold",
+          textColor: [255, 255, 255],
+          cellPadding: 6,
+        },
+        styles: {
+          fontSize: 11,
+          cellPadding: 6,
+          lineWidth: 0.5,
+          lineColor: [50, 50, 50],
+        },
+        columnStyles: {
+          0: { fontStyle: "bold", cellWidth: 60 },
+          1: { cellWidth: "auto" },
+        },
+        alternateRowStyles: {
+          fillColor: [248, 249, 250],
+        },
+        margin: { left: 20, right: 20 },
+        tableWidth: "auto",
+      });
+
+      yPosition = doc.lastAutoTable.finalY + 20;
     }
 
-    // Approval Process Section
+    // Approval Process Section - Using table format
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("Approval Process", 20, yPosition);
-    yPosition += 10;
+    yPosition += 15;
 
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
     const approvalFlow =
       projectData.requiresBudgetAllocation === "true"
         ? "Legal → Finance Review → Executive → Budget Allocation"
         : "Legal → Executive (using existing budget)";
 
-    doc.text(`Approval Flow: ${approvalFlow}`, 20, yPosition);
-    yPosition += 7;
-    doc.text(`Status: Project submitted and pending approval`, 20, yPosition);
-    yPosition += 7;
-    doc.text(
-      `Next Steps: Our team will review and process your project request`,
-      20,
-      yPosition
-    );
-    yPosition += 15;
+    // Create approval process table
+    const approvalData = [
+      ["Approval Flow", approvalFlow],
+      ["Status", "Project submitted and pending approval"],
+      ["Next Steps", "Our team will review and process your project request"],
+    ];
+
+    autoTable(doc, {
+      head: [["Field", "Value"]],
+      body: approvalData,
+      startY: yPosition,
+      theme: "grid",
+      headStyles: {
+        fillColor: elraGreen,
+        fontSize: 12,
+        fontStyle: "bold",
+        textColor: [255, 255, 255],
+        cellPadding: 6,
+      },
+      styles: {
+        fontSize: 11,
+        cellPadding: 6,
+        lineWidth: 0.5,
+        lineColor: [50, 50, 50],
+      },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 60 },
+        1: { cellWidth: "auto" },
+      },
+      alternateRowStyles: {
+        fillColor: [248, 249, 250],
+      },
+      margin: { left: 20, right: 20 },
+      tableWidth: "auto",
+    });
+
+    yPosition = doc.lastAutoTable.finalY + 20;
 
     yPosition = addPageIfNeeded(80);
 
@@ -505,7 +554,7 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
     );
     yPosition += 15;
 
-    // Footer
+    // Footer - Match payslip style
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.text(
@@ -515,6 +564,21 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
     );
     yPosition += 7;
     doc.text("Please keep this document for your records.", 20, yPosition);
+    yPosition += 15;
+
+    // Add footer like payslip
+    doc.setFontSize(8);
+    doc.setTextColor(130, 130, 130);
+    doc.text("Generated on: " + new Date().toLocaleString(), 20, yPosition);
+    doc.setFontSize(7);
+    doc.text("This is a computer generated document", 20, yPosition + 5);
+    doc.text(
+      "© " +
+        new Date().getFullYear() +
+        " ELRA Enterprise Resource Management System",
+      20,
+      yPosition + 10
+    );
 
     // Add page numbers
     const pageCount = doc.internal.getNumberOfPages();
@@ -561,35 +625,6 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
       format: "a4",
     });
 
-    // Helper function to add new page if needed
-    const addPageIfNeeded = (requiredSpace) => {
-      // Get current Y position more accurately
-      let currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 55;
-
-      const pageHeight = doc.internal.pageSize.height;
-      const margin = 60; // Increased margin for better spacing
-
-      if (currentY + requiredSpace > pageHeight - margin) {
-        doc.addPage();
-
-        // Add watermark to new page
-        doc.setGState(new doc.GState({ opacity: 0.05 }));
-        doc.setTextColor(100, 100, 100);
-        doc.setFontSize(100);
-        const pageWidth = doc.internal.pageSize.width;
-        const newPageHeight = doc.internal.pageSize.height;
-        doc.text("ELRA", pageWidth / 2, newPageHeight / 2, {
-          align: "center",
-          angle: 30,
-          renderingMode: "fill",
-        });
-        doc.setGState(new doc.GState({ opacity: 1 }));
-
-        return 30; // Start further down on new page
-      }
-      return currentY;
-    };
-
     // Set watermark with reduced opacity and size (same as payslip)
     doc.setGState(new doc.GState({ opacity: 0.05 }));
     doc.setTextColor(100, 100, 100);
@@ -631,47 +666,35 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
 
     let yPosition = 55;
 
-    // Vendor Information Section
-    yPosition = addPageIfNeeded(80);
+    // Vendor Information Section - Using table format
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("Vendor Information", 20, yPosition);
-    yPosition += 20;
+    yPosition += 15;
 
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Company Name: ${vendorData.name}`, 20, yPosition);
-    yPosition += 12;
+    // Create vendor information table
+    const vendorInfoData = [
+      ["Company Name", vendorData.name],
+      ["Services", vendorData.servicesOffered.join(", ")],
+      ["Status", "Pending Approval"],
+      ["Registration Date", new Date().toLocaleDateString()],
+    ];
 
-    // Add email if available
     if (vendorData.email) {
-      doc.text(`Email: ${vendorData.email}`, 20, yPosition);
-      yPosition += 12;
+      vendorInfoData.splice(1, 0, ["Email", vendorData.email]);
     }
-
-    // Add phone if available
     if (vendorData.phone) {
-      doc.text(`Phone: ${vendorData.phone}`, 20, yPosition);
-      yPosition += 12;
+      vendorInfoData.splice(vendorData.email ? 2 : 1, 0, [
+        "Phone",
+        vendorData.phone,
+      ]);
     }
-
-    // Add delivery address if available
     if (projectData.deliveryAddress) {
-      doc.text(
-        `Delivery Address: ${projectData.deliveryAddress}`,
-        20,
-        yPosition
-      );
-      yPosition += 12;
+      vendorInfoData.splice(-2, 0, [
+        "Delivery Address",
+        projectData.deliveryAddress,
+      ]);
     }
-
-    doc.text(
-      `Services: ${vendorData.servicesOffered.join(", ")}`,
-      20,
-      yPosition
-    );
-    yPosition += 12;
-
     if (
       projectData.vendorCategory &&
       projectData.vendorCategory !== "Not specified"
@@ -680,111 +703,130 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
         /_/g,
         " "
       );
-      doc.text(`Category: ${formattedVendorCategory}`, 20, yPosition);
-      yPosition += 10;
+      vendorInfoData.splice(-2, 0, ["Category", formattedVendorCategory]);
     }
 
-    doc.text(`Status: Pending Approval`, 20, yPosition);
-    yPosition += 10;
-    doc.text(
-      `Registration Date: ${new Date().toLocaleDateString()}`,
-      20,
-      yPosition
-    );
-    yPosition += 20;
+    autoTable(doc, {
+      head: [["Field", "Value"]],
+      body: vendorInfoData,
+      startY: yPosition,
+      theme: "grid",
+      headStyles: {
+        fillColor: elraGreen,
+        fontSize: 12,
+        fontStyle: "bold",
+        textColor: [255, 255, 255],
+        cellPadding: 6,
+      },
+      styles: {
+        fontSize: 11,
+        cellPadding: 6,
+        lineWidth: 0.5,
+        lineColor: [50, 50, 50],
+      },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 60 },
+        1: { cellWidth: "auto" },
+      },
+      alternateRowStyles: {
+        fillColor: [248, 249, 250],
+      },
+      margin: { left: 20, right: 20 },
+      tableWidth: "auto",
+    });
 
-    // Project Information Section
-    yPosition = addPageIfNeeded(100); // Check if we need a new page
+    yPosition = doc.lastAutoTable.finalY + 20;
+
+    // Project Information Section - Using table format
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("Project Information", 20, yPosition);
-    yPosition += 20;
+    yPosition += 15;
 
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Project Name: ${projectData.name}`, 20, yPosition);
-    yPosition += 12;
+    // Create project information table
+    const projectInfoData = [
+      ["Project Name", projectData.name],
+      [
+        "Scope",
+        projectData.projectScope
+          ? projectData.projectScope.charAt(0).toUpperCase() +
+            projectData.projectScope.slice(1)
+          : "External",
+      ],
+      [
+        "Budget",
+        `NGN ${projectData.budget.toLocaleString("en-NG", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`,
+      ],
+      ["Start Date", new Date(projectData.startDate).toLocaleDateString()],
+      ["End Date", new Date(projectData.endDate).toLocaleDateString()],
+    ];
 
-    // Add project category if available
     if (projectData.category && projectData.category !== "Not specified") {
       const formattedCategory = projectData.category.replace(/_/g, " ");
-      doc.text(`Category: ${formattedCategory}`, 20, yPosition);
-      yPosition += 12;
+      projectInfoData.splice(2, 0, ["Category", formattedCategory]);
     }
-
-    // Add project manager if available
     if (
       projectData.projectManager &&
       projectData.projectManager !== "Not assigned"
     ) {
-      doc.text(`Project Manager: ${projectData.projectManager}`, 20, yPosition);
-      yPosition += 12;
+      projectInfoData.splice(-3, 0, [
+        "Project Manager",
+        projectData.projectManager,
+      ]);
     }
-
-    // Add project priority if available
     if (projectData.priority && projectData.priority !== "medium") {
       const priorityText =
         projectData.priority.charAt(0).toUpperCase() +
         projectData.priority.slice(1);
-      doc.text(`Priority: ${priorityText}`, 20, yPosition);
-      yPosition += 12;
+      projectInfoData.splice(-3, 0, ["Priority", priorityText]);
     }
-
-    // Add project scope
-    const projectScopeText = projectData.projectScope
-      ? projectData.projectScope.charAt(0).toUpperCase() +
-        projectData.projectScope.slice(1)
-      : "External";
-    doc.text(`Scope: ${projectScopeText}`, 20, yPosition);
-    yPosition += 12;
-
-    doc.text(
-      `Budget: NGN ${projectData.budget.toLocaleString("en-NG", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}`,
-      20,
-      yPosition
-    );
-    yPosition += 10;
-    doc.text(
-      `Start Date: ${new Date(projectData.startDate).toLocaleDateString()}`,
-      20,
-      yPosition
-    );
-    yPosition += 10;
-    doc.text(
-      `End Date: ${new Date(projectData.endDate).toLocaleDateString()}`,
-      20,
-      yPosition
-    );
-    yPosition += 10;
-
-    // Add budget allocation information only if requested
     if (
       projectData.requiresBudgetAllocation === "true" ||
       projectData.requiresBudgetAllocation === true
     ) {
-      doc.text(`Budget Allocation: Requested`, 20, yPosition);
-      yPosition += 10;
+      projectInfoData.push(["Budget Allocation", "Requested"]);
     }
 
-    yPosition += 15;
+    autoTable(doc, {
+      head: [["Field", "Value"]],
+      body: projectInfoData,
+      startY: yPosition,
+      theme: "grid",
+      headStyles: {
+        fillColor: elraGreen,
+        fontSize: 12,
+        fontStyle: "bold",
+        textColor: [255, 255, 255],
+        cellPadding: 6,
+      },
+      styles: {
+        fontSize: 11,
+        cellPadding: 6,
+        lineWidth: 0.5,
+        lineColor: [50, 50, 50],
+      },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 60 },
+        1: { cellWidth: "auto" },
+      },
+      alternateRowStyles: {
+        fillColor: [248, 249, 250],
+      },
+      margin: { left: 20, right: 20 },
+      tableWidth: "auto",
+    });
+
+    yPosition = doc.lastAutoTable.finalY + 20;
 
     if (projectData.projectItems && projectData.projectItems.length > 0) {
-      yPosition = addPageIfNeeded(120);
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
       doc.text("Project Items", 20, yPosition);
-      yPosition += 20;
+      yPosition += 15;
 
-      const headers = [
-        "Item",
-        "Description",
-        "Quantity",
-        "Unit Price",
-        "Total",
-      ];
       // Helper function to parse formatted numbers
       const parseFormattedNumber = (value) => {
         if (typeof value === "string") {
@@ -814,12 +856,12 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
       });
 
       autoTable(doc, {
-        head: [headers],
+        head: [["Item", "Description", "Quantity", "Unit Price", "Total"]],
         body: rows,
         startY: yPosition,
         theme: "grid",
         headStyles: {
-          fillColor: [13, 100, 73],
+          fillColor: elraGreen,
           fontSize: 12,
           fontStyle: "bold",
           textColor: [255, 255, 255],
@@ -832,11 +874,11 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
           lineColor: [50, 50, 50],
         },
         columnStyles: {
-          0: { fontStyle: "bold", cellWidth: 60, cellPadding: 6 },
-          1: { cellWidth: 80, cellPadding: 6 },
-          2: { halign: "center", cellWidth: 30, cellPadding: 6 },
-          3: { halign: "right", cellWidth: 40, cellPadding: 6 },
-          4: { halign: "right", cellWidth: 40, cellPadding: 6 },
+          0: { fontStyle: "bold", cellWidth: 60 },
+          1: { cellWidth: 80 },
+          2: { halign: "center", cellWidth: 30 },
+          3: { halign: "right", cellWidth: 40 },
+          4: { halign: "right", cellWidth: 40 },
         },
         alternateRowStyles: {
           fillColor: [248, 249, 250],
@@ -845,7 +887,6 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
         tableWidth: "auto",
         pageBreak: "auto",
         showHead: "everyPage",
-        showFoot: "lastPage",
         didDrawPage: function (data) {
           // Add page number
           doc.setFontSize(10);
@@ -858,20 +899,6 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
             doc.internal.pageSize.height - 10,
             { align: "right" }
           );
-        },
-        didParseCell: function (data) {
-          if (data.column.index === 1) {
-            const text = data.cell.text.join(" ");
-            const words = text.split(" ");
-            const maxWordsPerLine = 8; // Increased for wider column
-            const lines = [];
-
-            for (let i = 0; i < words.length; i += maxWordsPerLine) {
-              lines.push(words.slice(i, i + maxWordsPerLine).join(" "));
-            }
-
-            data.cell.text = lines;
-          }
         },
       });
 
@@ -903,24 +930,11 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
       yPosition += 15;
     }
 
-    // Approval Workflow Section
-    yPosition += 10;
-
-    doc.setFontSize(12);
+    // Approval Workflow Section - Using table format
+    doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.text("Approval Workflow", 20, yPosition);
-    yPosition += 8;
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-
-    // Add project scope information
-    const scopeText = projectData.projectScope
-      ? projectData.projectScope.charAt(0).toUpperCase() +
-        projectData.projectScope.slice(1)
-      : "External";
-    doc.text(`Project Type: ${scopeText} Project`, 20, yPosition);
-    yPosition += 6;
+    yPosition += 15;
 
     // Determine approval workflow based on project scope and budget allocation
     let approvalSteps = [];
@@ -939,7 +953,7 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
           "5. Finance Department Budget Allocation",
         ];
         workflowDescription =
-          "This external project requires new budget allocation and will go through a comprehensive 5-level approval process. Finance will review budget calculations first, then Executive approves, and finally Finance allocates the budget.";
+          "This external project requires new budget allocation and will go through a comprehensive 5-level approval process.";
       } else {
         approvalSteps = [
           "1. Head of Department (HOD) Approval",
@@ -980,25 +994,54 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
       }
     }
 
-    // Add workflow description
-    doc.text(workflowDescription, 20, yPosition);
-    yPosition += 8;
+    // Create approval workflow table
+    const approvalData = [
+      [
+        "Project Type",
+        projectData.projectScope
+          ? projectData.projectScope.charAt(0).toUpperCase() +
+            projectData.projectScope.slice(1) +
+            " Project"
+          : "External Project",
+      ],
+      ["Workflow Description", workflowDescription],
+      ["Approval Steps", approvalSteps.join("\n")],
+    ];
 
-    // Add approval steps with bullet points
-    approvalSteps.forEach((step, index) => {
-      doc.text(`• ${step}`, 25, yPosition);
-      yPosition += 6;
+    autoTable(doc, {
+      head: [["Field", "Value"]],
+      body: approvalData,
+      startY: yPosition,
+      theme: "grid",
+      headStyles: {
+        fillColor: elraGreen,
+        fontSize: 12,
+        fontStyle: "bold",
+        textColor: [255, 255, 255],
+        cellPadding: 6,
+      },
+      styles: {
+        fontSize: 11,
+        cellPadding: 6,
+        lineWidth: 0.5,
+        lineColor: [50, 50, 50],
+      },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 60 },
+        1: { cellWidth: "auto" },
+      },
+      alternateRowStyles: {
+        fillColor: [248, 249, 250],
+      },
+      margin: { left: 20, right: 20 },
+      tableWidth: "auto",
     });
 
-    yPosition += 10;
+    yPosition = doc.lastAutoTable.finalY + 20;
 
-    // Footer - Check if we need a new page
-    const footerSpace = 20;
-    yPosition = addPageIfNeeded(footerSpace);
-
-    // Footer
+    // Footer - Match payslip style
     doc.setFontSize(10);
-    doc.setFont("helvetica", "italic");
+    doc.setFont("helvetica", "normal");
     doc.text(
       "This is an official vendor registration receipt from ELRA.",
       20,
@@ -1006,6 +1049,21 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
     );
     yPosition += 7;
     doc.text("Please keep this document for your records.", 20, yPosition);
+    yPosition += 15;
+
+    // Add footer like payslip
+    doc.setFontSize(8);
+    doc.setTextColor(130, 130, 130);
+    doc.text("Generated on: " + new Date().toLocaleString(), 20, yPosition);
+    doc.setFontSize(7);
+    doc.text("This is a computer generated document", 20, yPosition + 5);
+    doc.text(
+      "© " +
+        new Date().getFullYear() +
+        " ELRA Enterprise Resource Management System",
+      20,
+      yPosition + 10
+    );
 
     // Add page numbers
     const pageCount = doc.internal.getNumberOfPages();

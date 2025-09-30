@@ -146,6 +146,38 @@ const budgetAllocationSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // Project scope and percentage breakdown (for external projects)
+    projectScope: {
+      type: String,
+      enum: ["internal", "external"],
+      default: "internal",
+    },
+    budgetPercentage: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 100,
+      comment: "Percentage of project cost that ELRA will handle",
+    },
+    totalProjectCost: {
+      type: Number,
+      min: 0,
+      default: 0,
+      comment: "Total cost of the project (including client contribution)",
+    },
+    elraContribution: {
+      type: Number,
+      min: 0,
+      default: 0,
+      comment: "Amount ELRA will contribute to the project",
+    },
+    clientContribution: {
+      type: Number,
+      min: 0,
+      default: 0,
+      comment: "Amount client will contribute to the project",
+    },
+
     // Status and workflow
     status: {
       type: String,

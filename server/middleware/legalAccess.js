@@ -161,3 +161,37 @@ export const checkLegalDeleteAccess = (req, res, next) => {
       "Access denied. Only Legal HOD or Super Admin can delete legal items.",
   });
 };
+
+/**
+ * Check if user can perform legal approval with compliance program attachment
+ * ONLY Legal HOD and Super Admin can perform legal approval
+ */
+export const checkLegalApprovalAccess = (req, res, next) => {
+  const user = req.user;
+
+  if (!user) {
+    return res.status(401).json({
+      success: false,
+      message: "Authentication required",
+    });
+  }
+
+  // Super Admin can do everything
+  if (user.isSuperadmin || user.role.level >= 1000) {
+    return next();
+  }
+
+  // ONLY Legal HOD can perform legal approval
+  if (
+    user.role.level >= 700 &&
+    user.department?.name === "Legal & Compliance"
+  ) {
+    return next();
+  }
+
+  return res.status(403).json({
+    success: false,
+    message:
+      "Access denied. Only Legal & Compliance HOD can perform legal approval with compliance program attachment.",
+  });
+};

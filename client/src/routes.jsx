@@ -27,7 +27,6 @@ import DeductionsManagement from "./pages/user/modules/payroll/DeductionsManagem
 import PayrollProcessing from "./pages/user/modules/payroll/PayrollProcessing";
 import PaySlips from "./pages/user/modules/payroll/PaySlips";
 import MyPayslips from "./pages/user/modules/self-service/MyPayslips";
-import SubmitTicket from "./pages/user/modules/self-service/SubmitTicket";
 import {
   CustomerCareDashboard,
   StaffComplaints,
@@ -39,8 +38,6 @@ import MyAssignments from "./pages/user/modules/customer-care/MyAssignments";
 import AssignComplaints from "./pages/user/modules/customer-care/AssignComplaints";
 import MyComplaints from "./pages/user/modules/customer-care/MyComplaints";
 import MyTickets from "./pages/user/modules/self-service/MyTickets";
-import ITSupport from "./pages/user/modules/self-service/ITSupport";
-import EquipmentRequests from "./pages/user/modules/self-service/EquipmentRequests";
 import MyLeaveRequests from "./pages/user/modules/self-service/MyLeaveRequests";
 import MyDocuments from "./pages/user/modules/self-service/MyDocuments";
 import MyArchive from "./pages/user/modules/self-service/MyArchive";
@@ -55,6 +52,7 @@ import {
   Analytics,
   UserManagement,
   CreateDepartmentProject,
+  DepartmentProjects,
   DepartmentLeaveCalendar,
   DepartmentAnnouncements,
 } from "./pages/user/modules/department-management";
@@ -74,16 +72,26 @@ import ProjectReports from "./pages/user/modules/projects/ProjectReports";
 import ProjectProgress from "./pages/user/modules/projects/ProjectProgress";
 import ProjectResources from "./pages/user/modules/projects/ProjectResources";
 import ApprovalDashboard from "./pages/user/modules/projects/ApprovalDashboard";
+import ComplianceCertificate from "./pages/user/modules/projects/ComplianceCertificate";
 import ExternalProjectManagement from "./pages/user/modules/projects/ExternalProjectManagement";
 import TaskList from "./pages/user/modules/tasks/TaskList";
 import TaskAnalytics from "./pages/user/modules/tasks/TaskAnalytics";
 import TaskAssignments from "./pages/user/modules/tasks/TaskAssignments";
 import TaskReports from "./pages/user/modules/tasks/TaskReports";
+import FinancialManagement from "./pages/user/modules/finance/FinancialManagement";
 import ELRAWalletManagement from "./pages/user/modules/finance/ELRAWalletManagement";
 import TransactionHistoryAndReports from "./pages/user/modules/finance/TransactionHistoryAndReports";
 import BudgetAllocation from "./pages/user/modules/finance/BudgetAllocation";
 import PayrollApprovals from "./pages/user/modules/finance/PayrollApprovals";
 import SalesMarketingApprovals from "./pages/user/modules/finance/SalesMarketingApprovals";
+import ProjectManagement from "./pages/user/modules/projects/ProjectManagement";
+import HRModule from "./pages/user/modules/hr/HRModule";
+import SelfService from "./pages/user/modules/self-service/SelfService";
+import InventoryModule from "./pages/user/modules/inventory/InventoryModule";
+import PayrollManagement from "./pages/user/modules/payroll/PayrollManagement";
+import ProcurementModule from "./pages/user/modules/procurement/ProcurementModule";
+import SalesMarketingModule from "./pages/user/modules/sales-marketing/SalesMarketingModule";
+import LegalModule from "./pages/user/modules/legal/LegalModule";
 import {
   SalesMarketingDashboard,
   SalesMarketingTransactions,
@@ -186,7 +194,8 @@ const AppRoutes = () => {
 
         {/* Sales & Marketing Module Routes - MUST come before generic module route */}
         <Route path="modules/sales">
-          <Route index element={<SalesMarketingDashboard />} />
+          <Route index element={<SalesMarketingModule />} />
+          <Route path="overview" element={<SalesMarketingDashboard />} />
           <Route path="transactions" element={<SalesMarketingTransactions />} />
           <Route path="approvals" element={<SalesMarketingApprovals />} />
           <Route path="reports" element={<SalesMarketingReports />} />
@@ -195,7 +204,8 @@ const AppRoutes = () => {
         {/* Module routes - dynamic module dashboards */}
         <Route path="modules/:module" element={<Dashboard />} />
 
-        {/* HR Module specific sub-routes */}
+        {/* HR Module Routes */}
+        <Route path="modules/hr" element={<HRModule />} />
         <Route path="modules/hr/users" element={<HRUsers />} />
         <Route
           path="modules/hr/departments"
@@ -243,9 +253,11 @@ const AppRoutes = () => {
           path="modules/payroll/processing"
           element={<PayrollProcessing />}
         />
+        <Route path="modules/payroll" element={<PayrollManagement />} />
         <Route path="modules/payroll/payslips" element={<PaySlips />} />
 
         {/* Self-Service Module routes */}
+        <Route path="modules/self-service" element={<SelfService />} />
         <Route path="modules/self-service/payslips" element={<MyPayslips />} />
         <Route
           path="modules/self-service/my-projects"
@@ -264,13 +276,7 @@ const AppRoutes = () => {
           element={<MyDocuments />}
         />
         <Route path="modules/self-service/my-archive" element={<MyArchive />} />
-        <Route path="modules/self-service/tickets" element={<SubmitTicket />} />
         <Route path="modules/self-service/my-tickets" element={<MyTickets />} />
-        <Route path="modules/self-service/it-support" element={<ITSupport />} />
-        <Route
-          path="modules/self-service/equipment"
-          element={<EquipmentRequests />}
-        />
         <Route
           path="modules/self-service/project-tasks"
           element={<MyProjectTasks />}
@@ -279,6 +285,10 @@ const AppRoutes = () => {
         {/* Customer Care Module Routes */}
         <Route
           path="modules/customer-care"
+          element={<CustomerCareDashboard />}
+        />
+        <Route
+          path="modules/customer-care/overview"
           element={<CustomerCareDashboard />}
         />
         <Route
@@ -352,6 +362,10 @@ const AppRoutes = () => {
           path="modules/department-management/create-department-project"
           element={<CreateDepartmentProject />}
         />
+        <Route
+          path="modules/department-management/projects"
+          element={<DepartmentProjects />}
+        />
 
         <Route path="modules/communication" element={<Communication />} />
         <Route
@@ -371,6 +385,7 @@ const AppRoutes = () => {
         <Route path="modules/payroll/reports" element={<PayrollReports />} />
 
         {/* New ERP Module Routes */}
+        <Route path="modules/projects" element={<ProjectManagement />} />
         <Route path="modules/projects/list" element={<ProjectList />} />
         <Route
           path="modules/projects/analytics"
@@ -391,12 +406,18 @@ const AppRoutes = () => {
           path="modules/projects/approvals"
           element={<ApprovalDashboard />}
         />
+        <Route
+          path="modules/projects/certificate/:projectId"
+          element={<ComplianceCertificate />}
+        />
 
         <Route path="modules/tasks/list" element={<TaskList />} />
         <Route path="modules/tasks/analytics" element={<TaskAnalytics />} />
         <Route path="modules/tasks/assignments" element={<TaskAssignments />} />
         <Route path="modules/tasks/reports" element={<TaskReports />} />
 
+        {/* Finance Module Routes */}
+        <Route path="modules/finance" element={<FinancialManagement />} />
         <Route
           path="modules/finance/elra-wallet"
           element={<ELRAWalletManagement />}
@@ -419,7 +440,7 @@ const AppRoutes = () => {
         />
 
         {/* Procurement Module Routes */}
-        <Route path="modules/procurement" element={<ProcurementManagement />} />
+        <Route path="modules/procurement" element={<ProcurementModule />} />
         <Route path="modules/procurement/orders" element={<PurchaseOrders />} />
         <Route
           path="modules/procurement/tracking"
@@ -427,7 +448,7 @@ const AppRoutes = () => {
         />
 
         {/* Legal Module Routes */}
-        <Route path="modules/legal" element={<LegalDashboard />} />
+        <Route path="modules/legal" element={<LegalModule />} />
         <Route path="modules/legal/policies" element={<LegalPolicies />} />
         <Route
           path="modules/legal/compliance-programs"
@@ -447,7 +468,7 @@ const AppRoutes = () => {
         />
 
         {/* Inventory Module Routes */}
-        <Route path="modules/inventory" element={<InventoryManagement />} />
+        <Route path="modules/inventory" element={<InventoryModule />} />
         <Route path="modules/inventory/list" element={<InventoryList />} />
         <Route
           path="modules/inventory/tracking"

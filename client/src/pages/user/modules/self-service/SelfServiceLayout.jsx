@@ -5,10 +5,8 @@ import {
   DocumentTextIcon,
   CreditCardIcon,
   CalendarIcon,
-  WrenchScrewdriverIcon,
-  TicketIcon,
-  ComputerDesktopIcon,
-  CheckCircleIcon,
+  ArchiveBoxIcon,
+  FolderIcon,
 } from "@heroicons/react/24/outline";
 
 const SelfServiceLayout = () => {
@@ -16,46 +14,34 @@ const SelfServiceLayout = () => {
 
   const navigation = [
     {
-      name: "My Documents",
-      href: "/dashboard/modules/self-service/documents",
-      icon: DocumentTextIcon,
-      description: "View and manage your documents",
-    },
-    {
       name: "My Payslips",
       href: "/dashboard/modules/self-service/payslips",
       icon: CreditCardIcon,
-      description: "Access your payslips and salary information",
+      description: "View and download your personal payslips",
     },
     {
-      name: "Leave Requests",
+      name: "My Documents",
+      href: "/dashboard/modules/self-service/documents",
+      icon: DocumentTextIcon,
+      description: "View, upload, and scan documents with OCR processing",
+    },
+    {
+      name: "My Projects",
+      href: "/dashboard/modules/self-service/my-projects",
+      icon: FolderIcon,
+      description: "Create and manage your personal projects",
+    },
+    {
+      name: "My Leave Requests",
       href: "/dashboard/modules/self-service/leave-requests",
       icon: CalendarIcon,
-      description: "Submit and track leave requests",
+      description: "View your leave and other requests",
     },
     {
-      name: "Equipment Requests",
-      href: "/dashboard/modules/self-service/equipment",
-      icon: WrenchScrewdriverIcon,
-      description: "Request equipment and tools",
-    },
-    {
-      name: "My Tickets",
-      href: "/dashboard/modules/self-service/my-tickets",
-      icon: TicketIcon,
-      description: "View your support tickets",
-    },
-    {
-      name: "IT Support",
-      href: "/dashboard/modules/self-service/it-support",
-      icon: ComputerDesktopIcon,
-      description: "Get IT support and assistance",
-    },
-    {
-      name: "Project Tasks",
-      href: "/dashboard/modules/self-service/project-tasks",
-      icon: CheckCircleIcon,
-      description: "Manage tasks from your assigned projects",
+      name: "My Archive",
+      href: "/dashboard/modules/self-service/my-archive",
+      icon: ArchiveBoxIcon,
+      description: "Access your archived documents and historical records",
     },
   ];
 

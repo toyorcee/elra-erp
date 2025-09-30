@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
 import {
   CurrencyDollarIcon,
@@ -11,6 +12,11 @@ import {
   ChartBarIcon,
   MagnifyingGlassIcon,
   ArrowPathIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
+  BanknotesIcon,
+  BuildingOfficeIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import {
   CheckCircleIcon,
@@ -359,8 +365,15 @@ const BudgetAllocation = () => {
   };
 
   const getBaseAmountForAllocation = (project) => {
-    // Base allocation is always the total project items cost (for procurement)
-    return calculateProjectItemsTotal(project);
+    if (!project) return 0;
+
+    const totalItemsCost = calculateProjectItemsTotal(project);
+
+    if (project.projectScope === "external" && project.budgetPercentage) {
+      return (totalItemsCost * project.budgetPercentage) / 100;
+    }
+
+    return totalItemsCost;
   };
 
   const projectColumns = [
@@ -404,6 +417,13 @@ const BudgetAllocation = () => {
               Items: {formatCurrency(calculateProjectItemsTotal(project))}
             </div>
             <div>Budget: {formatCurrency(project.budget)}</div>
+            {project.projectScope === "external" &&
+              project.budgetPercentage && (
+                <div className="text-xs text-blue-600 font-medium">
+                  ELRA: {project.budgetPercentage}% | Client:{" "}
+                  {100 - project.budgetPercentage}%
+                </div>
+              )}
           </div>
         </div>
       ),
@@ -455,1310 +475,1731 @@ const BudgetAllocation = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="py-6">
+    <div className="w-full min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6">
+      {/* Modern Header */}
+      <div className="mb-8 relative">
+        <div className="bg-gradient-to-br from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] rounded-2xl p-8 text-white relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+          <div className="relative z-10">
             <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-slate-900">
-                  Project Budget Allocation
-                </h1>
-                <p className="mt-2 text-slate-600">
-                  Review and approve budget allocations for projects and
-                  operational funding
-                </p>
+              <div className="flex items-center space-x-4">
+                <div className="p-4 bg-white/20 rounded-3xl backdrop-blur-sm border border-white/20">
+                  <BanknotesIcon className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
+                    Project Budget Allocation
+                  </h1>
+                  <p className="text-white/90 mt-2 text-lg">
+                    Review and approve budget allocations for projects and
+                    operational funding
+                  </p>
+                </div>
               </div>
               <div className="flex items-center gap-3">
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => {
                     loadStats();
                     loadProjects();
                     loadBudgetHistory();
                   }}
                   disabled={loading}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition-all duration-200 disabled:opacity-50 border border-white/20"
                 >
                   <ArrowPathIcon
-                    className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                    className={`w-5 h-5 ${loading ? "animate-spin" : ""}`}
                   />
-                  Refresh
-                </button>
+                  Refresh Data
+                </motion.button>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Project Budget Allocation Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="w-full">
+        {/* Enhanced Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Pending Projects Card */}
-          <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl shadow-lg border border-amber-200 p-6 hover:shadow-xl transition-all duration-300">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl shadow-lg border border-amber-200 p-6 hover:shadow-xl transition-all duration-300"
+          >
             <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="p-4 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl shadow-lg">
-                  <DocumentTextIcon className="w-7 h-7 text-white" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-semibold text-amber-700 uppercase tracking-wide">
-                    Pending Projects
-                  </p>
-                  <p className="text-3xl font-bold text-amber-900">
-                    {stats.pendingProjects || 0}
-                  </p>
-                  <p className="text-xs text-amber-600 mt-1">
-                    Need Budget Allocation
-                  </p>
-                </div>
+              <div>
+                <p className="text-sm font-semibold text-amber-700 uppercase tracking-wide">
+                  Pending Projects
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-amber-900 mt-2 break-all leading-tight">
+                  {stats.pendingProjects || 0}
+                </p>
+                <p className="text-xs text-amber-600 mt-1">
+                  Need Budget Allocation
+                </p>
               </div>
-              <div className="text-right">
-                <div className="w-3 h-3 bg-amber-400 rounded-full animate-pulse"></div>
+              <div className="p-4 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-lg">
+                <DocumentTextIcon className="h-8 w-8 text-white" />
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* Allocated Projects Card */}
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl shadow-lg border border-green-200 p-6 hover:shadow-xl transition-all duration-300">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl shadow-lg border border-green-200 p-6 hover:shadow-xl transition-all duration-300"
+          >
             <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="p-4 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg">
-                  <CheckIcon className="w-7 h-7 text-white" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-semibold text-green-700 uppercase tracking-wide">
-                    Allocated Projects
-                  </p>
-                  <p className="text-3xl font-bold text-green-900">
-                    {stats.allocatedProjects || 0}
-                  </p>
-                  <p className="text-xs text-green-600 mt-1">Budget Approved</p>
-                </div>
+              <div>
+                <p className="text-sm font-semibold text-green-700 uppercase tracking-wide">
+                  Allocated Projects
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-green-900 mt-2 break-all leading-tight">
+                  {stats.allocatedProjects || 0}
+                </p>
+                <p className="text-xs text-green-600 mt-1">Budget Approved</p>
               </div>
-              <div className="text-right">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+              <div className="p-4 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg">
+                <CheckIcon className="h-8 w-8 text-white" />
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* Pending Approvals Card */}
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-lg border border-blue-200 p-6 hover:shadow-xl transition-all duration-300">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-lg border border-blue-200 p-6 hover:shadow-xl transition-all duration-300"
+          >
             <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="p-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg">
-                  <ClockIcon className="w-7 h-7 text-white" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">
-                    Pending Approvals
-                  </p>
-                  <p className="text-3xl font-bold text-blue-900">
-                    {stats.pendingAllocations || 0}
-                  </p>
-                  <p className="text-xs text-blue-600 mt-1">Awaiting Review</p>
-                </div>
+              <div>
+                <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">
+                  Pending Approvals
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-blue-900 mt-2 break-all leading-tight">
+                  {stats.pendingAllocations || 0}
+                </p>
+                <p className="text-xs text-blue-600 mt-1">Awaiting Review</p>
               </div>
-              <div className="text-right">
-                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+              <div className="p-4 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg">
+                <ClockIcon className="h-8 w-8 text-white" />
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* Total Allocated Card */}
-          <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl shadow-lg border border-purple-200 p-6 hover:shadow-xl transition-all duration-300">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl shadow-lg border border-purple-200 p-6 hover:shadow-xl transition-all duration-300"
+          >
             <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="p-4 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl shadow-lg">
-                  <CurrencyDollarIcon className="w-7 h-7 text-white" />
+              <div>
+                <p className="text-sm font-semibold text-purple-700 uppercase tracking-wide">
+                  Total Allocated
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-purple-900 mt-2 break-all leading-tight">
+                  {formatCurrency(stats.totalAllocated || 0)}
+                </p>
+                <p className="text-xs text-purple-600 mt-1">
+                  Budget Distributed
+                </p>
+              </div>
+              <div className="p-4 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl shadow-lg">
+                <CurrencyDollarIcon className="h-8 w-8 text-white" />
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Enhanced Financial Overview */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl shadow-lg p-8 mb-8 text-white relative overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm border border-white/20">
+                  <ChartBarIcon className="w-6 h-6 text-white" />
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-semibold text-purple-700 uppercase tracking-wide">
-                    Total Allocated
-                  </p>
-                  <p className="text-2xl font-bold text-purple-900">
-                    {formatCurrency(stats.totalAllocated || 0)}
-                  </p>
-                  <p className="text-xs text-purple-600 mt-1">
-                    Budget Distributed
+                <div>
+                  <h2 className="text-2xl font-bold">Financial Overview</h2>
+                  <p className="text-white/80">
+                    Budget allocation and wallet status
                   </p>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-white/90 uppercase tracking-wide">
+                    ELRA Wallet Balance
+                  </p>
+                  <BuildingOfficeIcon className="w-5 h-5 text-white/70" />
+                </div>
+                <p className="text-2xl font-bold text-white mb-1">
+                  {formatCurrency(
+                    stats.walletBalance?.projects?.available || 0
+                  )}
+                </p>
+                <p className="text-xs text-white/70">Available for Projects</p>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-white/90 uppercase tracking-wide">
+                    Total Project Items Cost
+                  </p>
+                  <ArrowTrendingUpIcon className="w-5 h-5 text-white/70" />
+                </div>
+                <p className="text-2xl font-bold text-white mb-1">
+                  {formatCurrency(stats.totalProjectItemsCost || 0)}
+                </p>
+                <p className="text-xs text-white/70">Pending Allocation</p>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-white/90 uppercase tracking-wide">
+                    Total Allocated Amount
+                  </p>
+                  <ArrowTrendingDownIcon className="w-5 h-5 text-white/70" />
+                </div>
+                <p className="text-2xl font-bold text-white mb-1">
+                  {formatCurrency(stats.totalAllocated || 0)}
+                </p>
+                <p className="text-xs text-white/70">Budget Distributed</p>
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Project Budget Allocation Tracking */}
-        <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl shadow-lg p-6 mb-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold">
-              Project Budget Allocation Tracking
-            </h2>
-            <div className="p-3 bg-white rounded-lg shadow-lg">
-              <ChartBarIcon className="w-6 h-6 text-[var(--elra-primary)]" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white rounded-lg p-4 shadow-lg">
-              <p className="text-sm font-bold text-[var(--elra-primary)] mb-1">
-                ELRA Wallet Balance
-              </p>
-              <p className="text-2xl font-black text-[var(--elra-primary)]">
-                {formatCurrency(stats.walletBalance?.projects?.available || 0)}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Available for Projects
-              </p>
-            </div>
-
-            <div className="bg-white rounded-lg p-4 shadow-lg">
-              <p className="text-sm font-bold text-blue-600 mb-1">
-                Total Project Items Cost
-              </p>
-              <p className="text-2xl font-black text-blue-600">
-                {formatCurrency(stats.totalProjectItemsCost || 0)}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">Pending Allocation</p>
-            </div>
-
-            <div className="bg-white rounded-lg p-4 shadow-lg">
-              <p className="text-sm font-bold text-green-600 mb-1">
-                Total Allocated Amount
-              </p>
-              <p className="text-2xl font-black text-green-600">
-                {formatCurrency(stats.totalAllocated || 0)}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">Budget Distributed</p>
-            </div>
-          </div>
-        </div>
-        {/* Tab Navigation */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+        {/* Enhanced Tab Navigation */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="bg-white rounded-xl shadow-lg border border-gray-200 mb-8 overflow-hidden"
+        >
           <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8 px-6">
+            <nav className="flex">
               <button
                 onClick={() => setActiveTab("projects")}
-                className={`py-3 px-3 border-b-2 font-medium text-sm cursor-pointer transition-colors rounded-t-md ${
+                className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-all duration-200 ${
                   activeTab === "projects"
-                    ? "border-[var(--elra-primary)] text-[var(--elra-primary)] bg-[color:var(--elra-primary,#0f5132)]/10"
-                    : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300"
+                    ? "bg-[var(--elra-primary)] text-white border-b-2 border-[var(--elra-primary)]"
+                    : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
                 }`}
               >
-                Projects Pending Allocation
+                <div className="flex items-center justify-center space-x-2">
+                  <DocumentTextIcon className="w-5 h-5" />
+                  <span>Projects Pending Allocation</span>
+                </div>
               </button>
               <button
                 onClick={() => setActiveTab("history")}
-                className={`py-3 px-3 border-b-2 font-medium text-sm cursor-pointer transition-colors rounded-t-md ${
+                className={`flex-1 py-4 px-6 text-center font-medium text-sm transition-all duration-200 ${
                   activeTab === "history"
-                    ? "border-[var(--elra-primary)] text-[var(--elra-primary)] bg-[color:var(--elra-primary,#0f5132)]/10"
-                    : "border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300"
+                    ? "bg-[var(--elra-primary)] text-white border-b-2 border-[var(--elra-primary)]"
+                    : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
                 }`}
               >
-                My Allocation History
+                <div className="flex items-center justify-center space-x-2">
+                  <ClockIcon className="w-5 h-5" />
+                  <span>Allocation History</span>
+                </div>
               </button>
             </nav>
           </div>
-        </div>
+        </motion.div>
 
         {/* Content based on active tab */}
-        {activeTab === "projects" ? (
-          <>
-            {/* Filter Summary */}
-            {filters.status && (
-              <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm text-blue-800">
-                    <span className="font-medium">Active Filter:</span>
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      Status:{" "}
-                      {filters.status === "pending_budget_allocation"
-                        ? "Pending Allocation"
-                        : "Approved"}
-                    </span>
-                  </div>
-                  <span className="text-sm text-blue-600">
-                    {filteredProjects.length} project
-                    {filteredProjects.length !== 1 ? "s" : ""} found
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Projects Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <DataTable
-                data={filteredProjects}
-                columns={projectColumns}
-                loading={loading}
-                actions={{
-                  showEdit: false,
-                  showDelete: false,
-                  showToggle: false,
-                  customActions: (project) => (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewProjectDetails(project);
-                        }}
-                        title="View Project Details"
-                        className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-lg transition-colors cursor-pointer"
-                      >
-                        <EyeIcon className="w-5 h-5" />
-                      </button>
-                      {project.status === "pending_budget_allocation" && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCreateAllocationForProject(project);
-                          }}
-                          title="Create Budget Allocation"
-                          className="bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white p-2 rounded-lg transition-colors cursor-pointer"
-                        >
-                          <PlusIcon className="w-5 h-5" />
-                        </button>
-                      )}
-                    </div>
-                  ),
-                }}
-                searchable={true}
-                sortable={true}
-                pagination={true}
-                itemsPerPage={10}
-                emptyState={{
-                  icon: (
-                    <DocumentTextIcon className="h-12 w-12 text-gray-400" />
-                  ),
-                  title: "No projects found",
-                  description: filters.status
-                    ? "No projects match your current status filter. Try adjusting your filter criteria."
-                    : "No projects found that need budget allocation.",
-                }}
-              />
-            </div>
-          </>
-        ) : activeTab === "history" ? (
-          /* Budget History Table using DataTable component */
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <DataTable
-              data={budgetHistory}
-              columns={[
-                {
-                  header: "Project",
-                  accessor: "project",
-                  renderer: (allocation) => (
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {allocation.project?.name ||
-                          allocation.entityName ||
-                          "N/A"}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {allocation.project?.code ||
-                          allocation.entityCode ||
-                          "N/A"}
-                      </div>
-                    </div>
-                  ),
-                },
-                {
-                  header: "Allocation Code",
-                  accessor: "allocationCode",
-                  renderer: (allocation) => (
-                    <span className="text-sm font-mono text-gray-900">
-                      {allocation.allocationCode}
-                    </span>
-                  ),
-                },
-                {
-                  header: "Amount Allocated",
-                  accessor: "allocatedAmount",
-                  renderer: (allocation) => (
-                    <div className="text-sm font-medium text-gray-900">
-                      {formatCurrency(
-                        allocation.allocatedAmount,
-                        allocation.currency
-                      )}
-                    </div>
-                  ),
-                },
-                {
-                  header: "Status",
-                  accessor: "status",
-                  renderer: (allocation) => (
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(allocation.status)}
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(
-                          allocation.status
-                        )}`}
-                      >
-                        {allocation.status.charAt(0).toUpperCase() +
-                          allocation.status.slice(1)}
+        <AnimatePresence mode="wait">
+          {activeTab === "projects" ? (
+            <motion.div
+              key="projects"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.3 }}
+            >
+              {/* Enhanced Filter Summary */}
+              {filters.status && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 text-sm text-blue-800">
+                      <span className="font-semibold">Active Filter:</span>
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                        Status:{" "}
+                        {filters.status === "pending_budget_allocation"
+                          ? "Pending Allocation"
+                          : "Approved"}
                       </span>
                     </div>
-                  ),
-                },
-                {
-                  header: "Allocated Date",
-                  accessor: "createdAt",
-                  renderer: (allocation) => (
-                    <div className="text-sm text-gray-500">
-                      {new Date(allocation.createdAt).toLocaleDateString()}
-                    </div>
-                  ),
-                },
-              ]}
-              loading={loading}
-              searchable={true}
-              sortable={true}
-              pagination={true}
-              actions={{
-                showEdit: false,
-                showDelete: false,
-                showToggle: false,
-                customActions: (allocation) => (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedAllocation(allocation);
-                      setShowDetailsModal(true);
-                    }}
-                    title="View Allocation Details"
-                    className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-lg transition-colors cursor-pointer"
-                  >
-                    <EyeIcon className="w-5 h-5" />
-                  </button>
-                ),
-              }}
-              emptyState={{
-                icon: <DocumentTextIcon className="h-12 w-12 text-gray-400" />,
-                title: "No budget allocation history found",
-                description:
-                  "Your approved budget allocations will appear here.",
-              }}
-            />
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            {loading ? (
-              <div className="p-8 text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--elra-primary)] mx-auto"></div>
-                <p className="mt-4 text-gray-600">
-                  Loading budget allocations...
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Entity
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Type
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Amount
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Created By
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Date
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {budgetHistory.map((allocation) => (
-                        <tr key={allocation._id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">
-                                {allocation.entityName || "N/A"}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                {allocation.allocationCode} •{" "}
-                                {allocation.entityCode || "N/A"}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              {getAllocationTypeLabel(
-                                allocation.allocationType
-                              )}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
-                              {formatCurrency(
-                                allocation.allocatedAmount,
-                                allocation.currency
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-2">
-                              {getStatusIcon(allocation.status)}
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(
-                                  allocation.status
-                                )}`}
-                              >
-                                {allocation.status.charAt(0).toUpperCase() +
-                                  allocation.status.slice(1)}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {allocation.allocatedBy?.firstName}{" "}
-                              {allocation.allocatedBy?.lastName}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {allocation.allocatedBy?.email}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {new Date(
-                              allocation.createdAt
-                            ).toLocaleDateString()}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => {
-                                  setSelectedAllocation(allocation);
-                                  setShowDetailsModal(true);
-                                }}
-                                className="text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)]"
-                              >
-                                <EyeIcon className="w-5 h-5" />
-                              </button>
-                              {allocation.status === "pending" && (
-                                <>
-                                  <button
-                                    onClick={() =>
-                                      handleApproveAllocation(allocation._id)
-                                    }
-                                    className="text-green-600 hover:text-green-800"
-                                  >
-                                    <CheckIcon className="w-5 h-5" />
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      handleRejectAllocation(allocation._id)
-                                    }
-                                    className="text-red-600 hover:text-red-800"
-                                  >
-                                    <XMarkIcon className="w-5 h-5" />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {budgetHistory.length === 0 && (
-                  <div className="text-center py-12">
-                    <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">
-                      No budget allocations found
-                    </h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Get started by creating a new budget allocation.
-                    </p>
+                    <span className="text-sm font-medium text-blue-600">
+                      {filteredProjects.length} project
+                      {filteredProjects.length !== 1 ? "s" : ""} found
+                    </span>
                   </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
+                </motion.div>
+              )}
+
+              {/* Enhanced Projects Table */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
+              >
+                <DataTable
+                  data={filteredProjects}
+                  columns={projectColumns}
+                  loading={loading}
+                  actions={{
+                    showEdit: false,
+                    showDelete: false,
+                    showToggle: false,
+                    customActions: (project) => (
+                      <div className="flex items-center gap-2">
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewProjectDetails(project);
+                          }}
+                          title="View Project Details"
+                          className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-lg transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md"
+                        >
+                          <EyeIcon className="w-5 h-5" />
+                        </motion.button>
+                        {project.status === "pending_budget_allocation" && (
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCreateAllocationForProject(project);
+                            }}
+                            title="Create Budget Allocation"
+                            className="bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white p-2 rounded-lg transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md"
+                          >
+                            <PlusIcon className="w-5 h-5" />
+                          </motion.button>
+                        )}
+                      </div>
+                    ),
+                  }}
+                  searchable={true}
+                  sortable={true}
+                  pagination={true}
+                  itemsPerPage={10}
+                  emptyState={{
+                    icon: (
+                      <DocumentTextIcon className="h-12 w-12 text-gray-400" />
+                    ),
+                    title: "No projects found",
+                    description: filters.status
+                      ? "No projects match your current status filter. Try adjusting your filter criteria."
+                      : "No projects found that need budget allocation.",
+                  }}
+                />
+              </motion.div>
+            </motion.div>
+          ) : activeTab === "history" ? (
+            <motion.div
+              key="history"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              {/* Enhanced Budget History Table */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
+              >
+                <DataTable
+                  data={budgetHistory}
+                  columns={[
+                    {
+                      header: "Project",
+                      accessor: "project",
+                      renderer: (allocation) => (
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {allocation.project?.name ||
+                              allocation.entityName ||
+                              "N/A"}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {allocation.project?.code ||
+                              allocation.entityCode ||
+                              "N/A"}
+                          </div>
+                        </div>
+                      ),
+                    },
+                    {
+                      header: "Allocation Code",
+                      accessor: "allocationCode",
+                      renderer: (allocation) => (
+                        <span className="text-sm font-mono text-gray-900 bg-gray-50 px-2 py-1 rounded">
+                          {allocation.allocationCode}
+                        </span>
+                      ),
+                    },
+                    {
+                      header: "Amount Allocated",
+                      accessor: "allocatedAmount",
+                      renderer: (allocation) => (
+                        <div className="text-sm font-semibold text-gray-900">
+                          {formatCurrency(
+                            allocation.allocatedAmount,
+                            allocation.currency
+                          )}
+                        </div>
+                      ),
+                    },
+                    {
+                      header: "Status",
+                      accessor: "status",
+                      renderer: (allocation) => (
+                        <div className="flex items-center gap-2">
+                          {getStatusIcon(allocation.status)}
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(
+                              allocation.status
+                            )}`}
+                          >
+                            {allocation.status.charAt(0).toUpperCase() +
+                              allocation.status.slice(1)}
+                          </span>
+                        </div>
+                      ),
+                    },
+                    {
+                      header: "Allocated Date",
+                      accessor: "createdAt",
+                      renderer: (allocation) => (
+                        <div className="text-sm text-gray-500">
+                          {new Date(allocation.createdAt).toLocaleDateString()}
+                        </div>
+                      ),
+                    },
+                  ]}
+                  loading={loading}
+                  searchable={true}
+                  sortable={true}
+                  pagination={true}
+                  actions={{
+                    showEdit: false,
+                    showDelete: false,
+                    showToggle: false,
+                    customActions: (allocation) => (
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedAllocation(allocation);
+                          setShowDetailsModal(true);
+                        }}
+                        title="View Allocation Details"
+                        className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-lg transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md"
+                      >
+                        <EyeIcon className="w-5 h-5" />
+                      </motion.button>
+                    ),
+                  }}
+                  emptyState={{
+                    icon: (
+                      <DocumentTextIcon className="h-12 w-12 text-gray-400" />
+                    ),
+                    title: "No budget allocation history found",
+                    description:
+                      "Your approved budget allocations will appear here.",
+                  }}
+                />
+              </motion.div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
 
-      {/* Create Allocation Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-8 w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">
-              Create Budget Allocation
-            </h2>
-
-            <form onSubmit={handleCreateAllocation}>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Allocation Type
-                  </label>
-                  <div className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
-                    Project Budget
+      {/* Enhanced Create Allocation Modal */}
+      <AnimatePresence>
+        {showCreateModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowCreateModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 30 }}
+              transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col border border-gray-100 relative overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="bg-gradient-to-br from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] text-white p-8 flex-shrink-0 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-4 bg-white/20 rounded-3xl backdrop-blur-sm border border-white/20">
+                        <PlusIcon className="w-8 h-8 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
+                          Create Budget Allocation
+                        </h2>
+                        <p className="text-white/90 mt-2 text-lg">
+                          Allocate budget for project procurement and operations
+                        </p>
+                      </div>
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setShowCreateModal(false)}
+                      className="p-3 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition-all duration-200 border border-white/20"
+                    >
+                      <XMarkIcon className="w-6 h-6" />
+                    </motion.button>
                   </div>
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Project
-                  </label>
-                  <div className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
-                    {(() => {
-                      const selectedProject = projects.find(
-                        (p) => p._id === formData.projectId
-                      );
-                      return selectedProject
-                        ? `${selectedProject.name} - ${selectedProject.code}`
-                        : "No project selected";
-                    })()}
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto p-8">
+                <form onSubmit={handleCreateAllocation} className="space-y-8">
+                  {/* Allocation Type */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                    <label className="block text-lg font-semibold text-gray-900 mb-3">
+                      Allocation Type
+                    </label>
+                    <div className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-700 font-medium">
+                      Project Budget
+                    </div>
                   </div>
 
+                  {/* Project Selection */}
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+                    <label className="block text-lg font-semibold text-gray-900 mb-3">
+                      Selected Project
+                    </label>
+                    <div className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-700 font-medium">
+                      {(() => {
+                        const selectedProject = projects.find(
+                          (p) => p._id === formData.projectId
+                        );
+                        return selectedProject
+                          ? `${selectedProject.name} - ${selectedProject.code}`
+                          : "No project selected";
+                      })()}
+                    </div>
+
+                    {formData.projectId &&
+                      (() => {
+                        const selectedProject = projects.find(
+                          (p) => p._id === formData.projectId
+                        );
+                        if (selectedProject) {
+                          const itemsTotal =
+                            calculateProjectItemsTotal(selectedProject);
+                          const budget = selectedProject.budget || 0;
+                          const baseAmount =
+                            getBaseAmountForAllocation(selectedProject);
+                          return (
+                            <div className="mt-6 space-y-6">
+                              {/* Project Details */}
+                              <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                                <div className="flex items-center space-x-3 mb-4">
+                                  <div className="p-2 bg-blue-100 rounded-lg">
+                                    <DocumentTextIcon className="w-5 h-5 text-blue-600" />
+                                  </div>
+                                  <h3 className="text-lg font-semibold text-gray-900">
+                                    Project Details
+                                  </h3>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div>
+                                    <p className="text-sm text-gray-600 mb-1">
+                                      Project Name:
+                                    </p>
+                                    <p className="font-semibold text-gray-900">
+                                      {selectedProject.name}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-600 mb-1">
+                                      Project Code:
+                                    </p>
+                                    <p className="font-semibold text-gray-900 font-mono">
+                                      {selectedProject.code}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-600 mb-1">
+                                      Department:
+                                    </p>
+                                    <p className="font-semibold text-gray-900">
+                                      {selectedProject.department?.name}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-600 mb-1">
+                                      Project Manager:
+                                    </p>
+                                    <p className="font-semibold text-gray-900">
+                                      {
+                                        selectedProject.projectManager
+                                          ?.firstName
+                                      }{" "}
+                                      {selectedProject.projectManager?.lastName}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Financial Breakdown */}
+                              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+                                <div className="flex items-center space-x-3 mb-4">
+                                  <div className="p-2 bg-green-100 rounded-lg">
+                                    <CurrencyDollarIcon className="w-5 h-5 text-green-600" />
+                                  </div>
+                                  <h3 className="text-lg font-semibold text-gray-900">
+                                    Financial Breakdown
+                                  </h3>
+                                </div>
+                                <div className="space-y-3">
+                                  <div className="flex justify-between items-center p-3 bg-white rounded-lg border">
+                                    <span className="text-gray-600 font-medium">
+                                      Items Total:
+                                    </span>
+                                    <span className="font-bold text-gray-900">
+                                      {formatCurrency(itemsTotal)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center p-3 bg-white rounded-lg border">
+                                    <span className="text-gray-600 font-medium">
+                                      Project Budget:
+                                    </span>
+                                    <span className="font-bold text-gray-900">
+                                      {formatCurrency(budget)}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center p-4 bg-green-100 rounded-lg border-2 border-green-300">
+                                    <span className="text-green-800 font-semibold">
+                                      Items Cost (Base Allocation):
+                                    </span>
+                                    <span className="text-green-800 font-bold text-lg">
+                                      {formatCurrency(baseAmount)}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* ELRA Contribution Breakdown (for external projects) */}
+                                {selectedProject.projectScope === "external" &&
+                                  selectedProject.budgetPercentage && (
+                                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                                      <div className="flex items-center space-x-3 mb-6">
+                                        <div className="p-2 bg-blue-100 rounded-lg">
+                                          <BuildingOfficeIcon className="w-5 h-5 text-blue-600" />
+                                        </div>
+                                        <h3 className="text-lg font-semibold text-gray-900">
+                                          ELRA Contribution Breakdown
+                                        </h3>
+                                      </div>
+
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* ELRA Contribution */}
+                                        <div className="bg-white rounded-lg p-4 border border-green-200 shadow-sm">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-medium text-gray-600">
+                                              ELRA Contribution
+                                            </span>
+                                            <span className="text-sm font-bold text-green-600 bg-green-100 px-2 py-1 rounded">
+                                              {selectedProject.budgetPercentage}
+                                              %
+                                            </span>
+                                          </div>
+                                          <div className="text-2xl font-bold text-green-700">
+                                            {formatCurrency(
+                                              (itemsTotal *
+                                                selectedProject.budgetPercentage) /
+                                                100
+                                            )}
+                                          </div>
+                                          <div className="text-xs text-gray-500 mt-1">
+                                            ELRA will fund this amount
+                                          </div>
+                                        </div>
+
+                                        {/* Client Contribution */}
+                                        <div className="bg-white rounded-lg p-4 border border-blue-200 shadow-sm">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-medium text-gray-600">
+                                              Client Contribution
+                                            </span>
+                                            <span className="text-sm font-bold text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                                              {100 -
+                                                selectedProject.budgetPercentage}
+                                              %
+                                            </span>
+                                          </div>
+                                          <div className="text-2xl font-bold text-blue-700">
+                                            {formatCurrency(
+                                              (itemsTotal *
+                                                (100 -
+                                                  selectedProject.budgetPercentage)) /
+                                                100
+                                            )}
+                                          </div>
+                                          <div className="text-xs text-gray-500 mt-1">
+                                            Client will handle this amount
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Total Project Cost */}
+                                      <div className="mt-4 p-3 bg-gray-50 rounded-lg border">
+                                        <div className="flex justify-between items-center">
+                                          <span className="font-semibold text-gray-700">
+                                            Total Project Cost:
+                                          </span>
+                                          <span className="font-bold text-lg text-gray-900">
+                                            {formatCurrency(itemsTotal)}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      {/* Important Notice */}
+                                      <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                        <div className="flex items-start space-x-2">
+                                          <div className="p-1 bg-yellow-100 rounded">
+                                            <ExclamationTriangleIcon className="w-4 h-4 text-yellow-600" />
+                                          </div>
+                                          <div>
+                                            <p className="text-sm font-medium text-yellow-800">
+                                              Important Notice
+                                            </p>
+                                            <p className="text-xs text-yellow-700 mt-1">
+                                              ELRA will only fund{" "}
+                                              {selectedProject.budgetPercentage}
+                                              % of the project cost. The client
+                                              is responsible for the remaining{" "}
+                                              {100 -
+                                                selectedProject.budgetPercentage}
+                                              % and must coordinate their own
+                                              delivery and payment arrangements.
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                              </div>
+
+                              {/* Project Documents Section */}
+                              {selectedProject.requiredDocuments &&
+                                selectedProject.requiredDocuments.length >
+                                  0 && (
+                                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                                    <div className="flex items-center space-x-3 mb-4">
+                                      <div className="p-2 bg-blue-100 rounded-lg">
+                                        <DocumentTextIcon className="w-5 h-5 text-blue-600" />
+                                      </div>
+                                      <h3 className="text-lg font-semibold text-gray-900">
+                                        Required Documents
+                                      </h3>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                      {selectedProject.requiredDocuments.map(
+                                        (doc, index) => (
+                                          <div
+                                            key={index}
+                                            className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+                                          >
+                                            <div className="flex items-center justify-center mb-3">
+                                              <div className="p-3 bg-blue-100 rounded-lg">
+                                                <DocumentTextIcon className="w-6 h-6 text-blue-600" />
+                                              </div>
+                                            </div>
+                                            <p className="text-sm font-semibold text-gray-900 text-center mb-1">
+                                              {doc.documentType
+                                                .replace(/_/g, " ")
+                                                .toUpperCase()}
+                                            </p>
+                                            <p className="text-xs text-gray-500 text-center mb-4 truncate">
+                                              {doc.fileName}
+                                            </p>
+                                            <motion.button
+                                              whileHover={{ scale: 1.05 }}
+                                              whileTap={{ scale: 0.95 }}
+                                              type="button"
+                                              onClick={() => {
+                                                if (doc.documentId) {
+                                                  window.open(
+                                                    `/api/documents/${doc.documentId}/view`,
+                                                    "_blank"
+                                                  );
+                                                }
+                                              }}
+                                              className="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer"
+                                              title="View Document"
+                                            >
+                                              View Document
+                                            </motion.button>
+                                          </div>
+                                        )
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                  </div>
+
+                  {/* Budget Allocation Info */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                    <div className="flex items-start space-x-4">
+                      <div className="p-3 bg-blue-100 rounded-xl">
+                        <span className="text-blue-600 text-xl">💡</span>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                          Budget Allocation Information
+                        </h3>
+                        <p className="text-blue-800">
+                          This will allocate the exact project items cost for
+                          procurement. Current ELRA wallet balance:{" "}
+                          <span className="font-bold">
+                            {formatCurrency(
+                              stats.walletBalance?.projects?.available || 0
+                            )}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment Summary */}
                   {formData.projectId &&
                     (() => {
                       const selectedProject = projects.find(
                         (p) => p._id === formData.projectId
                       );
                       if (selectedProject) {
-                        const itemsTotal =
-                          calculateProjectItemsTotal(selectedProject);
-                        const budget = selectedProject.budget || 0;
                         const baseAmount =
                           getBaseAmountForAllocation(selectedProject);
                         return (
-                          <div className="mt-3 p-4 bg-green-50 rounded-lg border border-green-200">
-                            <p className="text-sm font-medium text-green-800 mb-3">
-                              📋 Project Details
-                            </p>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div>
-                                <p className="text-gray-600">Project Name:</p>
-                                <p className="font-medium text-gray-900">
-                                  {selectedProject.name}
-                                </p>
+                          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+                            <div className="flex items-center space-x-3 mb-4">
+                              <div className="p-2 bg-green-100 rounded-lg">
+                                <CurrencyDollarIcon className="w-5 h-5 text-green-600" />
                               </div>
-                              <div>
-                                <p className="text-gray-600">Project Code:</p>
-                                <p className="font-medium text-gray-900">
-                                  {selectedProject.code}
-                                </p>
+                              <h3 className="text-lg font-semibold text-gray-900">
+                                Payment Summary
+                              </h3>
+                            </div>
+                            <div className="space-y-4">
+                              <div className="flex justify-between items-center p-4 bg-white rounded-xl border border-gray-200">
+                                <span className="text-gray-600 font-medium">
+                                  ELRA Wallet Balance:
+                                </span>
+                                <span className="font-bold text-green-600">
+                                  {formatCurrency(
+                                    stats.walletBalance?.projects?.available ||
+                                      0
+                                  )}
+                                </span>
                               </div>
-                              <div>
-                                <p className="text-gray-600">Department:</p>
-                                <p className="font-medium text-gray-900">
-                                  {selectedProject.department?.name}
-                                </p>
+                              <div className="flex justify-between items-center p-4 bg-white rounded-xl border border-gray-200">
+                                <span className="text-gray-600 font-medium">
+                                  Project Items Cost:
+                                </span>
+                                <span className="font-bold text-gray-900">
+                                  {formatCurrency(baseAmount)}
+                                </span>
                               </div>
-                              <div>
-                                <p className="text-gray-600">
-                                  Project Manager:
-                                </p>
-                                <p className="font-medium text-gray-900">
-                                  {selectedProject.projectManager?.firstName}{" "}
-                                  {selectedProject.projectManager?.lastName}
-                                </p>
+                              <div className="flex justify-between items-center p-4 bg-green-100 rounded-xl border-2 border-green-300">
+                                <span className="text-green-800 font-semibold text-lg">
+                                  Total Amount to Allocate:
+                                </span>
+                                <span className="text-green-800 font-bold text-xl">
+                                  {formatCurrency(baseAmount)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center p-4 bg-blue-50 rounded-xl border border-blue-200">
+                                <span className="text-blue-700 font-semibold">
+                                  Remaining Balance After:
+                                </span>
+                                <span className="text-blue-700 font-bold text-lg">
+                                  {formatCurrency(
+                                    (stats.walletBalance?.projects?.available ||
+                                      0) - baseAmount
+                                  )}
+                                </span>
                               </div>
                             </div>
-
-                            <div className="mt-4 p-3 bg-white rounded border border-green-200">
-                              <p className="text-sm font-medium text-green-800 mb-2">
-                                💰 Financial Breakdown
-                              </p>
-                              <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600">
-                                    Items Total:
-                                  </span>
-                                  <span className="font-medium">
-                                    {formatCurrency(itemsTotal)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-gray-600">
-                                    Project Budget:
-                                  </span>
-                                  <span className="font-medium">
-                                    {formatCurrency(budget)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between border-t pt-2">
-                                  <span className="text-green-700 font-medium">
-                                    Items Cost (Base Allocation):
-                                  </span>
-                                  <span className="text-green-700 font-bold">
-                                    {formatCurrency(baseAmount)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Project Documents Section */}
-                            {selectedProject.requiredDocuments &&
-                              selectedProject.requiredDocuments.length > 0 && (
-                                <div className="mt-4 p-3 bg-white rounded border border-green-200">
-                                  <p className="text-sm font-medium text-green-800 mb-3">
-                                    📄 Required Documents
-                                  </p>
-                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                    {selectedProject.requiredDocuments.map(
-                                      (doc, index) => (
-                                        <div key={index}>
-                                          <div className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                            <div className="flex items-center justify-center mb-2">
-                                              <DocumentTextIcon className="w-6 h-6 text-blue-600" />
-                                            </div>
-                                            <p className="text-xs font-medium text-gray-700 truncate text-center">
-                                              {doc.documentType
-                                                .replace(/_/g, " ")
-                                                .toUpperCase()}
-                                            </p>
-                                            <p className="text-xs text-gray-500 truncate mt-1 text-center">
-                                              {doc.fileName}
-                                            </p>
-                                            <div className="flex items-center justify-center mt-3">
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  if (doc.documentId) {
-                                                    window.open(
-                                                      `/api/documents/${doc.documentId}/view`,
-                                                      "_blank"
-                                                    );
-                                                  }
-                                                }}
-                                                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors cursor-pointer"
-                                                title="View Document"
-                                              >
-                                                View
-                                              </button>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      )
-                                    )}
-                                  </div>
-                                </div>
-                              )}
                           </div>
                         );
                       }
                       return null;
                     })()}
-                </div>
 
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="flex items-start">
-                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mr-3 mt-0.5">
-                      <span className="text-blue-600 text-sm">💡</span>
-                    </div>
-                    <div>
-                      <p className="text-sm text-blue-800 font-medium mb-1">
-                        Budget Allocation
-                      </p>
-                      <p className="text-sm text-blue-700">
-                        This will allocate the exact project items cost for
-                        procurement. Current ELRA wallet balance:{" "}
-                        {formatCurrency(
-                          stats.walletBalance?.projects?.available || 0
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {formData.projectId &&
-                  (() => {
-                    const selectedProject = projects.find(
-                      (p) => p._id === formData.projectId
-                    );
-                    if (selectedProject) {
-                      const baseAmount =
-                        getBaseAmountForAllocation(selectedProject);
-                      return (
-                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                          <p className="text-sm font-medium text-green-800 mb-3">
-                            💳 Payment Summary
-                          </p>
-                          <div className="space-y-3 text-sm">
-                            <div className="flex justify-between items-center p-2 bg-white rounded border">
-                              <span className="text-gray-600">
-                                ELRA Wallet Balance:
-                              </span>
-                              <span className="font-medium text-green-600">
-                                {formatCurrency(
-                                  stats.walletBalance?.projects?.available || 0
-                                )}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center p-2 bg-white rounded border">
-                              <span className="text-gray-600">
-                                Project Items Cost:
-                              </span>
-                              <span className="font-medium">
-                                {formatCurrency(baseAmount)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center p-3 bg-green-100 rounded border-2 border-green-300">
-                              <span className="text-green-800 font-semibold">
-                                Total Amount to Allocate:
-                              </span>
-                              <span className="text-green-800 font-bold text-lg">
-                                {formatCurrency(baseAmount)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center p-2 bg-blue-50 rounded border border-blue-200">
-                              <span className="text-blue-700 font-medium">
-                                Remaining Balance After:
-                              </span>
-                              <span className="text-blue-700 font-bold">
-                                {formatCurrency(
-                                  (stats.walletBalance?.projects?.available ||
-                                    0) - baseAmount
-                                )}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Notes
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const signatureTemplate = `Budget allocation approved for project items cost.
+                  {/* Notes Section */}
+                  <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-6 border border-gray-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <label className="block text-lg font-semibold text-gray-900">
+                        Allocation Notes
+                      </label>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        type="button"
+                        onClick={() => {
+                          const signatureTemplate = `Budget allocation approved for project items cost.
 
 Allocated by: ${user?.firstName} ${user?.lastName}
 Date & Time: ${new Date().toLocaleString()}
 Finance HOD`;
+                          setFormData((prev) => ({
+                            ...prev,
+                            notes: signatureTemplate,
+                          }));
+                        }}
+                        className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer"
+                      >
+                        Use Signature Template
+                      </motion.button>
+                    </div>
+                    <textarea
+                      value={formData.notes}
+                      onChange={(e) =>
                         setFormData((prev) => ({
                           ...prev,
-                          notes: signatureTemplate,
-                        }));
-                      }}
-                      className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
-                    >
-                      Use Signature Template
-                    </button>
-                  </div>
-                  <textarea
-                    value={formData.notes}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        notes: e.target.value,
-                      }))
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-                    rows="4"
-                    placeholder={`Budget allocation approved for project items cost.
+                          notes: e.target.value,
+                        }))
+                      }
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent resize-none"
+                      rows="4"
+                      placeholder={`Budget allocation approved for project items cost.
 
 Allocated by: ${user?.firstName} ${user?.lastName}
 Date & Time: ${new Date().toLocaleString()}
 Finance HOD`}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Click "Use Signature Template" to auto-fill your signature,
-                    or add your own notes
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  disabled={isSubmitting}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg font-medium hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      Creating...
-                    </>
-                  ) : (
-                    "Create Allocation"
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Details Modal */}
-      {showDetailsModal && selectedAllocation && (
-        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">
-              Budget Allocation Details
-            </h2>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Allocation Code
-                  </label>
-                  <p className="text-sm text-gray-900 font-mono">
-                    {selectedAllocation.allocationCode}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Entity Name
-                  </label>
-                  <p className="text-sm text-gray-900">
-                    {selectedAllocation.entityName}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Entity Code
-                  </label>
-                  <p className="text-sm text-gray-900">
-                    {selectedAllocation.entityCode}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Allocation Type
-                  </label>
-                  <p className="text-sm text-gray-900">
-                    {getAllocationTypeLabel(selectedAllocation.allocationType)}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Amount
-                  </label>
-                  <p className="text-sm text-gray-900">
-                    {formatCurrency(
-                      selectedAllocation.allocatedAmount,
-                      selectedAllocation.currency
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Status
-                  </label>
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(selectedAllocation.status)}
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(
-                        selectedAllocation.status
-                      )}`}
-                    >
-                      {selectedAllocation.status.charAt(0).toUpperCase() +
-                        selectedAllocation.status.slice(1)}
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Created By
-                  </label>
-                  <p className="text-sm text-gray-900">
-                    {selectedAllocation.allocatedBy?.firstName}{" "}
-                    {selectedAllocation.allocatedBy?.lastName}
-                  </p>
-                </div>
-              </div>
-
-              {selectedAllocation.notes && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Notes
-                  </label>
-                  <p className="text-sm text-gray-900">
-                    {selectedAllocation.notes}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setShowDetailsModal(false)}
-                className="flex-1 px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg font-medium hover:bg-[var(--elra-primary-dark)] transition-colors cursor-pointer"
-              >
-                Close
-              </button>
-              {selectedAllocation.status === "pending" && (
-                <>
-                  <button
-                    onClick={() => {
-                      handleApproveAllocation(selectedAllocation._id);
-                      setShowDetailsModal(false);
-                    }}
-                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleRejectAllocation(selectedAllocation._id);
-                      setShowDetailsModal(false);
-                    }}
-                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700"
-                  >
-                    Reject
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Project Details Modal */}
-      {showProjectDetailsModal && selectedProject && (
-        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-8 w-full max-w-6xl max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-200">
-              <div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                  Project Details
-                </h2>
-                <p className="text-gray-600">
-                  {selectedProject.name} - {selectedProject.code}
-                </p>
-              </div>
-              <button
-                onClick={() => setShowProjectDetailsModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
-              >
-                <XMarkIcon className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              {/* Project Progress Tracking */}
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
-                <div className="flex items-center mb-4">
-                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                    <span className="text-green-600 text-lg">📊</span>
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900">
-                    Approval Progress
-                  </h3>
-                </div>
-
-                {selectedProject.approvalChain &&
-                selectedProject.approvalChain.length > 0 ? (
-                  <div className="space-y-4">
-                    {/* Overall Progress */}
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-gray-700">
-                          Overall Approval Progress
-                        </span>
-                        <span className="text-sm font-bold text-green-600">
-                          {(() => {
-                            const completed =
-                              selectedProject.approvalChain.filter(
-                                (step) => step.status === "approved"
-                              ).length;
-                            const total = selectedProject.approvalChain.length;
-                            return `${completed}/${total} levels completed`;
-                          })()}
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-3">
-                        <div
-                          className="bg-gradient-to-r from-green-500 to-emerald-500 h-3 rounded-full transition-all duration-500"
-                          style={{
-                            width: `${(() => {
-                              const completed =
-                                selectedProject.approvalChain.filter(
-                                  (step) => step.status === "approved"
-                                ).length;
-                              const total =
-                                selectedProject.approvalChain.length;
-                              return total > 0 ? (completed / total) * 100 : 0;
-                            })()}%`,
-                          }}
-                        ></div>
-                      </div>
-                    </div>
-
-                    {/* Approval Chain Status */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {selectedProject.approvalChain.map((step, index) => (
-                        <div
-                          key={index}
-                          className={`flex items-center justify-between p-3 rounded-lg border ${
-                            step.status === "approved"
-                              ? "bg-green-50 border-green-200"
-                              : step.status === "pending"
-                              ? "bg-yellow-50 border-yellow-200"
-                              : "bg-gray-50 border-gray-200"
-                          }`}
-                        >
-                          <span className="text-sm font-medium text-gray-700">
-                            {step.level
-                              .replace(/_/g, " ")
-                              .replace(/\b\w/g, (l) => l.toUpperCase())}
-                          </span>
-                          <div className="flex items-center">
-                            {step.status === "approved" ? (
-                              <CheckCircleIcon className="w-5 h-5 text-green-500" />
-                            ) : step.status === "pending" ? (
-                              <ClockSolid className="w-5 h-5 text-yellow-500" />
-                            ) : (
-                              <div className="w-5 h-5 rounded-full bg-gray-300"></div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <p className="text-gray-500">
-                      No approval chain data available
+                    />
+                    <p className="text-sm text-gray-500 mt-2">
+                      Click "Use Signature Template" to auto-fill your
+                      signature, or add your own notes
                     </p>
                   </div>
-                )}
+                </form>
               </div>
 
-              {/* Budget Allocation Information */}
-              {selectedProject.requiresBudgetAllocation && (
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-                  <div className="flex items-center mb-4">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                      <span className="text-blue-600 text-lg">💳</span>
-                    </div>
-                    <h3 className="text-xl font-semibold text-gray-900">
-                      Budget Allocation Information
-                    </h3>
-                  </div>
+              {/* Modal Footer */}
+              <div className="flex-shrink-0 p-8 bg-gray-50 border-t border-gray-200">
+                <div className="flex gap-4">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    disabled={isSubmitting}
+                    className="flex-1 px-6 py-3 border border-gray-300 rounded-xl text-gray-700 font-semibold hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                  >
+                    Cancel
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="submit"
+                    disabled={isSubmitting}
+                    onClick={handleCreateAllocation}
+                    className="flex-1 px-6 py-3 bg-[var(--elra-primary)] text-white rounded-xl font-semibold hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 transition-all duration-200 cursor-pointer"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        Creating Allocation...
+                      </>
+                    ) : (
+                      <>
+                        <PlusIcon className="w-5 h-5" />
+                        Create Allocation
+                      </>
+                    )}
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-white rounded-lg p-4 border border-blue-100">
-                      <div className="text-sm font-medium text-gray-600 mb-1">
-                        ELRA Wallet Balance
-                      </div>
-                      <div className="text-lg font-bold text-green-600">
-                        {formatCurrency(
-                          stats.walletBalance?.projects?.available || 0
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        Available for Projects
-                      </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg p-4 border border-blue-100">
-                      <div className="text-sm font-medium text-gray-600 mb-1">
-                        Project Budget
-                      </div>
-                      <div className="text-lg font-bold text-gray-900">
-                        {formatCurrency(selectedProject.budget)}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        Total Project Budget
-                      </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg p-4 border border-blue-100">
-                      <div className="text-sm font-medium text-gray-600 mb-1">
-                        Items Cost (To Allocate)
-                      </div>
-                      <div className="text-lg font-bold text-blue-600">
-                        {formatCurrency(
-                          selectedProject.projectItems?.reduce(
-                            (sum, item) => sum + (item.totalPrice || 0),
-                            0
-                          ) || 0
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        Required for Procurement
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                    <div className="flex items-start">
-                      <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mr-3 mt-0.5">
-                        <span className="text-green-600 text-sm">💰</span>
+      {/* Enhanced Details Modal */}
+      <AnimatePresence>
+        {showDetailsModal && selectedAllocation && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowDetailsModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 30 }}
+              transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[95vh] flex flex-col border border-gray-100 relative overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="bg-gradient-to-br from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] text-white p-8 flex-shrink-0 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-4 bg-white/20 rounded-3xl backdrop-blur-sm border border-white/20">
+                        <EyeIcon className="w-8 h-8 text-white" />
                       </div>
                       <div>
-                        <p className="text-sm text-green-800 font-medium mb-1">
-                          Allocation Summary
+                        <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
+                          Budget Allocation Details
+                        </h2>
+                        <p className="text-white/90 mt-2 text-lg">
+                          View detailed information about this allocation
                         </p>
-                        <p className="text-sm text-green-700">
-                          This allocation will reserve ₦
-                          {formatNumberWithCommas(
-                            selectedProject.projectItems?.reduce(
-                              (sum, item) => sum + (item.totalPrice || 0),
-                              0
-                            ) || 0
-                          )}{" "}
-                          from the ELRA wallet for project procurement. After
-                          approval, procurement will be automatically triggered.
+                      </div>
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setShowDetailsModal(false)}
+                      className="p-3 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition-all duration-200 border border-white/20"
+                    >
+                      <XMarkIcon className="w-6 h-6" />
+                    </motion.button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto p-8">
+                <div className="space-y-8">
+                  {/* Allocation Information */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      Allocation Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-2">
+                          Allocation Code
+                        </label>
+                        <p className="text-lg font-mono text-gray-900 bg-white px-3 py-2 rounded-lg border">
+                          {selectedAllocation.allocationCode}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-2">
+                          Entity Name
+                        </label>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {selectedAllocation.entityName}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-2">
+                          Entity Code
+                        </label>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {selectedAllocation.entityCode}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-2">
+                          Allocation Type
+                        </label>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {getAllocationTypeLabel(
+                            selectedAllocation.allocationType
+                          )}
                         </p>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
 
-              {/* Project Basic Information */}
-              <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-6 border border-gray-200">
-                <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
-                  <span className="text-2xl">📋</span>
-                  Project Information
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <span className="font-medium text-gray-700">
-                      Project Name:
-                    </span>
-                    <p className="text-gray-900">{selectedProject.name}</p>
+                  {/* Financial Information */}
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      Financial Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-2">
+                          Amount Allocated
+                        </label>
+                        <p className="text-2xl font-bold text-green-600">
+                          {formatCurrency(
+                            selectedAllocation.allocatedAmount,
+                            selectedAllocation.currency
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-2">
+                          Status
+                        </label>
+                        <div className="flex items-center gap-2">
+                          {getStatusIcon(selectedAllocation.status)}
+                          <span
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(
+                              selectedAllocation.status
+                            )}`}
+                          >
+                            {selectedAllocation.status.charAt(0).toUpperCase() +
+                              selectedAllocation.status.slice(1)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-medium text-gray-700">
-                      Project Code:
-                    </span>
-                    <p className="text-gray-900 font-mono">
-                      {selectedProject.code}
-                    </p>
+
+                  {/* Creator Information */}
+                  <div className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-6 border border-purple-200">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      Creator Information
+                    </h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-600 mb-2">
+                        Created By
+                      </label>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {selectedAllocation.allocatedBy?.firstName}{" "}
+                        {selectedAllocation.allocatedBy?.lastName}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {selectedAllocation.allocatedBy?.email}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-medium text-gray-700">
-                      Department:
-                    </span>
-                    <p className="text-gray-900">
-                      {selectedProject.department?.name}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">
-                      Project Manager:
-                    </span>
-                    <p className="text-gray-900">
-                      {selectedProject.projectManager?.firstName}{" "}
-                      {selectedProject.projectManager?.lastName}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Budget:</span>
-                    <p className="text-gray-900 font-semibold">
-                      {formatCurrency(selectedProject.budget)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Status:</span>
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        selectedProject.status === "pending_budget_allocation"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-green-100 text-green-800"
-                      }`}
-                    >
-                      {selectedProject.status === "pending_budget_allocation"
-                        ? "Need Allocation"
-                        : "Allocated"}
-                    </span>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <span className="font-medium text-gray-700">
-                    Description:
-                  </span>
-                  <p className="text-gray-900 mt-1">
-                    {selectedProject.description}
-                  </p>
+
+                  {/* Notes Section */}
+                  {selectedAllocation.notes && (
+                    <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-6 border border-gray-200">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Notes
+                      </h3>
+                      <div className="bg-white rounded-lg p-4 border border-gray-200">
+                        <p className="text-gray-900 whitespace-pre-wrap">
+                          {selectedAllocation.notes}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Project Items */}
-              {selectedProject.projectItems &&
-                selectedProject.projectItems.length > 0 && (
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
-                      <span className="text-2xl">🛍️</span>
-                      Project Items
-                    </h3>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-white">
-                          <tr>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Item Name
-                            </th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Description
-                            </th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Quantity
-                            </th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Unit Price
-                            </th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Total Price
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {selectedProject.projectItems.map((item, index) => (
-                            <tr key={index}>
-                              <td className="px-4 py-2 text-sm font-medium text-gray-900">
-                                {item.name}
-                              </td>
-                              <td className="px-4 py-2 text-sm text-gray-500">
-                                {item.description}
-                              </td>
-                              <td className="px-4 py-2 text-sm text-gray-900">
-                                {item.quantity}
-                              </td>
-                              <td className="px-4 py-2 text-sm text-gray-900">
-                                {formatCurrency(item.unitPrice)}
-                              </td>
-                              <td className="px-4 py-2 text-sm font-semibold text-gray-900">
-                                {formatCurrency(item.totalPrice)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+              {/* Modal Footer */}
+              <div className="flex-shrink-0 p-8 bg-gray-50 border-t border-gray-200">
+                <div className="flex gap-4">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setShowDetailsModal(false)}
+                    className="flex-1 px-6 py-3 bg-[var(--elra-primary)] text-white rounded-xl font-semibold hover:bg-[var(--elra-primary-dark)] transition-all duration-200 cursor-pointer"
+                  >
+                    Close
+                  </motion.button>
+                  {selectedAllocation.status === "pending" && (
+                    <>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          handleApproveAllocation(selectedAllocation._id);
+                          setShowDetailsModal(false);
+                        }}
+                        className="flex-1 px-6 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-all duration-200"
+                      >
+                        Approve
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => {
+                          handleRejectAllocation(selectedAllocation._id);
+                          setShowDetailsModal(false);
+                        }}
+                        className="flex-1 px-6 py-3 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-all duration-200"
+                      >
+                        Reject
+                      </motion.button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Enhanced Project Details Modal */}
+      <AnimatePresence>
+        {showProjectDetailsModal && selectedProject && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowProjectDetailsModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 30 }}
+              transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-7xl max-h-[95vh] flex flex-col border border-gray-100 relative overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="bg-gradient-to-br from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] text-white p-8 flex-shrink-0 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-32 translate-x-32"></div>
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="p-4 bg-white/20 rounded-3xl backdrop-blur-sm border border-white/20">
+                        <DocumentTextIcon className="w-8 h-8 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
+                          Project Details
+                        </h2>
+                        <p className="text-white/90 mt-2 text-lg">
+                          {selectedProject.name} - {selectedProject.code}
+                        </p>
+                      </div>
                     </div>
-                    <div className="mt-4 p-3 bg-white rounded border">
-                      <div className="flex justify-between items-center">
-                        <span className="font-semibold text-gray-700">
-                          Items Total:
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setShowProjectDetailsModal(false)}
+                      className="p-3 bg-white/20 backdrop-blur-sm text-white rounded-xl hover:bg-white/30 transition-all duration-200 border border-white/20"
+                    >
+                      <XMarkIcon className="w-6 h-6" />
+                    </motion.button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto p-8">
+                <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-200">
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                      Project Details
+                    </h2>
+                    <p className="text-gray-600">
+                      {selectedProject.name} - {selectedProject.code}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowProjectDetailsModal(false)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-full"
+                  >
+                    <XMarkIcon className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Project Progress Tracking */}
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+                    <div className="flex items-center mb-4">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                        <span className="text-green-600 text-lg">📊</span>
+                      </div>
+                      <h3 className="text-xl font-semibold text-gray-900">
+                        Approval Progress
+                      </h3>
+                    </div>
+
+                    {selectedProject.approvalChain &&
+                    selectedProject.approvalChain.length > 0 ? (
+                      <div className="space-y-4">
+                        {/* Overall Progress */}
+                        <div>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium text-gray-700">
+                              Overall Approval Progress
+                            </span>
+                            <span className="text-sm font-bold text-green-600">
+                              {(() => {
+                                const completed =
+                                  selectedProject.approvalChain.filter(
+                                    (step) => step.status === "approved"
+                                  ).length;
+                                const total =
+                                  selectedProject.approvalChain.length;
+                                return `${completed}/${total} levels completed`;
+                              })()}
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-3">
+                            <div
+                              className="bg-gradient-to-r from-green-500 to-emerald-500 h-3 rounded-full transition-all duration-500"
+                              style={{
+                                width: `${(() => {
+                                  const completed =
+                                    selectedProject.approvalChain.filter(
+                                      (step) => step.status === "approved"
+                                    ).length;
+                                  const total =
+                                    selectedProject.approvalChain.length;
+                                  return total > 0
+                                    ? (completed / total) * 100
+                                    : 0;
+                                })()}%`,
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+
+                        {/* Approval Chain Status */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {selectedProject.approvalChain.map((step, index) => (
+                            <div
+                              key={index}
+                              className={`flex items-center justify-between p-3 rounded-lg border ${
+                                step.status === "approved"
+                                  ? "bg-green-50 border-green-200"
+                                  : step.status === "pending"
+                                  ? "bg-yellow-50 border-yellow-200"
+                                  : "bg-gray-50 border-gray-200"
+                              }`}
+                            >
+                              <span className="text-sm font-medium text-gray-700">
+                                {step.level
+                                  .replace(/_/g, " ")
+                                  .replace(/\b\w/g, (l) => l.toUpperCase())}
+                              </span>
+                              <div className="flex items-center">
+                                {step.status === "approved" ? (
+                                  <CheckCircleIcon className="w-5 h-5 text-green-500" />
+                                ) : step.status === "pending" ? (
+                                  <ClockSolid className="w-5 h-5 text-yellow-500" />
+                                ) : (
+                                  <div className="w-5 h-5 rounded-full bg-gray-300"></div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-gray-500">
+                          No approval chain data available
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Budget Allocation Information */}
+                  {selectedProject.requiresBudgetAllocation && (
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                      <div className="flex items-center mb-4">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                          <span className="text-blue-600 text-lg">💳</span>
+                        </div>
+                        <h3 className="text-xl font-semibold text-gray-900">
+                          Budget Allocation Information
+                        </h3>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white rounded-lg p-4 border border-blue-100">
+                          <div className="text-sm font-medium text-gray-600 mb-1">
+                            ELRA Wallet Balance
+                          </div>
+                          <div className="text-lg font-bold text-green-600">
+                            {formatCurrency(
+                              stats.walletBalance?.projects?.available || 0
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            Available for Projects
+                          </div>
+                        </div>
+
+                        <div className="bg-white rounded-lg p-4 border border-blue-100">
+                          <div className="text-sm font-medium text-gray-600 mb-1">
+                            Project Budget
+                          </div>
+                          <div className="text-lg font-bold text-gray-900">
+                            {formatCurrency(selectedProject.budget)}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            Total Project Budget
+                          </div>
+                        </div>
+
+                        <div className="bg-white rounded-lg p-4 border border-blue-100">
+                          <div className="text-sm font-medium text-gray-600 mb-1">
+                            Items Cost (To Allocate)
+                          </div>
+                          <div className="text-lg font-bold text-blue-600">
+                            {formatCurrency(
+                              selectedProject.projectItems?.reduce(
+                                (sum, item) => sum + (item.totalPrice || 0),
+                                0
+                              ) || 0
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            Required for Procurement
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                        <div className="flex items-start">
+                          <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mr-3 mt-0.5">
+                            <span className="text-green-600 text-sm">💰</span>
+                          </div>
+                          <div>
+                            <p className="text-sm text-green-800 font-medium mb-1">
+                              Allocation Summary
+                            </p>
+                            <p className="text-sm text-green-700">
+                              This allocation will reserve ₦
+                              {formatNumberWithCommas(
+                                selectedProject.projectItems?.reduce(
+                                  (sum, item) => sum + (item.totalPrice || 0),
+                                  0
+                                ) || 0
+                              )}{" "}
+                              from the ELRA wallet for project procurement.
+                              After approval, procurement will be automatically
+                              triggered.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Project Basic Information */}
+                  <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-6 border border-gray-200">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                      <span className="text-2xl">📋</span>
+                      Project Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <span className="font-medium text-gray-700">
+                          Project Name:
                         </span>
-                        <span className="font-bold text-lg text-blue-600">
+                        <p className="text-gray-900">{selectedProject.name}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">
+                          Project Code:
+                        </span>
+                        <p className="text-gray-900 font-mono">
+                          {selectedProject.code}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">
+                          Department:
+                        </span>
+                        <p className="text-gray-900">
+                          {selectedProject.department?.name}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">
+                          Project Manager:
+                        </span>
+                        <p className="text-gray-900">
+                          {selectedProject.projectManager?.firstName}{" "}
+                          {selectedProject.projectManager?.lastName}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">
+                          Budget:
+                        </span>
+                        <p className="text-gray-900 font-semibold">
+                          {formatCurrency(selectedProject.budget)}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">
+                          Status:
+                        </span>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            selectedProject.status ===
+                            "pending_budget_allocation"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-green-100 text-green-800"
+                          }`}
+                        >
+                          {selectedProject.status ===
+                          "pending_budget_allocation"
+                            ? "Need Allocation"
+                            : "Allocated"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <span className="font-medium text-gray-700">
+                        Description:
+                      </span>
+                      <p className="text-gray-900 mt-1">
+                        {selectedProject.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Budget Percentage Breakdown (for external projects) */}
+                  {selectedProject.projectScope === "external" &&
+                    selectedProject.budgetPercentage && (
+                      <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                          <span className="text-2xl">💰</span>
+                          Budget Contribution Breakdown
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="bg-white rounded-lg p-4 border border-green-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-gray-600">
+                                ELRA Contribution
+                              </span>
+                              <span className="text-sm font-bold text-green-600">
+                                {selectedProject.budgetPercentage}%
+                              </span>
+                            </div>
+                            <div className="text-2xl font-bold text-green-700">
+                              {formatCurrency(
+                                (calculateProjectItemsTotal(selectedProject) *
+                                  selectedProject.budgetPercentage) /
+                                  100
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              ELRA will handle this amount
+                            </div>
+                          </div>
+                          <div className="bg-white rounded-lg p-4 border border-blue-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-gray-600">
+                                Client Contribution
+                              </span>
+                              <span className="text-sm font-bold text-blue-600">
+                                {100 - selectedProject.budgetPercentage}%
+                              </span>
+                            </div>
+                            <div className="text-2xl font-bold text-blue-700">
+                              {formatCurrency(
+                                (calculateProjectItemsTotal(selectedProject) *
+                                  (100 - selectedProject.budgetPercentage)) /
+                                  100
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              Client will handle this amount
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-4 p-3 bg-white rounded border">
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold text-gray-700">
+                              Total Project Cost:
+                            </span>
+                            <span className="font-bold text-lg text-gray-900">
+                              {formatCurrency(
+                                calculateProjectItemsTotal(selectedProject)
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Project Items */}
+                  {selectedProject.projectItems &&
+                    selectedProject.projectItems.length > 0 && (
+                      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                          <span className="text-2xl">🛍️</span>
+                          Project Items
+                        </h3>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-white">
+                              <tr>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Item Name
+                                </th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Description
+                                </th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Quantity
+                                </th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Unit Price
+                                </th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                  Total Price
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {selectedProject.projectItems.map(
+                                (item, index) => (
+                                  <tr key={index}>
+                                    <td className="px-4 py-2 text-sm font-medium text-gray-900">
+                                      {item.name}
+                                    </td>
+                                    <td className="px-4 py-2 text-sm text-gray-500">
+                                      {item.description}
+                                    </td>
+                                    <td className="px-4 py-2 text-sm text-gray-900">
+                                      {item.quantity}
+                                    </td>
+                                    <td className="px-4 py-2 text-sm text-gray-900">
+                                      {formatCurrency(item.unitPrice)}
+                                    </td>
+                                    <td className="px-4 py-2 text-sm font-semibold text-gray-900">
+                                      {formatCurrency(item.totalPrice)}
+                                    </td>
+                                  </tr>
+                                )
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="mt-4 p-3 bg-white rounded border">
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold text-gray-700">
+                              Items Total:
+                            </span>
+                            <span className="font-bold text-lg text-blue-600">
+                              {formatCurrency(
+                                calculateProjectItemsTotal(selectedProject)
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Required Documents */}
+                  {selectedProject.requiredDocuments &&
+                    selectedProject.requiredDocuments.length > 0 && (
+                      <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6 border border-green-200">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                          <DocumentTextIcon className="w-6 h-6 text-green-600" />
+                          Required Documents
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {selectedProject.requiredDocuments.map(
+                            (doc, index) => (
+                              <div
+                                key={index}
+                                className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow"
+                              >
+                                <div className="flex flex-col items-center text-center">
+                                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-3">
+                                    <DocumentTextIcon className="w-6 h-6 text-blue-600" />
+                                  </div>
+                                  <h4 className="font-semibold text-gray-900 text-sm mb-1 capitalize">
+                                    {doc.documentType.replace(/_/g, " ")}
+                                  </h4>
+                                  <p className="text-xs text-gray-500 mb-3 truncate w-full">
+                                    {doc.fileName}
+                                  </p>
+                                  <button
+                                    onClick={() => {
+                                      if (doc.documentId) {
+                                        window.open(
+                                          `/api/documents/${doc.documentId}/view`,
+                                          "_blank"
+                                        );
+                                      }
+                                    }}
+                                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer w-full"
+                                  >
+                                    View Document
+                                  </button>
+                                </div>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Financial Summary */}
+                  <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-6 border border-yellow-200">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                      <span className="text-2xl">💰</span>
+                      Financial Summary
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center p-2 bg-white rounded border">
+                        <span className="text-gray-600">Project Budget:</span>
+                        <span className="font-medium">
+                          {formatCurrency(selectedProject.budget)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center p-2 bg-white rounded border">
+                        <span className="text-gray-600">Items Total:</span>
+                        <span className="font-medium">
                           {formatCurrency(
                             calculateProjectItemsTotal(selectedProject)
                           )}
@@ -1766,88 +2207,26 @@ Finance HOD`}
                       </div>
                     </div>
                   </div>
-                )}
-
-              {/* Required Documents */}
-              {selectedProject.requiredDocuments &&
-                selectedProject.requiredDocuments.length > 0 && (
-                  <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6 border border-green-200">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
-                      <DocumentTextIcon className="w-6 h-6 text-green-600" />
-                      Required Documents
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {selectedProject.requiredDocuments.map((doc, index) => (
-                        <div
-                          key={index}
-                          className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow"
-                        >
-                          <div className="flex flex-col items-center text-center">
-                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-3">
-                              <DocumentTextIcon className="w-6 h-6 text-blue-600" />
-                            </div>
-                            <h4 className="font-semibold text-gray-900 text-sm mb-1 capitalize">
-                              {doc.documentType.replace(/_/g, " ")}
-                            </h4>
-                            <p className="text-xs text-gray-500 mb-3 truncate w-full">
-                              {doc.fileName}
-                            </p>
-                            <button
-                              onClick={() => {
-                                if (doc.documentId) {
-                                  window.open(
-                                    `/api/documents/${doc.documentId}/view`,
-                                    "_blank"
-                                  );
-                                }
-                              }}
-                              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer w-full"
-                            >
-                              View Document
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-              {/* Financial Summary */}
-              <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-6 border border-yellow-200">
-                <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
-                  <span className="text-2xl">💰</span>
-                  Financial Summary
-                </h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-2 bg-white rounded border">
-                    <span className="text-gray-600">Project Budget:</span>
-                    <span className="font-medium">
-                      {formatCurrency(selectedProject.budget)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-2 bg-white rounded border">
-                    <span className="text-gray-600">Items Total:</span>
-                    <span className="font-medium">
-                      {formatCurrency(
-                        calculateProjectItemsTotal(selectedProject)
-                      )}
-                    </span>
-                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex justify-end mt-6">
-              <button
-                onClick={() => setShowProjectDetailsModal(false)}
-                className="px-6 py-2 bg-[var(--elra-primary)] text-white rounded-lg font-medium hover:bg-[var(--elra-primary-dark)] transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              {/* Modal Footer */}
+              <div className="flex-shrink-0 p-8 bg-gray-50 border-t border-gray-200">
+                <div className="flex justify-end">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setShowProjectDetailsModal(false)}
+                    className="px-8 py-3 bg-[var(--elra-primary)] text-white rounded-xl font-semibold hover:bg-[var(--elra-primary-dark)] transition-all duration-200 cursor-pointer"
+                  >
+                    Close
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

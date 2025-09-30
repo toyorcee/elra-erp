@@ -160,8 +160,8 @@ const createEmailTemplate = (
     <body>
         <div class="email-container">
             <div class="header">
-                <div class="logo">EDMS</div>
-                <div class="subtitle">Electronic Document Management System</div>
+                <div class="logo">ELRA</div>
+                <div class="subtitle">Equipment Leasing Registration Authority</div>
             </div>
             
             <div class="content">
@@ -177,7 +177,7 @@ const createEmailTemplate = (
             <div class="footer">
                 <div class="footer-text">${footerText}</div>
                 <div class="company-info">
-                    EDMS Platform - Secure Document Management
+                    ELRA ERP Platform - Equipment Leasing Management
                 </div>
             </div>
         </div>
@@ -199,16 +199,16 @@ export const sendAdminInvitationEmail = async (
     const loginUrl = `${process.env.CLIENT_URL}/login`;
 
     const htmlContent = createEmailTemplate(
-      `Welcome to ${companyName} - EDMS Platform`,
+      `Welcome to ${companyName} - ELRA ERP Platform`,
       `
         <p>Hello <strong>${adminName}</strong>,</p>
-        <p>🎉 <strong>Congratulations!</strong> Your EDMS subscription has been successfully activated!</p>
+        <p>🎉 <strong>Congratulations!</strong> Your ELRA ERP subscription has been successfully activated!</p>
         
         <div style="background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); color: white; padding: 25px; border-radius: 15px; margin: 20px 0; text-align: center;">
           <h2 style="margin: 0 0 15px 0; font-size: 24px;">Your Admin Account is Ready</h2>
           <p style="margin: 5px 0; font-size: 18px;"><strong>Company:</strong> ${companyName}</p>
           <p style="margin: 5px 0; font-size: 18px;"><strong>Role:</strong> Super Administrator</p>
-          <p style="margin: 15px 0 0 0; font-size: 16px;">You can now access your EDMS platform!</p>
+          <p style="margin: 15px 0 0 0; font-size: 16px;">You can now access your ELRA ERP platform!</p>
         </div>
         
         <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
@@ -220,7 +220,7 @@ export const sendAdminInvitationEmail = async (
         
         <p>🚀 <strong>What's Next?</strong></p>
         <ul style="margin: 20px 0; padding-left: 20px;">
-          <li>Login to your EDMS platform</li>
+          <li>Login to your ELRA ERP platform</li>
           <li>Change your temporary password</li>
           <li>Set up your departments and user roles</li>
           <li>Configure your approval workflows</li>
@@ -229,15 +229,15 @@ export const sendAdminInvitationEmail = async (
         
         <p>Need help getting started? Our support team is here to assist you!</p>
       `,
-      "Login to EDMS Platform",
+      "Login to ELRA ERP Platform",
       loginUrl,
-      `Welcome to ${companyName} - Your EDMS platform is ready!`
+      `Welcome to ${companyName} - Your ELRA ERP platform is ready!`
     );
 
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: adminEmail,
-      subject: `Welcome to ${companyName} - EDMS Platform Access`,
+      subject: `Welcome to ${companyName} - ELRA ERP Platform Access`,
       html: htmlContent,
     };
 
@@ -280,16 +280,16 @@ export const sendIndividualUserInvitationEmail = async (
     const loginUrl = `${process.env.CLIENT_URL}/login`;
 
     const htmlContent = createEmailTemplate(
-      `Welcome to EDMS - Your Account is Ready`,
+      `Welcome to ELRA ERP - Your Account is Ready`,
       `
         <p>Hello <strong>${userName}</strong>,</p>
-        <p>🎉 <strong>Congratulations!</strong> Your EDMS subscription has been successfully activated!</p>
+        <p>🎉 <strong>Congratulations!</strong> Your ELRA ERP subscription has been successfully activated!</p>
         
         <div style="background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); color: white; padding: 25px; border-radius: 15px; margin: 20px 0; text-align: center;">
-          <h2 style="margin: 0 0 15px 0; font-size: 24px;">Your EDMS Account is Ready</h2>
+          <h2 style="margin: 0 0 15px 0; font-size: 24px;">Your ELRA ERP Account is Ready</h2>
           <p style="margin: 5px 0; font-size: 18px;"><strong>Account Type:</strong> Individual User</p>
           <p style="margin: 5px 0; font-size: 18px;"><strong>Role:</strong> User</p>
-          <p style="margin: 15px 0 0 0; font-size: 16px;">You can now access your EDMS platform!</p>
+          <p style="margin: 15px 0 0 0; font-size: 16px;">You can now access your ELRA ERP platform!</p>
         </div>
         
         <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
@@ -301,7 +301,7 @@ export const sendIndividualUserInvitationEmail = async (
         
         <p>🚀 <strong>What's Next?</strong></p>
         <ul style="margin: 20px 0; padding-left: 20px;">
-          <li>Login to your EDMS platform</li>
+          <li>Login to your ELRA ERP platform</li>
           <li>Change your temporary password</li>
           <li>Set up your profile</li>
           <li>Upload your first documents</li>
@@ -310,15 +310,15 @@ export const sendIndividualUserInvitationEmail = async (
         
         <p>Need help getting started? Our support team is here to assist you!</p>
       `,
-      "Login to EDMS Platform",
+      "Login to ELRA ERP Platform",
       loginUrl,
-      "Welcome to EDMS - Your account is ready!"
+      "Welcome to ELRA ERP - Your account is ready!"
     );
 
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: userEmail,
-      subject: `Welcome to EDMS - Your Account is Ready`,
+      subject: `Welcome to ELRA ERP - Your Account is Ready`,
       html: htmlContent,
     };
 
@@ -367,10 +367,10 @@ export const sendCompanyBillingEmail = async (
     const formattedAmount = formatCurrency(amount, currency);
 
     const htmlContent = createEmailTemplate(
-      `EDMS Subscription Invoice - ${companyName}`,
+      `ELRA ERP Subscription Invoice - ${companyName}`,
       `
         <p>Hello <strong>${companyName}</strong> Team,</p>
-        <p>Thank you for your EDMS subscription! Here's your billing information.</p>
+        <p>Thank you for your ELRA ERP subscription! Here's your billing information.</p>
         
         <div style="background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); color: white; padding: 25px; border-radius: 15px; margin: 20px 0; text-align: center;">
           <h2 style="margin: 0 0 15px 0; font-size: 24px;">Subscription Invoice</h2>
@@ -391,7 +391,7 @@ export const sendCompanyBillingEmail = async (
         <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
           <h3 style="margin: 0 0 15px 0; color: #333;">What's Included:</h3>
           <ul style="margin: 0; padding-left: 20px;">
-            <li>Full access to EDMS platform</li>
+            <li>Full access to ELRA ERP platform</li>
             <li>Document management and workflow automation</li>
             <li>Team collaboration tools</li>
             <li>24/7 customer support</li>
@@ -411,13 +411,13 @@ export const sendCompanyBillingEmail = async (
       `,
       "View Billing Dashboard",
       billingUrl,
-      `Thank you for choosing EDMS - Your subscription is active!`
+      `Thank you for choosing ELRA ERP - Your subscription is active!`
     );
 
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: companyEmail,
-      subject: `EDMS Subscription Invoice - ${companyName}`,
+      subject: `ELRA ERP Subscription Invoice - ${companyName}`,
       html: htmlContent,
     };
 
@@ -468,7 +468,7 @@ export const sendPaymentConfirmationEmail = async (
       `Payment Confirmed - ${companyName}`,
       `
         <p>Hello <strong>${companyName}</strong> Team,</p>
-        <p>🎉 <strong>Payment Successful!</strong> Your EDMS subscription payment has been confirmed.</p>
+        <p>🎉 <strong>Payment Successful!</strong> Your ELRA ERP subscription payment has been confirmed.</p>
         
         <div style="background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); color: white; padding: 25px; border-radius: 15px; margin: 20px 0; text-align: center;">
           <h2 style="margin: 0 0 15px 0; font-size: 24px;">Payment Confirmed</h2>
@@ -485,11 +485,11 @@ export const sendPaymentConfirmationEmail = async (
           <li>Invite team members to collaborate</li>
         </ul>
         
-        <p>Thank you for choosing EDMS! We're excited to help you streamline your document management.</p>
+        <p>Thank you for choosing ELRA ERP! We're excited to help you streamline your document management.</p>
       `,
       "Access Your Platform",
       loginUrl,
-      `Payment confirmed - Welcome to EDMS!`
+      `Payment confirmed - Welcome to ELRA ERP!`
     );
 
     // Send to both admin and company emails
@@ -500,7 +500,7 @@ export const sendPaymentConfirmationEmail = async (
       const mailOptions = {
         from: process.env.EMAIL_FROM,
         to: email,
-        subject: `Payment Confirmed - ${companyName} EDMS Subscription`,
+        subject: `Payment Confirmed - ${companyName} ELRA ERP Subscription`,
         html: htmlContent,
       };
 
@@ -553,7 +553,7 @@ export const sendRenewalReminderEmail = async (
       `Subscription Renewal Reminder - ${companyName}`,
       `
         <p>Hello <strong>${companyName}</strong> Team,</p>
-        <p>This is a friendly reminder that your EDMS subscription will be renewed soon.</p>
+        <p>This is a friendly reminder that your ELRA ERP subscription will be renewed soon.</p>
         
         <div style="background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%); color: white; padding: 25px; border-radius: 15px; margin: 20px 0; text-align: center;">
           <h2 style="margin: 0 0 15px 0; font-size: 24px;">Renewal Reminder</h2>
@@ -578,7 +578,7 @@ export const sendRenewalReminderEmail = async (
       `,
       "Manage Subscription",
       billingUrl,
-      `Thank you for your continued trust in EDMS!`
+      `Thank you for your continued trust in ELRA ERP!`
     );
 
     const mailOptions = {
@@ -657,7 +657,7 @@ export const sendPaymentFailedEmail = async (
       `,
       "Update Payment Method",
       retryUrl,
-      `Please update your payment method to continue using EDMS.`
+      `Please update your payment method to continue using ELRA ERP.`
     );
 
     const mailOptions = {

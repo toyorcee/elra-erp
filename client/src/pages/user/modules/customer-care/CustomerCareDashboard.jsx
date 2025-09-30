@@ -43,6 +43,10 @@ const CustomerCareDashboard = () => {
     user?.department?.name === "Customer Care";
 
   const isHOD = user?.role?.level >= 700;
+  const isManager = user?.role?.level >= 600;
+  const isStaff = user?.role?.level >= 300;
+  const isViewer = user?.role?.level >= 100;
+  const canHandleComplaints = user?.role?.level >= 300; // Only staff level and above can handle complaints
 
   useEffect(() => {
     const fetchData = async () => {
@@ -376,7 +380,11 @@ const CustomerCareDashboard = () => {
       <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl p-6 text-white">
         <h1 className="text-3xl font-bold mb-2">Customer Care Dashboard</h1>
         <p className="text-white/80">
-          Manage staff complaints and service requests
+          {isHOD
+            ? "Manage team assignments and oversee complaint resolution"
+            : canHandleComplaints
+            ? "Handle assigned complaints and manage customer service requests"
+            : "View customer care data and reports (Viewer access)"}
         </p>
       </div>
 
@@ -480,25 +488,7 @@ const CustomerCareDashboard = () => {
       >
         <h2 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-            <Link
-              to="/dashboard/modules/customer-care/submit-complaint"
-              className="flex items-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl hover:shadow-lg transition-all duration-300 group"
-            >
-              <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <HiPlus className="w-6 h-6 text-white" />
-              </div>
-              <div className="ml-4">
-                <h3 className="font-semibold text-gray-900">
-                  Submit Complaint
-                </h3>
-                <p className="text-sm text-gray-600">
-                  Report an issue or concern
-                </p>
-              </div>
-            </Link>
-          </motion.div>
-
+          {/* All Complaints - Available to all Customer Care users */}
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <Link
               to="/dashboard/modules/customer-care/complaints"
@@ -508,18 +498,87 @@ const CustomerCareDashboard = () => {
                 <HiTicket className="w-6 h-6 text-white" />
               </div>
               <div className="ml-4">
-                <h3 className="font-semibold text-gray-900">View Complaints</h3>
-                <p className="text-sm text-gray-600">Check all complaints</p>
+                <h3 className="font-semibold text-gray-900">All Complaints</h3>
+                <p className="text-sm text-gray-600">
+                  View all staff complaints
+                </p>
               </div>
             </Link>
           </motion.div>
 
+          {/* Complaint Management - Only for staff level and above (not viewers) */}
+          {canHandleComplaints && (
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Link
+                to="/dashboard/modules/customer-care/management"
+                className="flex items-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl hover:shadow-lg transition-all duration-300 group"
+              >
+                <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <HiChatBubbleOvalLeftEllipsis className="w-6 h-6 text-white" />
+                </div>
+                <div className="ml-4">
+                  <h3 className="font-semibold text-gray-900">
+                    Complaint Management
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Manage complaint status and assignments
+                  </p>
+                </div>
+              </Link>
+            </motion.div>
+          )}
+
+          {/* Assign Complaints - Only for HODs */}
+          {isHOD && (
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Link
+                to="/dashboard/modules/customer-care/assign-complaints"
+                className="flex items-center p-6 bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 rounded-xl hover:shadow-lg transition-all duration-300 group"
+              >
+                <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <HiUserGroup className="w-6 h-6 text-white" />
+                </div>
+                <div className="ml-4">
+                  <h3 className="font-semibold text-gray-900">
+                    Assign Complaints
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Assign complaints to team members
+                  </p>
+                </div>
+              </Link>
+            </motion.div>
+          )}
+
+          {/* My Assignments - Only for non-HOD Customer Care staff (level 300-699) */}
+          {canHandleComplaints && !isHOD && (
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Link
+                to="/dashboard/modules/customer-care/assignments"
+                className="flex items-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-xl hover:shadow-lg transition-all duration-300 group"
+              >
+                <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <HiDocumentText className="w-6 h-6 text-white" />
+                </div>
+                <div className="ml-4">
+                  <h3 className="font-semibold text-gray-900">
+                    My Assignments
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    View complaints assigned to you
+                  </p>
+                </div>
+              </Link>
+            </motion.div>
+          )}
+
+          {/* Reports - Available to all Customer Care users */}
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <Link
               to="/dashboard/modules/customer-care/reports"
-              className="flex items-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-xl hover:shadow-lg transition-all duration-300 group"
+              className="flex items-center p-6 bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-xl hover:shadow-lg transition-all duration-300 group"
             >
-              <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+              <div className="p-3 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
                 <HiChartBar className="w-6 h-6 text-white" />
               </div>
               <div className="ml-4">
@@ -541,7 +600,11 @@ const CustomerCareDashboard = () => {
         className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
       >
         <h2 className="text-xl font-bold text-gray-900 mb-6">
-          Recent Complaints
+          {isHOD
+            ? "Recent Department Complaints"
+            : canHandleComplaints
+            ? "Recent Assigned Complaints"
+            : "Recent Complaints (View Only)"}
         </h2>
         <div className="space-y-4">
           {recentComplaints.map((complaint, index) => (

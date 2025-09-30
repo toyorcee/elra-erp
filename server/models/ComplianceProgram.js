@@ -26,6 +26,16 @@ const complianceProgramSchema = new mongoose.Schema(
         "Operational Standards",
         "Reporting Requirements",
         "Audit & Monitoring",
+        "Contractual Compliance",
+        "Regulatory Compliance",
+        "Environmental Compliance",
+        "Health & Safety",
+        "Quality Assurance",
+        "Vendor Management",
+        "Project Compliance",
+        "Legal Documentation",
+        "Insurance Compliance",
+        "Tax Compliance",
         "Other",
       ],
     },
@@ -202,6 +212,19 @@ complianceProgramSchema.methods.getComplianceStats = async function () {
   });
 
   return statsMap;
+};
+
+complianceProgramSchema.methods.isReadyForAttachment = async function () {
+  const Compliance = mongoose.model("Compliance");
+
+  // Count non-compliant items
+  const nonCompliantItems = await Compliance.countDocuments({
+    complianceProgram: this._id,
+    isActive: true,
+    status: { $in: ["Non-Compliant", "Pending", "Under Review"] },
+  });
+
+  return nonCompliantItems === 0;
 };
 
 complianceProgramSchema.statics.getProgramStats = async function () {

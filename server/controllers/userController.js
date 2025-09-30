@@ -44,8 +44,11 @@ export const getAllUsers = async (req, res) => {
         });
       }
 
-      // HR HOD can see ALL users across all departments
-      if (currentUser.department.name === "Human Resources") {
+      // HR HOD and PM HOD can see ALL users across all departments
+      if (
+        currentUser.department.name === "Human Resources" ||
+        currentUser.department.name === "Project Management"
+      ) {
         query.$or = [
           { isActive: true },
           { status: "PENDING_REGISTRATION" },
@@ -53,7 +56,7 @@ export const getAllUsers = async (req, res) => {
           { status: "ACTIVE" },
         ];
         console.log(
-          "🔍 [USER MANAGEMENT] HR HOD - showing all users across all departments"
+          `🔍 [USER MANAGEMENT] ${currentUser.department.name} HOD - showing all users across all departments`
         );
       } else {
         // Other HODs can only see users in their own department
@@ -1019,7 +1022,7 @@ export const getDepartmentUsers = async (req, res) => {
       };
       console.log("👥 [DEPARTMENT USERS] Super Admin - showing all users");
     }
-    // HODs can only see users in their department
+    // HODs - PM HOD can see all users, other HODs see department users
     else if (currentUser.role.level >= 700) {
       if (!currentUser.department) {
         return res.status(403).json({
@@ -1029,19 +1032,35 @@ export const getDepartmentUsers = async (req, res) => {
         });
       }
 
-      query = {
-        department: currentUser.department._id,
-        $or: [
-          { isActive: true },
-          { status: "PENDING_REGISTRATION" },
-          { status: "INVITED" },
-          { status: "ACTIVE" },
-        ],
-      };
-      console.log(
-        "👥 [DEPARTMENT USERS] HOD - showing users from department:",
-        currentUser.department.name
-      );
+      if (currentUser.department.name === "Project Management") {
+        // PM HOD can see all users across all departments
+        query = {
+          $or: [
+            { isActive: true },
+            { status: "PENDING_REGISTRATION" },
+            { status: "INVITED" },
+            { status: "ACTIVE" },
+          ],
+        };
+        console.log(
+          "👥 [DEPARTMENT USERS] PM HOD - showing all users across all departments"
+        );
+      } else {
+        // Other HODs can only see users in their department
+        query = {
+          department: currentUser.department._id,
+          $or: [
+            { isActive: true },
+            { status: "PENDING_REGISTRATION" },
+            { status: "INVITED" },
+            { status: "ACTIVE" },
+          ],
+        };
+        console.log(
+          "👥 [DEPARTMENT USERS] HOD - showing users from department:",
+          currentUser.department.name
+        );
+      }
     }
 
     // Fetch users with populated fields

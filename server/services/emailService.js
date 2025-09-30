@@ -572,7 +572,7 @@ export const sendPlatformAdminNewSubscriptionEmail = async (
     const mailOptions = {
       from: process.env.EMAIL_FROM,
       to: platformAdminEmail,
-      subject: `🎉 New EDMS Subscription - ${
+      subject: `🎉 New ELRA ERP Subscription - ${
         subscriptionData.companyName || subscriptionData.userName
       }`,
       html: htmlContent,
@@ -1825,11 +1825,25 @@ export const sendVendorNotificationEmail = async (
         <p><strong>What we need from you:</strong></p>
         <ul>
           <li>📧 Please review the attached project details PDF</li>
+          <li>✍️ <strong>Sign the PDF</strong> in the signature section and return it to us</li>
+          <li>📄 Attach your <strong>company invoice/quote</strong> for the project items</li>
+          <li>📋 Include your <strong>delivery timeline confirmation</strong></li>
           <li>🔄 Revert back to us within 48 hours with your response</li>
           <li>📞 Contact us if you have any questions about the project requirements</li>
           <li>✅ Confirm your availability and delivery capabilities</li>
           <li>🤝 Let us know if you're interested in partnering on this project</li>
         </ul>
+
+        <div class="info-box">
+          <div class="info-title">📋 Required Documents to Return</div>
+          <p><strong>Please include the following with your response:</strong></p>
+          <ul>
+            <li>✅ <strong>Signed PDF</strong> - Complete the signature section in the attached PDF</li>
+            <li>💰 <strong>Company Invoice/Quote</strong> - Your official pricing for the project items</li>
+            <li>📅 <strong>Delivery Timeline</strong> - Confirmed delivery dates for each item</li>
+            <li>📞 <strong>Contact Information</strong> - Your project coordinator details</li>
+          </ul>
+        </div>
 
         <p>We value your partnership and look forward to your response regarding this project opportunity.</p>
         <p>Please get in touch with us as soon as possible to discuss the project details and next steps.</p>
@@ -1896,8 +1910,6 @@ export const sendClientNotificationEmail = async (
 
     // Calculate budget allocation details based on actual items cost
     const totalBudget = parseFloat(projectData.budget) || 0;
-    const elraPercentage = parseFloat(projectData.budgetPercentage) || 100;
-    const clientPercentage = 100 - elraPercentage;
 
     // Calculate actual items cost
     const actualItemsCost = (projectData.projectItems || []).reduce(
@@ -1909,8 +1921,28 @@ export const sendClientNotificationEmail = async (
       0
     );
 
-    const elraAmount = (actualItemsCost * elraPercentage) / 100;
-    const clientAmount = actualItemsCost - elraAmount;
+    // Calculate budget allocation based on requiresBudgetAllocation
+    let elraPercentage;
+    let clientPercentage;
+    let elraAmount;
+    let clientAmount;
+
+    if (
+      projectData.requiresBudgetAllocation === "true" ||
+      projectData.requiresBudgetAllocation === true
+    ) {
+      // If budget allocation is requested, use the percentage (default 100% if empty)
+      elraPercentage = parseFloat(projectData.budgetPercentage) || 100;
+      clientPercentage = 100 - elraPercentage;
+      elraAmount = (actualItemsCost * elraPercentage) / 100;
+      clientAmount = actualItemsCost - elraAmount;
+    } else {
+      // If no budget allocation requested, CLIENT pays 100% (external project)
+      elraPercentage = 0;
+      clientPercentage = 100;
+      elraAmount = 0;
+      clientAmount = actualItemsCost;
+    }
 
     // Format currency
     const formatCurrency = (amount) => {
@@ -1924,9 +1956,10 @@ export const sendClientNotificationEmail = async (
 
     // Determine approval flow message
     const approvalFlow =
-      projectData.requiresBudgetAllocation === "true"
-        ? "Legal → Finance Review → Executive → Budget Allocation"
-        : "Legal → Executive (using existing budget)";
+      projectData.requiresBudgetAllocation === "true" ||
+      projectData.requiresBudgetAllocation === true
+        ? "Legal > Finance Review > Executive > Budget Allocation"
+        : "Legal > Executive (using existing budget)";
 
     // Generate project items table for client
     const generateItemsTable = (items) => {
@@ -2019,7 +2052,7 @@ export const sendClientNotificationEmail = async (
             projectData.code || "TBD"
           }</div>
           <div class="info-item"><strong>Category:</strong> ${
-            projectData.category
+            projectData.category?.replace(/[-_]/g, " ") || "N/A"
           }</div>
           <div class="info-item"><strong>Priority:</strong> <span class="priority-${
             projectData.priority
@@ -2065,9 +2098,10 @@ export const sendClientNotificationEmail = async (
               : ""
           }
           <div class="info-item"><strong>Budget Allocation:</strong> ${
-            projectData.requiresBudgetAllocation === "true"
-              ? "✅ Requested"
-              : "❌ Not Required"
+            projectData.requiresBudgetAllocation === "true" ||
+            projectData.requiresBudgetAllocation === true
+              ? "✅ Required - Budget allocation approval needed"
+              : "❌ Not Required - Using existing budget"
           }</div>
         </div>
 
@@ -2103,7 +2137,7 @@ export const sendClientNotificationEmail = async (
         <p><strong>What happens next?</strong></p>
         <ul>
           <li>✅ Your project has been successfully submitted to our system</li>
-          <li>🔄 It will go through our internal approval process</li>
+          <li>🔄 It will go through our internal approval process: <strong>${approvalFlow}</strong></li>
           <li>📧 You'll receive updates on the approval status</li>
           <li>🚀 Once approved, we'll begin project implementation</li>
           <li>📦 Project implementation and delivery processes will be initiated</li>

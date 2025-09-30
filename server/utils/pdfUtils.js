@@ -19,29 +19,50 @@ export const generatePDF = async (
   rows = []
 ) => {
   try {
-    const doc = new jsPDF();
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
 
-    // Add title
-    doc.setFontSize(20);
-    doc.text(title, 20, 20);
+    // Professional ELRA branding (like payslip)
+    const elraGreen = [13, 100, 73];
+    doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+    doc.setFontSize(32);
+    doc.setFont("helvetica", "bold");
+    doc.text("ELRA", 105, 25, { align: "center" });
+
+    // Reset to black for other text
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "normal");
+    doc.text(title, 105, 35, { align: "center" });
 
     // Add timestamp
     doc.setFontSize(10);
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 30);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 50);
 
     // Add table if headers and rows provided
     if (headers.length > 0 && rows.length > 0) {
       autoTable(doc, {
         head: [headers],
         body: rows,
-        startY: 40,
-        styles: {
-          fontSize: 8,
-          cellPadding: 2,
-        },
+        startY: 60,
+        theme: "grid",
         headStyles: {
-          fillColor: [41, 128, 185],
-          textColor: 255,
+          fillColor: elraGreen,
+          fontSize: 12,
+          fontStyle: "bold",
+          textColor: [255, 255, 255],
+          cellPadding: 6,
+        },
+        bodyStyles: {
+          fontSize: 10,
+          cellPadding: 4,
+        },
+        alternateRowStyles: {
+          fillColor: [248, 249, 250],
         },
       });
     }
@@ -49,9 +70,9 @@ export const generatePDF = async (
     // Add metadata
     doc.setProperties({
       title: title,
-      subject: "EDMS Document",
-      author: "EDMS System",
-      creator: "EDMS PDF Generator",
+      subject: "ELRA ERP Document",
+      author: "ELRA ERP System",
+      creator: "ELRA ERP PDF Generator",
     });
 
     return doc.output("arraybuffer");
@@ -149,7 +170,7 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
       ["End Date", new Date(projectData.endDate).toLocaleDateString()],
       [
         "Total Budget",
-        `₦${new Intl.NumberFormat().format(projectData.budget)}`,
+        `NGN ${new Intl.NumberFormat().format(projectData.budget)}`,
       ],
     ];
 
@@ -180,6 +201,7 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
       },
       margin: { left: 20, right: 20 },
       tableWidth: "auto",
+      pageBreak: "auto",
     });
 
     yPosition = doc.lastAutoTable.finalY + 20;
@@ -231,6 +253,7 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
       },
       margin: { left: 20, right: 20 },
       tableWidth: "auto",
+      pageBreak: "auto",
     });
 
     yPosition = doc.lastAutoTable.finalY + 20;
@@ -241,12 +264,38 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
     doc.text("Budget Allocation Agreement", 20, yPosition);
     yPosition += 15;
 
-    // Calculate budget allocation
-    const elraPercentage = parseFloat(projectData.budgetPercentage) || 100;
-    const clientPercentage = 100 - elraPercentage;
-    const elraAmount = (parseFloat(projectData.budget) * elraPercentage) / 100;
-    const clientAmount =
-      (parseFloat(projectData.budget) * clientPercentage) / 100;
+    // Calculate actual items cost
+    const actualItemsCost = (projectData.projectItems || []).reduce(
+      (sum, item) => {
+        const unitPrice = parseFloat(item.unitPrice) || 0;
+        const quantity = parseInt(item.quantity) || 1;
+        return sum + unitPrice * quantity;
+      },
+      0
+    );
+
+    // Calculate budget allocation based on requiresBudgetAllocation
+    let elraPercentage;
+    let clientPercentage;
+    let elraAmount;
+    let clientAmount;
+
+    if (
+      projectData.requiresBudgetAllocation === "true" ||
+      projectData.requiresBudgetAllocation === true
+    ) {
+      // If budget allocation is requested, use the percentage (default 100% if empty)
+      elraPercentage = parseFloat(projectData.budgetPercentage) || 100;
+      clientPercentage = 100 - elraPercentage;
+      elraAmount = (actualItemsCost * elraPercentage) / 100;
+      clientAmount = actualItemsCost - elraAmount;
+    } else {
+      // If no budget allocation requested, CLIENT pays 100% (external project)
+      elraPercentage = 0;
+      clientPercentage = 100;
+      elraAmount = 0;
+      clientAmount = actualItemsCost;
+    }
 
     console.log("🔍 [CLIENT PDF BUDGET DEBUG]:");
     console.log("  - Raw budgetPercentage:", projectData.budgetPercentage);
@@ -259,18 +308,20 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
     const budgetData = [
       [
         "Total Project Budget",
-        `₦${new Intl.NumberFormat().format(projectData.budget)}`,
+        `NGN ${new Intl.NumberFormat().format(projectData.budget)}`,
       ],
       [
         "ELRA Handles",
-        `${elraPercentage}% (₦${new Intl.NumberFormat().format(elraAmount)})`,
+        `${elraPercentage}% (NGN ${new Intl.NumberFormat().format(
+          elraAmount
+        )})`,
       ],
     ];
 
     if (clientPercentage > 0) {
       budgetData.push([
         "Client Handles",
-        `${clientPercentage}% (₦${new Intl.NumberFormat().format(
+        `${clientPercentage}% (NGN ${new Intl.NumberFormat().format(
           clientAmount
         )})`,
       ]);
@@ -278,7 +329,7 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
 
     budgetData.push([
       "Budget Allocation",
-      projectData.requiresBudgetAllocation ? "✅ Required" : "❌ Not Required",
+      projectData.requiresBudgetAllocation ? "Required" : "Not Required",
     ]);
 
     autoTable(doc, {
@@ -315,6 +366,9 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
 
     // Project Items Section - Using improved table format
     if (projectData.projectItems && projectData.projectItems.length > 0) {
+      console.log(
+        "🔍 [CLIENT PDF DEBUG] Found project items, generating table..."
+      );
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
       doc.text("Project Items & Deliverables", 20, yPosition);
@@ -328,7 +382,6 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
         return parseFloat(value) || 0;
       };
 
-      // Prepare table data
       const tableData = projectData.projectItems.map((item, index) => {
         const unitPrice = parseFormattedNumber(item.unitPrice);
         const quantity = parseInt(item.quantity) || 1;
@@ -336,15 +389,14 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
 
         return [
           index + 1,
-          item.name,
+          item.name || "N/A",
           quantity,
-          `₦${new Intl.NumberFormat().format(unitPrice)}`,
-          `₦${new Intl.NumberFormat().format(total)}`,
+          `NGN ${new Intl.NumberFormat().format(unitPrice)}`,
+          `NGN ${new Intl.NumberFormat().format(total)}`,
           item.deliveryTimeline || "TBD",
         ];
       });
 
-      // Add table with payslip-style formatting
       autoTable(doc, {
         head: [["#", "Item Name", "Qty", "Unit Price", "Total", "Timeline"]],
         body: tableData,
@@ -352,30 +404,32 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
         theme: "grid",
         headStyles: {
           fillColor: elraGreen,
-          fontSize: 12,
+          fontSize: 10,
           fontStyle: "bold",
           textColor: [255, 255, 255],
-          cellPadding: 6,
+          cellPadding: 4,
         },
         styles: {
-          fontSize: 11,
-          cellPadding: 6,
+          fontSize: 9,
+          cellPadding: 4,
           lineWidth: 0.5,
           lineColor: [50, 50, 50],
+          overflow: "linebreak",
+          halign: "left",
         },
         columnStyles: {
-          0: { cellWidth: 18, halign: "center" }, // #
-          1: { fontStyle: "bold", cellWidth: 85 }, // Item Name
-          2: { cellWidth: 25, halign: "center" }, // Qty
-          3: { cellWidth: 40, halign: "right" }, // Unit Price
-          4: { cellWidth: 40, halign: "right" }, // Total
-          5: { cellWidth: 45 }, // Timeline
+          0: { cellWidth: 15, halign: "center" },
+          1: { cellWidth: 50, fontStyle: "bold" },
+          2: { cellWidth: 15, halign: "center" },
+          3: { cellWidth: 30, halign: "right" },
+          4: { cellWidth: 30, halign: "right" },
+          5: { cellWidth: 25, halign: "center" },
         },
         alternateRowStyles: {
           fillColor: [248, 249, 250],
         },
         margin: { left: 20, right: 20 },
-        tableWidth: "auto",
+        tableWidth: "wrap",
         showHead: "everyPage",
         pageBreak: "auto",
         didDrawPage: function (data) {
@@ -405,11 +459,25 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.text(
-        `Total Project Cost: ₦${new Intl.NumberFormat().format(grandTotal)}`,
+        `Total Project Cost: NGN ${new Intl.NumberFormat().format(grandTotal)}`,
         20,
         yPosition
       );
       yPosition += 15;
+    } else {
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("Project Items & Deliverables", 20, yPosition);
+      yPosition += 15;
+
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        "Project details and deliverables will be provided upon approval.",
+        20,
+        yPosition
+      );
+      yPosition += 20;
     }
 
     // Vendor Information Section (if vendor exists) - Using table format
@@ -461,7 +529,8 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
           fillColor: [248, 249, 250],
         },
         margin: { left: 20, right: 20 },
-        tableWidth: "auto",
+        tableWidth: "wrap",
+        pageBreak: "auto",
       });
 
       yPosition = doc.lastAutoTable.finalY + 20;
@@ -474,9 +543,10 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
     yPosition += 15;
 
     const approvalFlow =
-      projectData.requiresBudgetAllocation === "true"
-        ? "Legal → Finance Review → Executive → Budget Allocation"
-        : "Legal → Executive (using existing budget)";
+      projectData.requiresBudgetAllocation === "true" ||
+      projectData.requiresBudgetAllocation === true
+        ? "Legal > Finance Review > Executive > Budget Allocation"
+        : "Legal > Executive (using existing budget)";
 
     // Create approval process table
     const approvalData = [
@@ -512,11 +582,10 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
       },
       margin: { left: 20, right: 20 },
       tableWidth: "auto",
+      pageBreak: "auto",
     });
 
     yPosition = doc.lastAutoTable.finalY + 20;
-
-    yPosition = addPageIfNeeded(80);
 
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(12);
@@ -611,40 +680,27 @@ export const generateClientProjectPDF = async (clientData, projectData) => {
 
 export const generateVendorReceiptPDF = async (vendorData, projectData) => {
   try {
-    // Debug logging for PDF generation
-    console.log("🔍 [PDF DEBUG] Generating PDF with data:");
-    console.log(
-      "  - requiresBudgetAllocation:",
-      projectData.requiresBudgetAllocation
-    );
-    console.log("  - Type:", typeof projectData.requiresBudgetAllocation);
-    console.log("  - projectManager:", projectData.projectManager);
     const doc = new jsPDF({
       orientation: "portrait",
       unit: "mm",
       format: "a4",
     });
 
-    // Set watermark with reduced opacity and size (same as payslip)
     doc.setGState(new doc.GState({ opacity: 0.05 }));
     doc.setTextColor(100, 100, 100);
     doc.setFontSize(100);
 
-    // Calculate the center of the page
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
 
-    // Position watermark
     doc.text("ELRA", pageWidth / 2, pageHeight / 2, {
       align: "center",
       angle: 30,
       renderingMode: "fill",
     });
 
-    // Reset opacity for rest of the content
     doc.setGState(new doc.GState({ opacity: 1 }));
 
-    // Header (same branding as payslip)
     const elraGreen = [13, 100, 73];
     doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
     doc.setFontSize(32);
@@ -700,7 +756,7 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
       projectData.vendorCategory !== "Not specified"
     ) {
       const formattedVendorCategory = projectData.vendorCategory.replace(
-        /_/g,
+        /[-_]/g,
         " "
       );
       vendorInfoData.splice(-2, 0, ["Category", formattedVendorCategory]);
@@ -764,8 +820,13 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
       ["End Date", new Date(projectData.endDate).toLocaleDateString()],
     ];
 
+    // Add department information for departmental projects
+    if (projectData.department && projectData.department !== "N/A") {
+      projectInfoData.splice(2, 0, ["Department", projectData.department]);
+    }
+
     if (projectData.category && projectData.category !== "Not specified") {
-      const formattedCategory = projectData.category.replace(/_/g, " ");
+      const formattedCategory = projectData.category.replace(/[-_]/g, " ");
       projectInfoData.splice(2, 0, ["Category", formattedCategory]);
     }
     if (
@@ -788,6 +849,9 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
       projectData.requiresBudgetAllocation === true
     ) {
       projectInfoData.push(["Budget Allocation", "Requested"]);
+    }
+    if (projectData.deliveryAddress) {
+      projectInfoData.push(["Delivery Address", projectData.deliveryAddress]);
     }
 
     autoTable(doc, {
@@ -862,29 +926,31 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
         theme: "grid",
         headStyles: {
           fillColor: elraGreen,
-          fontSize: 12,
+          fontSize: 10,
           fontStyle: "bold",
           textColor: [255, 255, 255],
-          cellPadding: 6,
+          cellPadding: 4,
         },
         styles: {
-          fontSize: 11,
-          cellPadding: 6,
+          fontSize: 9,
+          cellPadding: 4,
           lineWidth: 0.5,
           lineColor: [50, 50, 50],
+          overflow: "linebreak",
+          halign: "left",
         },
         columnStyles: {
-          0: { fontStyle: "bold", cellWidth: 60 },
-          1: { cellWidth: 80 },
-          2: { halign: "center", cellWidth: 30 },
-          3: { halign: "right", cellWidth: 40 },
-          4: { halign: "right", cellWidth: 40 },
+          0: { fontStyle: "bold", cellWidth: 40 },
+          1: { cellWidth: 50 },
+          2: { halign: "center", cellWidth: 20 },
+          3: { halign: "right", cellWidth: 30 },
+          4: { halign: "right", cellWidth: 30 },
         },
         alternateRowStyles: {
           fillColor: [248, 249, 250],
         },
         margin: { left: 20, right: 20 },
-        tableWidth: "auto",
+        tableWidth: "wrap",
         pageBreak: "auto",
         showHead: "everyPage",
         didDrawPage: function (data) {
@@ -930,115 +996,6 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
       yPosition += 15;
     }
 
-    // Approval Workflow Section - Using table format
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("Approval Workflow", 20, yPosition);
-    yPosition += 15;
-
-    // Determine approval workflow based on project scope and budget allocation
-    let approvalSteps = [];
-    let workflowDescription = "";
-
-    if (projectData.projectScope === "external") {
-      if (
-        projectData.requiresBudgetAllocation === "true" ||
-        projectData.requiresBudgetAllocation === true
-      ) {
-        approvalSteps = [
-          "1. Head of Department (HOD) Approval",
-          "2. Legal & Compliance Review",
-          "3. Finance Department Review (Budget Validation)",
-          "4. Executive Management Approval",
-          "5. Finance Department Budget Allocation",
-        ];
-        workflowDescription =
-          "This external project requires new budget allocation and will go through a comprehensive 5-level approval process.";
-      } else {
-        approvalSteps = [
-          "1. Head of Department (HOD) Approval",
-          "2. Legal & Compliance Review",
-          "3. Executive Management Approval",
-        ];
-        workflowDescription =
-          "This external project will use existing budget and requires 3-level approval process.";
-      }
-    } else if (projectData.projectScope === "departmental") {
-      if (
-        projectData.requiresBudgetAllocation === "true" ||
-        projectData.requiresBudgetAllocation === true
-      ) {
-        approvalSteps = [
-          "1. Head of Department (HOD) Approval",
-          "2. Finance Department Approval",
-        ];
-        workflowDescription =
-          "This departmental project requires new budget allocation and will go through 2-level approval process.";
-      } else {
-        approvalSteps = ["1. Head of Department (HOD) Approval"];
-        workflowDescription =
-          "This departmental project will use existing department budget and requires HOD approval only.";
-      }
-    } else if (projectData.projectScope === "personal") {
-      if (
-        projectData.requiresBudgetAllocation === "true" ||
-        projectData.requiresBudgetAllocation === true
-      ) {
-        approvalSteps = ["1. Finance Department Approval"];
-        workflowDescription =
-          "This personal project requires new budget allocation and will go through Finance approval.";
-      } else {
-        approvalSteps = ["1. Auto-Approval (No additional approvals required)"];
-        workflowDescription =
-          "This personal project will use existing personal budget and will be auto-approved.";
-      }
-    }
-
-    // Create approval workflow table
-    const approvalData = [
-      [
-        "Project Type",
-        projectData.projectScope
-          ? projectData.projectScope.charAt(0).toUpperCase() +
-            projectData.projectScope.slice(1) +
-            " Project"
-          : "External Project",
-      ],
-      ["Workflow Description", workflowDescription],
-      ["Approval Steps", approvalSteps.join("\n")],
-    ];
-
-    autoTable(doc, {
-      head: [["Field", "Value"]],
-      body: approvalData,
-      startY: yPosition,
-      theme: "grid",
-      headStyles: {
-        fillColor: elraGreen,
-        fontSize: 12,
-        fontStyle: "bold",
-        textColor: [255, 255, 255],
-        cellPadding: 6,
-      },
-      styles: {
-        fontSize: 11,
-        cellPadding: 6,
-        lineWidth: 0.5,
-        lineColor: [50, 50, 50],
-      },
-      columnStyles: {
-        0: { fontStyle: "bold", cellWidth: 60 },
-        1: { cellWidth: "auto" },
-      },
-      alternateRowStyles: {
-        fillColor: [248, 249, 250],
-      },
-      margin: { left: 20, right: 20 },
-      tableWidth: "auto",
-    });
-
-    yPosition = doc.lastAutoTable.finalY + 20;
-
     // Footer - Match payslip style
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
@@ -1079,6 +1036,140 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
       );
     }
 
+    const signatureSectionHeight = 200;
+    const currentPageHeight = doc.internal.pageSize.height;
+    const remainingSpace = currentPageHeight - yPosition - 20;
+
+    if (remainingSpace < signatureSectionHeight) {
+      doc.addPage();
+      yPosition = 20;
+    } else {
+      yPosition += 20;
+    }
+
+    // Vendor Agreement Header
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("VENDOR AGREEMENT & SIGNATURE", 20, yPosition);
+    yPosition += 20;
+
+    // Terms and conditions
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("By signing below, I confirm that:", 20, yPosition);
+    yPosition += 15;
+
+    const terms = [
+      "• I can deliver the items listed above according to the specified timelines",
+      "• All items meet the quality standards and specifications provided",
+      "• I will provide proper documentation and invoices for all deliverables",
+      "• I understand the project requirements and can fulfill them completely",
+      "• I agree to ELRA's terms and conditions for vendor partnerships",
+    ];
+
+    terms.forEach((term) => {
+      doc.text(term, 25, yPosition);
+      yPosition += 8;
+    });
+
+    yPosition += 20;
+
+    // Check if we need a new page for signature fields
+    const signatureFieldsHeight = 120; // Approximate height needed for signature fields
+    const pageHeightForFields = doc.internal.pageSize.height;
+    const remainingSpaceForFields = pageHeightForFields - yPosition - 20; // 20mm margin from bottom
+
+    if (remainingSpaceForFields < signatureFieldsHeight) {
+      // Add new page for signature fields
+      doc.addPage();
+      yPosition = 20; // Start from top of new page
+    }
+
+    // Vendor signature fields
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("VENDOR SIGNATURE", 20, yPosition);
+    yPosition += 20;
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+
+    // Signature fields
+    doc.text("Vendor Company: _________________________", 20, yPosition);
+    yPosition += 12;
+    doc.text(
+      "Authorized Representative: _________________________",
+      20,
+      yPosition
+    );
+    yPosition += 12;
+    doc.text("Title/Position: _________________________", 20, yPosition);
+    yPosition += 12;
+    doc.text("Date: _________________________", 20, yPosition);
+    yPosition += 12;
+    doc.text("Email: _________________________", 20, yPosition);
+    yPosition += 12;
+    doc.text("Phone: _________________________", 20, yPosition);
+    yPosition += 20;
+
+    // Signature box
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    doc.rect(20, yPosition, 80, 40);
+    doc.text("Authorized Signature & Company Stamp", 25, yPosition + 25);
+    yPosition += 50;
+
+    // Check if we need a new page for return instructions
+    const instructionsHeight = 80; // Approximate height needed for instructions
+    const pageHeightForInstructions = doc.internal.pageSize.height;
+    const remainingSpaceForInstructions =
+      pageHeightForInstructions - yPosition - 20; // 20mm margin from bottom
+
+    if (remainingSpaceForInstructions < instructionsHeight) {
+      // Add new page for return instructions
+      doc.addPage();
+      yPosition = 20; // Start from top of new page
+    }
+
+    // Return instructions
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("IMPORTANT: RETURN INSTRUCTIONS", 20, yPosition);
+    yPosition += 15;
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text("After completing this form, please:", 20, yPosition);
+    yPosition += 10;
+
+    const instructions = [
+      "1. Sign and stamp this document in the signature box above",
+      "2. Scan or photograph the completed document",
+      "3. Email it back to us within 48 hours",
+      "4. Include your company invoice/quote for the project items",
+      "5. Attach your delivery timeline confirmation",
+    ];
+
+    instructions.forEach((instruction) => {
+      doc.text(instruction, 25, yPosition);
+      yPosition += 8;
+    });
+
+    yPosition += 15;
+
+    // Professional closing
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "italic");
+    doc.text(
+      "This signature confirms our commitment to deliver quality services and products as outlined in this project agreement.",
+      20,
+      yPosition
+    );
+    yPosition += 20;
+
+    // Clean signature section completed
+
     // Add metadata
     doc.setProperties({
       title: "Vendor Registration Receipt",
@@ -1096,40 +1187,64 @@ export const generateVendorReceiptPDF = async (vendorData, projectData) => {
 
 export const generateReportPDF = async (reportData, reportType = "general") => {
   try {
-    const doc = new jsPDF();
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
 
-    // Add header
-    doc.setFontSize(24);
-    doc.setTextColor(41, 128, 185);
-    doc.text("EDMS Report", 20, 20);
+    // Professional ELRA branding (like payslip)
+    const elraGreen = [13, 100, 73];
+    doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+    doc.setFontSize(32);
+    doc.setFont("helvetica", "bold");
+    doc.text("ELRA", 105, 25, { align: "center" });
 
-    doc.setFontSize(12);
+    // Reset to black for other text
     doc.setTextColor(0, 0, 0);
-    doc.text(`Report Type: ${reportType}`, 20, 35);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 45);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "normal");
+    doc.text("ELRA Report", 105, 35, { align: "center" });
 
-    let yPosition = 60;
+    // Report details
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Report Type: ${reportType}`, 20, 50);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 57);
+
+    let yPosition = 70;
 
     // Add summary statistics
     if (reportData.summary) {
-      doc.setFontSize(16);
-      doc.text("Summary", 20, yPosition);
-      yPosition += 10;
+      const summaryData = Object.entries(reportData.summary).map(
+        ([key, value]) => [key, value]
+      );
 
-      doc.setFontSize(10);
-      Object.entries(reportData.summary).forEach(([key, value]) => {
-        doc.text(`${key}: ${value}`, 20, yPosition);
-        yPosition += 7;
+      autoTable(doc, {
+        head: [["Summary", "Value"]],
+        body: summaryData,
+        startY: yPosition,
+        theme: "grid",
+        headStyles: {
+          fillColor: elraGreen,
+          fontSize: 12,
+          fontStyle: "bold",
+          textColor: [255, 255, 255],
+          cellPadding: 6,
+        },
+        bodyStyles: {
+          fontSize: 10,
+          cellPadding: 4,
+        },
+        alternateRowStyles: {
+          fillColor: [248, 249, 250],
+        },
       });
-      yPosition += 10;
+
+      yPosition = doc.lastAutoTable.finalY + 15;
     }
 
-    // Add detailed data table
     if (reportData.data && reportData.data.length > 0) {
-      doc.setFontSize(16);
-      doc.text("Detailed Data", 20, yPosition);
-      yPosition += 10;
-
       const headers = Object.keys(reportData.data[0]);
       const rows = reportData.data.map((item) => Object.values(item));
 
@@ -1137,16 +1252,20 @@ export const generateReportPDF = async (reportData, reportType = "general") => {
         head: [headers],
         body: rows,
         startY: yPosition,
-        styles: {
-          fontSize: 8,
-          cellPadding: 2,
-        },
+        theme: "grid",
         headStyles: {
-          fillColor: [41, 128, 185],
-          textColor: 255,
+          fillColor: elraGreen,
+          fontSize: 10,
+          fontStyle: "bold",
+          textColor: [255, 255, 255],
+          cellPadding: 4,
+        },
+        bodyStyles: {
+          fontSize: 8,
+          cellPadding: 3,
         },
         alternateRowStyles: {
-          fillColor: [245, 245, 245],
+          fillColor: [248, 249, 250],
         },
       });
     }
@@ -1630,7 +1749,7 @@ export const generateInventoryCompletionPDF = async (
             fillColor: [245, 245, 245],
           },
           margin: { left: 20, right: 20 },
-          tableWidth: "auto",
+          tableWidth: "wrap",
           pageBreak: "auto",
         });
 
@@ -1693,7 +1812,7 @@ export const generateInventoryCompletionPDF = async (
             fillColor: [245, 245, 245],
           },
           margin: { left: 20, right: 20 },
-          tableWidth: "auto",
+          tableWidth: "wrap",
           pageBreak: "auto",
         });
 
@@ -1765,7 +1884,7 @@ export const generateInventoryCompletionPDF = async (
             fillColor: [245, 245, 245],
           },
           margin: { left: 20, right: 20 },
-          tableWidth: "auto",
+          tableWidth: "wrap",
           pageBreak: "auto",
         });
 
@@ -1853,7 +1972,7 @@ export const generateInventoryCompletionPDF = async (
           fillColor: [245, 245, 245],
         },
         margin: { left: 20, right: 20 },
-        tableWidth: "auto",
+        tableWidth: "wrap",
         pageBreak: "auto",
       });
 
@@ -1983,14 +2102,8 @@ export const generateProcurementOrderPDF = async (
     doc.text(`Company: ${procurementData.supplier.name}`, 20, yPosition);
     yPosition += 7;
 
-    if (procurementData.supplier.contactPerson) {
-      doc.text(
-        `Contact Person: ${procurementData.supplier.contactPerson}`,
-        20,
-        yPosition
-      );
-      yPosition += 7;
-    }
+    doc.text(`Contact: ${procurementData.supplier.name}`, 20, yPosition);
+    yPosition += 7;
 
     if (procurementData.supplier.email) {
       doc.text(`Email: ${procurementData.supplier.email}`, 20, yPosition);
@@ -2088,18 +2201,18 @@ export const generateProcurementOrderPDF = async (
           lineWidth: 0.1,
         },
         columnStyles: {
-          0: { halign: "center", cellWidth: "auto", cellPadding: 5 }, // S/N
-          1: { fontStyle: "bold", cellWidth: "auto", cellPadding: 5 }, // Item Name
-          2: { cellWidth: "auto", cellPadding: 5 }, // Description
-          3: { halign: "center", cellWidth: "auto", cellPadding: 5 }, // Quantity
-          4: { halign: "right", cellWidth: "auto", cellPadding: 5 }, // Unit Price
-          5: { halign: "right", cellWidth: "auto", cellPadding: 5 }, // Total Price
+          0: { halign: "center", cellWidth: 15, cellPadding: 3 }, // S/N
+          1: { fontStyle: "bold", cellWidth: 40, cellPadding: 3 }, // Item Name
+          2: { cellWidth: 50, cellPadding: 3 }, // Description
+          3: { halign: "center", cellWidth: 20, cellPadding: 3 }, // Quantity
+          4: { halign: "right", cellWidth: 30, cellPadding: 3 }, // Unit Price
+          5: { halign: "right", cellWidth: 30, cellPadding: 3 }, // Total Price
         },
         alternateRowStyles: {
           fillColor: [245, 245, 245],
         },
         margin: { left: 20, right: 20 },
-        tableWidth: "auto",
+        tableWidth: "wrap",
         pageBreak: "auto",
         showFoot: "lastPage",
         didParseCell: function (data) {
@@ -2251,7 +2364,10 @@ export const generateProcurementOrderPDF = async (
         yPosition += 7;
       }
 
-      if (procurementData.deliveryAddress.contactPerson) {
+      if (
+        procurementData.deliveryAddress.contactPerson &&
+        procurementData.deliveryAddress.contactPerson !== "To be updated"
+      ) {
         doc.text(
           `Delivery Contact: ${procurementData.deliveryAddress.contactPerson}`,
           20,
@@ -2275,42 +2391,42 @@ export const generateProcurementOrderPDF = async (
     // Ensure text color is black for all remaining text
     doc.setTextColor(0, 0, 0);
     doc.text("Human Resources Department:", 20, yPosition);
-    yPosition += 10; // Increased spacing
+    yPosition += 10;
 
     doc.text("Email: hod.hr@elra.com", 20, yPosition);
-    yPosition += 8; // Increased spacing
+    yPosition += 8;
 
     doc.text("Name: Lisa Davis", 20, yPosition);
-    yPosition += 8; // Increased spacing
+    yPosition += 8;
 
     doc.text("Procurement Department:", 20, yPosition);
-    yPosition += 8; // Increased spacing
+    yPosition += 8;
 
     doc.text("Email: hod.proc@elra.com", 20, yPosition);
-    yPosition += 20; // Increased spacing
+    yPosition += 20;
 
     doc.text("Please respond within 48 hours with:", 20, yPosition);
-    yPosition += 10; // Increased spacing
+    yPosition += 10;
 
     doc.text("• Confirmation of order acceptance", 25, yPosition);
-    yPosition += 8; // Increased spacing
+    yPosition += 8;
 
     doc.text("• Expected delivery timeline", 25, yPosition);
-    yPosition += 8; // Increased spacing
+    yPosition += 8;
 
     doc.text("• Any questions or clarifications needed", 25, yPosition);
-    yPosition += 8; // Increased spacing
+    yPosition += 8;
 
     doc.text("• Invoice for payment processing", 25, yPosition);
-    yPosition += 8; // Increased spacing
+    yPosition += 8;
 
     doc.setFont("helvetica", "bold");
     doc.text("• Signed copy of this purchase order", 25, yPosition);
-    yPosition += 12; // Increased spacing
+    yPosition += 12;
 
     doc.setFont("helvetica", "normal");
     doc.text("To finalize this order, please contact:", 20, yPosition);
-    yPosition += 10; // Increased spacing
+    yPosition += 10;
 
     doc.text(
       "• Human Resources Department for any personnel-related queries",
@@ -2431,5 +2547,531 @@ export const generateProcurementOrderPDF = async (
   } catch (error) {
     console.error("Procurement order PDF generation error:", error);
     throw new Error("Failed to generate procurement order PDF");
+  }
+};
+
+/**
+ * Generate Customer Care Report PDF
+ * @param {Object} reportData - Customer Care report data
+ * @returns {Buffer}
+ */
+export const generateCustomerCareReportPDF = async (reportData) => {
+  try {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    let yPosition = 20;
+
+    // Header
+    doc.setFillColor(41, 128, 185);
+    doc.rect(0, 0, pageWidth, 30, "F");
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text("Customer Care Report", 20, 20);
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Generated: ${reportData.generatedAt.toLocaleString()}`, 20, 28);
+    doc.text(`Date Range: ${reportData.dateRange.days} days`, 120, 28);
+
+    yPosition = 50;
+
+    // Key Statistics Section
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Key Statistics", 20, yPosition);
+    yPosition += 10;
+
+    const stats = reportData.statistics;
+    const statsData = [
+      ["Metric", "Value"],
+      ["Total Complaints", stats.totalComplaints || 0],
+      ["Resolved Complaints", stats.resolvedComplaints || 0],
+      ["Pending Complaints", stats.pendingComplaints || 0],
+      ["Average Resolution Time", `${stats.averageResolutionTime || 0} days`],
+      ["Satisfaction Score", `${stats.satisfactionScore || 0}/5`],
+    ];
+
+    autoTable(doc, {
+      head: [statsData[0]],
+      body: statsData.slice(1),
+      startY: yPosition,
+      styles: {
+        fontSize: 10,
+        cellPadding: 4,
+      },
+      headStyles: {
+        fillColor: [41, 128, 185],
+        textColor: 255,
+      },
+    });
+
+    yPosition = doc.lastAutoTable.finalY + 20;
+
+    // Department Breakdown
+    if (
+      reportData.departmentBreakdown &&
+      reportData.departmentBreakdown.length > 0
+    ) {
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("Department Breakdown", 20, yPosition);
+      yPosition += 10;
+
+      const deptData = [
+        ["Department", "Count", "Resolution Rate"],
+        ...reportData.departmentBreakdown.map((dept) => [
+          dept.department,
+          dept.count,
+          `${dept.resolutionRate.toFixed(1)}%`,
+        ]),
+      ];
+
+      autoTable(doc, {
+        head: [deptData[0]],
+        body: deptData.slice(1),
+        startY: yPosition,
+        styles: {
+          fontSize: 10,
+          cellPadding: 4,
+        },
+        headStyles: {
+          fillColor: [41, 128, 185],
+          textColor: 255,
+        },
+      });
+
+      yPosition = doc.lastAutoTable.finalY + 20;
+    }
+
+    // Category Breakdown
+    if (
+      reportData.categoryBreakdown &&
+      reportData.categoryBreakdown.length > 0
+    ) {
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("Category Breakdown", 20, yPosition);
+      yPosition += 10;
+
+      const catData = [
+        ["Category", "Count"],
+        ...reportData.categoryBreakdown.map((cat) => [cat.category, cat.count]),
+      ];
+
+      autoTable(doc, {
+        head: [catData[0]],
+        body: catData.slice(1),
+        startY: yPosition,
+        styles: {
+          fontSize: 10,
+          cellPadding: 4,
+        },
+        headStyles: {
+          fillColor: [41, 128, 185],
+          textColor: 255,
+        },
+      });
+
+      yPosition = doc.lastAutoTable.finalY + 20;
+    }
+
+    // Priority Breakdown
+    if (
+      reportData.priorityBreakdown &&
+      reportData.priorityBreakdown.length > 0
+    ) {
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("Priority Breakdown", 20, yPosition);
+      yPosition += 10;
+
+      const priorityData = [
+        ["Priority", "Count"],
+        ...reportData.priorityBreakdown.map((priority) => [
+          priority.priority,
+          priority.count,
+        ]),
+      ];
+
+      autoTable(doc, {
+        head: [priorityData[0]],
+        body: priorityData.slice(1),
+        startY: yPosition,
+        styles: {
+          fontSize: 10,
+          cellPadding: 4,
+        },
+        headStyles: {
+          fillColor: [41, 128, 185],
+          textColor: 255,
+        },
+      });
+
+      yPosition = doc.lastAutoTable.finalY + 20;
+    }
+
+    // Trend Analysis
+    if (reportData.trendCalculations) {
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("Trend Analysis", 20, yPosition);
+      yPosition += 10;
+
+      const trendData = [
+        ["Metric", "Change"],
+        [
+          "Total Complaints",
+          `${
+            reportData.trendCalculations.totalComplaintsChange > 0 ? "+" : ""
+          }${reportData.trendCalculations.totalComplaintsChange.toFixed(1)}%`,
+        ],
+        [
+          "Resolution Rate",
+          `${
+            reportData.trendCalculations.resolutionRateChange > 0 ? "+" : ""
+          }${reportData.trendCalculations.resolutionRateChange.toFixed(1)}%`,
+        ],
+        [
+          "Resolution Time",
+          `${
+            reportData.trendCalculations.resolutionTimeChange > 0 ? "+" : ""
+          }${reportData.trendCalculations.resolutionTimeChange.toFixed(1)}%`,
+        ],
+        [
+          "Satisfaction",
+          `${
+            reportData.trendCalculations.satisfactionChange > 0 ? "+" : ""
+          }${reportData.trendCalculations.satisfactionChange.toFixed(1)}%`,
+        ],
+      ];
+
+      autoTable(doc, {
+        head: [trendData[0]],
+        body: trendData.slice(1),
+        startY: yPosition,
+        styles: {
+          fontSize: 10,
+          cellPadding: 4,
+        },
+        headStyles: {
+          fillColor: [41, 128, 185],
+          textColor: 255,
+        },
+      });
+    }
+
+    // Add page numbers
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(0, 0, 0);
+      doc.text(
+        `Page ${i} of ${pageCount}`,
+        105,
+        doc.internal.pageSize.height - 10,
+        { align: "center" }
+      );
+    }
+
+    // Add metadata
+    doc.setProperties({
+      title: "Customer Care Report",
+      subject: "ELRA Customer Care Analytics",
+      author: "ELRA System",
+      creator: "ELRA PDF Generator",
+    });
+
+    return Buffer.from(doc.output("arraybuffer"));
+  } catch (error) {
+    console.error("Customer Care report PDF generation error:", error);
+    throw new Error("Failed to generate Customer Care report PDF");
+  }
+};
+
+/**
+ * Generate Compliance Certificate PDF with Nigerian Government styling
+ * @param {Object} certificateData - Certificate data
+ * @returns {Buffer}
+ */
+export const generateComplianceCertificatePDF = async (certificateData) => {
+  try {
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    // Nigerian Government colors
+    const nigerianGreen = [0, 102, 51]; // Nigerian flag green
+    const gold = [255, 215, 0]; // Gold
+    const darkGreen = [0, 51, 25]; // Dark green
+
+    // Add decorative border with gold flowers
+    doc.setDrawColor(gold[0], gold[1], gold[2]);
+    doc.setLineWidth(3);
+    doc.rect(10, 10, 190, 277); // Outer border
+
+    // Inner decorative border
+    doc.setDrawColor(nigerianGreen[0], nigerianGreen[1], nigerianGreen[2]);
+    doc.setLineWidth(2);
+    doc.rect(15, 15, 180, 267); // Inner border
+
+    // Corner decorations (gold flowers)
+    const cornerSize = 20;
+    const corners = [
+      [15, 15], // Top-left
+      [175, 15], // Top-right
+      [15, 252], // Bottom-left
+      [175, 252], // Bottom-right
+    ];
+
+    corners.forEach(([x, y]) => {
+      // Gold flower decorations
+      doc.setFillColor(gold[0], gold[1], gold[2]);
+      doc.circle(x + 10, y + 10, 8, "F"); // Center
+      // Petals
+      for (let i = 0; i < 8; i++) {
+        const angle = (i * Math.PI) / 4;
+        const petalX = x + 10 + Math.cos(angle) * 12;
+        const petalY = y + 10 + Math.sin(angle) * 12;
+        doc.circle(petalX, petalY, 4, "F");
+      }
+    });
+
+    // Federal Republic of Nigeria header
+    doc.setTextColor(nigerianGreen[0], nigerianGreen[1], nigerianGreen[2]);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("FEDERAL REPUBLIC OF NIGERIA", 105, 40, { align: "center" });
+
+    // Equipment Leasing Registration Authority
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("EQUIPMENT LEASING REGISTRATION AUTHORITY", 105, 50, {
+      align: "center",
+    });
+
+    // ELRA logo area with gold circle
+    doc.setFillColor(gold[0], gold[1], gold[2]);
+    doc.circle(105, 70, 15, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("ELRA", 105, 75, { align: "center" });
+
+    // Certificate title - different for different project types
+    doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+    doc.setFontSize(24);
+    doc.setFont("helvetica", "bold");
+
+    let certificateTitle = "PROJECT COMPLETION CERTIFICATE";
+    if (
+      certificateData.project.projectScope === "external" &&
+      certificateData.complianceProgram
+    ) {
+      certificateTitle = "COMPLIANCE CERTIFICATE";
+    }
+
+    doc.text(certificateTitle, 105, 100, { align: "center" });
+
+    // Decorative line
+    doc.setDrawColor(gold[0], gold[1], gold[2]);
+    doc.setLineWidth(2);
+    doc.line(60, 105, 150, 105);
+
+    // Certificate number
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      `Certificate No: ${certificateData.certificate.number}`,
+      105,
+      115,
+      { align: "center" }
+    );
+
+    // Project information
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text(certificateData.project.name, 105, 135, { align: "center" });
+
+    // Project status badge
+    doc.setFillColor(0, 150, 0);
+    doc.rect(80, 145, 50, 8, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+
+    let statusText = "PROJECT APPROVED";
+    if (
+      certificateData.project.projectScope === "external" &&
+      certificateData.complianceProgram
+    ) {
+      statusText = "FULLY COMPLIANT";
+    }
+
+    doc.text(statusText, 105, 151, { align: "center" });
+
+    // Project details
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+
+    let yPos = 170;
+    const details = [
+      { label: "Project Code:", value: certificateData.project.code },
+      {
+        label: "Project Manager:",
+        value: `${certificateData.project.projectManager.firstName} ${certificateData.project.projectManager.lastName}`,
+      },
+      { label: "Department:", value: certificateData.project.department.name },
+      {
+        label: "Duration:",
+        value: `${new Date(
+          certificateData.project.startDate
+        ).toLocaleDateString()} - ${new Date(
+          certificateData.project.endDate
+        ).toLocaleDateString()}`,
+      },
+    ];
+
+    details.forEach(({ label, value }) => {
+      doc.text(`${label} ${value}`, 20, yPos);
+      yPos += 8;
+    });
+
+    // Compliance program section (only for external projects with compliance programs)
+    if (
+      certificateData.project.projectScope === "external" &&
+      certificateData.complianceProgram
+    ) {
+      yPos += 10;
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(nigerianGreen[0], nigerianGreen[1], nigerianGreen[2]);
+      doc.text("ATTACHED COMPLIANCE PROGRAM", 105, yPos, { align: "center" });
+
+      yPos += 15;
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Program: ${certificateData.complianceProgram.name}`, 20, yPos);
+      yPos += 8;
+      doc.text(
+        `Category: ${certificateData.complianceProgram.category}`,
+        20,
+        yPos
+      );
+      yPos += 8;
+      doc.text(`Status: ${certificateData.complianceProgram.status}`, 20, yPos);
+      yPos += 8;
+      doc.text(
+        `Priority: ${certificateData.complianceProgram.priority}`,
+        20,
+        yPos
+      );
+
+      // Compliance items
+      yPos += 15;
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(nigerianGreen[0], nigerianGreen[1], nigerianGreen[2]);
+      doc.text("COMPLIANCE ITEMS VERIFICATION", 105, yPos, { align: "center" });
+
+      yPos += 10;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(0, 0, 0);
+      doc.text(
+        `${certificateData.complianceItems.length} Items • All Compliant`,
+        105,
+        yPos,
+        { align: "center" }
+      );
+
+      // List compliance items
+      yPos += 15;
+      certificateData.complianceItems.forEach((item, index) => {
+        if (yPos > 250) {
+          doc.addPage();
+          yPos = 20;
+        }
+        doc.text(`✓ ${item.title} (${item.category})`, 20, yPos);
+        yPos += 6;
+      });
+    }
+
+    // Signature section
+    yPos = 220;
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(nigerianGreen[0], nigerianGreen[1], nigerianGreen[2]);
+    doc.text("AUTHORIZED SIGNATURE", 60, yPos);
+    doc.text("ISSUE DATE", 140, yPos);
+
+    yPos += 20;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
+    doc.text(certificateData.certificate.issuedBy, 60, yPos);
+    doc.text(certificateData.certificate.issueDate, 140, yPos);
+
+    yPos += 5;
+    doc.setFontSize(8);
+    doc.text(certificateData.certificate.issuedByTitle, 60, yPos);
+    doc.text("Certificate Valid Until Review", 140, yPos);
+
+    // Official stamp area
+    yPos += 15;
+    doc.setDrawColor(gold[0], gold[1], gold[2]);
+    doc.setLineWidth(2);
+    doc.circle(105, yPos, 20);
+    doc.setTextColor(gold[0], gold[1], gold[2]);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("OFFICIAL", 105, yPos - 5, { align: "center" });
+    doc.text("STAMP", 105, yPos + 5, { align: "center" });
+
+    // Footer
+    yPos += 30;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(nigerianGreen[0], nigerianGreen[1], nigerianGreen[2]);
+    doc.text(
+      "This project has been verified and approved by ELRA's Legal & Compliance Department",
+      105,
+      yPos,
+      { align: "center" }
+    );
+
+    yPos += 8;
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text(
+      "All regulatory requirements have been met and documented. This certificate serves as official proof of compliance with ELRA's regulatory standards.",
+      105,
+      yPos,
+      { align: "center" }
+    );
+
+    // Add metadata
+    doc.setProperties({
+      title: "ELRA Compliance Certificate",
+      subject: "Regulatory Compliance Certificate",
+      author: "ELRA Legal & Compliance Department",
+      creator: "ELRA Certificate Generator",
+    });
+
+    return Buffer.from(doc.output("arraybuffer"));
+  } catch (error) {
+    console.error("Compliance certificate PDF generation error:", error);
+    throw new Error("Failed to generate compliance certificate PDF");
   }
 };

@@ -5,51 +5,63 @@ import {
   HiDocumentText,
   HiClock,
   HiCheckCircle,
-  HiExclamationTriangle,
   HiUserGroup,
   HiCalendar,
   HiArrowTrendingUp,
   HiArrowTrendingDown,
-  HiArrowLeft,
-  HiHome,
+  HiArrowDownTray,
 } from "react-icons/hi2";
-import { Link } from "react-router-dom";
 import { BarChart, PieChart, LineChart } from "../../../../components/graphs";
-import { statisticsAPI } from "../../../../services/customerCareAPI";
+import {
+  statisticsAPI,
+  complaintAPI,
+} from "../../../../services/customerCareAPI";
 import { toast } from "react-toastify";
 
 const CustomerCareReports = () => {
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [exportLoading, setExportLoading] = useState({
+    pdf: false,
+    word: false,
+    csv: false,
+  });
 
   useEffect(() => {
     const fetchReportData = async () => {
       try {
         setLoading(true);
 
-        // Fetch all report data in parallel
         const [
           statisticsResponse,
           trendsResponse,
           departmentBreakdownResponse,
           categoryBreakdownResponse,
+          priorityBreakdownResponse,
+          trendCalculationsResponse,
         ] = await Promise.all([
           statisticsAPI.getStatistics(),
           statisticsAPI.getTrends({ months: 6 }),
           statisticsAPI.getDepartmentBreakdown(),
           statisticsAPI.getCategoryBreakdown(),
+          statisticsAPI.getPriorityBreakdown(),
+          statisticsAPI.getTrendCalculations({ months: 6 }),
         ]);
 
         if (
           statisticsResponse.success &&
           trendsResponse.success &&
           departmentBreakdownResponse.success &&
-          categoryBreakdownResponse.success
+          categoryBreakdownResponse.success &&
+          priorityBreakdownResponse.success &&
+          trendCalculationsResponse.success
         ) {
           const stats = statisticsResponse.data;
           const trends = trendsResponse.data;
           const departmentData = departmentBreakdownResponse.data;
           const categoryData = categoryBreakdownResponse.data;
+          const priorityData = priorityBreakdownResponse.data;
+          const trendCalculations = trendCalculationsResponse.data;
 
           setReportData({
             totalComplaints: stats.totalComplaints || 0,
@@ -71,27 +83,26 @@ const CustomerCareReports = () => {
               complaints: trend.total,
               resolved: trend.resolved,
             })),
-            priorityBreakdown: [
-              {
-                priority: "High",
-                count: stats.highPriority || 0,
-                color: "#EF4444",
-              },
-              {
-                priority: "Medium",
-                count: Math.floor((stats.totalComplaints || 0) * 0.5),
-                color: "#F59E0B",
-              },
-              {
-                priority: "Low",
-                count: Math.floor((stats.totalComplaints || 0) * 0.3),
-                color: "#10B981",
-              },
-            ],
+            priorityBreakdown: priorityData.map((item) => ({
+              priority: item.priority,
+              count: item.count,
+              color:
+                item.priority === "High"
+                  ? "#EF4444"
+                  : item.priority === "Medium"
+                  ? "#F59E0B"
+                  : "#10B981",
+            })),
             topCategories: categoryData.map((cat) => ({
               category: cat.category,
               count: cat.count,
             })),
+            trendCalculations: trendCalculations || {
+              totalComplaintsChange: 0,
+              resolutionRateChange: 0,
+              resolutionTimeChange: 0,
+              satisfactionChange: 0,
+            },
           });
         } else {
           toast.error("Failed to load report data");
@@ -107,6 +118,120 @@ const CustomerCareReports = () => {
     fetchReportData();
   }, []);
 
+  const handleExportPDF = async () => {
+    try {
+      setExportLoading((prev) => ({ ...prev, pdf: true }));
+
+      console.log("statisticsAPI:", statisticsAPI);
+      console.log(
+        "exportCustomerCareReport:",
+        statisticsAPI.exportCustomerCareReport
+      );
+
+      if (!statisticsAPI.exportCustomerCareReport) {
+        throw new Error(
+          "exportCustomerCareReport function not found in statisticsAPI"
+        );
+      }
+
+      const blob = await statisticsAPI.exportCustomerCareReport("pdf", {
+        dateRange: "30",
+        startDate: "",
+        endDate: "",
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `customer-care-report-${
+        new Date().toISOString().split("T")[0]
+      }.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("PDF report exported successfully!");
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      toast.error(
+        `Failed to export PDF report: ${
+          error.response?.data?.message || error.message
+        }`
+      );
+    } finally {
+      setExportLoading((prev) => ({ ...prev, pdf: false }));
+    }
+  };
+
+  const handleExportWord = async () => {
+    try {
+      setExportLoading((prev) => ({ ...prev, word: true }));
+
+      const blob = await statisticsAPI.exportCustomerCareReport("word", {
+        dateRange: "30",
+        startDate: "",
+        endDate: "",
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `customer-care-report-${
+        new Date().toISOString().split("T")[0]
+      }.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Word report exported successfully!");
+    } catch (error) {
+      console.error("Error exporting Word report:", error);
+      toast.error(
+        `Failed to export Word report: ${
+          error.response?.data?.message || error.message
+        }`
+      );
+    } finally {
+      setExportLoading((prev) => ({ ...prev, word: false }));
+    }
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      setExportLoading((prev) => ({ ...prev, csv: true }));
+
+      const blob = await statisticsAPI.exportCustomerCareReport("csv", {
+        dateRange: "30",
+        startDate: "",
+        endDate: "",
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `customer-care-report-${
+        new Date().toISOString().split("T")[0]
+      }.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("CSV report exported successfully!");
+    } catch (error) {
+      console.error("Error exporting CSV report:", error);
+      toast.error(
+        `Failed to export CSV report: ${
+          error.response?.data?.message || error.message
+        }`
+      );
+    } finally {
+      setExportLoading((prev) => ({ ...prev, csv: false }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -117,20 +242,7 @@ const CustomerCareReports = () => {
 
   return (
     <div className="space-y-6 p-4">
-      {/* Breadcrumb Navigation */}
-      <div className="flex items-center space-x-2 text-sm text-gray-600 mb-4">
-        <Link
-          to="/dashboard/modules/customer-care"
-          className="flex items-center space-x-1 hover:text-[var(--elra-primary)] transition-colors"
-        >
-          <HiHome className="w-4 h-4" />
-          <span>Customer Care</span>
-        </Link>
-        <span>/</span>
-        <span className="text-gray-900 font-medium">Reports</span>
-      </div>
-
-      {/* Header with Back Button */}
+      {/* Header with Export Buttons */}
       <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
@@ -139,13 +251,62 @@ const CustomerCareReports = () => {
               Analytics and insights for customer care performance
             </p>
           </div>
-          <Link
-            to="/dashboard/modules/customer-care"
-            className="flex items-center space-x-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl transition-colors"
-          >
-            <HiArrowLeft className="w-5 h-5" />
-            <span>Back to Dashboard</span>
-          </Link>
+          <div className="flex space-x-3">
+            <motion.button
+              onClick={handleExportPDF}
+              disabled={exportLoading.pdf}
+              whileHover={!exportLoading.pdf ? { scale: 1.05 } : {}}
+              whileTap={!exportLoading.pdf ? { scale: 0.95 } : {}}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                exportLoading.pdf
+                  ? "bg-white/10 cursor-not-allowed opacity-50"
+                  : "bg-white/20 hover:bg-white/30"
+              }`}
+            >
+              {exportLoading.pdf ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              ) : (
+                <HiArrowDownTray className="w-4 h-4" />
+              )}
+              <span>{exportLoading.pdf ? "Exporting..." : "PDF"}</span>
+            </motion.button>
+            <motion.button
+              onClick={handleExportWord}
+              disabled={exportLoading.word}
+              whileHover={!exportLoading.word ? { scale: 1.05 } : {}}
+              whileTap={!exportLoading.word ? { scale: 0.95 } : {}}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                exportLoading.word
+                  ? "bg-white/10 cursor-not-allowed opacity-50"
+                  : "bg-white/20 hover:bg-white/30"
+              }`}
+            >
+              {exportLoading.word ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              ) : (
+                <HiArrowDownTray className="w-4 h-4" />
+              )}
+              <span>{exportLoading.word ? "Exporting..." : "Word"}</span>
+            </motion.button>
+            <motion.button
+              onClick={handleExportCSV}
+              disabled={exportLoading.csv}
+              whileHover={!exportLoading.csv ? { scale: 1.05 } : {}}
+              whileTap={!exportLoading.csv ? { scale: 0.95 } : {}}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                exportLoading.csv
+                  ? "bg-white/10 cursor-not-allowed opacity-50"
+                  : "bg-white/20 hover:bg-white/30"
+              }`}
+            >
+              {exportLoading.csv ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              ) : (
+                <HiArrowDownTray className="w-4 h-4" />
+              )}
+              <span>{exportLoading.csv ? "Exporting..." : "CSV"}</span>
+            </motion.button>
+          </div>
         </div>
       </div>
 
@@ -167,7 +328,13 @@ const CustomerCareReports = () => {
               </p>
               <p className="text-sm text-blue-600 mt-1">
                 <HiArrowTrendingUp className="w-4 h-4 inline mr-1" />
-                +12% from last month
+                {(reportData.trendCalculations?.totalComplaintsChange || 0) > 0
+                  ? "+"
+                  : ""}
+                {(
+                  reportData.trendCalculations?.totalComplaintsChange || 0
+                ).toFixed(1)}
+                % from last month
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
@@ -196,7 +363,13 @@ const CustomerCareReports = () => {
               </p>
               <p className="text-sm text-green-600 mt-1">
                 <HiArrowTrendingUp className="w-4 h-4 inline mr-1" />
-                +5% improvement
+                {(reportData.trendCalculations?.resolutionRateChange || 0) > 0
+                  ? "+"
+                  : ""}
+                {(
+                  reportData.trendCalculations?.resolutionRateChange || 0
+                ).toFixed(1)}
+                % improvement
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
@@ -221,7 +394,13 @@ const CustomerCareReports = () => {
               </p>
               <p className="text-sm text-purple-600 mt-1">
                 <HiArrowTrendingDown className="w-4 h-4 inline mr-1" />
-                -0.5 days faster
+                {(reportData.trendCalculations?.resolutionTimeChange || 0) < 0
+                  ? ""
+                  : "+"}
+                {(
+                  reportData.trendCalculations?.resolutionTimeChange || 0
+                ).toFixed(1)}
+                % change
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
@@ -246,7 +425,13 @@ const CustomerCareReports = () => {
               </p>
               <p className="text-sm text-yellow-600 mt-1">
                 <HiArrowTrendingUp className="w-4 h-4 inline mr-1" />
-                +0.3 improvement
+                {(reportData.trendCalculations?.satisfactionChange || 0) > 0
+                  ? "+"
+                  : ""}
+                {(
+                  reportData.trendCalculations?.satisfactionChange || 0
+                ).toFixed(1)}
+                % improvement
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg">

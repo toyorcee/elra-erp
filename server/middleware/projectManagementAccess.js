@@ -51,6 +51,11 @@ export const checkExternalProjectCreateAccess = (req, res, next) => {
     });
   }
 
+  // Only apply this middleware to external projects
+  if (req.body.projectScope !== "external") {
+    return next();
+  }
+
   // Super Admin can do everything
   if (user.isSuperadmin || user.role.level >= 1000) {
     return next();

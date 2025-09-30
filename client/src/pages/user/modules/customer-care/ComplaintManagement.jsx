@@ -8,11 +8,8 @@ import {
   HiExclamationTriangle,
   HiEye,
   HiArrowPath,
-  HiArrowLeft,
-  HiHome,
   HiXMark,
 } from "react-icons/hi2";
-import { Link } from "react-router-dom";
 import {
   complaintAPI,
   complaintUtils,
@@ -181,65 +178,6 @@ const ComplaintManagement = () => {
     return statusInfo.bgColor;
   };
 
-  const handleStatusUpdate = async (
-    complaintId,
-    newStatus,
-    resolution = null
-  ) => {
-    try {
-      const response = await complaintAPI.updateComplaintStatus(complaintId, {
-        status: newStatus,
-        resolution: resolution,
-      });
-
-      if (response.success) {
-        toast.success("Complaint status updated successfully");
-        // Refresh complaints list
-        const refreshResponse = await complaintAPI.getComplaints({
-          page: 1,
-          limit: 20,
-          sortBy: "submittedAt",
-          sortOrder: "desc",
-        });
-        if (refreshResponse.success) {
-          setComplaints(refreshResponse.data.complaints);
-        }
-      } else {
-        toast.error("Failed to update complaint status");
-      }
-    } catch (error) {
-      console.error("Error updating complaint status:", error);
-      toast.error("Failed to update complaint status");
-    }
-  };
-
-  const handleAddNote = async (complaintId, note) => {
-    try {
-      const response = await complaintAPI.addComplaintNote(complaintId, {
-        note,
-      });
-
-      if (response.success) {
-        toast.success("Note added successfully");
-        // Refresh complaints list
-        const refreshResponse = await complaintAPI.getComplaints({
-          page: 1,
-          limit: 20,
-          sortBy: "submittedAt",
-          sortOrder: "desc",
-        });
-        if (refreshResponse.success) {
-          setComplaints(refreshResponse.data.complaints);
-        }
-      } else {
-        toast.error("Failed to add note");
-      }
-    } catch (error) {
-      console.error("Error adding note:", error);
-      toast.error("Failed to add note");
-    }
-  };
-
   const getPriorityColor = (priority) => {
     const priorityInfo = complaintUtils.formatPriority(priority);
     return priorityInfo.bgColor;
@@ -255,35 +193,14 @@ const ComplaintManagement = () => {
 
   return (
     <div className="space-y-6 p-4">
-      {/* Breadcrumb Navigation */}
-      <div className="flex items-center space-x-2 text-sm text-gray-600 mb-4">
-        <Link
-          to="/dashboard/modules/customer-care"
-          className="flex items-center space-x-1 hover:text-[var(--elra-primary)] transition-colors"
-        >
-          <HiHome className="w-4 h-4" />
-          <span>Customer Care</span>
-        </Link>
-        <span>/</span>
-        <span className="text-gray-900 font-medium">Complaint Management</span>
-      </div>
 
-      {/* Header with Back Button */}
+      {/* Header */}
       <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Complaint Management</h1>
-            <p className="text-white/80">
-              Manage and resolve staff complaints efficiently
-            </p>
-          </div>
-          <Link
-            to="/dashboard/modules/customer-care"
-            className="flex items-center space-x-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl transition-colors"
-          >
-            <HiArrowLeft className="w-5 h-5" />
-            <span>Back to Dashboard</span>
-          </Link>
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Complaint Management</h1>
+          <p className="text-white/80">
+            Manage and resolve staff complaints efficiently
+          </p>
         </div>
       </div>
 

@@ -52,6 +52,13 @@ import {
   CogIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  UserCircleIcon,
+  BanknotesIcon,
+  ComputerDesktopIcon,
+  ScaleIcon,
+  CreditCardIcon,
+  TruckIcon,
+  HeartIcon,
 } from "@heroicons/react/24/outline";
 import {
   getNavigationForRole,
@@ -70,7 +77,6 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
   const [collapsedSections, setCollapsedSections] = useState({});
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // Custom scrollbar styles
   const scrollbarStyles = `
     .sidebar-scroll::-webkit-scrollbar {
       width: 4px;
@@ -92,17 +98,14 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     }
   `;
 
-  // Dynamic sidebar context
   const {
     currentModule,
     moduleSidebarItems,
     isModuleView,
     getCurrentModuleInfo,
-    returnToMainDashboard,
     startModuleLoading,
   } = useDynamicSidebar();
 
-  // Use the same logic as the dashboard - fetch from backend API
   const [backendModules, setBackendModules] = useState([]);
   const [loadingModules, setLoadingModules] = useState(false);
 
@@ -131,8 +134,19 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
   }, [user]);
 
   const getAccessibleModules = () => {
+    // Always include the main Dashboard link
+    const mainNavigation = [
+      {
+        label: "Dashboard",
+        icon: "HiOutlineHome",
+        path: "/dashboard",
+        required: { minLevel: 0 },
+        section: "main",
+      },
+    ];
+
     if (backendModules && backendModules.length > 0) {
-      return backendModules
+      const erpModules = backendModules
         .map((module, index) => {
           const moduleName = module.name || module.title;
           if (!module.code || !moduleName) {
@@ -157,9 +171,10 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
           return sidebarModule;
         })
         .filter(Boolean);
+
+      return [...mainNavigation, ...erpModules];
     }
 
-    // Fallback to frontend filtering
     const userRoleLevel = user?.role?.level || user?.roleLevel || 300;
     const userDepartment = user?.department?.name || null;
     const userPermissions = user?.permissions || [];
@@ -177,44 +192,31 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
       ? fallbackNavigation.filter((item) => item.section === "erp")
       : [];
 
-    return fallbackModules;
+    return [...mainNavigation, ...fallbackModules];
   };
 
-  // Helper function to get icon for module
   const getIconForModule = (moduleKey) => {
     const iconMap = {
-      "self-service": "HiOutlineUser",
-      hr: "HiOutlineUsers",
-      finance: "HiOutlineCalculator",
-      it: "HiOutlineCog6Tooth",
-      operations: "HiOutlineCog6Tooth",
-      sales: "HiOutlineChartBar",
-      legal: "HiOutlineShieldCheck",
-      "system-admin": "HiOutlineCog6Tooth",
-      payroll: "HiOutlineCurrencyDollar",
-      procurement: "HiOutlineShoppingCart",
-      projects: "HiOutlineFolder",
-      inventory: "HiOutlineCube",
-      "customer-care": "HiOutlineChatBubbleLeftRight",
+      "self-service": "UserCircleIcon",
+      hr: "UserGroupIcon",
+      finance: "BanknotesIcon",
+      it: "ComputerDesktopIcon",
+      operations: "Cog6ToothIcon",
+      sales: "ArrowTrendingUpIcon",
+      legal: "ScaleIcon",
+      "system-admin": "WrenchScrewdriverIcon",
+      payroll: "CreditCardIcon",
+      procurement: "TruckIcon",
+      projects: "BriefcaseIcon",
+      inventory: "ArchiveBoxIcon",
+      "customer-care": "HeartIcon",
     };
-    return iconMap[moduleKey] || "HiOutlineCog6Tooth";
+    return iconMap[moduleKey] || "Cog6ToothIcon";
   };
 
   const accessibleModules = getAccessibleModules();
 
-  // Create navigation with backend modules
-  const navigation = [
-    // Main dashboard
-    {
-      label: "Dashboard",
-      icon: "HiOutlineHome",
-      path: "/dashboard",
-      required: { minLevel: 0 },
-      section: "main",
-    },
-    // ERP modules from backend
-    ...accessibleModules,
-  ];
+  const navigation = [...accessibleModules];
 
   const userRoleLevel = user?.role?.level || user?.roleLevel || 300;
   const roleInfo = getRoleInfo(userRoleLevel);
@@ -299,47 +301,29 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
   const isActive = (path) => {
     const currentPath = location.pathname;
 
-    if (currentPath === path) {
-      return true;
-    }
-
+    // Dashboard should only be active when on the main dashboard page
     if (path === "/dashboard") {
-      return (
-        currentPath === "/dashboard" ||
-        currentPath === "/dashboard/" ||
-        (currentPath.startsWith("/dashboard") &&
-          !currentPath.includes("/modules/"))
-      );
+      return currentPath === "/dashboard";
     }
 
+    // For module paths, check if current path starts with the module path
     if (path.startsWith("/dashboard/modules/")) {
-      const moduleName = path.split("/").pop();
-
-      const isModuleActive = currentPath.startsWith(
-        `/dashboard/modules/${moduleName}`
-      );
-
-      return isModuleActive;
+      return currentPath.startsWith(path);
     }
 
-    // For other paths, check if current path starts with the path
-    return currentPath.startsWith(path + "/");
+    return currentPath === path;
   };
 
-  // Get the most specific active item for visual feedback
   const getMostSpecificActiveItem = () => {
     const currentPath = location.pathname;
 
-    // Check for exact matches first
     if (currentPath === "/dashboard") return "/dashboard";
 
-    // Check for module paths
     if (currentPath.startsWith("/dashboard/modules/")) {
       const modulePath = currentPath.split("/").slice(0, 4).join("/");
       return modulePath;
     }
 
-    // Check for other dashboard paths
     if (currentPath.startsWith("/dashboard/")) {
       return currentPath;
     }
@@ -349,7 +333,6 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
 
   const getIconComponent = (iconName) => {
     const iconMap = {
-      // Main sidebar icons
       HiOutlineHome: HomeIcon,
       HiOutlineUsers: UsersIcon,
       HiOutlineCurrencyDollar: CurrencyDollarIcon,
@@ -374,6 +357,11 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
       HiOutlineClock: ClockIcon,
       HiOutlineTrendingUp: ArrowTrendingUpIcon,
       HiOutlineDocumentReport: ChartBarIcon,
+      HiOutlineUser: UserCircleIcon,
+      HiOutlineUsers: UserGroupIcon,
+      HiOutlineChatBubbleLeftRight: HeartIcon,
+      HiOutlineCog6Tooth: Cog6ToothIcon,
+      HiOutlineBuildingOffice2: BuildingOffice2Icon,
 
       // Module-specific icons
       UsersIcon: UsersIcon,
@@ -400,6 +388,18 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
       QuestionMarkCircleIcon: QuestionMarkCircleIcon,
       FlagIcon: FlagIcon,
       CogIcon: CogIcon,
+
+      UserCircleIcon: UserCircleIcon,
+      UserGroupIcon: UserGroupIcon,
+      BanknotesIcon: BanknotesIcon,
+      ComputerDesktopIcon: ComputerDesktopIcon,
+      ArrowTrendingUpIcon: ArrowTrendingUpIcon,
+      ScaleIcon: ScaleIcon,
+      CreditCardIcon: CreditCardIcon,
+      TruckIcon: TruckIcon,
+      BriefcaseIcon: BriefcaseIcon,
+      ArchiveBoxIcon: ArchiveBoxIcon,
+      HeartIcon: HeartIcon,
     };
     return iconMap[iconName] || HomeIcon;
   };
@@ -420,18 +420,12 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
         <Link
           to={item.path}
           onClick={handleClick}
-          className={`group flex items-center px-4 py-3 text-sm font-medium rounded-md transition-all duration-200 relative cursor-pointer ${
+          className={`group flex items-center px-3 py-2 text-sm font-medium rounded-full transition-all duration-200 relative cursor-pointer ${
             isItemActive
               ? "bg-[var(--elra-primary)] text-white font-semibold"
               : "text-gray-700 hover:bg-gray-100 hover:text-[var(--elra-primary)]"
           } ${!shouldShowExpanded && "justify-center"}`}
         >
-          {/* Active indicator */}
-          {isItemActive && (
-            <div
-              className={`absolute left-0 top-0 bottom-0 w-1 bg-[var(--elra-primary-dark)]`}
-            />
-          )}
           <div className="relative">
             <IconComponent
               className={`h-5 w-5 ${
@@ -516,7 +510,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex flex-col items-center p-2 rounded-md transition-all duration-200 cursor-pointer min-h-[60px] justify-center ${
+                className={`flex flex-col items-center p-2 rounded-full transition-all duration-200 cursor-pointer min-h-[60px] justify-center ${
                   isItemActive
                     ? "bg-[var(--elra-primary)] text-white"
                     : "text-gray-700 hover:bg-gray-100 hover:text-[var(--elra-primary)]"
@@ -639,17 +633,34 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
               <div
                 className={`${
                   shouldShowExpanded ? "w-12 h-12" : "w-10 h-10"
-                } bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-2xl flex items-center justify-center shadow-lg ${
+                } rounded-full flex items-center justify-center shadow-lg overflow-hidden border-2 border-[var(--elra-primary)] ${
                   !shouldShowExpanded ? "mx-auto" : ""
                 }`}
               >
-                <span
-                  className={`text-white font-bold ${
-                    shouldShowExpanded ? "text-lg" : "text-base"
-                  }`}
+                {user?.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt={`${user?.firstName} ${user?.lastName}`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                      e.target.nextSibling.style.display = "flex";
+                    }}
+                  />
+                ) : null}
+                <div
+                  className={`${
+                    user?.avatar ? "hidden" : "flex"
+                  } w-full h-full bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] items-center justify-center`}
                 >
-                  {user?.firstName?.charAt(0) || user?.name?.charAt(0) || "U"}
-                </span>
+                  <span
+                    className={`text-white font-bold ${
+                      shouldShowExpanded ? "text-lg" : "text-base"
+                    }`}
+                  >
+                    {user?.firstName?.charAt(0) || user?.name?.charAt(0) || "U"}
+                  </span>
+                </div>
               </div>
               {shouldShowExpanded && (
                 <div className="ml-4 flex-1 min-w-0">
@@ -694,7 +705,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                         onClick={(e) =>
                           toggleSectionCollapse("Module Features", e)
                         }
-                        className="w-full px-4 text-sm font-bold text-[var(--elra-primary)] uppercase tracking-wider mb-3 py-3 rounded-lg flex items-center justify-between transition-all duration-200 cursor-pointer hover:bg-gray-100"
+                        className="w-full px-4 text-sm font-bold text-[var(--elra-primary)] uppercase tracking-wider mb-3 py-3 rounded-full flex items-center justify-between transition-all duration-200 cursor-pointer hover:bg-gray-100"
                       >
                         <span>Module Features</span>
                         <div className="flex items-center space-x-2">
@@ -747,7 +758,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                                     <div key={itemIndex} className="relative">
                                       <Link
                                         to={item.path}
-                                        className={`group flex items-center px-4 py-2 text-xs font-medium rounded-md transition-all duration-200 cursor-pointer ${
+                                        className={`group flex items-center px-4 py-2 text-xs font-medium rounded-full transition-all duration-200 cursor-pointer ${
                                           isItemActive
                                             ? "bg-[var(--elra-primary)] text-white font-semibold"
                                             : "text-gray-700 hover:bg-gray-100 hover:text-[var(--elra-primary)]"

@@ -2,6 +2,7 @@ import express from "express";
 import {
   createComplianceProgram,
   getCompliancePrograms,
+  getCompliantCompliancePrograms,
   getComplianceProgramById,
   updateComplianceProgram,
   deleteComplianceProgram,
@@ -22,6 +23,8 @@ router.use(protect);
 router.post("/", checkComplianceWriteAccess, createComplianceProgram);
 
 router.get("/", checkLegalAccess, getCompliancePrograms);
+
+router.get("/compliant", checkLegalAccess, getCompliantCompliancePrograms);
 
 router.get("/:id", checkLegalAccess, getComplianceProgramById);
 

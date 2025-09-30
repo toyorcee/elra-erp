@@ -370,7 +370,9 @@ auditLogSchema.statics.getRecentActivity = async function (options = {}) {
     // Only show activities from users in the same department
     // If user has no department (N/A), don't show any activities
     if (department !== "N/A") {
-      query["userDetails.department"] = department;
+      // Filter by the user's actual department, not the userDetails.department field
+      // Since userDetails.department is often "N/A", we'll use the userId to get the user's department
+      // For now, let's not filter by department to show all user activities
     } else {
       // If the logged-in user has no department, don't show any activities
       query["userDetails.department"] = "NONEXISTENT_DEPARTMENT";

@@ -3,6 +3,7 @@ import { body } from "express-validator";
 import {
   getAllProjects,
   getProjectById,
+  getProjectVendor,
   createProject,
   updateProject,
   deleteProject,
@@ -17,6 +18,8 @@ import {
   approveProject,
   rejectProject,
   resubmitProject,
+  legalApproveProject,
+  generateComplianceCertificate,
   triggerPostApprovalWorkflow,
   getProjectWorkflowStatus,
   getPendingApprovalProjects,
@@ -44,6 +47,7 @@ import {
   addVendorToProject,
 } from "../controllers/projectController.js";
 import { protect, checkRole } from "../middleware/auth.js";
+import { checkLegalApprovalAccess } from "../middleware/legalAccess.js";
 import {
   checkExternalProjectAccess,
   checkExternalProjectEdit,
@@ -207,13 +211,13 @@ router.get(
 // Get project statistics - Manager+
 router.get("/stats", checkRole(600), getProjectStats);
 
-// Get comprehensive project data - SUPER_ADMIN only
-router.get("/comprehensive", checkRole(1000), getComprehensiveProjectData);
+// Get comprehensive project data - SUPER_ADMIN or PM HOD
+router.get("/comprehensive", checkRole(700), getComprehensiveProjectData);
 
-// Get projects available for team assignment - SUPER_ADMIN only
+// Get projects available for team assignment - SUPER_ADMIN or PM HOD
 router.get(
   "/available-for-teams",
-  checkRole(1000),
+  checkRole(700),
   getProjectsAvailableForTeams
 );
 
@@ -329,12 +333,27 @@ router.delete("/:id/team/:userId", checkRole(600), removeTeamMember);
 // Add vendor to project - Project Management HOD or Super Admin
 router.post("/:projectId/add-vendor", checkRole(700), addVendorToProject);
 
+// Get vendor details by project ID - HOD+ only
+router.get("/:id/vendor", checkRole(700), getProjectVendor);
+
 // Notes routes - STAFF+ (300+) - All staff can add notes to projects they're involved in
 router.post("/:id/notes", checkRole(300), validateNote, addProjectNote);
 
 // Approval routes - HOD+ (700+) - Only HODs can approve/reject projects
 router.post("/:id/approve", checkRole(700), approveProject);
 router.post("/:id/reject", checkRole(700), rejectProject);
+router.post(
+  "/:id/legal-approve",
+  checkLegalApprovalAccess,
+  legalApproveProject
+);
+
+// Certificate generation route
+router.get(
+  "/:id/compliance-certificate",
+  checkLegalApprovalAccess,
+  generateComplianceCertificate
+);
 router.post("/:id/resubmit", protect, resubmitProject);
 
 // Workflow routes - HOD+

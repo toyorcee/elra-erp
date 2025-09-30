@@ -60,21 +60,15 @@ const procurementSchema = new mongoose.Schema(
         trim: true,
       },
       address: {
-        street: String,
-        city: String,
-        state: String,
-        postalCode: String,
+        type: String,
+        trim: true,
       },
     },
 
     // Delivery Information
     deliveryAddress: {
-      street: String,
-      city: String,
-      state: String,
-      postalCode: String,
-      contactPerson: String,
-      phone: String,
+      type: String,
+      trim: true,
     },
 
     // Purchase Order Items

@@ -83,6 +83,29 @@ export const complaintAPI = {
     }
   },
 
+  getDepartmentsWithHODs: async () => {
+    try {
+      const response = await api.get("/customer-care/departments-with-hods");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching departments with HODs:", error);
+      throw error;
+    }
+  },
+
+  sendComplaintToHOD: async (complaintId, data) => {
+    try {
+      const response = await api.post(
+        `/customer-care/complaints/${complaintId}/send-to-hod`,
+        data
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error sending complaint to HOD:", error);
+      throw error;
+    }
+  },
+
   assignComplaint: async (complaintId, assignmentData) => {
     try {
       const response = await api.post(
@@ -146,6 +169,42 @@ export const statisticsAPI = {
       return response.data;
     } catch (error) {
       console.error("Error fetching category breakdown:", error);
+      throw error;
+    }
+  },
+
+  getPriorityBreakdown: async () => {
+    try {
+      const response = await api.get("/customer-care/priority-breakdown");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching priority breakdown:", error);
+      throw error;
+    }
+  },
+
+  getTrendCalculations: async (params = {}) => {
+    try {
+      const response = await api.get("/customer-care/trends", { params });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching trend calculations:", error);
+      throw error;
+    }
+  },
+
+  exportCustomerCareReport: async (format, params = {}) => {
+    try {
+      const response = await api.get(
+        `/customer-care/reports/export/${format}`,
+        {
+          params,
+          responseType: "blob", 
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error exporting report:", error);
       throw error;
     }
   },

@@ -10,8 +10,13 @@ import {
   getComplaintTrends,
   getDepartmentBreakdown,
   getCategoryBreakdown,
+  getPriorityBreakdown,
+  getTrendCalculations,
+  exportCustomerCareReport,
   submitFeedback,
   getTeamMembers,
+  getDepartmentsWithHODs,
+  sendComplaintToHOD,
   assignComplaint,
   saveSession,
   getSessionsByComplaint,
@@ -54,6 +59,20 @@ router.get(
   getCategoryBreakdown
 );
 
+router.get(
+  "/priority-breakdown",
+  checkCustomerCareAccess,
+  getPriorityBreakdown
+);
+
+router.get("/trends", checkCustomerCareAccess, getTrendCalculations);
+
+router.get(
+  "/reports/export/:format",
+  checkCustomerCareAccess,
+  exportCustomerCareReport
+);
+
 router.post(
   "/complaints/:id/feedback",
   checkCustomerCareAccess,
@@ -61,6 +80,18 @@ router.post(
 );
 
 router.get("/team-members", checkCustomerCareAccess, getTeamMembers);
+
+router.get(
+  "/departments-with-hods",
+  checkCustomerCareAccess,
+  getDepartmentsWithHODs
+);
+
+router.post(
+  "/complaints/:id/send-to-hod",
+  checkCustomerCareAccess,
+  sendComplaintToHOD
+);
 
 router.post("/complaints/:id/assign", checkCustomerCareAccess, assignComplaint);
 
@@ -83,6 +114,10 @@ router.get(
 router.get("/sessions/active", checkCustomerCareAccess, getActiveSessions);
 
 // Send reminder notification for complaint
-router.post("/complaints/:complaintId/reminder", checkCustomerCareAccess, sendReminderNotification);
+router.post(
+  "/complaints/:complaintId/reminder",
+  checkCustomerCareAccess,
+  sendReminderNotification
+);
 
 export default router;

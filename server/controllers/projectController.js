@@ -6,6 +6,7 @@ import TeamMember from "../models/TeamMember.js";
 import Approval from "../models/Approval.js";
 import Vendor from "../models/Vendor.js";
 import Notification from "../models/Notification.js";
+import ComplianceProgram from "../models/ComplianceProgram.js";
 import { checkDepartmentAccess } from "../middleware/auth.js";
 import NotificationService from "../services/notificationService.js";
 import ProjectAuditService from "../services/projectAuditService.js";
@@ -13,6 +14,7 @@ import emailService from "../services/emailService.js";
 import {
   generateVendorReceiptPDF,
   generateClientProjectPDF,
+  generateComplianceCertificatePDF,
 } from "../utils/pdfUtils.js";
 
 // ============================================================================
@@ -68,9 +70,10 @@ const generateNextProjectCode = async (departmentId) => {
     const currentYear = new Date().getFullYear();
     const deptPrefix = department.name.substring(0, 3).toUpperCase();
 
-    // Count projects for this department in current year
+    // Count departmental projects for this department in current year
     const count = await Project.countDocuments({
       department: departmentId,
+      projectScope: "departmental",
       createdAt: {
         $gte: new Date(currentYear, 0, 1),
         $lt: new Date(currentYear + 1, 0, 1),
@@ -299,17 +302,11 @@ export const getAllProjects = async (req, res) => {
           currentUser.department?.name === "Procurement";
 
         if (isProjectManagementDepartment) {
-          query.$or = [
-            { projectScope: "personal", createdBy: currentUser._id },
-            {
-              projectScope: "departmental",
-              department: currentUser.department,
-            },
-            {
-              projectScope: "external",
-              department: currentUser.department,
-            },
-          ];
+          // PM HOD can see ALL projects across all departments
+          console.log(
+            "🔍 [PROJECTS] PM HOD - showing all projects across all departments"
+          );
+          // No additional filters needed - see everything
           console.log(
             `🔍 [PROJECTS] Project Management HOD - showing personal, departmental, and external projects from department: ${currentUser.department.name}`
           );
@@ -358,7 +355,7 @@ export const getAllProjects = async (req, res) => {
     }
 
     const projects = await Project.find(query)
-      .populate("projectManager", "firstName lastName email")
+      .populate("projectManager", "firstName lastName email avatar")
       .populate("teamMembers.user", "firstName lastName email")
       .populate("createdBy", "firstName lastName")
       .populate("department", "name code")
@@ -757,7 +754,23 @@ export const createProject = async (req, res) => {
       const projectBudget = parseFloat(req.body.budget) || 0;
       const requiresBudgetAllocation =
         req.body.requiresBudgetAllocation === "true";
-      const budgetPercentage = parseFloat(req.body.budgetPercentage) || 100;
+
+      // Calculate budget percentage based on requiresBudgetAllocation
+      let budgetPercentage;
+      let elraContribution;
+      let clientContribution;
+
+      if (requiresBudgetAllocation) {
+        // If budget allocation is requested, use the percentage (default 100% if empty)
+        budgetPercentage = parseFloat(req.body.budgetPercentage) || 100;
+        elraContribution = (totalItemsCost * budgetPercentage) / 100;
+        clientContribution = totalItemsCost - elraContribution;
+      } else {
+        // If no budget allocation requested, CLIENT pays 100% (external project)
+        budgetPercentage = 0;
+        elraContribution = 0;
+        clientContribution = totalItemsCost;
+      }
 
       console.log(`💰 [BUDGET VALIDATION] Project: ${req.body.name}`);
       console.log(
@@ -772,9 +785,6 @@ export const createProject = async (req, res) => {
       console.log(
         `💰 [BUDGET VALIDATION] ELRA Percentage: ${budgetPercentage}%`
       );
-
-      const elraContribution = (totalItemsCost * budgetPercentage) / 100;
-      const clientContribution = totalItemsCost - elraContribution;
 
       console.log(
         `💰 [BUDGET VALIDATION] ELRA Pays: ₦${elraContribution.toLocaleString()}`
@@ -897,13 +907,18 @@ export const createProject = async (req, res) => {
         }
       }
 
-      // Validate vendor information for external projects
-      if (!req.body.vendorName || !req.body.vendorName.trim()) {
+      // Validate vendor information for external projects (optional)
+      if (
+        req.body.hasVendor &&
+        (!req.body.vendorName || !req.body.vendorName.trim())
+      ) {
         return res.status(400).json({
           success: false,
-          message: "Vendor information is required for external projects",
-          errors: ["Vendor name is required for external projects"],
-          fieldErrors: { vendorName: "Vendor name is required" },
+          message: "Vendor name is required when vendor is selected",
+          errors: ["Vendor name is required when vendor is selected"],
+          fieldErrors: {
+            vendorName: "Vendor name is required when vendor is selected",
+          },
         });
       }
 
@@ -1276,7 +1291,10 @@ export const createProject = async (req, res) => {
     }
 
     let vendorId = null;
-    if (projectScope === "external" && req.body.vendorName) {
+    if (
+      (projectScope === "external" || projectScope === "departmental") &&
+      req.body.vendorName
+    ) {
       try {
         let vendor = await Vendor.findOne({
           name: { $regex: new RegExp(req.body.vendorName, "i") },
@@ -1351,7 +1369,7 @@ export const createProject = async (req, res) => {
                 "⚠️ Could not fetch project manager name:",
                 error.message
               );
-              projectManagerName = req.body.projectManager; // Fallback to ID
+              projectManagerName = req.body.projectManager;
             }
           }
 
@@ -2169,6 +2187,7 @@ export const createProject = async (req, res) => {
           priority: project.priority,
           projectScope: project.projectScope,
           deliveryAddress: project.deliveryAddress,
+          department: project.department?.name || "N/A",
           vendor: project.vendor
             ? {
                 name: project.vendor.name,
@@ -2227,7 +2246,12 @@ export const createProject = async (req, res) => {
     }
 
     // Send vendor email AFTER successful transaction
-    if (projectScope === "external" && vendorId) {
+    // For external projects: send to both client and vendor
+    // For departmental projects: send only to vendor (no client)
+    if (
+      (projectScope === "external" || projectScope === "departmental") &&
+      vendorId
+    ) {
       try {
         const vendor = await Vendor.findById(vendorId);
         console.log(`📧 [VENDOR DEBUG] Retrieved vendor from DB:`, {
@@ -2261,6 +2285,7 @@ export const createProject = async (req, res) => {
             status: project.status,
             priority: project.priority,
             projectScope: project.projectScope,
+            department: project.department?.name || "N/A",
             deliveryAddress: project.deliveryAddress,
           };
 
@@ -2271,7 +2296,7 @@ export const createProject = async (req, res) => {
           console.log(`📄 [VENDOR PDF] Receipt generated successfully`);
 
           console.log(
-            `📧 [VENDOR EMAIL] Sending notification to: ${vendor.email}`
+            `📧 [VENDOR EMAIL] Sending notification to: ${vendor.email} for ${projectScope} project`
           );
           const emailResult = await emailService.sendVendorNotificationEmail(
             vendor,
@@ -2281,7 +2306,11 @@ export const createProject = async (req, res) => {
 
           if (emailResult.success) {
             console.log(
-              `📧 [VENDOR EMAIL] ✅ Welcome email with PDF sent successfully to ${vendor.email}`
+              `📧 [VENDOR EMAIL] ✅ ${
+                projectScope === "external" ? "Client & Vendor" : "Vendor"
+              } notification email with PDF sent successfully to ${
+                vendor.email
+              }`
             );
           } else {
             console.error(
@@ -2299,6 +2328,33 @@ export const createProject = async (req, res) => {
           vendorEmailError
         );
       }
+    }
+
+    // Email notification summary
+    console.log(
+      `📧 [EMAIL SUMMARY] Project: ${project.name} (${project.code}) - ${projectScope} project`
+    );
+    if (projectScope === "external") {
+      console.log(
+        `📧 [EMAIL SUMMARY] ✅ Client email sent to: ${
+          project.clientEmail || "N/A"
+        }`
+      );
+      console.log(
+        `📧 [EMAIL SUMMARY] ✅ Vendor email sent to: ${
+          vendorId ? "Vendor" : "N/A"
+        }`
+      );
+    } else if (projectScope === "departmental") {
+      console.log(
+        `📧 [EMAIL SUMMARY] ✅ Vendor email sent to: ${
+          vendorId ? "Vendor" : "N/A"
+        } (No client email for departmental projects)`
+      );
+    } else {
+      console.log(
+        `📧 [EMAIL SUMMARY] ✅ No emails sent for ${projectScope} project`
+      );
     }
 
     console.log(
@@ -2868,18 +2924,24 @@ export const getProjectStats = async (req, res) => {
   }
 };
 
-// @desc    Get comprehensive project data (SUPER_ADMIN only)
+// @desc    Get comprehensive project data (SUPER_ADMIN or PM HOD)
 // @route   GET /api/projects/comprehensive-data
-// @access  Private (SUPER_ADMIN)
+// @access  Private (SUPER_ADMIN or PM HOD)
 export const getComprehensiveProjectData = async (req, res) => {
   try {
     const currentUser = req.user;
 
-    // Check if user is SUPER_ADMIN
-    if (currentUser.role.level < 1000) {
+    // Check if user is SUPER_ADMIN or PM HOD
+    if (
+      currentUser.role.level < 1000 &&
+      !(
+        currentUser.role.level >= 700 &&
+        currentUser.department?.name === "Project Management"
+      )
+    ) {
       return res.status(403).json({
         success: false,
-        message: "Access denied. SUPER_ADMIN level required.",
+        message: "Access denied. SUPER_ADMIN or PM HOD level required.",
       });
     }
 
@@ -2897,7 +2959,7 @@ export const getComprehensiveProjectData = async (req, res) => {
       limit: parseInt(limit),
       populate: [
         { path: "createdBy", select: "firstName lastName email" },
-        { path: "projectManager", select: "firstName lastName email" },
+        { path: "projectManager", select: "firstName lastName email avatar" },
         { path: "department", select: "name code" },
         { path: "approvalChain.approver", select: "firstName lastName email" },
       ],
@@ -2911,6 +2973,24 @@ export const getComprehensiveProjectData = async (req, res) => {
       .sort(options.sort)
       .skip((options.page - 1) * options.limit)
       .limit(options.limit);
+
+    // Calculate team member counts for each project
+    const enhancedProjects = await Promise.all(
+      projects.map(async (project) => {
+        const projectObj = project.toObject();
+
+        // Get team member count for this project
+        const TeamMember = mongoose.model("TeamMember");
+        const teamMemberCount = await TeamMember.countDocuments({
+          project: project._id,
+          isActive: true,
+          status: "active",
+        });
+
+        projectObj.teamMemberCount = teamMemberCount;
+        return projectObj;
+      })
+    );
 
     // Get additional statistics
     const totalStats = await Project.aggregate([
@@ -2948,7 +3028,7 @@ export const getComprehensiveProjectData = async (req, res) => {
     res.status(200).json({
       success: true,
       data: {
-        projects: projects,
+        projects: enhancedProjects,
         pagination: {
           page: options.page,
           limit: options.limit,
@@ -3939,6 +4019,185 @@ export const approveProject = async (req, res) => {
   }
 };
 
+// @desc    Legal approval with compliance program attachment
+// @route   POST /api/projects/:id/legal-approve
+// @access  Private (Legal HOD)
+export const legalApproveProject = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { complianceProgramId, comments } = req.body;
+    const currentUser = req.user;
+
+    // Check if user is Legal HOD
+    if (
+      currentUser.role.level < 700 ||
+      currentUser.department.name !== "Legal & Compliance"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Only Legal HOD can perform legal approval",
+      });
+    }
+
+    const project = await Project.findById(id)
+      .populate("department", "name")
+      .populate("approvalChain.approver", "firstName lastName email");
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    // Check if project is in legal approval status
+    if (project.status !== "pending_legal_compliance_approval") {
+      return res.status(400).json({
+        success: false,
+        message: "Project is not in legal approval status",
+      });
+    }
+
+    // MANDATORY: Legal HOD must provide a compliance program
+    if (!complianceProgramId) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "MANDATORY: Legal approval requires a compliance program to be attached. This ensures ELRA maintains full regulatory compliance.",
+      });
+    }
+
+    // Validate compliance program
+    const complianceProgram = await ComplianceProgram.findById(
+      complianceProgramId
+    );
+
+    if (!complianceProgram) {
+      return res.status(404).json({
+        success: false,
+        message: "Compliance program not found",
+      });
+    }
+
+    // Check if compliance program is ready for attachment (all items compliant)
+    const isReady = await complianceProgram.isReadyForAttachment();
+
+    if (!isReady) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Compliance program cannot be attached. All compliance items must be 'Compliant' before attachment.",
+      });
+    }
+
+    // Attach compliance program to project
+    project.complianceProgram = complianceProgramId;
+
+    // Use the existing approveProject method which handles all notifications automatically
+    await project.approveProject(
+      currentUser._id,
+      "legal_compliance",
+      comments || "Legal compliance approved"
+    );
+
+    // Send notification to the Legal HOD confirming their approval
+    try {
+      const nextPendingStep = project.approvalChain.find(
+        (step) => step.status === "pending"
+      );
+
+      let approverMessage = `You have successfully approved project "${project.name}" at Legal & Compliance level.`;
+
+      if (nextPendingStep) {
+        if (
+          nextPendingStep.level === "budget_allocation" &&
+          currentUser.department?.name === "Finance & Accounting"
+        ) {
+          approverMessage += ` You can now proceed to allocate budget for this project.`;
+        } else {
+          // Normal case: different approver for next step
+          let nextStage = "";
+          switch (nextPendingStep.level) {
+            case "project_management":
+              nextStage = "Project Management HOD";
+              break;
+            case "legal_compliance":
+              nextStage = "Legal & Compliance HOD";
+              break;
+            case "finance":
+              nextStage = "Finance HOD";
+              break;
+            case "executive":
+              nextStage = "Executive HOD";
+              break;
+            case "budget_allocation":
+              nextStage = "Finance HOD for budget allocation";
+              break;
+            default:
+              nextStage = "next approver";
+          }
+          approverMessage += ` The project has been forwarded to ${nextStage} for the next approval stage.`;
+        }
+      } else {
+        approverMessage += ` The project has been fully approved and is ready for implementation.`;
+      }
+
+      await sendProjectNotification(req, {
+        recipient: currentUser._id,
+        type: "project_approval_confirmed",
+        title: "Project Approval Confirmed",
+        message: approverMessage,
+        data: {
+          projectId: project._id,
+          projectName: project.name,
+          approvalLevel: "legal_compliance",
+          nextStage: nextPendingStep ? nextPendingStep.level : "completed",
+        },
+      });
+
+      console.log(
+        `📧 [LEGAL APPROVER NOTIFICATION] Sent approval confirmation to ${currentUser.firstName} ${currentUser.lastName}`
+      );
+    } catch (error) {
+      console.error(
+        "❌ [LEGAL APPROVER NOTIFICATION] Error sending approval confirmation:",
+        error
+      );
+    }
+
+    // Audit logging for project approval
+    try {
+      await ProjectAuditService.logProjectApproved(
+        project,
+        currentUser,
+        "legal_compliance",
+        comments || "Legal compliance approved"
+      );
+    } catch (error) {
+      console.error("❌ [AUDIT] Error logging legal approval:", error);
+    }
+
+    res.json({
+      success: true,
+      message: "Project legally approved successfully",
+      data: {
+        project: {
+          id: project._id,
+          name: project.name,
+          status: project.status,
+          complianceProgram: project.complianceProgram,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error in legal approval:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to perform legal approval",
+    });
+  }
+};
+
 // @desc    Reject project
 // @route   POST /api/projects/:id/reject
 // @access  Private (Approvers)
@@ -4409,9 +4668,9 @@ export const getPendingApprovalProjects = async (req, res) => {
       .populate("projectManager", "firstName lastName email")
       .populate("department", "name")
       .populate("approvalChain.approver", "firstName lastName email")
+      .populate("complianceProgram")
       .sort({ createdAt: -1 });
 
-    // Filter projects where current user is the next approver (for cross-departmental approvals)
     const filteredProjects = projects.filter((project) => {
       if (!project.approvalChain || project.approvalChain.length === 0) {
         return false;
@@ -4552,6 +4811,14 @@ export const getPendingApprovalProjects = async (req, res) => {
           projectDoc.status
         );
 
+        if (projectDoc.complianceProgram) {
+          const Compliance = await import("../models/Compliance.js");
+          const complianceItems = await Compliance.default.find({
+            complianceProgram: projectDoc.complianceProgram._id,
+          });
+          projectDoc.complianceProgram.complianceItems = complianceItems;
+        }
+
         return projectDoc;
       })
     );
@@ -4608,6 +4875,7 @@ export const getDepartmentPendingApprovalProjects = async (req, res) => {
       .populate("projectManager", "firstName lastName email")
       .populate("department", "name code")
       .populate("approvalChain.approver", "firstName lastName email")
+      .populate("complianceProgram")
       .sort({ createdAt: -1 });
 
     // Filter projects where current user is the next pending approver
@@ -4738,6 +5006,7 @@ export const getProjectManagementPendingApprovalProjects = async (req, res) => {
       .populate("projectManager", "firstName lastName email")
       .populate("department", "name code")
       .populate("approvalChain.approver", "firstName lastName email")
+      .populate("complianceProgram")
       .sort({ createdAt: -1 });
 
     // Filter projects where current user is the next pending approver
@@ -5327,6 +5596,7 @@ export const getCrossDepartmentalApprovalHistory = async (req, res) => {
       .populate("projectManager", "firstName lastName email")
       .populate("department", "name code")
       .populate("approvalChain.approver", "firstName lastName email")
+      .populate("complianceProgram")
       .sort({ updatedAt: -1 });
 
     const approvalHistory = [];
@@ -5340,11 +5610,18 @@ export const getCrossDepartmentalApprovalHistory = async (req, res) => {
       );
 
       if (userApprovalStep) {
-        // Get document counts from requiredDocuments array
         const totalDocuments = project.requiredDocuments?.length || 0;
         const submittedDocuments =
           project.requiredDocuments?.filter((doc) => doc.isSubmitted).length ||
           0;
+
+        let complianceItems = [];
+        if (project.complianceProgram) {
+          const Compliance = await import("../models/Compliance.js");
+          complianceItems = await Compliance.default.find({
+            complianceProgram: project.complianceProgram._id,
+          });
+        }
 
         approvalHistory.push({
           _id: project._id,
@@ -5368,6 +5645,12 @@ export const getCrossDepartmentalApprovalHistory = async (req, res) => {
           requiredDocuments: project.requiredDocuments,
           projectItems: project.projectItems,
           approvalChain: project.approvalChain,
+          complianceProgram: project.complianceProgram
+            ? {
+                ...project.complianceProgram.toObject(),
+                complianceItems: complianceItems,
+              }
+            : null,
           documentStats: {
             submitted: submittedDocuments,
             total: totalDocuments,
@@ -7079,6 +7362,186 @@ For questions or clarifications, contact the Project Management Office.
     res.status(500).json({
       success: false,
       message: "Failed to export project approval reports",
+      error: error.message,
+    });
+  }
+};
+
+// Generate Compliance Certificate
+export const generateComplianceCertificate = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+
+    console.log(
+      `🏆 [COMPLIANCE CERTIFICATE] Generating certificate for project: ${id}`
+    );
+
+    // Find the project with compliance program
+    const project = await Project.findById(id)
+      .populate("complianceProgram")
+      .populate("createdBy", "firstName lastName email")
+      .populate("projectManager", "firstName lastName email")
+      .populate("department", "name code");
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    // For external projects, check if compliance program is attached
+    if (project.projectScope === "external" && !project.complianceProgram) {
+      return res.status(400).json({
+        success: false,
+        message: "No compliance program attached to this external project",
+      });
+    }
+
+    // Fetch compliance items (only for external projects with compliance programs)
+    let complianceItems = [];
+    if (project.projectScope === "external" && project.complianceProgram) {
+      const Compliance = await import("../models/Compliance.js");
+      complianceItems = await Compliance.default.find({
+        complianceProgram: project.complianceProgram._id,
+      });
+    }
+
+    // Generate certificate number
+    const certificateNumber = `ELRA-COMP-${Date.now()}`;
+    const issueDate = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+    // Create certificate data
+    const certificateData = {
+      project: {
+        name: project.name,
+        code: project.code,
+        description: project.description,
+        budget: project.budget,
+        startDate: project.startDate,
+        endDate: project.endDate,
+        createdBy: project.createdBy,
+        projectManager: project.projectManager,
+        department: project.department,
+      },
+      complianceProgram: project.complianceProgram
+        ? {
+            name: project.complianceProgram.name,
+            description: project.complianceProgram.description,
+            category: project.complianceProgram.category,
+            status: project.complianceProgram.status,
+            priority: project.complianceProgram.priority,
+            programOwner: project.complianceProgram.programOwner,
+            effectiveDate: project.complianceProgram.effectiveDate,
+            reviewDate: project.complianceProgram.reviewDate,
+          }
+        : null,
+      complianceItems: complianceItems.map((item) => ({
+        title: item.title,
+        category: item.category,
+        status: item.status,
+        priority: item.priority,
+        description: item.description,
+        dueDate: item.dueDate,
+        lastAudit: item.lastAudit,
+      })),
+      certificate: {
+        number: certificateNumber,
+        issueDate: issueDate,
+        issuedBy: user.firstName + " " + user.lastName,
+        issuedByTitle: "Legal & Compliance HOD",
+        department: "Legal & Compliance",
+      },
+    };
+
+    console.log(
+      `✅ [COMPLIANCE CERTIFICATE] Certificate data prepared for project: ${project.name}`
+    );
+
+    // Generate PDF certificate
+    const pdfBuffer = await generateComplianceCertificatePDF(certificateData);
+
+    // Set response headers for PDF download
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="ELRA-Compliance-Certificate-${project.code}.pdf"`
+    );
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error(
+      "❌ [COMPLIANCE CERTIFICATE] Error generating certificate:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate compliance certificate",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get vendor details by project ID
+// @route   GET /api/projects/:id/vendor
+// @access  Private (HOD+)
+export const getProjectVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUser = req.user;
+
+    console.log(`🏢 [VENDOR API] Fetching vendor details for project: ${id}`);
+
+    const project = await Project.findById(id).populate("vendorId");
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    if (!project.vendorId) {
+      return res.status(404).json({
+        success: false,
+        message: "No vendor assigned to this project",
+      });
+    }
+
+    const vendor = project.vendorId;
+    console.log(
+      `✅ [VENDOR API] Found vendor: ${vendor.name} (${vendor.email})`
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Vendor details retrieved successfully",
+      data: {
+        vendor: {
+          _id: vendor._id,
+          name: vendor.name,
+          contactPerson: vendor.contactPerson,
+          email: vendor.email,
+          phone: vendor.phone,
+          address: vendor.address, // This will be a string from project creation
+        },
+        project: {
+          _id: project._id,
+          name: project.name,
+          code: project.code,
+          deliveryAddress: project.deliveryAddress,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("❌ [VENDOR API] Error fetching vendor details:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching vendor details",
       error: error.message,
     });
   }

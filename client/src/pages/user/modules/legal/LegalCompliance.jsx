@@ -133,6 +133,18 @@ const LegalCompliance = () => {
       return;
     }
 
+    // Validate KPI fields
+    const invalidKPIs = programData.kpis.filter(
+      (kpi) =>
+        kpi.name.trim() === "" ||
+        kpi.target.trim() === "" ||
+        kpi.unit.trim() === ""
+    );
+    if (invalidKPIs.length > 0) {
+      toast.error("Please fill in all KPI fields (Name, Target, and Unit)");
+      return;
+    }
+
     // Validate dates are not in the past
     const today = new Date().toISOString().split("T")[0];
     if (programData.reviewDate < today) {
@@ -436,7 +448,11 @@ const LegalCompliance = () => {
       accessor: "programOwner",
       renderer: (program) => (
         <div className="text-sm text-gray-900">
-          {program.programOwner || "Not set"}
+          {program.programOwner === "ELRA"
+            ? "ELRA"
+            : program.programOwner?.firstName && program.programOwner?.lastName
+            ? `${program.programOwner.firstName} ${program.programOwner.lastName}`
+            : program.programOwner?.email || program.programOwner || "Not set"}
         </div>
       ),
     },
@@ -862,17 +878,31 @@ const LegalCompliance = () => {
                             onChange={(e) =>
                               updateKPI(index, "name", e.target.value)
                             }
-                            className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
-                            placeholder="KPI Name"
+                            className={`px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200 ${
+                              kpi.name.trim() === ""
+                                ? "border-red-300 bg-red-50"
+                                : "border-gray-200"
+                            }`}
+                            placeholder="e.g., Compliance Rate, Legal Review Time, Risk Mitigation Score"
+                            required
                           />
                           <input
                             type="text"
                             value={kpi.target}
-                            onChange={(e) =>
-                              updateKPI(index, "target", e.target.value)
-                            }
-                            className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
-                            placeholder="Target Value"
+                            onChange={(e) => {
+                              // Validate numeric input for target
+                              const value = e.target.value;
+                              if (value === "" || /^\d+(\.\d+)?$/.test(value)) {
+                                updateKPI(index, "target", value);
+                              }
+                            }}
+                            className={`px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200 ${
+                              kpi.target.trim() === ""
+                                ? "border-red-300 bg-red-50"
+                                : "border-gray-200"
+                            }`}
+                            placeholder="e.g., 100, 48, 95"
+                            required
                           />
                           <input
                             type="text"
@@ -880,8 +910,13 @@ const LegalCompliance = () => {
                             onChange={(e) =>
                               updateKPI(index, "unit", e.target.value)
                             }
-                            className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200"
-                            placeholder="Unit (%, count, etc.)"
+                            className={`px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)] transition-all duration-200 ${
+                              kpi.unit.trim() === ""
+                                ? "border-red-300 bg-red-50"
+                                : "border-gray-200"
+                            }`}
+                            placeholder="e.g., %, hours, days, count"
+                            required
                           />
                           {programData.kpis.length > 1 && (
                             <button
@@ -1190,7 +1225,14 @@ const LegalCompliance = () => {
                       Program Owner
                     </h3>
                     <div className="text-gray-700">
-                      {selectedProgram.programOwner || "Not set"}
+                      {selectedProgram.programOwner === "ELRA"
+                        ? "ELRA"
+                        : selectedProgram.programOwner?.firstName &&
+                          selectedProgram.programOwner?.lastName
+                        ? `${selectedProgram.programOwner.firstName} ${selectedProgram.programOwner.lastName}`
+                        : selectedProgram.programOwner?.email ||
+                          selectedProgram.programOwner ||
+                          "Not set"}
                     </div>
                   </div>
 

@@ -46,11 +46,11 @@ const systemSettingsSchema = new mongoose.Schema(
     systemInfo: {
       companyName: {
         type: String,
-        default: "EDMS System",
+        default: "ELRA ERP System",
       },
       systemName: {
         type: String,
-        default: "Electronic Document Management System",
+        default: "Equipment Leasing Registration Authority",
       },
       version: {
         type: String,
@@ -58,7 +58,7 @@ const systemSettingsSchema = new mongoose.Schema(
       },
       contactEmail: {
         type: String,
-        default: "admin@edms.com",
+        default: "admin@elra.com",
       },
     },
 

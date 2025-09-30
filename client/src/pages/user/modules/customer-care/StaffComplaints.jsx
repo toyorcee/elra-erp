@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  HiPlus,
   HiTicket,
   HiUser,
   HiCalendar,
-  HiArrowLeft,
-  HiHome,
   HiEye,
   HiXMark,
   HiChatBubbleOvalLeftEllipsis,
@@ -122,10 +119,6 @@ const StaffComplaints = () => {
     setShowDetailsModal(true);
   };
 
-  // Status update functionality removed - this is now view-only
-
-  // Status update functionality removed - this is now view-only
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -136,44 +129,13 @@ const StaffComplaints = () => {
 
   return (
     <div className="space-y-6 p-4">
-      {/* Breadcrumb Navigation */}
-      <div className="flex items-center space-x-2 text-sm text-gray-600 mb-4">
-        <Link
-          to="/dashboard/modules/customer-care"
-          className="flex items-center space-x-1 hover:text-[var(--elra-primary)] transition-colors"
-        >
-          <HiHome className="w-4 h-4" />
-          <span>Customer Care</span>
-        </Link>
-        <span>/</span>
-        <span className="text-gray-900 font-medium">All Complaints</span>
-      </div>
-
-      {/* Header with Back Button */}
+      {/* Header */}
       <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Staff Complaints</h1>
-            <p className="text-white/80">
-              View and manage all staff complaints and service requests
-            </p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <Link
-              to="/dashboard/modules/customer-care"
-              className="flex items-center space-x-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl transition-colors"
-            >
-              <HiArrowLeft className="w-5 h-5" />
-              <span>Back to Dashboard</span>
-            </Link>
-            <Link
-              to="/dashboard/modules/customer-care/submit-complaint"
-              className="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center space-x-2"
-            >
-              <HiPlus className="w-5 h-5" />
-              <span>Submit Complaint</span>
-            </Link>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Staff Complaints</h1>
+          <p className="text-white/80">
+            View and manage all staff complaints and service requests
+          </p>
         </div>
       </div>
 

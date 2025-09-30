@@ -98,6 +98,7 @@ export const uploadInventoryDocuments = async (req, res) => {
             mimeType: file.mimetype,
             documentType: documentType,
             category: "administrative",
+            archiveCategory: "project",
             status: "approved",
             department: currentUser.department,
             createdBy: currentUser._id,

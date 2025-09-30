@@ -259,6 +259,20 @@ export const approveProject = async (projectId, approvalData) => {
   }
 };
 
+// Legal approve project with compliance program
+export const legalApproveProject = async (projectId, approvalData) => {
+  try {
+    const response = await api.post(
+      `/projects/${projectId}/legal-approve`,
+      approvalData
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error legally approving project:", error);
+    throw error;
+  }
+};
+
 // Reject project
 export const rejectProject = async (projectId, rejectionData) => {
   try {

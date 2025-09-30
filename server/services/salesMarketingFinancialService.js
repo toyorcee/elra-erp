@@ -718,6 +718,14 @@ class SalesMarketingFinancialService {
         throw new Error("ELRA wallet not found");
       }
 
+      console.log(
+        "🔍 [SALES_MARKETING] Wallet transactions:",
+        wallet.transactions.length
+      );
+      console.log("🔍 [SALES_MARKETING] Available referenceTypes:", [
+        ...new Set(wallet.transactions.map((t) => t.referenceType)),
+      ]);
+
       // Get sales and marketing transactions
       const salesTransactions = wallet.transactions.filter(
         (t) => t.referenceType === "sales"
@@ -726,6 +734,15 @@ class SalesMarketingFinancialService {
         (t) => t.referenceType === "marketing"
       );
       const allTransactions = [...salesTransactions, ...marketingTransactions];
+
+      console.log(
+        "🔍 [SALES_MARKETING] Sales transactions:",
+        salesTransactions.length
+      );
+      console.log(
+        "🔍 [SALES_MARKETING] Marketing transactions:",
+        marketingTransactions.length
+      );
 
       // Calculate combined statistics
       const totalRevenue = allTransactions

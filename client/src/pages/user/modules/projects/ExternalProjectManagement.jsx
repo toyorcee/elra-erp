@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { HiDocument } from "react-icons/hi2";
 import {
   GlobeAltIcon,
   PlusIcon,
@@ -23,8 +24,6 @@ import {
 import DataTable from "../../../../components/common/DataTable";
 import { toast } from "react-toastify";
 import {
-  formatCurrency,
-  formatDate,
   formatNumberWithCommas,
   parseFormattedNumber,
 } from "../../../../utils/formatters.js";
@@ -37,10 +36,7 @@ import {
   fetchProjectCategories,
   addVendorToProject,
 } from "../../../../services/projectAPI.js";
-import {
-  uploadDocument,
-  getProjectDocuments,
-} from "../../../../services/documents.js";
+import { uploadDocument } from "../../../../services/documents.js";
 import SmartFileUpload from "../../../../components/common/SmartFileUpload.jsx";
 import ELRALogo from "../../../../components/ELRALogo.jsx";
 import {
@@ -69,15 +65,16 @@ const ExternalProjectManagement = () => {
     deliveryAddress: "",
   });
 
-  // Document upload state
   const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [showDocumentViewModal, setShowDocumentViewModal] = useState(false);
   const [selectedProjectForDocument, setSelectedProjectForDocument] =
     useState(null);
+  const [downloadingDocumentId, setDownloadingDocumentId] = useState(null);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [documentFormData, setDocumentFormData] = useState({
     title: "",
     description: "",
-    category: "Project Documentation",
+    category: "project",
     documentType: "",
     priority: "Medium",
     tags: "",
@@ -85,6 +82,37 @@ const ExternalProjectManagement = () => {
   });
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  const [currentDocumentStep, setCurrentDocumentStep] = useState(0);
+  const [uploadedDocuments, setUploadedDocuments] = useState([]);
+  const [wizardFormData, setWizardFormData] = useState({});
+
+  const requiredDocuments = [
+    {
+      documentType: "project_proposal",
+      title: "Project Proposal Document",
+      description:
+        "Complete project proposal with objectives, scope, and detailed description",
+      category: "project",
+      priority: "High",
+    },
+    {
+      documentType: "budget_breakdown",
+      title: "Budget & Financial Plan",
+      description:
+        "Detailed budget breakdown, cost analysis, and financial justification",
+      category: "financial",
+      priority: "High",
+    },
+    {
+      documentType: "technical_specifications",
+      title: "Technical & Implementation Plan",
+      description:
+        "Technical specifications, timeline, milestones, and implementation strategy",
+      category: "technical",
+      priority: "High",
+    },
+  ];
 
   const [formData, setFormData] = useState({
     // Basic project info
@@ -108,7 +136,7 @@ const ExternalProjectManagement = () => {
     clientAddress: "",
 
     // Budget percentage agreement
-    budgetPercentage: "",
+    budgetPercentage: "100",
 
     // Vendor information
     hasVendor: false,
@@ -134,7 +162,6 @@ const ExternalProjectManagement = () => {
     },
   ]);
 
-  // Additional states for external projects
   const [projectCategories, setProjectCategories] = useState([]);
   const [nextProjectCode, setNextProjectCode] = useState("");
   const [elraWalletBudget, setElraWalletBudget] = useState(null);
@@ -289,6 +316,14 @@ const ExternalProjectManagement = () => {
     return () => document.head.removeChild(style);
   }, []);
 
+  // Helper function to slice text to 10 words
+  const sliceToWords = (text, wordLimit = 10) => {
+    if (!text) return "";
+    const words = text.split(" ");
+    if (words.length <= wordLimit) return text;
+    return words.slice(0, wordLimit).join(" ") + "...";
+  };
+
   // DataTable columns configuration
   const columns = [
     {
@@ -301,13 +336,13 @@ const ExternalProjectManagement = () => {
             className="font-semibold text-gray-900 break-words"
             title={row.name}
           >
-            {row.name}
+            {sliceToWords(row.name, 10)}
           </div>
           <div
             className="text-sm text-gray-500 break-words"
             title={row.description}
           >
-            {row.description}
+            {sliceToWords(row.description, 15)}
           </div>
         </div>
       ),
@@ -358,17 +393,39 @@ const ExternalProjectManagement = () => {
     {
       header: "Status",
       accessor: "status",
-      width: "w-32",
+      width: "w-40",
       renderer: (row) => {
         const statusInfo = getStatusInfo(row.status);
         const StatusIcon = statusInfo.icon;
         return (
-          <span
-            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}
-          >
-            <StatusIcon className="h-3 w-3 mr-1" />
-            {statusInfo.label}
-          </span>
+          <div className="flex flex-col space-y-1">
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}
+            >
+              <StatusIcon className="h-3 w-3 mr-1" />
+              {statusInfo.label}
+            </span>
+            {row.status === "pending_legal_compliance_approval" && (
+              <span className="text-xs text-orange-600 font-medium">
+                • Legal Approval
+              </span>
+            )}
+            {row.status === "pending_finance_approval" && (
+              <span className="text-xs text-yellow-600 font-medium">
+                • Finance Review
+              </span>
+            )}
+            {row.status === "pending_executive_approval" && (
+              <span className="text-xs text-purple-600 font-medium">
+                • Executive Review
+              </span>
+            )}
+            {row.status === "pending_approval" && (
+              <span className="text-xs text-blue-600 font-medium">
+                • Pending Review
+              </span>
+            )}
+          </div>
         );
       },
     },
@@ -450,7 +507,6 @@ const ExternalProjectManagement = () => {
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
-  // Get status color and icon
   const getStatusInfo = (status) => {
     switch (status) {
       case "in_progress":
@@ -560,13 +616,27 @@ const ExternalProjectManagement = () => {
   };
 
   const projectBudget = parseFormattedNumber(formData.budget) || 0;
-  const budgetPercentage = parseFloat(formData.budgetPercentage) || 0;
   const totalItemsCost = projectItems.reduce(
     (sum, item) => sum + (item.totalPrice || 0),
     0
   );
-  const elraContribution = (totalItemsCost * budgetPercentage) / 100;
-  const clientContribution = totalItemsCost - elraContribution;
+
+  // Calculate budget percentage based on requiresBudgetAllocation
+  let budgetPercentage;
+  let elraContribution;
+  let clientContribution;
+
+  if (formData.requiresBudgetAllocation === "true") {
+    // If budget allocation is requested, use the percentage (default 100% if empty)
+    budgetPercentage = parseFloat(formData.budgetPercentage) || 100;
+    elraContribution = (totalItemsCost * budgetPercentage) / 100;
+    clientContribution = totalItemsCost - elraContribution;
+  } else {
+    // If no budget allocation requested, CLIENT pays 100% (external project)
+    budgetPercentage = 0;
+    elraContribution = 0;
+    clientContribution = totalItemsCost;
+  }
 
   const canUseBudgetAllocation =
     projectBudget > 0 && totalItemsCost <= projectBudget;
@@ -605,7 +675,7 @@ const ExternalProjectManagement = () => {
   const isBudgetAllocationComplete = Boolean(
     !formData.requiresBudgetAllocation ||
       (formData.requiresBudgetAllocation === "true" &&
-        formData.budgetPercentage)
+        (formData.budgetPercentage || formData.budgetPercentage === 0))
   );
 
   const allRequiredFieldsFilled =
@@ -615,7 +685,6 @@ const ExternalProjectManagement = () => {
     isVendorInfoComplete &&
     isBudgetAllocationComplete;
 
-  // Determine if create button should be disabled
   const hasValidationErrors =
     itemsExceedBudget || itemsExceedElraContribution || elraWalletInsufficient;
   const isCreateButtonDisabled =
@@ -705,7 +774,7 @@ const ExternalProjectManagement = () => {
       clientCompany: "",
       clientPhone: "",
       clientAddress: "",
-      budgetPercentage: "",
+      budgetPercentage: "100",
       hasVendor: false,
       customCategory: "",
     });
@@ -774,9 +843,10 @@ const ExternalProjectManagement = () => {
         startDate: formData.startDate,
         endDate: formData.endDate,
         budget: parseFormattedNumber(formData.budget),
-        code: nextProjectCode, // Use the pre-generated external project code
-        // Don't send projectManager for external projects unless user is HR HOD
-        ...(user?.department?.name === "Human Resources" &&
+        code: nextProjectCode,
+        ...((user?.department?.name === "Human Resources" ||
+          (user?.department?.name === "Project Management" &&
+            user?.role?.level >= 700)) &&
         formData.projectManager
           ? { projectManager: formData.projectManager }
           : {}),
@@ -944,7 +1014,6 @@ const ExternalProjectManagement = () => {
         const externalProjects =
           projectsResponse.data.projects || projectsResponse.data || [];
         setProjects(externalProjects);
-        toast.success("Projects refreshed successfully");
       } else {
         toast.error("Failed to refresh projects");
       }
@@ -956,25 +1025,6 @@ const ExternalProjectManagement = () => {
     }
   };
 
-  const fetchElraWalletBudget = async () => {
-    try {
-      const response = await fetch("/api/projects/budget", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setElraWalletBudget(data.data);
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching ELRA wallet budget:", error);
-    }
-  };
-
-  // Document upload functions
   const handleUploadDocument = (project) => {
     console.log(
       "📄 [UPLOAD DOCUMENT] Upload document button clicked for project:",
@@ -984,7 +1034,7 @@ const ExternalProjectManagement = () => {
     setDocumentFormData({
       title: "",
       description: "",
-      category: "Project Documentation",
+      category: "project",
       documentType: "",
       priority: "Medium",
       tags: "",
@@ -994,6 +1044,42 @@ const ExternalProjectManagement = () => {
     setShowDocumentModal(true);
   };
 
+  const handleViewDocuments = (project) => {
+    console.log(
+      "📄 [VIEW DOCUMENTS] View documents button clicked for project:",
+      project
+    );
+    console.log(
+      "📄 [REQUIRED DOCUMENTS] Required documents array:",
+      project.requiredDocuments
+    );
+    console.log(
+      "📄 [DOCUMENT COUNT] Total required documents:",
+      project.requiredDocuments?.length || 0
+    );
+    console.log(
+      "📄 [SUBMITTED DOCUMENTS] Submitted documents:",
+      project.requiredDocuments?.filter((doc) => doc.isSubmitted)?.length || 0
+    );
+    setSelectedProjectForDocument(project);
+    setShowDocumentViewModal(true);
+  };
+
+  const handleDownloadDocument = async (documentId) => {
+    try {
+      setDownloadingDocumentId(documentId);
+      const url = `/api/documents/${documentId}/view`;
+      window.open(url, "_blank");
+    } catch (error) {
+      console.error("Error downloading document:", error);
+      toast.error("Failed to download document");
+    } finally {
+      setTimeout(() => {
+        setDownloadingDocumentId(null);
+      }, 1000);
+    }
+  };
+
   const closeDocumentModal = async () => {
     setShowDocumentModal(false);
     setSelectedProjectForDocument(null);
@@ -1001,7 +1087,7 @@ const ExternalProjectManagement = () => {
     setDocumentFormData({
       title: "",
       description: "",
-      category: "Project Documentation",
+      category: "project",
       documentType: "",
       priority: "Medium",
       tags: "",
@@ -1009,11 +1095,27 @@ const ExternalProjectManagement = () => {
     });
     setIsUploadingDocument(false);
     setUploadProgress(0);
+    // Reset wizard state
+    setCurrentDocumentStep(0);
+    setUploadedDocuments([]);
+    setWizardFormData({});
   };
 
   const handleDocumentUpload = async () => {
-    if (selectedFiles.length === 0) {
-      toast.error("Please select at least one file to upload");
+    const allDocuments = [...uploadedDocuments];
+
+    if (selectedFiles.length > 0) {
+      const currentDoc = {
+        ...requiredDocuments[currentDocumentStep],
+        ...wizardFormData,
+        files: selectedFiles,
+        isConfidential: true, // Always confidential for external projects
+      };
+      allDocuments.push(currentDoc);
+    }
+
+    if (allDocuments.length === 0) {
+      toast.error("Please upload at least one document");
       return;
     }
 
@@ -1032,22 +1134,25 @@ const ExternalProjectManagement = () => {
         });
       }, 200);
 
-      // Upload each file
-      for (const fileWrapper of selectedFiles) {
-        const file = fileWrapper.file || fileWrapper;
-        const uploadData = new FormData();
-        uploadData.append("document", file);
-        uploadData.append("title", documentFormData.title || file.name);
-        uploadData.append("description", documentFormData.description);
-        uploadData.append("documentType", documentFormData.documentType);
-        uploadData.append("projectId", selectedProjectForDocument.id);
-        uploadData.append("isConfidential", documentFormData.isConfidential);
-        uploadData.append("category", documentFormData.category);
-        uploadData.append("priority", documentFormData.priority);
+      for (const doc of allDocuments) {
+        if (doc.files && doc.files.length > 0) {
+          for (const fileWrapper of doc.files) {
+            const file = fileWrapper.file || fileWrapper;
+            const uploadData = new FormData();
+            uploadData.append("document", file);
+            uploadData.append("title", doc.title || file.name);
+            uploadData.append("description", doc.description);
+            uploadData.append("documentType", doc.documentType || "");
+            uploadData.append("projectId", selectedProjectForDocument.id);
+            uploadData.append("isConfidential", true);
+            uploadData.append("category", doc.category);
+            uploadData.append("priority", doc.priority);
 
-        const result = await uploadDocument(uploadData);
-        if (!result.success) {
-          throw new Error(result.message || "Failed to upload document");
+            const result = await uploadDocument(uploadData);
+            if (!result.success) {
+              throw new Error(result.message || "Failed to upload document");
+            }
+          }
         }
       }
 
@@ -1055,10 +1160,10 @@ const ExternalProjectManagement = () => {
       setUploadProgress(100);
 
       toast.success(
-        `${selectedFiles.length} document(s) uploaded successfully for project "${selectedProjectForDocument.name}"!`
+        `${allDocuments.length} required document(s) uploaded successfully for project "${selectedProjectForDocument.name}"!`
       );
 
-      await refreshData();
+      await refreshProjects();
       closeDocumentModal();
     } catch (error) {
       console.error("Document upload error:", error);
@@ -1070,7 +1175,7 @@ const ExternalProjectManagement = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="mx-auto space-y-6">
         {/* Header */}
         <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl p-6 text-white">
           <h1 className="text-3xl font-bold mb-2">
@@ -1125,7 +1230,7 @@ const ExternalProjectManagement = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg border border-blue-200 p-6 hover:shadow-xl transition-all duration-300"
+            className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl shadow-lg border border-gray-200 p-6 hover:shadow-xl transition-all duration-300"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -1346,12 +1451,66 @@ const ExternalProjectManagement = () => {
                         </svg>
                       </button>
                     )}
+                  {/* Documents Icon - Always show for document management */}
                   <button
-                    onClick={() => handleUploadDocument(row)}
-                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="Upload Document"
+                    onClick={() => {
+                      if (
+                        row.requiredDocuments &&
+                        row.requiredDocuments.length > 0
+                      ) {
+                        const submittedCount = row.requiredDocuments.filter(
+                          (doc) => doc.isSubmitted
+                        ).length;
+                        const totalCount = row.requiredDocuments.length;
+
+                        if (submittedCount === totalCount) {
+                          // All documents uploaded - show view modal
+                          handleViewDocuments(row);
+                        } else {
+                          // Some or no documents uploaded - show upload wizard
+                          handleUploadDocument(row);
+                        }
+                      } else {
+                        // No required documents - show upload wizard
+                        handleUploadDocument(row);
+                      }
+                    }}
+                    className={`p-2 rounded-lg transition-colors cursor-pointer relative ${
+                      row.requiredDocuments &&
+                      row.requiredDocuments.filter((doc) => doc.isSubmitted)
+                        .length === row.requiredDocuments.length
+                        ? "text-green-600 hover:text-green-800 hover:bg-green-50"
+                        : "text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                    }`}
+                    title={
+                      row.requiredDocuments && row.requiredDocuments.length > 0
+                        ? (() => {
+                            const submittedCount = row.requiredDocuments.filter(
+                              (doc) => doc.isSubmitted
+                            ).length;
+                            const totalCount = row.requiredDocuments.length;
+                            if (submittedCount === totalCount) {
+                              return `View ${submittedCount}/${totalCount} uploaded documents`;
+                            } else {
+                              return `Upload remaining ${
+                                totalCount - submittedCount
+                              } of ${totalCount} required documents`;
+                            }
+                          })()
+                        : "Upload Required Documents"
+                    }
                   >
-                    <ArrowUpTrayIcon className="h-4 w-4" />
+                    <HiDocument className="h-4 w-4" />
+                    {row.requiredDocuments &&
+                      row.requiredDocuments.some((doc) => doc.isSubmitted) && (
+                        <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                          {
+                            row.requiredDocuments.filter(
+                              (doc) => doc.isSubmitted
+                            ).length
+                          }
+                        </span>
+                      )}
                   </button>
                 </div>
               ),
@@ -1672,6 +1831,14 @@ const ExternalProjectManagement = () => {
                             <p className="text-green-700 font-semibold">
                               {selectedProject.budgetPercentage}%
                             </p>
+                            <p className="text-green-600 text-sm font-medium">
+                              ₦
+                              {(
+                                (selectedProject.budget *
+                                  selectedProject.budgetPercentage) /
+                                100
+                              ).toLocaleString()}
+                            </p>
                           </div>
                           <div>
                             <label className="text-sm font-medium text-gray-600">
@@ -1679,6 +1846,14 @@ const ExternalProjectManagement = () => {
                             </label>
                             <p className="text-blue-700 font-semibold">
                               {100 - selectedProject.budgetPercentage}%
+                            </p>
+                            <p className="text-blue-600 text-sm font-medium">
+                              ₦
+                              {(
+                                (selectedProject.budget *
+                                  (100 - selectedProject.budgetPercentage)) /
+                                100
+                              ).toLocaleString()}
                             </p>
                           </div>
                         </div>
@@ -1835,6 +2010,15 @@ const ExternalProjectManagement = () => {
                             Set up a new external project with client and vendor
                             information
                           </p>
+                          <div className="mt-3 p-3 bg-yellow-500/20 border border-yellow-400/30 rounded-lg">
+                            <p className="text-yellow-100 text-sm font-medium">
+                              📋 <strong>Required Documents:</strong> After
+                              creating the project, you'll need to upload 3
+                              required documents: Project Proposal, Budget
+                              Breakdown, and Technical Specifications for
+                              approval.
+                            </p>
+                          </div>
                         </div>
                       </div>
                       <button
@@ -2097,10 +2281,10 @@ const ExternalProjectManagement = () => {
                     </motion.div>
 
                     {/* Project Items Section */}
-                    <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
-                      <h3 className="text-lg font-semibold text-purple-800 mb-4 flex items-center">
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                         <svg
-                          className="w-5 h-5 mr-2"
+                          className="w-5 h-5 mr-2 text-[var(--elra-primary)]"
                           fill="currentColor"
                           viewBox="0 0 20 20"
                         >
@@ -2112,7 +2296,7 @@ const ExternalProjectManagement = () => {
                         </svg>
                         Project Items & Specifications
                       </h3>
-                      <p className="text-sm text-purple-600 mb-4">
+                      <p className="text-sm text-gray-600 mb-4">
                         List all items, services, or deliverables required for
                         this project.
                       </p>
@@ -2120,7 +2304,7 @@ const ExternalProjectManagement = () => {
                       {projectItems.map((item, index) => (
                         <div
                           key={index}
-                          className="bg-white border border-purple-300 rounded-lg p-4 mb-4"
+                          className="bg-white border border-gray-300 rounded-lg p-4 mb-4"
                         >
                           <div className="flex justify-between items-center mb-3">
                             <h4 className="text-md font-semibold text-gray-800">
@@ -2267,7 +2451,7 @@ const ExternalProjectManagement = () => {
                       <button
                         type="button"
                         onClick={addProjectItem}
-                        className="inline-flex items-center space-x-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors font-medium"
+                        className="inline-flex items-center space-x-2 px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors font-medium"
                         title="Add another project item"
                       >
                         <svg
@@ -2287,12 +2471,12 @@ const ExternalProjectManagement = () => {
                       </button>
 
                       {/* Overall Project Total */}
-                      <div className="mt-6 p-4 bg-gradient-to-r from-purple-100 to-indigo-100 border border-purple-300 rounded-xl">
+                      <div className="mt-6 p-4 bg-gray-100 border border-gray-300 rounded-xl">
                         <div className="flex justify-between items-center">
-                          <h4 className="text-xl font-bold text-purple-800">
+                          <h4 className="text-xl font-bold text-gray-800">
                             Total Project Cost:
                           </h4>
-                          <span className="text-2xl font-extrabold text-purple-900">
+                          <span className="text-2xl font-extrabold text-[var(--elra-primary)]">
                             {formatCurrency(
                               projectItems.reduce(
                                 (sum, item) => sum + item.totalPrice,
@@ -2307,19 +2491,19 @@ const ExternalProjectManagement = () => {
                           projectItems.some(
                             (item) => item.name && item.unitPrice
                           ) && (
-                            <div className="mt-3 pt-3 border-t border-purple-200">
+                            <div className="mt-3 pt-3 border-t border-gray-200">
                               <div className="flex justify-between items-center text-sm">
-                                <span className="text-purple-700 font-medium">
+                                <span className="text-gray-700 font-medium">
                                   Project Budget:
                                 </span>
-                                <span className="text-purple-800 font-semibold">
+                                <span className="text-gray-800 font-semibold">
                                   {formatCurrency(
                                     parseFormattedNumber(formData.budget)
                                   )}
                                 </span>
                               </div>
                               <div className="flex justify-between items-center text-sm mt-1">
-                                <span className="text-purple-700 font-medium">
+                                <span className="text-gray-700 font-medium">
                                   Remaining Budget:
                                 </span>
                                 <span
@@ -2363,11 +2547,11 @@ const ExternalProjectManagement = () => {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3, delay: 0.2 }}
-                      className="bg-blue-50 border border-blue-200 rounded-xl p-6"
+                      className="bg-gray-50 border border-gray-200 rounded-xl p-6"
                     >
                       <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center">
                         <svg
-                          className="w-5 h-5 mr-2"
+                          className="w-5 h-5 mr-2 text-[var(--elra-primary)]"
                           fill="currentColor"
                           viewBox="0 0 20 20"
                         >
@@ -2465,7 +2649,7 @@ const ExternalProjectManagement = () => {
                         className={`border rounded-xl p-4 ${
                           !canUseBudgetAllocation
                             ? "bg-red-50 border-red-200"
-                            : "bg-green-50 border-green-200"
+                            : "bg-gray-50 border-gray-200"
                         }`}
                       >
                         {/* Budget Validation Messages */}
@@ -2627,59 +2811,69 @@ const ExternalProjectManagement = () => {
                         >
                           {formData.requiresBudgetAllocation === "true"
                             ? "Project will go through Legal → Finance Review → Executive → Budget Allocation approval."
-                            : "Project will go through Legal → Executive approval (using existing budget)."}
+                            : "Project will go through Legal → Executive approval (client pays 100%)."}
                         </p>
 
                         {/* Budget Breakdown Display */}
-                        {formData.requiresBudgetAllocation === "true" &&
-                          projectBudget > 0 && (
-                            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                              <h4 className="text-sm font-semibold text-blue-800 mb-3">
-                                💰 Budget Breakdown
-                              </h4>
-                              <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                  <span className="text-blue-700 font-medium">
-                                    Total Budget:
-                                  </span>
-                                  <div className="text-blue-900 font-semibold">
-                                    ₦{projectBudget.toLocaleString()}
-                                  </div>
+                        {projectBudget > 0 && (
+                          <div className="mt-4 p-4 bg-gray-100 border border-gray-300 rounded-lg">
+                            <h4 className="text-sm font-semibold text-gray-800 mb-3">
+                              💰 Budget Breakdown
+                            </h4>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <span className="text-gray-700 font-medium">
+                                  Total Budget:
+                                </span>
+                                <div className="text-gray-900 font-semibold">
+                                  ₦{projectBudget.toLocaleString()}
                                 </div>
-                                <div>
-                                  <span className="text-blue-700 font-medium">
-                                    Items Cost:
-                                  </span>
-                                  <div className="text-blue-900 font-semibold">
-                                    ₦{totalItemsCost.toLocaleString()}
-                                  </div>
+                              </div>
+                              <div>
+                                <span className="text-gray-700 font-medium">
+                                  Items Cost:
+                                </span>
+                                <div className="text-gray-900 font-semibold">
+                                  ₦{totalItemsCost.toLocaleString()}
                                 </div>
-                                <div>
-                                  <span className="text-green-700 font-medium">
-                                    ELRA Pays ({budgetPercentage}%):
-                                  </span>
-                                  <div className="text-green-900 font-semibold">
-                                    ₦{elraContribution.toLocaleString()}
-                                  </div>
+                              </div>
+                              <div>
+                                <span className="text-[var(--elra-primary)] font-medium">
+                                  ELRA Pays ({budgetPercentage}%):
+                                </span>
+                                <div className="text-[var(--elra-primary)] font-semibold">
+                                  ₦{elraContribution.toLocaleString()}
                                 </div>
-                                <div>
-                                  <span className="text-purple-700 font-medium">
-                                    Client Pays ({100 - budgetPercentage}%):
-                                  </span>
-                                  <div className="text-purple-900 font-semibold">
-                                    ₦{clientContribution.toLocaleString()}
-                                  </div>
+                              </div>
+                              <div>
+                                <span className="text-gray-700 font-medium">
+                                  Client Pays ({100 - budgetPercentage}%):
+                                </span>
+                                <div className="text-gray-900 font-semibold">
+                                  ₦{clientContribution.toLocaleString()}
                                 </div>
                               </div>
                             </div>
-                          )}
+                            {formData.requiresBudgetAllocation === "false" && (
+                              <div className="mt-2 p-2 bg-blue-100 rounded-lg">
+                                <p className="text-xs text-blue-800 font-medium">
+                                  ℹ️ No budget allocation requested - Client
+                                  will handle 100% of the project cost
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {/* Budget Percentage - Only show when budget allocation is TRUE */}
                         {formData.requiresBudgetAllocation === "true" && (
-                          <div className="mt-4 p-4 bg-white border border-green-300 rounded-lg">
+                          <div className="mt-4 p-4 bg-white border border-gray-300 rounded-lg">
                             <label className="block text-sm font-semibold text-gray-800 mb-2">
                               ELRA Budget Handling Percentage{" "}
-                              <span className="text-red-500">*</span>
+                              <span className="text-gray-500">
+                                (Optional - if left empty, ELRA will handle 100%
+                                of the items cost)
+                              </span>
                             </label>
                             <div className="flex items-center space-x-2">
                               <input
@@ -2704,6 +2898,18 @@ const ExternalProjectManagement = () => {
                                     });
                                   }
                                 }}
+                                onKeyDown={(e) => {
+                                  // Prevent negative values, 'e', 'E', '+', '.'
+                                  if (
+                                    e.key === "-" ||
+                                    e.key === "e" ||
+                                    e.key === "E" ||
+                                    e.key === "+" ||
+                                    e.key === "."
+                                  ) {
+                                    e.preventDefault();
+                                  }
+                                }}
                                 min="0"
                                 max="100"
                                 step="1"
@@ -2718,7 +2924,8 @@ const ExternalProjectManagement = () => {
                             <p className="mt-2 text-sm text-green-600">
                               Specify what percentage of the actual project
                               items cost ELRA will be responsible for handling
-                              and managing.
+                              and managing. Enter 0% if ELRA should not pay
+                              anything.
                             </p>
                             <p className="text-xs text-blue-600 mt-1">
                               💡 Note: The percentage is applied to the actual
@@ -2765,10 +2972,10 @@ const ExternalProjectManagement = () => {
                       </div>
 
                       {/* Vendor Information */}
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-                        <h3 className="text-lg font-semibold text-yellow-800 mb-4 flex items-center">
+                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                           <svg
-                            className="w-5 h-5 mr-2"
+                            className="w-5 h-5 mr-2 text-[var(--elra-primary)]"
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -2778,7 +2985,10 @@ const ExternalProjectManagement = () => {
                               clipRule="evenodd"
                             />
                           </svg>
-                          Vendor Information
+                          Vendor Information{" "}
+                          <span className="text-sm font-normal text-gray-600">
+                            (Optional)
+                          </span>
                         </h3>
 
                         <div className="mb-4">
@@ -3127,12 +3337,31 @@ const ExternalProjectManagement = () => {
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold text-white">
-                      Upload Documents for Project
+                      Required Documents Upload
                     </h2>
                     <p className="text-white/80 text-sm">
                       {selectedProjectForDocument.name} -{" "}
                       {selectedProjectForDocument.code}
                     </p>
+                    <div className="mt-2">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-white/80 text-sm">
+                          Step {currentDocumentStep + 1} of 3
+                        </span>
+                        <div className="flex space-x-1">
+                          {[0, 1, 2].map((step) => (
+                            <div
+                              key={step}
+                              className={`w-2 h-2 rounded-full ${
+                                step <= currentDocumentStep
+                                  ? "bg-white"
+                                  : "bg-white/30"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <button
@@ -3144,149 +3373,128 @@ const ExternalProjectManagement = () => {
               </div>
 
               <div className="space-y-6">
-                {/* Document Form */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Current Document Step */}
+                <div className="bg-gray-50 rounded-lg p-6">
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="w-10 h-10 bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white font-bold">
+                      {currentDocumentStep + 1}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {requiredDocuments[currentDocumentStep].title}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {requiredDocuments[currentDocumentStep].description}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Pre-filled Form Data */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Document Title
+                      </label>
+                      <input
+                        type="text"
+                        value={requiredDocuments[currentDocumentStep].title}
+                        readOnly
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Category
+                      </label>
+                      <input
+                        type="text"
+                        value={requiredDocuments[currentDocumentStep].category}
+                        readOnly
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Priority
+                      </label>
+                      <input
+                        type="text"
+                        value={requiredDocuments[currentDocumentStep].priority}
+                        readOnly
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Document Type
+                      </label>
+                      <input
+                        type="text"
+                        value={requiredDocuments[
+                          currentDocumentStep
+                        ].documentType.replace(/_/g, " ")}
+                        readOnly
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600"
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Document Title
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Description
                     </label>
-                    <input
-                      type="text"
-                      value={documentFormData.title}
+                    <textarea
+                      value={
+                        wizardFormData.description ||
+                        requiredDocuments[currentDocumentStep].description
+                      }
                       onChange={(e) =>
-                        setDocumentFormData({
-                          ...documentFormData,
-                          title: e.target.value,
+                        setWizardFormData({
+                          ...wizardFormData,
+                          description: e.target.value,
                         })
                       }
+                      rows={3}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-                      placeholder="Enter document title"
+                      placeholder="Enter document description"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Document Type
-                    </label>
-                    <select
-                      value={documentFormData.documentType}
-                      onChange={(e) =>
-                        setDocumentFormData({
-                          ...documentFormData,
-                          documentType: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-                    >
-                      <option value="">Select document type</option>
-                      <option value="Contract">Contract</option>
-                      <option value="Proposal">Proposal</option>
-                      <option value="Invoice">Invoice</option>
-                      <option value="Report">Report</option>
-                      <option value="Specification">Specification</option>
-                      <option value="Other">Other</option>
-                    </select>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="isConfidential"
+                        checked={true}
+                        disabled
+                        className="h-4 w-4 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] border-gray-300 rounded"
+                      />
+                      <label
+                        htmlFor="isConfidential"
+                        className="ml-2 block text-sm text-blue-800 font-medium"
+                      >
+                        Automatically marked as confidential
+                      </label>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-1 ml-6">
+                      All external project documents are automatically marked as
+                      confidential due to sensitive business information.
+                    </p>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Priority
-                    </label>
-                    <select
-                      value={documentFormData.priority}
-                      onChange={(e) =>
-                        setDocumentFormData({
-                          ...documentFormData,
-                          priority: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-                    >
-                      <option value="Low">Low</option>
-                      <option value="Medium">Medium</option>
-                      <option value="High">High</option>
-                      <option value="Critical">Critical</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Category
-                    </label>
-                    <select
-                      value={documentFormData.category}
-                      onChange={(e) =>
-                        setDocumentFormData({
-                          ...documentFormData,
-                          category: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-                    >
-                      <option value="Project Documentation">
-                        Project Documentation
-                      </option>
-                      <option value="Legal Documents">Legal Documents</option>
-                      <option value="Financial Documents">
-                        Financial Documents
-                      </option>
-                      <option value="Technical Specifications">
-                        Technical Specifications
-                      </option>
-                      <option value="Reports">Reports</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    value={documentFormData.description}
-                    onChange={(e) =>
-                      setDocumentFormData({
-                        ...documentFormData,
-                        description: e.target.value,
-                      })
-                    }
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-                    placeholder="Enter document description"
-                  />
-                </div>
-
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="isConfidential"
-                    checked={documentFormData.isConfidential}
-                    onChange={(e) =>
-                      setDocumentFormData({
-                        ...documentFormData,
-                        isConfidential: e.target.checked,
-                      })
-                    }
-                    className="h-4 w-4 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] border-gray-300 rounded"
-                  />
-                  <label
-                    htmlFor="isConfidential"
-                    className="ml-2 block text-sm text-gray-700"
-                  >
-                    Mark as confidential
-                  </label>
                 </div>
 
                 {/* File Upload Section */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Upload Documents
+                    Upload Document (1 file only)
                   </label>
                   <SmartFileUpload
                     files={selectedFiles}
                     onFilesChange={setSelectedFiles}
-                    maxFiles={10}
+                    maxFiles={1}
                     className="border-2 border-dashed border-gray-300 rounded-lg p-6"
                   />
                 </div>
@@ -3311,35 +3519,264 @@ const ExternalProjectManagement = () => {
                   </div>
                 )}
 
-                {/* Action Buttons */}
-                <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
-                  <button
-                    type="button"
-                    onClick={closeDocumentModal}
-                    className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                    disabled={isUploadingDocument}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDocumentUpload}
-                    disabled={selectedFiles.length === 0 || isUploadingDocument}
-                    className="px-6 py-2 bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white rounded-lg hover:shadow-lg transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                  >
-                    {isUploadingDocument ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
-                        Uploading...
-                      </>
-                    ) : (
-                      <>
-                        <ArrowUpTrayIcon className="h-4 w-4 mr-2 inline-block" />
-                        Upload Documents
-                      </>
+                {/* Wizard Navigation Buttons */}
+                <div className="flex justify-between pt-6 border-t border-gray-200">
+                  <div className="flex space-x-3">
+                    <button
+                      type="button"
+                      onClick={closeDocumentModal}
+                      className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      disabled={isUploadingDocument}
+                    >
+                      Cancel
+                    </button>
+                    {currentDocumentStep > 0 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCurrentDocumentStep(currentDocumentStep - 1)
+                        }
+                        className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                        disabled={isUploadingDocument}
+                      >
+                        Previous
+                      </button>
                     )}
+                  </div>
+
+                  <div className="flex space-x-3">
+                    {currentDocumentStep < 2 ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Save current document data
+                          const currentDoc = {
+                            ...requiredDocuments[currentDocumentStep],
+                            ...wizardFormData,
+                            files: selectedFiles,
+                            isConfidential: true, // Always confidential for external projects
+                          };
+                          setUploadedDocuments([
+                            ...uploadedDocuments,
+                            currentDoc,
+                          ]);
+                          setWizardFormData({});
+                          setSelectedFiles([]);
+                          setCurrentDocumentStep(currentDocumentStep + 1);
+                        }}
+                        disabled={
+                          selectedFiles.length === 0 || isUploadingDocument
+                        }
+                        className="px-6 py-2 bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white rounded-lg hover:shadow-lg transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                      >
+                        Next Document
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleDocumentUpload}
+                        disabled={
+                          selectedFiles.length === 0 || isUploadingDocument
+                        }
+                        className="px-6 py-2 bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white rounded-lg hover:shadow-lg transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                      >
+                        {isUploadingDocument ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
+                            Uploading All Documents...
+                          </>
+                        ) : (
+                          <>
+                            <ArrowUpTrayIcon className="h-4 w-4 mr-2 inline-block" />
+                            Complete Upload
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Document View Modal */}
+        {showDocumentViewModal && selectedProjectForDocument && (
+          <div className="fixed inset-0 modal-backdrop-enhanced flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl modal-shadow-enhanced max-w-4xl w-full max-h-[90vh] flex flex-col border border-gray-100">
+              {/* ELRA Branded Header */}
+              <div className="bg-gradient-to-br from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] text-white p-8 rounded-t-2xl flex-shrink-0 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+                <div className="relative flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                      <HiDocument className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-white">
+                        Project Documents
+                      </h3>
+                      <p className="text-white/80 text-sm mt-1">
+                        {selectedProjectForDocument.name}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowDocumentViewModal(false)}
+                    className="text-white/80 hover:text-white hover:bg-white/10 p-2 rounded-lg transition-colors"
+                  >
+                    <svg
+                      className="h-6 w-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
                   </button>
                 </div>
+              </div>
+
+              <div className="p-8 flex-1 overflow-y-auto">
+                {selectedProjectForDocument.requiredDocuments &&
+                selectedProjectForDocument.requiredDocuments.length > 0 ? (
+                  <div className="space-y-4">
+                    {selectedProjectForDocument.requiredDocuments.map(
+                      (doc, index) => (
+                        <div
+                          key={index}
+                          className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200 hover:shadow-md transition-all duration-200"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                                {doc.documentType
+                                  ?.replace(/_/g, " ")
+                                  .toUpperCase()}
+                              </h4>
+                              <p className="text-sm text-gray-600 mb-3">
+                                Required Document -{" "}
+                                {doc.documentType?.replace(/_/g, " ")}
+                              </p>
+                              <div className="flex items-center space-x-3 mb-4">
+                                <span
+                                  className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                    doc.isSubmitted
+                                      ? "bg-green-100 text-green-800"
+                                      : "bg-yellow-100 text-yellow-800"
+                                  }`}
+                                >
+                                  {doc.isSubmitted ? "Submitted" : "Pending"}
+                                </span>
+                                <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  {doc.approvalStatus}
+                                </span>
+                                {doc.isRequired && (
+                                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    Required
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-3 ml-4">
+                              <span className="text-sm text-gray-500">
+                                {doc.submittedAt
+                                  ? new Date(
+                                      doc.submittedAt
+                                    ).toLocaleDateString()
+                                  : "Not submitted"}
+                              </span>
+                              {doc.documentId && (
+                                <button
+                                  onClick={() =>
+                                    handleDownloadDocument(doc.documentId)
+                                  }
+                                  disabled={
+                                    downloadingDocumentId === doc.documentId
+                                  }
+                                  className={`px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 text-white ${
+                                    downloadingDocumentId === doc.documentId
+                                      ? "bg-gray-400 cursor-not-allowed"
+                                      : "bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)]"
+                                  }`}
+                                  title="Download Document"
+                                >
+                                  {downloadingDocumentId === doc.documentId ? (
+                                    <>
+                                      <svg
+                                        className="animate-spin h-4 w-4"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <circle
+                                          className="opacity-25"
+                                          cx="12"
+                                          cy="12"
+                                          r="10"
+                                          stroke="currentColor"
+                                          strokeWidth="4"
+                                        />
+                                        <path
+                                          className="opacity-75"
+                                          fill="currentColor"
+                                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                        />
+                                      </svg>
+                                      <span className="text-sm font-medium">
+                                        Opening...
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg
+                                        className="h-4 w-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                        />
+                                      </svg>
+                                      <span className="text-sm font-medium">
+                                        Download
+                                      </span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <svg
+                      className="h-12 w-12 text-gray-400 mx-auto mb-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    <p className="text-gray-500">No documents uploaded yet</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

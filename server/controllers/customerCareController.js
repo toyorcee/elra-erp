@@ -488,14 +488,12 @@ export const getComplaintStatistics = async (req, res) => {
       }
     }
 
-    // Apply user-based filtering
     if (req.userFilter) {
       Object.assign(filter, req.userFilter);
     }
 
     const statistics = await Complaint.getStatistics(filter);
 
-    // Get additional metrics
     const totalComplaints = await Complaint.countDocuments(filter);
     const resolvedComplaints = await Complaint.countDocuments({
       ...filter,
@@ -712,6 +710,1154 @@ export const getCategoryBreakdown = async (req, res) => {
   }
 };
 
+// @desc    Get priority breakdown statistics
+// @route   GET /api/customer-care/priority-breakdown
+// @access  Private (Customer Care+)
+export const getPriorityBreakdown = async (req, res) => {
+  try {
+    const filter = req.userFilter || {};
+
+    const breakdown = await Complaint.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: "$priority",
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+
+    // Map to consistent format
+    const priorityData = breakdown.map((item) => ({
+      priority: item._id,
+      count: item.count,
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: priorityData,
+    });
+  } catch (error) {
+    console.error("Error getting priority breakdown:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching priority breakdown",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get trend calculations (percentage changes)
+// @route   GET /api/customer-care/trends
+// @access  Private (Customer Care+)
+export const getTrendCalculations = async (req, res) => {
+  try {
+    const filter = req.userFilter || {};
+    const { months = 6 } = req.query;
+
+    const currentDate = new Date();
+    const previousDate = new Date();
+    previousDate.setMonth(previousDate.getMonth() - parseInt(months));
+
+    // Current period data
+    const currentPeriod = await Complaint.aggregate([
+      { $match: { ...filter, submittedAt: { $gte: previousDate } } },
+      {
+        $group: {
+          _id: null,
+          totalComplaints: { $sum: 1 },
+          resolvedComplaints: {
+            $sum: {
+              $cond: [{ $in: ["$status", ["resolved", "closed"]] }, 1, 0],
+            },
+          },
+          avgResolutionTime: {
+            $avg: {
+              $cond: [
+                { $in: ["$status", ["resolved", "closed"]] },
+                {
+                  $divide: [
+                    { $subtract: ["$resolvedAt", "$submittedAt"] },
+                    1000 * 60 * 60 * 24,
+                  ],
+                },
+                null,
+              ],
+            },
+          },
+          avgSatisfaction: {
+            $avg: {
+              $cond: [
+                { $ne: ["$satisfactionRating", null] },
+                "$satisfactionRating",
+                null,
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    const previousPeriodStart = new Date();
+    previousPeriodStart.setMonth(
+      previousPeriodStart.getMonth() - parseInt(months) * 2
+    );
+    const previousPeriodEnd = new Date();
+    previousPeriodEnd.setMonth(previousPeriodEnd.getMonth() - parseInt(months));
+
+    const previousPeriod = await Complaint.aggregate([
+      {
+        $match: {
+          ...filter,
+          submittedAt: {
+            $gte: previousPeriodStart,
+            $lt: previousPeriodEnd,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalComplaints: { $sum: 1 },
+          resolvedComplaints: {
+            $sum: {
+              $cond: [{ $in: ["$status", ["resolved", "closed"]] }, 1, 0],
+            },
+          },
+          avgResolutionTime: {
+            $avg: {
+              $cond: [
+                { $in: ["$status", ["resolved", "closed"]] },
+                {
+                  $divide: [
+                    { $subtract: ["$resolvedAt", "$submittedAt"] },
+                    1000 * 60 * 60 * 24,
+                  ],
+                },
+                null,
+              ],
+            },
+          },
+          avgSatisfaction: {
+            $avg: {
+              $cond: [
+                { $ne: ["$satisfactionRating", null] },
+                "$satisfactionRating",
+                null,
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    const current = currentPeriod[0] || {
+      totalComplaints: 0,
+      resolvedComplaints: 0,
+      avgResolutionTime: 0,
+      avgSatisfaction: 0,
+    };
+
+    const previous = previousPeriod[0] || {
+      totalComplaints: 0,
+      resolvedComplaints: 0,
+      avgResolutionTime: 0,
+      avgSatisfaction: 0,
+    };
+
+    // Calculate percentage changes
+    const calculatePercentageChange = (current, previous) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return ((current - previous) / previous) * 100;
+    };
+
+    const trends = {
+      totalComplaintsChange: calculatePercentageChange(
+        current.totalComplaints,
+        previous.totalComplaints
+      ),
+      resolutionRateChange: calculatePercentageChange(
+        current.totalComplaints > 0
+          ? (current.resolvedComplaints / current.totalComplaints) * 100
+          : 0,
+        previous.totalComplaints > 0
+          ? (previous.resolvedComplaints / previous.totalComplaints) * 100
+          : 0
+      ),
+      resolutionTimeChange: calculatePercentageChange(
+        current.avgResolutionTime,
+        previous.avgResolutionTime
+      ),
+      satisfactionChange: calculatePercentageChange(
+        current.avgSatisfaction,
+        previous.avgSatisfaction
+      ),
+    };
+
+    res.status(200).json({
+      success: true,
+      data: trends,
+    });
+  } catch (error) {
+    console.error("Error getting trend calculations:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching trend calculations",
+      error: error.message,
+    });
+  }
+};
+
+// Helper functions for data fetching (without HTTP responses)
+const getComplaintStatisticsData = async (filter) => {
+  try {
+    const stats = await Complaint.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+          totalComplaints: { $sum: 1 },
+          resolvedComplaints: {
+            $sum: {
+              $cond: [{ $in: ["$status", ["resolved", "closed"]] }, 1, 0],
+            },
+          },
+          pendingComplaints: {
+            $sum: {
+              $cond: [{ $in: ["$status", ["pending", "in_progress"]] }, 1, 0],
+            },
+          },
+          highPriority: {
+            $sum: {
+              $cond: [{ $eq: ["$priority", "High"] }, 1, 0],
+            },
+          },
+          overdue: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $in: ["$status", ["pending", "in_progress"]] },
+                    {
+                      $lt: [
+                        "$submittedAt",
+                        new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+                      ],
+                    },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          avgResolutionTime: {
+            $avg: {
+              $cond: [
+                { $in: ["$status", ["resolved", "closed"]] },
+                {
+                  $divide: [
+                    { $subtract: ["$resolvedAt", "$submittedAt"] },
+                    1000 * 60 * 60 * 24,
+                  ],
+                },
+                null,
+              ],
+            },
+          },
+          satisfactionRating: {
+            $avg: {
+              $cond: [
+                { $ne: ["$satisfactionRating", null] },
+                "$satisfactionRating",
+                null,
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    const result = stats[0] || {
+      totalComplaints: 0,
+      resolvedComplaints: 0,
+      pendingComplaints: 0,
+      highPriority: 0,
+      overdue: 0,
+      avgResolutionTime: 0,
+      satisfactionRating: 0,
+    };
+
+    return {
+      totalComplaints: result.totalComplaints,
+      resolvedComplaints: result.resolvedComplaints,
+      pendingComplaints: result.pendingComplaints,
+      highPriority: result.highPriority,
+      overdue: result.overdue,
+      averageResolutionTime: Math.round(result.avgResolutionTime * 10) / 10,
+      satisfactionScore: Math.round(result.satisfactionRating * 10) / 10,
+      resolutionRate:
+        result.totalComplaints > 0
+          ? Math.round(
+              (result.resolvedComplaints / result.totalComplaints) * 100
+            )
+          : 0,
+    };
+  } catch (error) {
+    console.error("Error getting statistics data:", error);
+    return {
+      totalComplaints: 0,
+      resolvedComplaints: 0,
+      pendingComplaints: 0,
+      highPriority: 0,
+      overdue: 0,
+      averageResolutionTime: 0,
+      satisfactionScore: 0,
+      resolutionRate: 0,
+    };
+  }
+};
+
+const getComplaintTrendsData = async (filter) => {
+  try {
+    const trends = await Complaint.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$submittedAt" },
+            month: { $month: "$submittedAt" },
+          },
+          total: { $sum: 1 },
+          resolved: {
+            $sum: {
+              $cond: [{ $in: ["$status", ["resolved", "closed"]] }, 1, 0],
+            },
+          },
+        },
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } },
+      { $limit: 6 },
+    ]);
+
+    return trends.map((trend) => ({
+      month: trend._id.month,
+      year: trend._id.year,
+      total: trend.total,
+      resolved: trend.resolved,
+    }));
+  } catch (error) {
+    console.error("Error getting trends data:", error);
+    return [];
+  }
+};
+
+const getDepartmentBreakdownData = async (filter) => {
+  try {
+    const breakdown = await Complaint.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: "$department",
+          count: { $sum: 1 },
+          resolved: {
+            $sum: {
+              $cond: [{ $in: ["$status", ["resolved", "closed"]] }, 1, 0],
+            },
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: "departments",
+          localField: "_id",
+          foreignField: "_id",
+          as: "department",
+        },
+      },
+      {
+        $unwind: {
+          path: "$department",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $project: {
+          department: "$department.name",
+          count: 1,
+          resolved: 1,
+          resolutionRate: {
+            $multiply: [{ $divide: ["$resolved", "$count"] }, 100],
+          },
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+
+    return breakdown.map((item) => ({
+      department: item.department || "Unknown",
+      count: item.count,
+      resolved: item.resolved,
+      resolutionRate: Math.round(item.resolutionRate * 10) / 10,
+    }));
+  } catch (error) {
+    console.error("Error getting department breakdown data:", error);
+    return [];
+  }
+};
+
+const getCategoryBreakdownData = async (filter) => {
+  try {
+    const breakdown = await Complaint.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: "$category",
+          count: { $sum: 1 },
+          resolved: {
+            $sum: {
+              $cond: [{ $in: ["$status", ["resolved", "closed"]] }, 1, 0],
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          category: "$_id",
+          count: 1,
+          resolved: 1,
+          resolutionRate: {
+            $multiply: [{ $divide: ["$resolved", "$count"] }, 100],
+          },
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+
+    return breakdown.map((item) => ({
+      category: item.category,
+      count: item.count,
+      resolved: item.resolved,
+      resolutionRate: Math.round(item.resolutionRate * 10) / 10,
+    }));
+  } catch (error) {
+    console.error("Error getting category breakdown data:", error);
+    return [];
+  }
+};
+
+const getPriorityBreakdownData = async (filter) => {
+  try {
+    const breakdown = await Complaint.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: "$priority",
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+
+    return breakdown.map((item) => ({
+      priority: item._id,
+      count: item.count,
+    }));
+  } catch (error) {
+    console.error("Error getting priority breakdown data:", error);
+    return [];
+  }
+};
+
+const getTrendCalculationsData = async (filter) => {
+  try {
+    const currentDate = new Date();
+    const previousDate = new Date();
+    previousDate.setMonth(previousDate.getMonth() - 6);
+
+    // Current period data
+    const currentPeriod = await Complaint.aggregate([
+      { $match: { ...filter, submittedAt: { $gte: previousDate } } },
+      {
+        $group: {
+          _id: null,
+          totalComplaints: { $sum: 1 },
+          resolvedComplaints: {
+            $sum: {
+              $cond: [{ $in: ["$status", ["resolved", "closed"]] }, 1, 0],
+            },
+          },
+          avgResolutionTime: {
+            $avg: {
+              $cond: [
+                { $in: ["$status", ["resolved", "closed"]] },
+                {
+                  $divide: [
+                    { $subtract: ["$resolvedAt", "$submittedAt"] },
+                    1000 * 60 * 60 * 24,
+                  ],
+                },
+                null,
+              ],
+            },
+          },
+          avgSatisfaction: {
+            $avg: {
+              $cond: [
+                { $ne: ["$satisfactionRating", null] },
+                "$satisfactionRating",
+                null,
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    // Previous period data
+    const previousPeriodStart = new Date();
+    previousPeriodStart.setMonth(previousPeriodStart.getMonth() - 12);
+    const previousPeriodEnd = new Date();
+    previousPeriodEnd.setMonth(previousPeriodEnd.getMonth() - 6);
+
+    const previousPeriod = await Complaint.aggregate([
+      {
+        $match: {
+          ...filter,
+          submittedAt: {
+            $gte: previousPeriodStart,
+            $lt: previousPeriodEnd,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalComplaints: { $sum: 1 },
+          resolvedComplaints: {
+            $sum: {
+              $cond: [{ $in: ["$status", ["resolved", "closed"]] }, 1, 0],
+            },
+          },
+          avgResolutionTime: {
+            $avg: {
+              $cond: [
+                { $in: ["$status", ["resolved", "closed"]] },
+                {
+                  $divide: [
+                    { $subtract: ["$resolvedAt", "$submittedAt"] },
+                    1000 * 60 * 60 * 24,
+                  ],
+                },
+                null,
+              ],
+            },
+          },
+          avgSatisfaction: {
+            $avg: {
+              $cond: [
+                { $ne: ["$satisfactionRating", null] },
+                "$satisfactionRating",
+                null,
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    const current = currentPeriod[0] || {
+      totalComplaints: 0,
+      resolvedComplaints: 0,
+      avgResolutionTime: 0,
+      avgSatisfaction: 0,
+    };
+
+    const previous = previousPeriod[0] || {
+      totalComplaints: 0,
+      resolvedComplaints: 0,
+      avgResolutionTime: 0,
+      avgSatisfaction: 0,
+    };
+
+    // Calculate percentage changes
+    const calculatePercentageChange = (current, previous) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return ((current - previous) / previous) * 100;
+    };
+
+    return {
+      totalComplaintsChange: calculatePercentageChange(
+        current.totalComplaints,
+        previous.totalComplaints
+      ),
+      resolutionRateChange: calculatePercentageChange(
+        current.totalComplaints > 0
+          ? (current.resolvedComplaints / current.totalComplaints) * 100
+          : 0,
+        previous.totalComplaints > 0
+          ? (previous.resolvedComplaints / previous.totalComplaints) * 100
+          : 0
+      ),
+      resolutionTimeChange: calculatePercentageChange(
+        current.avgResolutionTime,
+        previous.avgResolutionTime
+      ),
+      satisfactionChange: calculatePercentageChange(
+        current.avgSatisfaction,
+        previous.avgSatisfaction
+      ),
+    };
+  } catch (error) {
+    console.error("Error getting trend calculations data:", error);
+    return {
+      totalComplaintsChange: 0,
+      resolutionRateChange: 0,
+      resolutionTimeChange: 0,
+      satisfactionChange: 0,
+    };
+  }
+};
+
+// @desc    Export Customer Care report
+// @route   GET /api/customer-care/reports/export/:format
+// @access  Private (Customer Care+)
+export const exportCustomerCareReport = async (req, res) => {
+  try {
+    const { format } = req.params;
+    const { dateRange = "30", departmentFilter = "all" } = req.query;
+    const filter = req.userFilter || {};
+
+    // Calculate date range
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(dateRange));
+
+    // Add date filter
+    const dateFilter = {
+      ...filter,
+      submittedAt: {
+        $gte: startDate,
+        $lte: endDate,
+      },
+    };
+
+    // Fetch all data needed for the report (without sending responses)
+    const [
+      statisticsResponse,
+      trendsResponse,
+      departmentBreakdownResponse,
+      categoryBreakdownResponse,
+      priorityBreakdownResponse,
+      trendCalculationsResponse,
+    ] = await Promise.all([
+      getComplaintStatisticsData(filter),
+      getComplaintTrendsData(filter),
+      getDepartmentBreakdownData(filter),
+      getCategoryBreakdownData(filter),
+      getPriorityBreakdownData(filter),
+      getTrendCalculationsData(filter),
+    ]);
+
+    const { generateCustomerCareReportPDF } = await import(
+      "../utils/pdfUtils.js"
+    );
+
+    const reportData = {
+      statistics: statisticsResponse,
+      trends: trendsResponse,
+      departmentBreakdown: departmentBreakdownResponse,
+      categoryBreakdown: categoryBreakdownResponse,
+      priorityBreakdown: priorityBreakdownResponse,
+      trendCalculations: trendCalculationsResponse,
+      dateRange: {
+        start: startDate,
+        end: endDate,
+        days: parseInt(dateRange),
+      },
+      generatedAt: new Date(),
+      generatedBy: req.user,
+    };
+
+    if (format.toLowerCase() === "pdf") {
+      const { jsPDF } = await import("jspdf");
+      const autoTable = (await import("jspdf-autotable")).default;
+
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      // ELRA Branding - Green color scheme
+      // ELRA Branding - Official ELRA color scheme
+      const elraGreen = [13, 100, 73];
+      doc.setFontSize(24);
+      doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+      doc.text("ELRA Customer Care Report", 20, 20);
+
+      // Add ELRA logo placeholder (ELRA green rectangle)
+      doc.setFillColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+      doc.rect(150, 15, 30, 10, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.text("ELRA", 155, 22);
+
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.text(
+        `Generated for: ${req.user.firstName} ${req.user.lastName}`,
+        20,
+        35
+      );
+      doc.text(`Department: ${req.user.department?.name}`, 20, 42);
+      doc.text(`Position: ${req.user.role?.name}`, 20, 49);
+      doc.text(`Report Period: Last ${dateRange} days`, 20, 56);
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 63);
+
+      let yPosition = 75;
+
+      doc.setFontSize(16);
+      doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+      doc.text("Executive Summary", 20, yPosition);
+      yPosition += 10;
+
+      doc.setFontSize(10);
+      doc.text(
+        `Total Complaints: ${statisticsResponse.totalComplaints}`,
+        20,
+        yPosition
+      );
+      yPosition += 7;
+      doc.text(
+        `Resolved Complaints: ${statisticsResponse.resolvedComplaints}`,
+        20,
+        yPosition
+      );
+      yPosition += 7;
+      doc.text(
+        `Pending Complaints: ${statisticsResponse.pendingComplaints}`,
+        20,
+        yPosition
+      );
+      yPosition += 7;
+      doc.text(
+        `High Priority: ${statisticsResponse.highPriority}`,
+        20,
+        yPosition
+      );
+      yPosition += 7;
+      doc.text(
+        `Resolution Rate: ${statisticsResponse.resolutionRate}%`,
+        20,
+        yPosition
+      );
+      yPosition += 7;
+      doc.text(
+        `Average Resolution Time: ${statisticsResponse.averageResolutionTime} days`,
+        20,
+        yPosition
+      );
+      yPosition += 7;
+      doc.text(
+        `Satisfaction Score: ${statisticsResponse.satisfactionScore}/5`,
+        20,
+        yPosition
+      );
+      yPosition += 15;
+
+      if (departmentBreakdownResponse.length > 0) {
+        doc.setFontSize(14);
+        doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+        doc.text("Department Breakdown", 20, yPosition);
+        yPosition += 10;
+
+        const deptHeaders = ["Department", "Count", "Resolution Rate"];
+        const deptRows = departmentBreakdownResponse.map((dept) => [
+          dept.department,
+          dept.count.toString(),
+          `${dept.resolutionRate.toFixed(1)}%`,
+        ]);
+
+        autoTable(doc, {
+          head: [deptHeaders],
+          body: deptRows,
+          startY: yPosition,
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: elraGreen, textColor: 255 }, // Official ELRA Green
+        });
+
+        yPosition = doc.lastAutoTable.finalY + 10;
+      }
+
+      if (categoryBreakdownResponse.length > 0) {
+        doc.setFontSize(14);
+        doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+        doc.text("Category Breakdown", 20, yPosition);
+        yPosition += 10;
+
+        const catHeaders = ["Category", "Count"];
+        const catRows = categoryBreakdownResponse.map((cat) => [
+          cat.category,
+          cat.count.toString(),
+        ]);
+
+        autoTable(doc, {
+          head: [catHeaders],
+          body: catRows,
+          startY: yPosition,
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: elraGreen, textColor: 255 }, // Official ELRA Green
+        });
+
+        yPosition = doc.lastAutoTable.finalY + 10;
+      }
+
+      if (priorityBreakdownResponse.length > 0) {
+        doc.setFontSize(14);
+        doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+        doc.text("Priority Breakdown", 20, yPosition);
+        yPosition += 10;
+
+        const priorityHeaders = ["Priority", "Count"];
+        const priorityRows = priorityBreakdownResponse.map((priority) => [
+          priority.priority,
+          priority.count.toString(),
+        ]);
+
+        autoTable(doc, {
+          head: [priorityHeaders],
+          body: priorityRows,
+          startY: yPosition,
+          styles: { fontSize: 8 },
+          headStyles: { fillColor: elraGreen, textColor: 255 }, // Official ELRA Green
+        });
+      }
+
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.text(
+          `Page ${i} of ${pageCount}`,
+          20,
+          doc.internal.pageSize.height - 10
+        );
+      }
+
+      const pdfBuffer = doc.output("arraybuffer");
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="customer-care-report-${
+          new Date().toISOString().split("T")[0]
+        }.pdf"`
+      );
+      res.send(Buffer.from(pdfBuffer));
+    } else if (format.toLowerCase() === "csv") {
+      // Generate CSV content like Company Wallet module
+      let csvContent = "Customer Care Report\n";
+      csvContent += `Generated for: ${req.user.firstName} ${req.user.lastName}\n`;
+      csvContent += `Department: ${req.user.department?.name}\n`;
+      csvContent += `Position: ${req.user.role?.name}\n`;
+      csvContent += `Report Period: Last ${dateRange} days\n`;
+      csvContent += `Generated on: ${new Date().toLocaleString()}\n\n`;
+
+      csvContent += "Executive Summary\n";
+      csvContent += "Metric,Value\n";
+      csvContent += `Total Complaints,${statisticsResponse.totalComplaints}\n`;
+      csvContent += `Resolved Complaints,${statisticsResponse.resolvedComplaints}\n`;
+      csvContent += `Pending Complaints,${statisticsResponse.pendingComplaints}\n`;
+      csvContent += `High Priority,${statisticsResponse.highPriority}\n`;
+      csvContent += `Resolution Rate,${statisticsResponse.resolutionRate}%\n`;
+      csvContent += `Average Resolution Time,${statisticsResponse.averageResolutionTime} days\n`;
+      csvContent += `Satisfaction Score,${statisticsResponse.satisfactionScore}/5\n\n`;
+
+      if (departmentBreakdownResponse.length > 0) {
+        csvContent += "Department Breakdown\n";
+        csvContent += "Department,Count,Resolution Rate\n";
+        departmentBreakdownResponse.forEach((dept) => {
+          csvContent += `${dept.department},${
+            dept.count
+          },${dept.resolutionRate.toFixed(1)}%\n`;
+        });
+        csvContent += "\n";
+      }
+
+      if (categoryBreakdownResponse.length > 0) {
+        csvContent += "Category Breakdown\n";
+        csvContent += "Category,Count\n";
+        categoryBreakdownResponse.forEach((cat) => {
+          csvContent += `${cat.category},${cat.count}\n`;
+        });
+        csvContent += "\n";
+      }
+
+      if (priorityBreakdownResponse.length > 0) {
+        csvContent += "Priority Breakdown\n";
+        csvContent += "Priority,Count\n";
+        priorityBreakdownResponse.forEach((priority) => {
+          csvContent += `${priority.priority},${priority.count}\n`;
+        });
+        csvContent += "\n";
+      }
+
+      csvContent += "Trend Analysis\n";
+      csvContent += "Metric,Change\n";
+      csvContent += `Total Complaints Change,${trendCalculationsResponse.totalComplaintsChange.toFixed(
+        1
+      )}%\n`;
+      csvContent += `Resolution Rate Change,${trendCalculationsResponse.resolutionRateChange.toFixed(
+        1
+      )}%\n`;
+      csvContent += `Resolution Time Change,${trendCalculationsResponse.resolutionTimeChange.toFixed(
+        1
+      )}%\n`;
+      csvContent += `Satisfaction Change,${trendCalculationsResponse.satisfactionChange.toFixed(
+        1
+      )}%\n`;
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="customer-care-report-${
+          new Date().toISOString().split("T")[0]
+        }.csv"`
+      );
+      res.send(csvContent);
+    } else if (format.toLowerCase() === "word") {
+      let htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Customer Care Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { text-align: center; color: #0d6449; margin-bottom: 30px; }
+        .section { margin-bottom: 25px; }
+        .section h2 { color: #0d6449; border-bottom: 2px solid #0d6449; padding-bottom: 5px; }
+        .summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .summary-item { background: #f8f9fa; padding: 10px; border-radius: 5px; }
+        .summary-item strong { color: #0d6449; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #0d6449; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        .footer { margin-top: 30px; text-align: center; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>ELRA Customer Care Report</h1>
+        <p>Generated for: ${req.user.firstName} ${req.user.lastName}</p>
+        <p>Department: ${req.user.department?.name} | Position: ${
+        req.user.role?.name
+      }</p>
+        <p>Report Period: Last ${dateRange} days | Generated: ${new Date().toLocaleString()}</p>
+    </div>
+
+    <div class="section">
+        <h2>Executive Summary</h2>
+        <div class="summary-grid">
+            <div class="summary-item">
+                <strong>Total Complaints:</strong> ${
+                  statisticsResponse.totalComplaints
+                }
+            </div>
+            <div class="summary-item">
+                <strong>Resolved Complaints:</strong> ${
+                  statisticsResponse.resolvedComplaints
+                }
+            </div>
+            <div class="summary-item">
+                <strong>Pending Complaints:</strong> ${
+                  statisticsResponse.pendingComplaints
+                }
+            </div>
+            <div class="summary-item">
+                <strong>High Priority:</strong> ${
+                  statisticsResponse.highPriority
+                }
+            </div>
+            <div class="summary-item">
+                <strong>Resolution Rate:</strong> ${
+                  statisticsResponse.resolutionRate
+                }%
+            </div>
+            <div class="summary-item">
+                <strong>Average Resolution Time:</strong> ${
+                  statisticsResponse.averageResolutionTime
+                } days
+            </div>
+            <div class="summary-item">
+                <strong>Satisfaction Score:</strong> ${
+                  statisticsResponse.satisfactionScore
+                }/5
+            </div>
+        </div>
+    </div>
+`;
+
+      if (departmentBreakdownResponse.length > 0) {
+        htmlContent += `
+    <div class="section">
+        <h2>Department Breakdown</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Department</th>
+                    <th>Count</th>
+                    <th>Resolution Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+`;
+        departmentBreakdownResponse.forEach((dept) => {
+          htmlContent += `
+                <tr>
+                    <td>${dept.department}</td>
+                    <td>${dept.count}</td>
+                    <td>${dept.resolutionRate.toFixed(1)}%</td>
+                </tr>
+`;
+        });
+        htmlContent += `
+            </tbody>
+        </table>
+    </div>
+`;
+      }
+
+      if (categoryBreakdownResponse.length > 0) {
+        htmlContent += `
+    <div class="section">
+        <h2>Category Breakdown</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Count</th>
+                </tr>
+            </thead>
+            <tbody>
+`;
+        categoryBreakdownResponse.forEach((cat) => {
+          htmlContent += `
+                <tr>
+                    <td>${cat.category}</td>
+                    <td>${cat.count}</td>
+                </tr>
+`;
+        });
+        htmlContent += `
+            </tbody>
+        </table>
+    </div>
+`;
+      }
+
+      if (priorityBreakdownResponse.length > 0) {
+        htmlContent += `
+    <div class="section">
+        <h2>Priority Breakdown</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Priority</th>
+                    <th>Count</th>
+                </tr>
+            </thead>
+            <tbody>
+`;
+        priorityBreakdownResponse.forEach((priority) => {
+          htmlContent += `
+                <tr>
+                    <td>${priority.priority}</td>
+                    <td>${priority.count}</td>
+                </tr>
+`;
+        });
+        htmlContent += `
+            </tbody>
+        </table>
+    </div>
+`;
+      }
+
+      htmlContent += `
+    <div class="section">
+        <h2>Trend Analysis</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Change</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Total Complaints Change</td>
+                    <td>${trendCalculationsResponse.totalComplaintsChange.toFixed(
+                      1
+                    )}%</td>
+                </tr>
+                <tr>
+                    <td>Resolution Rate Change</td>
+                    <td>${trendCalculationsResponse.resolutionRateChange.toFixed(
+                      1
+                    )}%</td>
+                </tr>
+                <tr>
+                    <td>Resolution Time Change</td>
+                    <td>${trendCalculationsResponse.resolutionTimeChange.toFixed(
+                      1
+                    )}%</td>
+                </tr>
+                <tr>
+                    <td>Satisfaction Change</td>
+                    <td>${trendCalculationsResponse.satisfactionChange.toFixed(
+                      1
+                    )}%</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="footer">
+        <p>Report generated by ELRA Customer Care System</p>
+        <p>For support, contact: support@elra.com</p>
+    </div>
+</body>
+</html>
+`;
+
+      res.setHeader("Content-Type", "text/html");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="customer-care-report-${
+          new Date().toISOString().split("T")[0]
+        }.html"`
+      );
+      res.send(htmlContent);
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Unsupported export format",
+      });
+    }
+  } catch (error) {
+    console.error("Error exporting Customer Care report:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to export report",
+      error: error.message,
+    });
+  }
+};
+
 // Submit feedback for resolved complaint
 export const submitFeedback = async (req, res) => {
   try {
@@ -779,6 +1925,8 @@ export const submitFeedback = async (req, res) => {
 export const getTeamMembers = async (req, res) => {
   try {
     const User = (await import("../models/User.js")).default;
+    const currentUser = req.user;
+    const currentUserLevel = currentUser.role?.level || 300;
 
     const teamMembers = await User.find({
       $or: [
@@ -788,10 +1936,14 @@ export const getTeamMembers = async (req, res) => {
     })
       .populate("role", "name level")
       .populate("department", "name")
-      .select("firstName lastName email role department")
+      .select("firstName lastName email role department avatar")
       .then((users) =>
         users.filter(
-          (user) => user.role && user.role.level >= 300 && user.role.level < 700
+          (user) =>
+            user.role &&
+            user.role.level < currentUserLevel &&
+            user.role.level >= 300 &&
+            user._id.toString() !== currentUser._id.toString()
         )
       );
 
@@ -809,6 +1961,10 @@ export const getTeamMembers = async (req, res) => {
       })
     );
 
+    console.log(
+      `✅ [CUSTOMER CARE] Returning ${membersWithCounts.length} team members with counts`
+    );
+
     res.status(200).json({
       success: true,
       data: membersWithCounts,
@@ -818,6 +1974,186 @@ export const getTeamMembers = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching team members",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Get all departments with their HODs
+// @route   GET /api/customer-care/departments-with-hods
+// @access  Private (Staff+)
+export const getDepartmentsWithHODs = async (req, res) => {
+  try {
+    const Department = (await import("../models/Department.js")).default;
+    const User = (await import("../models/User.js")).default;
+
+    const departments = await Department.find({ isActive: true })
+      .select("name code description")
+      .sort({ name: 1 });
+
+    // Find the HOD role first
+    const Role = (await import("../models/Role.js")).default;
+    const hodRole = await Role.findOne({ name: "HOD" });
+
+    if (!hodRole) {
+      return res.status(404).json({
+        success: false,
+        message: "HOD role not found in system",
+      });
+    }
+
+    // For each department, find the HOD using the role ID
+    const departmentsWithHODs = await Promise.all(
+      departments.map(async (dept) => {
+        const hod = await User.findOne({
+          department: dept._id,
+          role: hodRole._id,
+        })
+          .select("firstName lastName email role avatar")
+          .populate("role", "name level")
+          .populate("avatar");
+
+        return {
+          ...dept.toObject(),
+          hod: hod || null,
+        };
+      })
+    );
+
+    res.status(200).json({
+      success: true,
+      data: departmentsWithHODs,
+    });
+  } catch (error) {
+    console.error("Error fetching departments with HODs:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch departments with HODs",
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Send complaint details to a department HOD
+// @route   POST /api/customer-care/complaints/:id/send-to-hod
+// @access  Private (Staff+)
+export const sendComplaintToHOD = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { targetDepartmentId, targetHODId, message } = req.body;
+    const currentUser = req.user;
+
+    // Find the complaint
+    const complaint = await Complaint.findById(id)
+      .populate("submittedBy", "firstName lastName email department")
+      .populate("department", "name")
+      .populate("assignedTo", "firstName lastName email");
+
+    if (!complaint) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found",
+      });
+    }
+
+    // Find the target department first
+    const Department = (await import("../models/Department.js")).default;
+    const targetDepartment = await Department.findById(targetDepartmentId);
+
+    if (!targetDepartment) {
+      return res.status(404).json({
+        success: false,
+        message: "Target department not found",
+      });
+    }
+
+    // Find the HOD role
+    const Role = (await import("../models/Role.js")).default;
+    const hodRole = await Role.findOne({ name: "HOD" });
+
+    if (!hodRole) {
+      return res.status(404).json({
+        success: false,
+        message: "HOD role not found in system",
+      });
+    }
+
+    const User = (await import("../models/User.js")).default;
+    const targetHOD = await User.findOne({
+      role: hodRole._id,
+      department: targetDepartmentId,
+    })
+      .populate("department", "name")
+      .populate("role", "name level");
+
+    if (!targetHOD) {
+      return res.status(404).json({
+        success: false,
+        message: `No HOD found for ${targetDepartment.name} department`,
+      });
+    }
+
+    const NotificationService = (
+      await import("../services/notificationService.js")
+    ).default;
+    const notificationService = new NotificationService();
+
+    const notificationData = {
+      recipient: targetHODId,
+      type: "complaint_forwarded",
+      title: "Complaint Forwarded to Your Department",
+      message:
+        message ||
+        `Complaint #${complaint.complaintNumber} has been forwarded to your department for review.`,
+      priority: "high",
+      data: {
+        complaintId: complaint._id,
+        complaintNumber: complaint.complaintNumber,
+        complaintTitle: complaint.title,
+        complaintCategory: complaint.category,
+        complaintPriority: complaint.priority,
+        complaintStatus: complaint.status,
+        submittedBy: complaint.submittedBy._id,
+        submittedByName: `${complaint.submittedBy.firstName} ${complaint.submittedBy.lastName}`,
+        submittedByDepartment: complaint.submittedBy.department?.name || "N/A",
+        forwardedBy: currentUser._id,
+        forwardedByName: `${currentUser.firstName} ${currentUser.lastName}`,
+        forwardedByDepartment: currentUser.department?.name || "N/A",
+        targetDepartmentId: targetDepartmentId,
+        targetDepartmentName: targetHOD.department?.name || "N/A",
+        forwardedAt: new Date(),
+        actionUrl: `/dashboard/modules/customer-care/complaint-management`,
+      },
+    };
+
+    await notificationService.createNotification(notificationData);
+
+    console.log(
+      `✅ [CUSTOMER CARE] Complaint #${complaint.complaintNumber} forwarded to ${targetHOD.firstName} ${targetHOD.lastName} (${targetHOD.department?.name} HOD)`
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Complaint details sent to department HOD",
+      data: {
+        complaintId: complaint._id,
+        complaintNumber: complaint.complaintNumber,
+        targetHOD: {
+          id: targetHOD._id,
+          name: `${targetHOD.firstName} ${targetHOD.lastName}`,
+          department: targetHOD.department?.name,
+        },
+        forwardedBy: {
+          id: currentUser._id,
+          name: `${currentUser.firstName} ${currentUser.lastName}`,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error sending complaint to HOD:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to send complaint to HOD",
       error: error.message,
     });
   }
@@ -855,25 +2191,37 @@ export const assignComplaint = async (req, res) => {
     ]);
 
     try {
-      const Notification = (await import("../models/Notification.js")).default;
+      const NotificationService = (
+        await import("../services/notificationService.js")
+      ).default;
+      const notificationService = new NotificationService();
 
-      const assignmentNotification = {
+      const assignmentNotificationData = {
         recipient: assignedTo,
         type: "complaint_assigned",
-        title: "New Complaint Assigned",
-        message: `You have been assigned a new complaint: "${complaint.title}"`,
+        title: "New Complaint Assigned to You",
+        message: `You have been assigned a new complaint: "${complaint.title}" from ${complaint.submittedBy.firstName} ${complaint.submittedBy.lastName}. Please review and take action.`,
+        priority: "high",
         data: {
           complaintId: complaint._id,
+          complaintNumber: complaint.complaintNumber,
           complaintTitle: complaint.title,
           complaintCategory: complaint.category,
           complaintPriority: complaint.priority,
           submittedBy: complaint.submittedBy._id,
+          submittedByName: `${complaint.submittedBy.firstName} ${complaint.submittedBy.lastName}`,
           assignedBy: req.user._id,
+          assignedByName: `${req.user.firstName} ${req.user.lastName}`,
+          assignedAt: new Date(),
+          actionUrl: `/dashboard/modules/customer-care/my-assignments`,
         },
-        isRead: false,
       };
 
-      await Notification.create(assignmentNotification);
+      await notificationService.createNotification(assignmentNotificationData);
+
+      console.log(
+        `✅ [CUSTOMER CARE] Notification sent to ${complaint.assignedTo.firstName} ${complaint.assignedTo.lastName} for complaint assignment`
+      );
     } catch (notificationError) {
       console.error(
         "❌ [CUSTOMER CARE] Error creating assignment notification:",

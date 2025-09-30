@@ -74,8 +74,11 @@ const ProjectTeams = () => {
       const usersResponse = await getUsers();
       setAllUsers(usersResponse.data || []);
 
-      if (user.role.level >= 1000) {
-        // SUPER_ADMIN - use comprehensive endpoints
+      if (
+        user.role.level >= 1000 ||
+        (user.role.level >= 700 &&
+          user.department?.name === "Project Management")
+      ) {
         const comprehensiveData = await fetchComprehensiveProjectData();
         const availableProjectsData = await fetchProjectsAvailableForTeams();
 
@@ -83,11 +86,9 @@ const ProjectTeams = () => {
         setAvailableProjects(availableProjectsData.data || []);
         setTeamMembers(comprehensiveData.data.teamMembers || []);
       } else {
-        // HOD and other roles - use regular endpoints with role-based filtering
         const projectsData = await fetchProjects();
         const teamData = await fetchAllTeamMembers();
 
-        // Transform the data to match the expected format
         setProjectData({
           projects: projectsData.data || [],
           teamMembers: teamData.data || [],
@@ -131,8 +132,6 @@ const ProjectTeams = () => {
 
   const handleProjectSelect = async (projectId) => {
     try {
-      console.log("🔍 [ProjectTeams] Project selected:", projectId);
-      console.log("🔍 [ProjectTeams] Current team members:", teamMembers);
       setSelectedProject(projectId);
       setNewMemberData((prev) => ({ ...prev, projectId }));
 
@@ -331,19 +330,36 @@ const ProjectTeams = () => {
     {
       header: "Status",
       accessor: "status",
-      renderer: (project) => (
-        <span
-          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-            project.status === "active"
-              ? "bg-green-100 text-green-800"
-              : project.status === "completed"
-              ? "bg-blue-100 text-blue-800"
-              : "bg-gray-100 text-gray-800"
-          }`}
-        >
-          {project.status}
-        </span>
-      ),
+      renderer: (project) => {
+        const formatStatus = (status) => {
+          return status
+            .split("_")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
+        };
+
+        const getStatusColor = (status) => {
+          if (status === "implementation" || status === "in_progress") {
+            return "bg-green-100 text-green-800";
+          } else if (status === "completed") {
+            return "bg-blue-100 text-blue-800";
+          } else if (status.includes("pending")) {
+            return "bg-yellow-100 text-yellow-800";
+          } else {
+            return "bg-gray-100 text-gray-800";
+          }
+        };
+
+        return (
+          <span
+            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+              project.status
+            )}`}
+          >
+            {formatStatus(project.status)}
+          </span>
+        );
+      },
     },
     {
       header: "Team Size",
@@ -435,83 +451,68 @@ const ProjectTeams = () => {
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto py-8 px-4">
+    <div className="w-full mx-auto py-8 px-4">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Project Teams Management
         </h1>
         <p className="text-gray-600">
-          {user.role.level >= 1000
+          {user.role.level >= 1000 ||
+          (user.role.level >= 700 &&
+            user.department?.name === "Project Management")
             ? "Manage all project teams across the organization"
             : "View and manage your project teams"}
         </p>
       </div>
 
-      {/* Statistics Cards (SUPER_ADMIN) */}
-      {user.role.level >= 1000 && projectData && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Total Projects
-            </h3>
-            <p className="text-3xl font-bold text-blue-600">
-              {projectData.statistics?.totalProjects || 0}
-            </p>
+      {/* Statistics Cards (SUPER_ADMIN or PM HOD) */}
+      {(user.role.level >= 1000 ||
+        (user.role.level >= 700 &&
+          user.department?.name === "Project Management")) &&
+        projectData && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Total Projects
+              </h3>
+              <p className="text-3xl font-bold text-blue-600">
+                {projectData?.projects?.length || 0}
+              </p>
+            </div>
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Active Projects
+              </h3>
+              <p className="text-3xl font-bold text-green-600">
+                {projectData?.projects?.filter(
+                  (p) =>
+                    p.status === "implementation" || p.status === "in_progress"
+                ).length || 0}
+              </p>
+            </div>
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Completed Projects
+              </h3>
+              <p className="text-3xl font-bold text-purple-600">
+                {projectData?.projects?.filter((p) => p.status === "completed")
+                  .length || 0}
+              </p>
+            </div>
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Total Team Members
+              </h3>
+              <p className="text-3xl font-bold text-orange-600">
+                {projectData?.projects?.reduce(
+                  (total, project) => total + (project.teamMemberCount || 0),
+                  0
+                ) || 0}
+              </p>
+            </div>
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Active Projects
-            </h3>
-            <p className="text-3xl font-bold text-green-600">
-              {projectData.statistics?.activeProjects || 0}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Completed Projects
-            </h3>
-            <p className="text-3xl font-bold text-purple-600">
-              {projectData.statistics?.completedProjects || 0}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Total Team Members
-            </h3>
-            <p className="text-3xl font-bold text-orange-600">
-              {projectData.statistics?.totalTeamMembers || 0}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Projects List (SUPER_ADMIN) */}
-      {user.role.level >= 1000 && projectData && (
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">
-              All Projects
-            </h2>
-          </div>
-          <DataTable
-            data={projectData.projects || []}
-            columns={projectColumns}
-            loading={false}
-            actions={{
-              showEdit: false,
-              showDelete: false,
-              showToggle: false,
-            }}
-            onRowClick={(project) => handleProjectSelect(project._id)}
-            emptyState={{
-              icon: <UserGroupIcon className="h-12 w-12 text-white" />,
-              title: "No projects found",
-              description: "No projects are available to display",
-            }}
-          />
-        </div>
-      )}
+        )}
 
       {/* Team Members List */}
       <div>
@@ -523,7 +524,6 @@ const ProjectTeams = () => {
             <button
               onClick={() => {
                 setShowAddMember(true);
-                // Check if there are available projects based on user role
                 const projectsToCheck =
                   user.role.level >= 1000
                     ? availableProjects
@@ -543,43 +543,37 @@ const ProjectTeams = () => {
             </button>
           )}
         </div>
-
-        <DataTable
-          data={teamMembers.filter((member) => {
-            if (!selectedProject) return true;
-            const memberProjectId =
-              typeof member.project === "object"
-                ? member.project._id
-                : member.project;
-            return memberProjectId === selectedProject;
-          })}
-          columns={teamMemberColumns}
-          loading={false}
-          actions={{
-            showEdit: false,
-            showDelete: user.role.level >= 600,
-            showToggle: false,
-            onDelete: handleRemoveTeamMember,
-          }}
-          deletingIds={deletingMemberId ? [deletingMemberId] : []}
-          emptyState={{
-            icon: <UserGroupIcon className="h-12 w-12 text-white" />,
-            title: "No team members found",
-            description: selectedProject
-              ? "No team members assigned to this project yet"
-              : "No team members found in the system",
-            actionButton:
-              user.role.level >= 600 ? (
-                <button
-                  onClick={() => setShowAddMember(true)}
-                  className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors"
-                >
-                  Add Team Member
-                </button>
-              ) : null,
-          }}
-        />
       </div>
+
+      {/* Projects List (SUPER_ADMIN or PM HOD) */}
+      {(user.role.level >= 1000 ||
+        (user.role.level >= 700 &&
+          user.department?.name === "Project Management")) &&
+        projectData && (
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">
+                All Projects
+              </h2>
+            </div>
+            <DataTable
+              data={projectData.projects || []}
+              columns={projectColumns}
+              loading={false}
+              actions={{
+                showEdit: false,
+                showDelete: false,
+                showToggle: false,
+              }}
+              onRowClick={(project) => handleProjectSelect(project._id)}
+              emptyState={{
+                icon: <UserGroupIcon className="h-12 w-12 text-white" />,
+                title: "No projects found",
+                description: "No projects are available to display",
+              }}
+            />
+          </div>
+        )}
 
       {/* Add Team Member Modal */}
       {showAddMember && (
@@ -722,6 +716,10 @@ const ProjectTeams = () => {
                           {user.role?.level === 600 &&
                             "You can only select STAFF from your department"}
                           {user.role?.level === 700 &&
+                            user.department?.name === "Project Management" &&
+                            "You can select anyone from any department (PM HOD privileges)"}
+                          {user.role?.level === 700 &&
+                            user.department?.name !== "Project Management" &&
                             "You can select STAFF and MANAGER from your department"}
                           {user.role?.level >= 1000 && "You can select anyone"}
                         </p>
@@ -759,6 +757,14 @@ const ProjectTeams = () => {
                                 potentialMember.role?.level || 0;
 
                               if (currentUserRoleLevel >= 1000) {
+                                return true;
+                              }
+
+                              // PM HOD can select anyone
+                              if (
+                                currentUserRoleLevel >= 700 &&
+                                user.department?.name === "Project Management"
+                              ) {
                                 return true;
                               }
 

@@ -197,3 +197,14 @@ export const markProcurementAsDelivered = async (id, deliveryNotes = "") => {
     throw error;
   }
 };
+
+// Get vendor details by project ID (backup API)
+export const getProjectVendor = async (projectId) => {
+  try {
+    const response = await api.get(`/projects/${projectId}/vendor`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching project vendor:", error);
+    throw error;
+  }
+};

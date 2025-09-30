@@ -21,9 +21,15 @@ export const getRecentActivity = asyncHandler(async (req, res) => {
     department,
   } = req.query;
 
+  // Always filter by current user unless explicitly requesting all users (admin only)
+  const currentUserId = req.user.id;
+  const isAdmin =
+    req.user.role?.name === "PLATFORM_ADMIN" ||
+    req.user.role?.name === "SUPER_ADMIN";
+
   const options = {
     limit: parseInt(limit),
-    userId,
+    userId: userId || (isAdmin ? null : currentUserId),
     resourceType,
     action,
     startDate,
@@ -31,6 +37,14 @@ export const getRecentActivity = asyncHandler(async (req, res) => {
     riskLevel,
     department,
   };
+
+  console.log("🔍 Audit API Debug:", {
+    currentUserId,
+    isAdmin,
+    requestedUserId: userId,
+    finalUserId: options.userId,
+    userRole: req.user.role?.name,
+  });
 
   const activity = await AuditService.getRecentActivity(options);
 
@@ -258,4 +272,64 @@ export const getAuditDashboard = asyncHandler(async (req, res) => {
     data: dashboardData,
     message: "Audit dashboard data retrieved successfully",
   });
+});
+
+/**
+ * Create sample audit data for testing
+ */
+export const createSampleAuditData = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Create some sample audit logs
+    const sampleLogs = [
+      {
+        userId,
+        action: "PROJECT_CREATED",
+        resourceType: "PROJECT",
+        details: {
+          description: "Created new external project",
+          projectName: "Sample Project 1",
+        },
+        riskLevel: "LOW",
+      },
+      {
+        userId,
+        action: "DOCUMENT_UPLOADED",
+        resourceType: "DOCUMENT",
+        details: {
+          description: "Uploaded project proposal document",
+          documentTitle: "Project Proposal.pdf",
+        },
+        riskLevel: "LOW",
+      },
+      {
+        userId,
+        action: "USER_LOGIN",
+        resourceType: "AUTH",
+        details: {
+          description: "User logged into system",
+        },
+        riskLevel: "LOW",
+      },
+    ];
+
+    const createdLogs = [];
+    for (const logData of sampleLogs) {
+      const log = await AuditService.logActivity(logData);
+      if (log) createdLogs.push(log);
+    }
+
+    res.json({
+      success: true,
+      data: createdLogs,
+      message: "Sample audit data created successfully",
+    });
+  } catch (error) {
+    console.error("Error creating sample audit data:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to create sample audit data",
+    });
+  }
 });

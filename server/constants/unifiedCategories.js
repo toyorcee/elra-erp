@@ -115,6 +115,25 @@ export const UNIFIED_CATEGORIES = [
   "waste_management", // Waste disposal, recycling systems
 
   // ============================================================================
+  // DEPARTMENTAL PROJECT CATEGORIES
+  // ============================================================================
+  "internal_training", // Internal staff training programs
+  "department_development", // Department-specific development initiatives
+  "process_improvement", // Internal process optimization
+  "team_building", // Team building activities and events
+  "skill_development", // Professional skill development programs
+  "research_development", // Internal research and development
+  "system_upgrade", // Internal system upgrades and maintenance
+  "compliance_training", // Regulatory compliance training
+  "leadership_development", // Leadership and management development
+  "innovation_projects", // Innovation and experimentation projects
+  "department_equipment", // Department-specific equipment purchases
+  "workspace_improvement", // Office space and workspace improvements
+  "technology_adoption", // New technology adoption and implementation
+  "quality_improvement", // Quality management and improvement initiatives
+  "sustainability_projects", // Environmental and sustainability projects
+
+  // ============================================================================
   // OTHER & MISCELLANEOUS
   // ============================================================================
   "other", // Catch-all for uncategorized items
@@ -148,11 +167,21 @@ export const mapToUnifiedCategory = (category) => {
 
     training_program: "training_services",
     capacity_building: "training_services",
-    skill_development: "training_services",
-    professional_development: "training_services",
+    skill_development: "skill_development",
+    professional_development: "skill_development",
 
     consulting: "consulting_services",
     training: "training_services",
+
+    // Departmental project categories
+    internal: "internal_training",
+    internal_training: "internal_training",
+    department_development: "department_development",
+    process_improvement: "process_improvement",
+    team_building: "team_building",
+    research: "research_development",
+    development: "department_development",
+    maintenance: "system_upgrade",
 
     // Legacy Procurement categories
     equipment: "industrial_equipment",
@@ -355,6 +384,23 @@ export const getCategoryDisplayName = (category) => {
     telecommunications: "Telecommunications",
     waste_management: "Waste Management",
 
+    // Departmental project categories
+    internal_training: "Internal Training",
+    department_development: "Department Development",
+    process_improvement: "Process Improvement",
+    team_building: "Team Building",
+    skill_development: "Skill Development",
+    research_development: "Research & Development",
+    system_upgrade: "System Upgrade",
+    compliance_training: "Compliance Training",
+    leadership_development: "Leadership Development",
+    innovation_projects: "Innovation Projects",
+    department_equipment: "Department Equipment",
+    workspace_improvement: "Workspace Improvement",
+    technology_adoption: "Technology Adoption",
+    quality_improvement: "Quality Improvement",
+    sustainability_projects: "Sustainability Projects",
+
     other: "Other",
   };
 
@@ -444,6 +490,23 @@ export const getCategoriesByType = () => {
       "hvac_systems",
       "telecommunications",
       "waste_management",
+    ],
+    "Departmental Projects": [
+      "internal_training",
+      "department_development",
+      "process_improvement",
+      "team_building",
+      "skill_development",
+      "research_development",
+      "system_upgrade",
+      "compliance_training",
+      "leadership_development",
+      "innovation_projects",
+      "department_equipment",
+      "workspace_improvement",
+      "technology_adoption",
+      "quality_improvement",
+      "sustainability_projects",
     ],
     Other: ["other"],
   };

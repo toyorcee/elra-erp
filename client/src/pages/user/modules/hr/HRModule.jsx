@@ -1,5 +1,5 @@
 import React from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../../context/AuthContext";
 import { GradientSpinner } from "../../../../components/common";
 import { FaUsers, FaUserPlus, FaCalendarAlt, FaChartBar } from "react-icons/fa";
@@ -7,36 +7,58 @@ import { FaUsers, FaUserPlus, FaCalendarAlt, FaChartBar } from "react-icons/fa";
 const HRModule = () => {
   const { user } = useAuth();
   const { module } = useParams();
+  const navigate = useNavigate();
   const [loading, setLoading] = React.useState(false);
 
   const hrFeatures = [
     {
-      title: "Employee Management",
-      description: "Add, edit, and manage employee records",
-      icon: FaUsers,
-      color: "bg-[var(--elra-primary)]",
-      path: "/dashboard/modules/hr/employees",
-    },
-    {
-      title: "Recruitment",
-      description: "Manage job postings and candidate applications",
+      title: "Employee Invitation",
+      description: "Invite and onboard new employees",
       icon: FaUserPlus,
       color: "bg-[var(--elra-primary)]",
-      path: "/dashboard/modules/hr/recruitment",
+      path: "/dashboard/modules/hr/invitation",
+    },
+    {
+      title: "Onboarding Management",
+      description: "Manage onboarding tasks and checklists",
+      icon: FaUsers,
+      color: "bg-[var(--elra-primary)]",
+      path: "/dashboard/modules/hr/onboarding",
+    },
+    {
+      title: "Offboarding Management",
+      description: "Handle employee exit processes",
+      icon: FaUsers,
+      color: "bg-[var(--elra-primary)]",
+      path: "/dashboard/modules/hr/offboarding",
     },
     {
       title: "Leave Management",
       description: "Handle leave requests and approvals",
       icon: FaCalendarAlt,
       color: "bg-[var(--elra-primary)]",
-      path: "/dashboard/modules/hr/leave",
+      path: "/dashboard/modules/hr/leave/management",
     },
     {
-      title: "Performance Reviews",
-      description: "Conduct and track performance evaluations",
+      title: "Attendance Tracking",
+      description: "Track employee attendance and time",
       icon: FaChartBar,
       color: "bg-[var(--elra-primary)]",
-      path: "/dashboard/modules/hr/performance",
+      path: "/dashboard/modules/hr/attendance",
+    },
+    {
+      title: "Policy Management",
+      description: "Manage HR policies and procedures",
+      icon: FaUsers,
+      color: "bg-[var(--elra-primary)]",
+      path: "/dashboard/modules/hr/policies",
+    },
+    {
+      title: "Compliance Management",
+      description: "Ensure regulatory compliance",
+      icon: FaChartBar,
+      color: "bg-[var(--elra-primary)]",
+      path: "/dashboard/modules/hr/compliance",
     },
   ];
 
@@ -67,7 +89,7 @@ const HRModule = () => {
             <div
               key={feature.title}
               className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer border border-gray-200"
-              onClick={() => (window.location.href = feature.path)}
+              onClick={() => navigate(feature.path)}
             >
               <div className="p-6">
                 <div className="flex items-center mb-4">

@@ -25,34 +25,34 @@ export const moduleSidebarConfig = {
           },
         ],
       },
-      // {
-      //   title: "Departmental Projects Management",
-      //   collapsible: true,
-      //   defaultExpanded: true,
-      //   items: [
-      //     {
-      //       label: "Create Department Project",
-      //       icon: "PlusCircleIcon",
-      //       path: "/dashboard/modules/department-management/create-department-project",
-      //       required: { minLevel: 700 },
-      //       description: "Create new projects for your department",
-      //     },
-      //     {
-      //       label: "Pending Approvals",
-      //       icon: "ClockIcon",
-      //       path: "/dashboard/modules/department-management/project-approvals",
-      //       required: { minLevel: 700 },
-      //       description: "Review and approve department project requests",
-      //     },
-      //     {
-      //       label: "Approval History",
-      //       icon: "DocumentCheckIcon",
-      //       path: "/dashboard/modules/department-management/approval-history",
-      //       required: { minLevel: 700 },
-      //       description: "View all project approval decisions and history",
-      //     },
-      //   ],
-      // },
+      {
+        title: "Departmental Projects Management",
+        collapsible: true,
+        defaultExpanded: true,
+        items: [
+          {
+            label: "Department Projects",
+            icon: "FolderIcon",
+            path: "/dashboard/modules/department-management/projects",
+            required: { minLevel: 700 },
+            description: "Create and manage internal departmental projects",
+          },
+          {
+            label: "Pending Approvals",
+            icon: "ClockIcon",
+            path: "/dashboard/modules/department-management/project-approvals",
+            required: { minLevel: 700 },
+            description: "Review and approve department project requests",
+          },
+          {
+            label: "Approval History",
+            icon: "DocumentCheckIcon",
+            path: "/dashboard/modules/department-management/approval-history",
+            required: { minLevel: 700 },
+            description: "View all project approval decisions and history",
+          },
+        ],
+      },
       {
         title: "User Management",
         collapsible: true,
@@ -149,40 +149,13 @@ export const moduleSidebarConfig = {
             required: { minLevel: 300 },
             description: "View your leave and other requests",
           },
-        ],
-      },
-      {
-        title: "Support & Requests",
-        collapsible: true,
-        defaultExpanded: false,
-        items: [
-          // {
-          //   label: "Submit Ticket",
-          //   icon: "TicketIcon",
-          //   path: "/dashboard/modules/self-service/tickets",
-          //   required: { minLevel: 300 },
-          //   description: "Submit support tickets and service requests",
-          // },
           {
-            label: "My Tickets",
-            icon: "ClipboardDocumentListIcon",
-            path: "/dashboard/modules/self-service/my-tickets",
+            label: "My Archive",
+            icon: "ArchiveBoxIcon",
+            path: "/dashboard/modules/self-service/my-archive",
             required: { minLevel: 300 },
-            description: "View and track your support tickets",
-          },
-          {
-            label: "IT Support",
-            icon: "Cog6ToothIcon",
-            path: "/dashboard/modules/self-service/it-support",
-            required: { minLevel: 300 },
-            description: "Request IT support and technical assistance",
-          },
-          {
-            label: "Equipment Requests",
-            icon: "CubeIcon",
-            path: "/dashboard/modules/self-service/equipment",
-            required: { minLevel: 300 },
-            description: "Request office equipment and supplies",
+            description:
+              "Access your archived documents and historical records",
           },
         ],
       },
@@ -231,11 +204,11 @@ export const moduleSidebarConfig = {
         defaultExpanded: true,
         items: [
           {
-            label: "Dashboard",
+            label: "Overview",
             icon: "HomeIcon",
-            path: "/dashboard/modules/customer-care",
+            path: "/dashboard/modules/customer-care/overview",
             required: { minLevel: 0 },
-            description: "Customer care dashboard and overview",
+            description: "Customer care overview and key metrics",
             hidden: (user) => {
               return false;
             },
@@ -941,9 +914,9 @@ export const moduleSidebarConfig = {
         defaultExpanded: true,
         items: [
           {
-            label: "Dashboard",
+            label: "Overview",
             icon: "ChartBarIcon",
-            path: "/dashboard/modules/sales",
+            path: "/dashboard/modules/sales/overview",
             required: { minLevel: 300 },
             description: "Overview of sales and marketing performance",
             hidden: (user) => {
@@ -1109,13 +1082,6 @@ export const moduleSidebarConfig = {
         collapsible: true,
         defaultExpanded: true,
         items: [
-          {
-            label: "Dashboard",
-            icon: "ChartBarIcon",
-            path: "/dashboard/modules/legal",
-            required: { minLevel: 100 },
-            description: "Legal & Compliance overview and key metrics",
-          },
           {
             label: "Legal Policies",
             icon: "DocumentTextIcon",

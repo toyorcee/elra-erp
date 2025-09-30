@@ -1,0 +1,9 @@
+export { default as SelfService } from "./SelfService";
+export { default as SelfServiceLayout } from "./SelfServiceLayout";
+export { default as MyDocuments } from "./MyDocuments";
+export { default as MyPayslips } from "./MyPayslips";
+export { default as MyLeaveRequests } from "./MyLeaveRequests";
+export { default as MyArchive } from "./MyArchive";
+export { default as MyTickets } from "./MyTickets";
+export { default as MyProjects } from "./MyProjects";
+export { default as MyProjectTasks } from "./MyProjectTasks";

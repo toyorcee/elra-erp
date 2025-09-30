@@ -904,7 +904,7 @@ companyWalletSchema.statics.getOrCreateWallet = async function (
 
 // Pre-save middleware to ensure mathematical consistency
 companyWalletSchema.pre("save", function (next) {
-  // Ensure mathematical consistency
+  // Ensure mathematical consistency for main wallet
   const calculatedAvailable =
     this.totalFunds - this.allocatedFunds - this.reservedFunds;
 
@@ -913,6 +913,27 @@ companyWalletSchema.pre("save", function (next) {
       `Wallet balance inconsistency detected. Available: ${this.availableFunds}, Calculated: ${calculatedAvailable}`
     );
     this.availableFunds = calculatedAvailable;
+  }
+
+  // Ensure budget categories consistency
+  if (this.budgetCategories) {
+    Object.keys(this.budgetCategories).forEach((category) => {
+      const cat = this.budgetCategories[category];
+      if (
+        cat.allocated !== undefined &&
+        cat.used !== undefined &&
+        cat.available !== undefined
+      ) {
+        const calculatedCatAvailable =
+          cat.allocated - cat.used - (cat.reserved || 0);
+        if (Math.abs(cat.available - calculatedCatAvailable) > 0.01) {
+          console.warn(
+            `Budget category ${category} inconsistency detected. Available: ${cat.available}, Calculated: ${calculatedCatAvailable}`
+          );
+          cat.available = calculatedCatAvailable;
+        }
+      }
+    });
   }
 
   // Ensure no negative values

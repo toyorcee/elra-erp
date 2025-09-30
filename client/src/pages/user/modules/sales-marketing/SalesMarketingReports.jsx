@@ -18,6 +18,11 @@ import { toast } from "react-toastify";
 const SalesMarketingReports = () => {
   const [reportsData, setReportsData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [exportLoading, setExportLoading] = useState({
+    pdf: false,
+    word: false,
+    csv: false,
+  });
   useEffect(() => {
     fetchReportsData();
   }, []);
@@ -26,8 +31,8 @@ const SalesMarketingReports = () => {
     try {
       setLoading(true);
       const response = await getSalesMarketingReports({
-        dateRange: "30", 
-        departmentFilter: "all", 
+        dateRange: "30",
+        departmentFilter: "all",
       });
 
       if (response.success) {
@@ -45,40 +50,101 @@ const SalesMarketingReports = () => {
 
   const handleExportPDF = async () => {
     try {
-      await exportSalesMarketingReport("PDF", {
+      setExportLoading((prev) => ({ ...prev, pdf: true }));
+
+      const blob = await exportSalesMarketingReport("pdf", {
         dateRange: "30",
         departmentFilter: "all",
       });
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.target = "_blank";
+      link.download = `sales-marketing-report-${
+        new Date().toISOString().split("T")[0]
+      }.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
       toast.success("PDF report exported successfully!");
     } catch (error) {
       console.error("Error exporting PDF:", error);
-      toast.error("Failed to export PDF report");
+      toast.error(
+        `Failed to export PDF report: ${
+          error.response?.data?.message || error.message
+        }`
+      );
+    } finally {
+      setExportLoading((prev) => ({ ...prev, pdf: false }));
     }
   };
 
   const handleExportWord = async () => {
     try {
-      await exportSalesMarketingReport("Word", {
+      setExportLoading((prev) => ({ ...prev, word: true }));
+
+      const blob = await exportSalesMarketingReport("word", {
         dateRange: "30",
         departmentFilter: "all",
       });
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `sales-marketing-report-${
+        new Date().toISOString().split("T")[0]
+      }.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
       toast.success("Word report exported successfully!");
     } catch (error) {
       console.error("Error exporting Word report:", error);
-      toast.error("Failed to export Word report");
+      toast.error(
+        `Failed to export Word report: ${
+          error.response?.data?.message || error.message
+        }`
+      );
+    } finally {
+      setExportLoading((prev) => ({ ...prev, word: false }));
     }
   };
 
   const handleExportCSV = async () => {
     try {
-      await exportSalesMarketingReport("CSV", {
+      setExportLoading((prev) => ({ ...prev, csv: true }));
+
+      const blob = await exportSalesMarketingReport("csv", {
         dateRange: "30",
         departmentFilter: "all",
       });
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `sales-marketing-report-${
+        new Date().toISOString().split("T")[0]
+      }.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
       toast.success("CSV report exported successfully!");
     } catch (error) {
       console.error("Error exporting CSV report:", error);
-      toast.error("Failed to export CSV report");
+      toast.error(
+        `Failed to export CSV report: ${
+          error.response?.data?.message || error.message
+        }`
+      );
+    } finally {
+      setExportLoading((prev) => ({ ...prev, csv: false }));
     }
   };
 
@@ -130,27 +196,54 @@ const SalesMarketingReports = () => {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={handleExportPDF}
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl font-semibold flex items-center space-x-2 transition-colors cursor-pointer"
+            disabled={exportLoading.pdf}
+            className={`px-4 py-2 rounded-xl font-semibold flex items-center space-x-2 transition-colors ${
+              exportLoading.pdf
+                ? "bg-red-300 cursor-not-allowed opacity-50"
+                : "bg-red-500 hover:bg-red-600 cursor-pointer"
+            }`}
             title="Export Sales report as PDF"
           >
-            <ArrowDownTrayIcon className="h-5 w-5" />
-            <span>Export PDF</span>
+            {exportLoading.pdf ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+            ) : (
+              <ArrowDownTrayIcon className="h-5 w-5" />
+            )}
+            <span>{exportLoading.pdf ? "Exporting..." : "Export PDF"}</span>
           </button>
           <button
             onClick={handleExportWord}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl font-semibold flex items-center space-x-2 transition-colors cursor-pointer"
+            disabled={exportLoading.word}
+            className={`px-4 py-2 rounded-xl font-semibold flex items-center space-x-2 transition-colors ${
+              exportLoading.word
+                ? "bg-blue-300 cursor-not-allowed opacity-50"
+                : "bg-blue-500 hover:bg-blue-600 cursor-pointer"
+            }`}
             title="Export Sales report as Word/HTML"
           >
-            <ArrowDownTrayIcon className="h-5 w-5" />
-            <span>Export Word</span>
+            {exportLoading.word ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+            ) : (
+              <ArrowDownTrayIcon className="h-5 w-5" />
+            )}
+            <span>{exportLoading.word ? "Exporting..." : "Export Word"}</span>
           </button>
           <button
             onClick={handleExportCSV}
-            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-semibold flex items-center space-x-2 transition-colors cursor-pointer"
+            disabled={exportLoading.csv}
+            className={`px-4 py-2 rounded-xl font-semibold flex items-center space-x-2 transition-colors ${
+              exportLoading.csv
+                ? "bg-green-300 cursor-not-allowed opacity-50"
+                : "bg-green-500 hover:bg-green-600 cursor-pointer"
+            }`}
             title="Export Sales report as CSV"
           >
-            <ArrowDownTrayIcon className="h-5 w-5" />
-            <span>Export CSV</span>
+            {exportLoading.csv ? (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+            ) : (
+              <ArrowDownTrayIcon className="h-5 w-5" />
+            )}
+            <span>{exportLoading.csv ? "Exporting..." : "Export CSV"}</span>
           </button>
         </div>
       </div>

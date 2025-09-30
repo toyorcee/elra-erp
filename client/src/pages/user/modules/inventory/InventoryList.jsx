@@ -847,28 +847,6 @@ const InventoryList = () => {
       },
     },
     {
-      header: "Delivery Address",
-      accessor: "deliveryAddress",
-      renderer: (item) => {
-        const deliveryAddress = item.procurementId?.deliveryAddress;
-        return (
-          <div className="text-sm">
-            <div className="font-medium text-gray-900">
-              {deliveryAddress?.street || "N/A"}
-            </div>
-            <div className="text-gray-500">
-              {deliveryAddress?.city && deliveryAddress?.state
-                ? `${deliveryAddress.city}, ${deliveryAddress.state}`
-                : deliveryAddress?.city || deliveryAddress?.state || "N/A"}
-            </div>
-            <div className="text-xs text-gray-400">
-              Contact: {deliveryAddress?.contactPerson || "N/A"}
-            </div>
-          </div>
-        );
-      },
-    },
-    {
       header: "Price & Value",
       accessor: "currentValue",
       renderer: (item) => (
@@ -1396,63 +1374,9 @@ const InventoryList = () => {
                         {formatDate(selectedItem.createdAt)}
                       </span>
                     </div>
-                    <div className="pt-2">
-                      <div className="bg-green-100 rounded-lg p-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-green-700">
-                            Value Retention
-                          </span>
-                          <span className="text-xs font-bold text-green-800">
-                            {(
-                              (selectedItem.currentValue /
-                                selectedItem.purchasePrice) *
-                              100
-                            ).toFixed(1)}
-                            %
-                          </span>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
-
-              {/* Location Information Card */}
-              {selectedItem.location && selectedItem.location.trim() !== "" && (
-                <div className="mb-8">
-                  <div className="bg-white rounded-lg border border-gray-200 p-6">
-                    <div className="flex items-center space-x-3 mb-4">
-                      <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-                        <svg
-                          className="w-4 h-4 text-gray-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                        </svg>
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Location
-                      </h3>
-                    </div>
-                    <div className="text-sm text-gray-700">
-                      {selectedItem.location}
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Maintenance Information Card */}
               {selectedItem.maintenance &&
@@ -1726,17 +1650,6 @@ const InventoryList = () => {
                     <div>
                       Quantity: {completingItem.quantity || 1} | Price:{" "}
                       {formatCurrency(completingItem.purchasePrice)}
-                    </div>
-                    <div>
-                      Delivery Address:{" "}
-                      {completingItem.procurementId?.deliveryAddress?.street ||
-                        "N/A"}
-                      ,{" "}
-                      {completingItem.procurementId?.deliveryAddress?.city ||
-                        "N/A"}
-                      ,{" "}
-                      {completingItem.procurementId?.deliveryAddress?.state ||
-                        "N/A"}
                     </div>
                   </div>
                 </div>

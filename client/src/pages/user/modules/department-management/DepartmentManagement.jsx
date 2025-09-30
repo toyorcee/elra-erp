@@ -1,61 +1,64 @@
 import React from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../../context/AuthContext";
 import { GradientSpinner } from "../../../../components/common";
-import { 
-  FaClipboardCheck, 
-  FaCalendarAlt, 
-  FaUsers, 
-  FaChartBar 
+import {
+  FaClipboardCheck,
+  FaCalendarAlt,
+  FaUsers,
+  FaChartBar,
+  FaProjectDiagram,
 } from "react-icons/fa";
 
 const DepartmentManagement = () => {
   const { user } = useAuth();
   const { module } = useParams();
+  const navigate = useNavigate();
   const [loading, setLoading] = React.useState(false);
 
   const deptFeatures = [
     {
-      title: "Project Approvals",
-      description: "Review and approve department project requests",
-      icon: FaClipboardCheck,
+      title: "Analytics",
+      description: "Department overview and key metrics",
+      icon: FaChartBar,
       color: "bg-[var(--elra-primary)]",
-      path: "/dashboard/modules/department-management/project-approvals",
+      path: "/dashboard/modules/department-management/analytics",
     },
     {
-      title: "User Management",
+      title: "Department Users",
       description: "View and manage users in your department",
       icon: FaUsers,
       color: "bg-[var(--elra-primary)]",
       path: "/dashboard/modules/department-management/users",
     },
     {
-      title: "Departmental Projects",
-      description: "Create and manage projects for your department",
+      title: "Announcements",
+      description:
+        "Create and manage department-specific announcements (HOD only)",
       icon: FaClipboardCheck,
       color: "bg-[var(--elra-primary)]",
-      path: "/dashboard/modules/department-management/departmental-projects",
+      path: "/dashboard/modules/department-management/announcements",
     },
     {
       title: "Leave Management",
-      description: "Handle leave requests and approvals for your department",
+      description: "Review and approve employee leave requests",
       icon: FaCalendarAlt,
       color: "bg-[var(--elra-primary)]",
       path: "/dashboard/modules/department-management/leave-management",
     },
     {
-      title: "Team Management",
-      description: "Manage department staff and team structure",
-      icon: FaUsers,
+      title: "Department Leave Calendar",
+      description: "Visual calendar of approved leaves for your department",
+      icon: FaCalendarAlt,
       color: "bg-[var(--elra-primary)]",
-      path: "/dashboard/modules/department-management/team-management",
+      path: "/dashboard/modules/department-management/leave-calendar",
     },
     {
-      title: "Department Analytics",
-      description: "View department performance metrics and reports",
-      icon: FaChartBar,
+      title: "Department Projects",
+      description: "Create and manage internal departmental projects",
+      icon: FaProjectDiagram,
       color: "bg-[var(--elra-primary)]",
-      path: "/dashboard/modules/department-management/analytics",
+      path: "/dashboard/modules/department-management/projects",
     },
   ];
 
@@ -74,7 +77,9 @@ const DepartmentManagement = () => {
           Department Management Module
         </h1>
         <p className="text-gray-600">
-          Centralized module for HODs to manage department-specific functions including project approvals, leave management, team oversight, and analytics.
+          Centralized module for HODs to manage department-specific functions
+          including project approvals, leave management, team oversight, and
+          analytics.
         </p>
       </div>
 
@@ -86,7 +91,7 @@ const DepartmentManagement = () => {
             <div
               key={feature.title}
               className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 cursor-pointer border border-gray-200"
-              onClick={() => (window.location.href = feature.path)}
+              onClick={() => navigate(feature.path)}
             >
               <div className="p-6">
                 <div className="flex items-center mb-4">

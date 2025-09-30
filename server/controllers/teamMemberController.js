@@ -32,34 +32,40 @@ export const getAllTeamMembers = async (req, res) => {
 
     let query = { isActive: true };
 
-    // SUPER_ADMIN (1000) - see all team members across all projects
     if (currentUser.role.level >= 1000) {
       console.log("🔍 [TEAM MEMBERS] Super Admin - showing all team members");
     }
-    // HOD (700) - see team members in their department's projects
+    // HOD (700) - PM HOD can see all team members, other HODs see department projects
     else if (currentUser.role.level >= 700) {
-      if (!currentUser.department) {
-        return res.status(403).json({
-          success: false,
-          message: "You must be assigned to a department to view team members",
-        });
+      if (currentUser.department?.name === "Project Management") {
+        console.log(
+          "🔍 [TEAM MEMBERS] PM HOD - showing all team members across all projects"
+        );
+      } else {
+        if (!currentUser.department) {
+          return res.status(403).json({
+            success: false,
+            message:
+              "You must be assigned to a department to view team members",
+          });
+        }
+
+        // Get projects in user's department
+        const departmentProjects = await Project.find({
+          isActive: true,
+          $or: [
+            { projectManager: currentUser._id },
+            { "teamMembers.user": currentUser._id },
+          ],
+        }).select("_id");
+
+        const projectIds = departmentProjects.map((p) => p._id);
+        query.project = { $in: projectIds };
+
+        console.log(
+          "🔍 [TEAM MEMBERS] HOD - showing team members for department projects"
+        );
       }
-
-      // Get projects in user's department
-      const departmentProjects = await Project.find({
-        isActive: true,
-        $or: [
-          { projectManager: currentUser._id },
-          { "teamMembers.user": currentUser._id },
-        ],
-      }).select("_id");
-
-      const projectIds = departmentProjects.map((p) => p._id);
-      query.project = { $in: projectIds };
-
-      console.log(
-        "🔍 [TEAM MEMBERS] HOD - showing team members for department projects"
-      );
     }
     // MANAGER (600) - see team members in projects they manage
     else if (currentUser.role.level >= 600) {
@@ -231,7 +237,11 @@ export const addTeamMember = async (req, res) => {
     }
 
     // Additional validation for external projects
-    if (project.projectScope === "external") {
+    // PM HOD can manage any project team without restrictions
+    if (
+      project.projectScope === "external" &&
+      currentUser.department?.name !== "Project Management"
+    ) {
       const isHRDepartment =
         currentUser.department?.name === "Human Resources" ||
         currentUser.department?.name === "HR" ||
@@ -245,7 +255,7 @@ export const addTeamMember = async (req, res) => {
         });
       }
 
-      // For external projects, ensure user is from HR department
+      // For external projects, ensure user is from HR department (only for non-PM HOD)
       const isUserFromHRDepartment =
         user.department?.name === "Human Resources" ||
         user.department?.name === "HR" ||
@@ -263,29 +273,34 @@ export const addTeamMember = async (req, res) => {
     const currentUserRoleLevel = currentUser.role?.level || 0;
     const potentialMemberRoleLevel = user.role?.level || 0;
 
-    // SUPER_ADMIN can assign anyone
     if (currentUserRoleLevel >= 1000) {
       console.log("🔍 [TEAM MEMBERS] Super Admin - can assign any user");
-    }
-    // HOD (700) can assign users at their level or below from their department
-    else if (currentUserRoleLevel >= 700) {
-      if (
-        potentialMemberRoleLevel > currentUserRoleLevel ||
-        user.department?.toString() !== currentUser.department?.toString()
-      ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "Access denied. HOD can only assign users at their level or below from their department.",
-        });
+    } else if (currentUserRoleLevel >= 700) {
+      if (currentUser.department?.name === "Project Management") {
+        console.log(
+          "🔍 [TEAM MEMBERS] PM HOD - can assign any user to any project"
+        );
+      } else {
+        if (
+          potentialMemberRoleLevel > currentUserRoleLevel ||
+          (user.department?._id?.toString() || user.department?.toString()) !==
+            (currentUser.department?._id?.toString() ||
+              currentUser.department?.toString())
+        ) {
+          return res.status(403).json({
+            success: false,
+            message:
+              "Access denied. HOD can only assign users at their level or below from their department.",
+          });
+        }
+        console.log("🔍 [TEAM MEMBERS] HOD - assigning user at level or below");
       }
-      console.log("🔍 [TEAM MEMBERS] HOD - assigning user at level or below");
-    }
-    // MANAGER (600) can assign users at their level or below from their department
-    else if (currentUserRoleLevel >= 600) {
+    } else if (currentUserRoleLevel >= 600) {
       if (
         potentialMemberRoleLevel > currentUserRoleLevel ||
-        user.department?.toString() !== currentUser.department?.toString()
+        (user.department?._id?.toString() || user.department?.toString()) !==
+          (currentUser.department?._id?.toString() ||
+            currentUser.department?.toString())
       ) {
         return res.status(403).json({
           success: false,
@@ -296,12 +311,12 @@ export const addTeamMember = async (req, res) => {
       console.log(
         "🔍 [TEAM MEMBERS] Manager - assigning user at level or below"
       );
-    }
-    // STAFF (300) can assign users at their level or below from their department
-    else if (currentUserRoleLevel >= 300) {
+    } else if (currentUserRoleLevel >= 300) {
       if (
         potentialMemberRoleLevel > currentUserRoleLevel ||
-        user.department?.toString() !== currentUser.department?.toString()
+        (user.department?._id?.toString() || user.department?.toString()) !==
+          (currentUser.department?._id?.toString() ||
+            currentUser.department?.toString())
       ) {
         return res.status(403).json({
           success: false,
@@ -309,7 +324,6 @@ export const addTeamMember = async (req, res) => {
             "Access denied. STAFF can only assign users at their level or below from their department.",
         });
       }
-      console.log("🔍 [TEAM MEMBERS] Staff - assigning user at level or below");
     } else {
       return res.status(403).json({
         success: false,
@@ -394,10 +408,104 @@ export const addTeamMember = async (req, res) => {
       console.log(
         `✅ [TEAM MEMBER] Notification sent to ${teamMember.user.firstName} ${teamMember.user.lastName} for project assignment`
       );
+
+      // Send a welcome notification to the new team member
+      try {
+        await notificationService.createNotification({
+          recipient: userId,
+          type: "TEAM_MEMBER_ADDED",
+          title: "Welcome to the Team! 🎉",
+          message: `Welcome to the ${
+            teamMember.project.name
+          } project team! We're excited to have you on board as a ${getRoleDisplayName(
+            role
+          )}.`,
+          priority: "medium",
+          data: {
+            projectId: projectId,
+            projectName: teamMember.project.name,
+            projectCode: teamMember.project.code,
+            role: role,
+            roleDisplay: getRoleDisplayName(role),
+            welcomeMessage: true,
+            actionUrl: `/dashboard/modules/self-service/projects`,
+          },
+        });
+
+        console.log(
+          `🎉 [WELCOME] Welcome notification sent to ${teamMember.user.firstName} ${teamMember.user.lastName}`
+        );
+      } catch (welcomeError) {
+        console.error(
+          "❌ [WELCOME] Failed to send welcome notification:",
+          welcomeError
+        );
+      }
     } catch (notificationError) {
       console.error(
         "❌ [TEAM MEMBER] Failed to send notification:",
         notificationError
+      );
+    }
+
+    // Send notification to all existing team members about the new addition
+    try {
+      const NotificationService = (
+        await import("../services/notificationService.js")
+      ).default;
+      const notificationService = new NotificationService();
+
+      // Get all existing team members for this project (excluding the newly added one)
+      const existingTeamMembers = await TeamMember.find({
+        project: projectId,
+        user: { $ne: userId },
+        isActive: true,
+        status: "active",
+      }).populate("user", "firstName lastName email");
+
+      console.log(
+        `📢 [TEAM NOTIFICATION] Notifying ${existingTeamMembers.length} existing team members about new addition`
+      );
+
+      // Send notification to each existing team member
+      for (const existingMember of existingTeamMembers) {
+        try {
+          await notificationService.createNotification({
+            recipient: existingMember.user._id,
+            type: "TEAM_MEMBER_ADDED",
+            title: "New Team Member Added",
+            message: `${teamMember.user.firstName} ${
+              teamMember.user.lastName
+            } has been added to project "${
+              teamMember.project.name
+            }" as a ${getRoleDisplayName(role)}.`,
+            priority: "medium",
+            data: {
+              projectId: projectId,
+              projectName: teamMember.project.name,
+              projectCode: teamMember.project.code,
+              newMemberName: `${teamMember.user.firstName} ${teamMember.user.lastName}`,
+              newMemberRole: getRoleDisplayName(role),
+              addedBy: `${currentUser.firstName} ${currentUser.lastName}`,
+              addedDate: teamMember.assignedDate,
+              actionUrl: `/dashboard/modules/self-service/projects`,
+            },
+          });
+
+          console.log(
+            `✅ [TEAM NOTIFICATION] Notification sent to ${existingMember.user.firstName} ${existingMember.user.lastName} about new team member`
+          );
+        } catch (memberNotificationError) {
+          console.error(
+            `❌ [TEAM NOTIFICATION] Failed to notify ${existingMember.user.firstName} ${existingMember.user.lastName}:`,
+            memberNotificationError
+          );
+        }
+      }
+    } catch (teamNotificationError) {
+      console.error(
+        "❌ [TEAM NOTIFICATION] Failed to send team notifications:",
+        teamNotificationError
       );
     }
 
@@ -634,11 +742,17 @@ export const getAvailableUsers = async (req, res) => {
         currentUser.department?.name === "HR" ||
         currentUser.department?.name === "Human Resource Management";
 
-      if (!isHRDepartment || currentUser.role.level < 700) {
+      const isPMDepartment =
+        currentUser.department?.name === "Project Management";
+
+      if (
+        (!isHRDepartment && !isPMDepartment) ||
+        currentUser.role.level < 700
+      ) {
         return res.status(403).json({
           success: false,
           message:
-            "Access denied. Only HR HOD can manage external project teams.",
+            "Access denied. Only HR HOD or PM HOD can manage external project teams.",
         });
       }
     }
@@ -663,20 +777,28 @@ export const getAvailableUsers = async (req, res) => {
         "🔍 [TEAM MEMBERS] Super Admin - showing all available users"
       );
     }
-    // HOD can see users in their department at their level or below
+    // HOD - PM HOD can see all users, other HODs see department users
     else if (currentUser.role.level >= 700) {
-      if (!currentUser.department) {
-        return res.status(403).json({
-          success: false,
-          message: "You must be assigned to a department to view users",
-        });
+      if (currentUser.department?.name === "Project Management") {
+        // PM HOD can see all users across all departments
+        console.log(
+          "🔍 [TEAM MEMBERS] PM HOD - showing all available users across all departments"
+        );
+      } else {
+        // Other HODs see users in their department at their level or below
+        if (!currentUser.department) {
+          return res.status(403).json({
+            success: false,
+            message: "You must be assigned to a department to view users",
+          });
+        }
+        userQuery.department = currentUser.department;
+        // HOD can only assign users at their level (700) or below
+        userQuery["role.level"] = { $lte: currentUser.role.level };
+        console.log(
+          "🔍 [TEAM MEMBERS] HOD - showing available users in department at level 700 or below"
+        );
       }
-      userQuery.department = currentUser.department;
-      // HOD can only assign users at their level (700) or below
-      userQuery["role.level"] = { $lte: currentUser.role.level };
-      console.log(
-        "🔍 [TEAM MEMBERS] HOD - showing available users in department at level 700 or below"
-      );
     }
     // MANAGER can see users in their department at their level or below
     else if (currentUser.role.level >= 600) {
@@ -775,27 +897,38 @@ const checkProjectAccess = async (user, project) => {
   // HOD can access projects in their department or where they're manager
   if (user.role.level >= 700) {
     return (
-      project.projectManager.toString() === user._id.toString() ||
+      (project.projectManager?._id?.toString() ||
+        project.projectManager?.toString()) ===
+        (user._id?.toString() || user._id) ||
       project.teamMembers.some(
         (member) =>
-          member.user.toString() === user._id.toString() && member.isActive
+          (member.user?._id?.toString() || member.user?.toString()) ===
+            (user._id?.toString() || user._id) && member.isActive
       ) ||
-      project.company.toString() === user.company.toString()
+      (project.company?._id?.toString() || project.company?.toString()) ===
+        (user.company?._id?.toString() || user.company?.toString())
     );
   }
 
   // MANAGER can access projects they manage
   if (user.role.level >= 600) {
-    return project.projectManager.toString() === user._id.toString();
+    return (
+      (project.projectManager?._id?.toString() ||
+        project.projectManager?.toString()) ===
+      (user._id?.toString() || user._id)
+    );
   }
 
   // STAFF can access projects they're assigned to
   if (user.role.level >= 300) {
     return (
-      project.projectManager.toString() === user._id.toString() ||
+      (project.projectManager?._id?.toString() ||
+        project.projectManager?.toString()) ===
+        (user._id?.toString() || user._id) ||
       project.teamMembers.some(
         (member) =>
-          member.user.toString() === user._id.toString() && member.isActive
+          (member.user?._id?.toString() || member.user?.toString()) ===
+            (user._id?.toString() || user._id) && member.isActive
       )
     );
   }
@@ -811,14 +944,21 @@ const checkProjectEditAccess = async (user, project) => {
   // HOD can edit projects in their department or where they're manager
   if (user.role.level >= 700) {
     return (
-      project.projectManager.toString() === user._id.toString() ||
-      project.company.toString() === user.company.toString()
+      (project.projectManager?._id?.toString() ||
+        project.projectManager?.toString()) ===
+        (user._id?.toString() || user._id) ||
+      (project.company?._id?.toString() || project.company?.toString()) ===
+        (user.company?._id?.toString() || user.company?.toString())
     );
   }
 
   // MANAGER can edit projects they manage
   if (user.role.level >= 600) {
-    return project.projectManager.toString() === user._id.toString();
+    return (
+      (project.projectManager?._id?.toString() ||
+        project.projectManager?.toString()) ===
+      (user._id?.toString() || user._id)
+    );
   }
 
   return false;

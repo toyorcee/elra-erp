@@ -29,35 +29,10 @@ const vendorSchema = new mongoose.Schema(
       maxlength: 100,
     },
     address: {
-      street: {
-        type: String,
-        required: true,
-        trim: true,
-        maxlength: 200,
-      },
-      city: {
-        type: String,
-        required: true,
-        trim: true,
-        maxlength: 100,
-      },
-      state: {
-        type: String,
-        required: true,
-        trim: true,
-        maxlength: 100,
-      },
-      postalCode: {
-        type: String,
-        trim: true,
-        maxlength: 20,
-      },
-      country: {
-        type: String,
-        default: "Nigeria",
-        trim: true,
-        maxlength: 100,
-      },
+      type: String,
+      required: false,
+      trim: true,
+      maxlength: 500,
     },
 
     // Business Information
@@ -193,8 +168,7 @@ vendorSchema.index({ tinNumber: 1 });
 
 // Virtual for full address
 vendorSchema.virtual("fullAddress").get(function () {
-  const addr = this.address;
-  return `${addr.street}, ${addr.city}, ${addr.state} ${addr.postalCode}, ${addr.country}`;
+  return this.address || "Address not provided";
 });
 
 // Virtual for display name

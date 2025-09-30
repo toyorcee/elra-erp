@@ -310,10 +310,25 @@ class AuditService {
    */
   static async getRecentActivity(options = {}) {
     try {
-      const { limit = 10, department } = options;
+      const {
+        limit = 10,
+        department,
+        userId,
+        resourceType,
+        action,
+        startDate,
+        endDate,
+        riskLevel,
+      } = options;
       return await AuditLog.getRecentActivity({
         limit,
         department,
+        userId,
+        resourceType,
+        action,
+        startDate,
+        endDate,
+        riskLevel,
       });
     } catch (error) {
       console.error("Error getting recent activity:", error);

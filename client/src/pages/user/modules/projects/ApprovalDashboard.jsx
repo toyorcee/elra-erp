@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Listbox, Transition } from "@headlessui/react";
 import {
   CheckIcon,
   XMarkIcon,
@@ -16,7 +18,9 @@ import {
   InformationCircleIcon,
   ExclamationCircleIcon,
   DocumentIcon,
+  ChevronUpDownIcon,
 } from "@heroicons/react/24/outline";
+import { FaCertificate } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useAuth } from "../../../../context/AuthContext";
 import {
@@ -24,6 +28,7 @@ import {
   fetchCrossDepartmentalApprovalHistory,
   approveProject,
   rejectProject,
+  legalApproveProject,
 } from "../../../../services/projectAPI.js";
 import { getProjectDocuments } from "../../../../services/documents.js";
 import { formatCurrency } from "../../../../utils/formatters.js";
@@ -32,6 +37,7 @@ import DataTable from "../../../../components/common/DataTable";
 const ApprovalDashboard = () => {
   ``;
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [approvedProjects, setApprovedProjects] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -56,6 +62,13 @@ const ApprovalDashboard = () => {
   const [projectDocuments, setProjectDocuments] = useState({});
   const [loadingDocuments, setLoadingDocuments] = useState({});
   const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Compliance programs state
+  const [compliancePrograms, setCompliancePrograms] = useState([]);
+  const [loadingCompliancePrograms, setLoadingCompliancePrograms] =
+    useState(false);
+  const [selectedComplianceProgram, setSelectedComplianceProgram] =
+    useState("");
 
   useEffect(() => {
     loadPendingProjectApprovals();
@@ -97,15 +110,10 @@ const ApprovalDashboard = () => {
 
   const loadApprovedProjects = async () => {
     try {
-      console.log("🔍 [FRONTEND] Loading approved projects...");
       const response = await fetchCrossDepartmentalApprovalHistory();
-      console.log(
-        "🔍 [FRONTEND] Cross-departmental approval history response:",
-        response
-      );
+
       if (response.success) {
         setApprovedProjects(response.data);
-        console.log("🔍 [FRONTEND] Set approved projects:", response.data);
 
         const approvedCount = response.data.filter(
           (p) => p.approver?._id?.toString() === user?.id
@@ -115,9 +123,6 @@ const ApprovalDashboard = () => {
           (p) =>
             p.approver?._id?.toString() === user?.id && p.status === "rejected"
         ).length;
-
-        console.log("🔍 [FRONTEND] Approved count:", approvedCount);
-        console.log("🔍 [FRONTEND] Rejected count:", rejectedCount);
 
         setStats((prevStats) => ({
           ...prevStats,
@@ -132,6 +137,51 @@ const ApprovalDashboard = () => {
     }
   };
 
+  const loadCompliantCompliancePrograms = async () => {
+    setLoadingCompliancePrograms(true);
+    console.log("🔍 [FRONTEND] Loading compliant compliance programs...");
+
+    try {
+      const response = await fetch("/api/legal/compliance-programs/compliant", {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      console.log("🔍 [FRONTEND] API Response status:", response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log("🔍 [FRONTEND] API Response data:", data);
+
+        if (data.success) {
+          const programs = data.data.compliancePrograms || [];
+          console.log(
+            `✅ [FRONTEND] Loaded ${programs.length} compliant programs:`,
+            programs
+          );
+          setCompliancePrograms(programs);
+        } else {
+          console.error(
+            "❌ [FRONTEND] Failed to load compliant compliance programs:",
+            data.message
+          );
+        }
+      } else {
+        const errorData = await response.json();
+        console.error("❌ [FRONTEND] API Error:", response.status, errorData);
+      }
+    } catch (error) {
+      console.error(
+        "❌ [FRONTEND] Error loading compliant compliance programs:",
+        error
+      );
+    } finally {
+      setLoadingCompliancePrograms(false);
+    }
+  };
+
   const handleViewProject = (project) => {
     setSelectedProject(project);
     setShowProjectDetailsModal(true);
@@ -141,6 +191,16 @@ const ApprovalDashboard = () => {
     setSelectedProject(project);
     const defaultComment = `Approved by ${user.firstName} ${user.lastName} (${user.department?.name} HOD)`;
     setApprovalComments(defaultComment);
+    setSelectedComplianceProgram("");
+
+    if (
+      user.department?.name === "Legal & Compliance" &&
+      user.role?.level >= 700 &&
+      project.status === "pending_legal_compliance_approval"
+    ) {
+      loadCompliantCompliancePrograms();
+    }
+
     setShowApprovalModal(true);
   };
 
@@ -157,6 +217,7 @@ const ApprovalDashboard = () => {
       setSelectedProject(project);
 
       const response = await getProjectDocuments(project._id);
+
       if (response.success) {
         setProjectDocuments((prev) => ({
           ...prev,
@@ -165,6 +226,7 @@ const ApprovalDashboard = () => {
         setShowDocumentsModal(true);
       }
     } catch (error) {
+      console.error("❌ [APPROVAL DASHBOARD] Error loading documents:", error);
       toast.error("Failed to load project documents");
     } finally {
       setLoadingDocuments((prev) => ({ ...prev, [project._id]: false }));
@@ -193,7 +255,28 @@ const ApprovalDashboard = () => {
 
       let response;
       if (action === "approve") {
-        response = await approveProject(projectId, approvalData);
+        // Use legal approval for Legal HOD when it's their turn, regular approval for others
+        if (
+          user.department?.name === "Legal & Compliance" &&
+          user.role?.level >= 700 &&
+          selectedProject?.status === "pending_legal_compliance_approval"
+        ) {
+          // MANDATORY: Legal HOD must select a compliance program
+          if (!selectedComplianceProgram) {
+            toast.error(
+              "MANDATORY: You must select a compliance program before approving this project. This ensures ELRA maintains full regulatory compliance."
+            );
+            return;
+          }
+
+          const legalApprovalData = {
+            ...approvalData,
+            complianceProgramId: selectedComplianceProgram,
+          };
+          response = await legalApproveProject(projectId, legalApprovalData);
+        } else {
+          response = await approveProject(projectId, approvalData);
+        }
       } else {
         response = await rejectProject(projectId, approvalData);
       }
@@ -461,7 +544,6 @@ const ApprovalDashboard = () => {
             );
           }
 
-          // For pending projects, show current approval level
           const currentLevel = getCurrentApprovalLevel(project);
           const progress = getApprovalProgress(project);
 
@@ -600,7 +682,7 @@ const ApprovalDashboard = () => {
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto py-8 px-4">
+    <div className="w-full py-8 px-4">
       {/* Enhanced Header */}
       <div className="mb-8 relative">
         <div className="bg-gradient-to-br from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] rounded-2xl p-8 text-white relative overflow-hidden">
@@ -788,7 +870,7 @@ const ApprovalDashboard = () => {
                 ? "All Projects Approved! 🎉"
                 : "No Approval History Yet"}
             </h3>
-            <p className="text-gray-600 mb-8 max-w-lg mx-auto leading-relaxed text-lg">
+            <p className="text-gray-600 mb-8 leading-relaxed text-lg">
               {activeTab === "pending"
                 ? "Great news! All project approval requests have been processed. No pending approvals require your attention."
                 : "You haven't approved any cross-departmental projects yet. Your approval history will appear here once you start reviewing projects."}
@@ -817,16 +899,9 @@ const ApprovalDashboard = () => {
               showDelete: false,
               showToggle: false,
               customActions: (project) => {
-                console.log("🔍 [FULL PROJECT DATA] Project:", project.name);
-                console.log(
-                  "🔍 [FULL PROJECT DATA] Complete project object:",
-                  JSON.stringify(project, null, 2)
-                );
-
                 const progress = getApprovalProgress(project);
                 const currentUser = user;
 
-                // For approved projects, show read-only actions
                 if (activeTab === "approved") {
                   return (
                     <div className="flex items-center space-x-1.5">
@@ -861,126 +936,42 @@ const ApprovalDashboard = () => {
 
                 let isNextApprover = false;
 
-                // Add debug logging
-                console.log("🔍 [APPROVAL DEBUG] Project:", project.name);
-                console.log("🔍 [APPROVAL DEBUG] Current User:", {
-                  id: currentUser._id,
-                  name: `${currentUser.firstName} ${currentUser.lastName}`,
-                  role: currentUser.role?.name,
-                  roleLevel: currentUser.role?.level,
-                  department: currentUser.department?.name,
-                });
-                console.log(
-                  "🔍 [APPROVAL DEBUG] Next Approval Step:",
-                  nextApprovalStep
-                );
-                console.log(
-                  "🔍 [APPROVAL DEBUG] Project Status:",
-                  project.status
-                );
-
                 if (nextApprovalStep) {
                   if (currentUser.role.level >= 1000) {
                     isNextApprover = true;
-                    console.log(
-                      "🔍 [APPROVAL DEBUG] User is admin/super admin - can approve"
-                    );
                   } else if (nextApprovalStep.level === "hod") {
                     isNextApprover =
                       currentUser.role.level >= 700 &&
                       currentUser.department?._id ===
                         nextApprovalStep.department;
-                    console.log("🔍 [APPROVAL DEBUG] HOD check:", {
-                      userRoleLevel: currentUser.role.level,
-                      requiredLevel: 700,
-                      userDeptId: currentUser.department?._id,
-                      requiredDeptId: nextApprovalStep.department,
-                      isNextApprover,
-                    });
                   } else if (nextApprovalStep.level === "project_management") {
                     // Project Management HOD approves project_management level (cross-departmental)
                     isNextApprover =
                       currentUser.role.level >= 700 &&
                       currentUser.department?.name === "Project Management";
-                    console.log(
-                      "🔍 [APPROVAL DEBUG] Project Management check:",
-                      {
-                        userRoleLevel: currentUser.role.level,
-                        requiredLevel: 700,
-                        userDept: currentUser.department?.name,
-                        requiredDept: "Project Management",
-                        isNextApprover,
-                      }
-                    );
                   } else if (nextApprovalStep.level === "department") {
                     // Legacy case - should not happen with new logic
                     isNextApprover =
                       currentUser.role.level >= 700 &&
                       currentUser.department?.name === "Project Management";
-                    console.log(
-                      "🔍 [APPROVAL DEBUG] Department (Legacy) check:",
-                      {
-                        userRoleLevel: currentUser.role.level,
-                        requiredLevel: 700,
-                        userDept: currentUser.department?.name,
-                        requiredDept: "Project Management",
-                        isNextApprover,
-                      }
-                    );
                   } else if (nextApprovalStep.level === "finance") {
                     isNextApprover =
                       currentUser.role.level >= 700 &&
                       currentUser.department?.name === "Finance & Accounting";
-                    console.log("🔍 [APPROVAL DEBUG] Finance check:", {
-                      userRoleLevel: currentUser.role.level,
-                      requiredLevel: 700,
-                      userDept: currentUser.department?.name,
-                      requiredDept: "Finance & Accounting",
-                      isNextApprover,
-                    });
                   } else if (nextApprovalStep.level === "legal_compliance") {
                     isNextApprover =
                       currentUser.role.level >= 700 &&
                       currentUser.department?.name === "Legal & Compliance";
-                    console.log("🔍 [APPROVAL DEBUG] Legal Compliance check:", {
-                      userRoleLevel: currentUser.role.level,
-                      requiredLevel: 700,
-                      userDept: currentUser.department?.name,
-                      requiredDept: "Legal & Compliance",
-                      isNextApprover,
-                    });
                   } else if (nextApprovalStep.level === "executive") {
                     isNextApprover =
                       currentUser.role.level >= 700 &&
                       currentUser.department?.name === "Executive Office";
-                    console.log("🔍 [APPROVAL DEBUG] Executive check:", {
-                      userRoleLevel: currentUser.role.level,
-                      requiredLevel: 700,
-                      userDept: currentUser.department?.name,
-                      requiredDept: "Executive Office",
-                      isNextApprover,
-                    });
                   } else if (nextApprovalStep.level === "budget_allocation") {
                     isNextApprover =
                       currentUser.role.level >= 700 &&
                       currentUser.department?.name === "Finance & Accounting";
-                    console.log(
-                      "🔍 [APPROVAL DEBUG] Budget Allocation check:",
-                      {
-                        userRoleLevel: currentUser.role.level,
-                        requiredLevel: 700,
-                        userDept: currentUser.department?.name,
-                        requiredDept: "Finance & Accounting",
-                        isNextApprover,
-                      }
-                    );
                   }
                 }
-
-                console.log(
-                  "🔍 [APPROVAL DEBUG] Final isNextApprover:",
-                  isNextApprover
-                );
 
                 const isPendingApproval = [
                   "pending_approval",
@@ -1002,20 +993,7 @@ const ApprovalDashboard = () => {
                   !isProjectCreator &&
                   isNextApprover;
 
-                // Get document status for this project
                 const docStatus = getDocumentStatus(project);
-
-                // Add debug logging for action visibility
-                console.log("🔍 [APPROVAL DEBUG] Action visibility check:", {
-                  progressPercentage: progress.percentage,
-                  isPendingApproval,
-                  isProjectCreator,
-                  isNextApprover,
-                  canShowActions,
-                  docStatusSubmitted: docStatus.submitted,
-                  docStatusTotal: docStatus.total,
-                  allDocsSubmitted: docStatus.submitted === docStatus.total,
-                });
 
                 return (
                   <div className="flex flex-col space-y-1.5">
@@ -1279,6 +1257,298 @@ const ApprovalDashboard = () => {
                   </div>
                 </div>
 
+                {/* Compliance Program Selection - Only for Legal HOD when it's their turn */}
+                {user.department?.name === "Legal & Compliance" &&
+                  user.role?.level >= 700 &&
+                  selectedProject?.status ===
+                    "pending_legal_compliance_approval" && (
+                    <div className="mb-6">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <div className="p-2 bg-purple-500 rounded-xl">
+                          <DocumentTextIcon className="h-5 w-5 text-white" />
+                        </div>
+                        <h4 className="text-lg font-semibold text-gray-900">
+                          Compliance Program Selection
+                        </h4>
+                      </div>
+                      <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 p-6 rounded-2xl shadow-sm">
+                        <div className="flex items-center space-x-2 mb-4">
+                          <div className="p-2 bg-red-100 rounded-lg">
+                            <ExclamationTriangleIcon className="h-5 w-5 text-red-600" />
+                          </div>
+                          <p className="text-red-800 font-bold">
+                            MANDATORY: Select a compliance program to attach to
+                            this project
+                          </p>
+                        </div>
+                        <p className="text-purple-700 text-sm mb-4">
+                          As ELRA's Legal & Compliance HOD, you must attach a
+                          fully compliant program to ensure regulatory
+                          adherence. This is mandatory for all project
+                          approvals.
+                        </p>
+
+                        {loadingCompliancePrograms ? (
+                          <div className="flex items-center justify-center py-4">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+                            <span className="ml-2 text-purple-600">
+                              Loading compliance programs...
+                            </span>
+                          </div>
+                        ) : compliancePrograms.length > 0 ? (
+                          <Listbox
+                            value={selectedComplianceProgram}
+                            onChange={setSelectedComplianceProgram}
+                          >
+                            <div className="relative">
+                              <Listbox.Button className="relative w-full cursor-default rounded-lg bg-white py-2 pl-3 pr-10 text-left shadow-md focus:outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-orange-300 sm:text-sm border border-gray-300">
+                                <span className="block truncate">
+                                  {selectedComplianceProgram
+                                    ? compliancePrograms.find(
+                                        (p) =>
+                                          p._id === selectedComplianceProgram
+                                      )?.name || "Select a compliance program"
+                                    : "Select a compliance program"}
+                                </span>
+                                <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                                  <ChevronUpDownIcon
+                                    className="h-5 w-5 text-gray-400"
+                                    aria-hidden="true"
+                                  />
+                                </span>
+                              </Listbox.Button>
+                              <Transition
+                                as={React.Fragment}
+                                leave="transition ease-in duration-100"
+                                leaveFrom="opacity-100"
+                                leaveTo="opacity-0"
+                              >
+                                <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                                  {compliancePrograms.map((program) => (
+                                    <Listbox.Option
+                                      key={program._id}
+                                      className={({ active }) =>
+                                        `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                                          active
+                                            ? "bg-purple-100 text-purple-900"
+                                            : "text-gray-900"
+                                        }`
+                                      }
+                                      value={program._id}
+                                    >
+                                      {({ selected }) => (
+                                        <>
+                                          <span
+                                            className={`block truncate ${
+                                              selected
+                                                ? "font-medium"
+                                                : "font-normal"
+                                            }`}
+                                          >
+                                            <div className="flex items-center justify-between">
+                                              <div>
+                                                <div className="font-medium text-gray-900">
+                                                  {program.name}
+                                                </div>
+                                                <div className="text-sm text-gray-600">
+                                                  {program.category}
+                                                </div>
+                                                <div className="text-xs text-gray-500">
+                                                  Owner:{" "}
+                                                  {program.programOwner ===
+                                                  "ELRA"
+                                                    ? "ELRA"
+                                                    : program.programOwner
+                                                        ?.firstName +
+                                                      " " +
+                                                      program.programOwner
+                                                        ?.lastName}
+                                                </div>
+                                              </div>
+                                              <div className="text-right">
+                                                <div className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                  ✓ All Items Compliant
+                                                </div>
+                                                <div className="text-xs text-gray-500 mt-1">
+                                                  {program.complianceItemsCount ||
+                                                    0}{" "}
+                                                  items
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </span>
+                                          {selected ? (
+                                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-purple-600">
+                                              <CheckIcon
+                                                className="h-5 w-5"
+                                                aria-hidden="true"
+                                              />
+                                            </span>
+                                          ) : null}
+                                        </>
+                                      )}
+                                    </Listbox.Option>
+                                  ))}
+                                </Listbox.Options>
+                              </Transition>
+                            </div>
+                          </Listbox>
+                        ) : (
+                          <div className="text-center py-6 text-gray-500">
+                            <div className="p-3 bg-yellow-50 rounded-full w-16 h-16 mx-auto mb-3 flex items-center justify-center">
+                              <ExclamationTriangleIcon className="h-8 w-8 text-yellow-500" />
+                            </div>
+                            <p className="font-medium text-gray-700 mb-1">
+                              No Compliant Programs Available
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              All compliance programs must have all items marked
+                              as "Compliant" before they can be attached to
+                              projects.
+                            </p>
+                            <p className="text-xs text-gray-500 mt-2">
+                              Please update your compliance items to "Compliant"
+                              status in the Legal & Compliance module.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                {/* Attached Compliance Program - Show for all users after legal approval */}
+                {selectedProject?.complianceProgram && (
+                  <div className="mb-6">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <div className="p-2 bg-green-500 rounded-xl">
+                        <CheckCircleIcon className="h-5 w-5 text-white" />
+                      </div>
+                      <h4 className="text-lg font-semibold text-gray-900">
+                        Attached Compliance Program
+                      </h4>
+                    </div>
+                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 p-6 rounded-2xl shadow-sm">
+                      <div className="flex items-center space-x-2 mb-4">
+                        <div className="p-2 bg-green-100 rounded-lg">
+                          <CheckCircleIcon className="h-5 w-5 text-green-600" />
+                        </div>
+                        <p className="text-green-800 font-bold">
+                          ✓ Compliance Program Attached by Legal & Compliance
+                          HOD
+                        </p>
+                      </div>
+
+                      {/* Compliance Program Details */}
+                      <div className="bg-white border border-green-200 rounded-xl p-4 mb-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h5 className="text-lg font-semibold text-gray-900">
+                            {selectedProject.complianceProgram.name}
+                          </h5>
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                            ✓ Fully Compliant
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Category:
+                            </span>
+                            <p className="text-gray-600">
+                              {selectedProject.complianceProgram.category}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Program Owner:
+                            </span>
+                            <p className="text-gray-600">
+                              {selectedProject.complianceProgram
+                                .programOwner === "ELRA"
+                                ? "ELRA"
+                                : selectedProject.complianceProgram.programOwner
+                                    ?.firstName +
+                                  " " +
+                                  selectedProject.complianceProgram.programOwner
+                                    ?.lastName}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Status:
+                            </span>
+                            <p className="text-gray-600">
+                              {selectedProject.complianceProgram.status}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">
+                              Priority:
+                            </span>
+                            <p className="text-gray-600">
+                              {selectedProject.complianceProgram.priority}
+                            </p>
+                          </div>
+                        </div>
+                        {selectedProject.complianceProgram.description && (
+                          <div className="mt-3">
+                            <span className="font-medium text-gray-700">
+                              Description:
+                            </span>
+                            <p className="text-gray-600 text-sm mt-1">
+                              {selectedProject.complianceProgram.description}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Compliance Items */}
+                      {selectedProject.complianceProgram.complianceItems &&
+                        selectedProject.complianceProgram.complianceItems
+                          .length > 0 && (
+                          <div className="bg-white border border-green-200 rounded-xl p-4">
+                            <h6 className="text-md font-semibold text-gray-900 mb-3">
+                              Compliance Items (
+                              {
+                                selectedProject.complianceProgram
+                                  .complianceItems.length
+                              }{" "}
+                              items)
+                            </h6>
+                            <div className="space-y-2">
+                              {selectedProject.complianceProgram.complianceItems.map(
+                                (item, index) => (
+                                  <div
+                                    key={index}
+                                    className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-100"
+                                  >
+                                    <div className="flex-1">
+                                      <div className="font-medium text-gray-900">
+                                        {item.name}
+                                      </div>
+                                      <div className="text-sm text-gray-600">
+                                        {item.category}
+                                      </div>
+                                      {item.description && (
+                                        <div className="text-xs text-gray-500 mt-1">
+                                          {item.description}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        ✓ Compliant
+                                      </span>
+                                    </div>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Enhanced Authorization Notes */}
                 <div className="mb-6">
                   <div className="flex items-center space-x-3 mb-4">
@@ -1327,7 +1597,14 @@ const ApprovalDashboard = () => {
                         approvalComments
                       )
                     }
-                    disabled={actionLoading[selectedProject._id]}
+                    disabled={
+                      actionLoading[selectedProject._id] ||
+                      (user.department?.name === "Legal & Compliance" &&
+                        user.role?.level >= 700 &&
+                        selectedProject?.status ===
+                          "pending_legal_compliance_approval" &&
+                        !selectedComplianceProgram)
+                    }
                     className="px-8 py-3 text-sm font-medium text-white bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 cursor-pointer transition-all duration-200"
                   >
                     {actionLoading[selectedProject._id] ? (
@@ -1338,7 +1615,15 @@ const ApprovalDashboard = () => {
                     ) : (
                       <>
                         <CheckIcon className="h-5 w-5" />
-                        <span>Authorize Project</span>
+                        <span>
+                          {user.department?.name === "Legal & Compliance" &&
+                          user.role?.level >= 700 &&
+                          selectedProject?.status ===
+                            "pending_legal_compliance_approval" &&
+                          !selectedComplianceProgram
+                            ? "Select Compliance Program First"
+                            : "Authorize Project"}
+                        </span>
                       </>
                     )}
                   </button>
@@ -2042,6 +2327,144 @@ const ApprovalDashboard = () => {
                       </div>
                     </div>
                   )}
+
+                {/* Attached Compliance Program - Show in project details modal */}
+                {selectedProject?.complianceProgram && (
+                  <div className="mt-6 bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <div className="p-2 bg-green-500 rounded-xl">
+                        <CheckCircleIcon className="h-5 w-5 text-white" />
+                      </div>
+                      <h4 className="text-lg font-semibold text-gray-900">
+                        Attached Compliance Program
+                      </h4>
+                    </div>
+
+                    <div className="bg-white border border-green-200 rounded-xl p-4 mb-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h5 className="text-lg font-semibold text-gray-900">
+                          {selectedProject.complianceProgram.name}
+                        </h5>
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                          ✓ Fully Compliant
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium text-gray-700">
+                            Category:
+                          </span>
+                          <p className="text-gray-600">
+                            {selectedProject.complianceProgram.category}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">
+                            Program Owner:
+                          </span>
+                          <p className="text-gray-600">
+                            {selectedProject.complianceProgram.programOwner ===
+                            "ELRA"
+                              ? "ELRA"
+                              : selectedProject.complianceProgram.programOwner
+                                  ?.firstName +
+                                " " +
+                                selectedProject.complianceProgram.programOwner
+                                  ?.lastName}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">
+                            Status:
+                          </span>
+                          <p className="text-gray-600">
+                            {selectedProject.complianceProgram.status}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">
+                            Priority:
+                          </span>
+                          <p className="text-gray-600">
+                            {selectedProject.complianceProgram.priority}
+                          </p>
+                        </div>
+                      </div>
+                      {selectedProject.complianceProgram.description && (
+                        <div className="mt-3">
+                          <span className="font-medium text-gray-700">
+                            Description:
+                          </span>
+                          <p className="text-gray-600 text-sm mt-1">
+                            {selectedProject.complianceProgram.description}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Compliance Items */}
+                    {selectedProject.complianceProgram.complianceItems &&
+                      selectedProject.complianceProgram.complianceItems.length >
+                        0 && (
+                        <div className="bg-white border border-green-200 rounded-xl p-4">
+                          <h6 className="text-md font-semibold text-gray-900 mb-3">
+                            Compliance Items (
+                            {
+                              selectedProject.complianceProgram.complianceItems
+                                .length
+                            }{" "}
+                            items)
+                          </h6>
+                          <div className="space-y-2">
+                            {selectedProject.complianceProgram.complianceItems.map(
+                              (item, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-100"
+                                >
+                                  <div className="flex-1">
+                                    <div className="font-medium text-gray-900">
+                                      {item.title || item.name}
+                                    </div>
+                                    <div className="text-sm text-gray-600">
+                                      {item.category}
+                                    </div>
+                                    {item.description && (
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        {item.description}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                      ✓ Compliant
+                                    </span>
+                                  </div>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      )}
+                  </div>
+                )}
+
+                {/* View Certificate Button */}
+                {selectedProject?.status === "approved" && (
+                  <div className="mt-6 flex justify-center">
+                    <button
+                      onClick={() =>
+                        navigate(
+                          `/dashboard/modules/projects/certificate/${selectedProject._id}`
+                        )
+                      }
+                      className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-lg shadow-lg hover:from-amber-600 hover:to-amber-700 transition-all duration-200 transform hover:scale-105"
+                    >
+                      <FaCertificate className="h-5 w-5 mr-2" />
+                      View Project Certificate
+                    </button>
+                  </div>
+                )}
 
                 {/* Timeline Information */}
                 <div className="mt-6 bg-gray-50 rounded-lg p-4">

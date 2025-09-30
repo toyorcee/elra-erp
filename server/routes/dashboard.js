@@ -147,4 +147,15 @@ router.get(
   dashboardController.getSelfServiceDashboardData
 );
 
+// ==================== NEW DASHBOARD ROUTES ====================
+
+// Get user-specific dashboard data
+router.get("/user", protect, dashboardController.getUserDashboard);
+
+// Get dashboard statistics
+router.get("/stats", protect, dashboardController.getDashboardStats);
+
+// Get system health
+router.get("/health", protect, dashboardController.getSystemHealth);
+
 export default router;

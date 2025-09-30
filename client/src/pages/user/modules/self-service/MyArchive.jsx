@@ -204,7 +204,6 @@ const MyArchive = () => {
       data = data.filter((doc) => doc.category === filterType);
     }
 
-    // Sort by date (newest first)
     data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     return data;

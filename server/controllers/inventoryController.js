@@ -535,6 +535,7 @@ export const updateInventory = async (req, res) => {
           mimeType: "application/pdf",
           documentType: "report",
           category: "administrative",
+          archiveCategory: "project",
           status: "approved",
           createdBy: currentUser._id,
           uploadedBy: currentUser._id,

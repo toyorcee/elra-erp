@@ -55,20 +55,18 @@ export const createComplianceProgram = async (req, res) => {
       reviewDate,
       complianceScope: complianceScope || "legal",
       applicableProjectScopes: applicableProjectScopes || [],
-      programOwner: programOwner || req.user._id,
+      programOwner: programOwner || "ELRA",
       createdBy: req.user._id,
       objectives: objectives || [],
       kpis: kpis || [],
       documentation: documentation || [],
     });
 
-    // Populate the created program with owner details
     await complianceProgram.populate([
       { path: "programOwner", select: "firstName lastName email" },
       { path: "createdBy", select: "firstName lastName email" },
     ]);
 
-    // Send notifications to all HODs for compliance program creation
     try {
       await sendComplianceProgramNotifications(
         complianceProgram,
@@ -153,6 +151,74 @@ export const getCompliancePrograms = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching compliance programs",
+      error: error.message,
+    });
+  }
+};
+
+// Get compliant compliance programs (all items are compliant)
+export const getCompliantCompliancePrograms = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      category,
+      complianceScope,
+    } = req.query;
+
+    // Check if user has permission (Legal HOD or Super Admin)
+    if (req.user.role.level < 700) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Only Legal HOD and Super Admin can view compliance programs.",
+      });
+    }
+
+    // Build filter object
+    const filter = { isActive: true };
+    if (status) filter.status = status;
+    if (category) filter.category = category;
+    if (complianceScope) filter.complianceScope = complianceScope;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const compliancePrograms = await ComplianceProgram.find(filter)
+      .populate("programOwner", "firstName lastName email")
+      .populate("createdBy", "firstName lastName email")
+      .populate("complianceItemsCount")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const compliantPrograms = [];
+
+    for (const program of compliancePrograms) {
+      const isReady = await program.isReadyForAttachment();
+      if (isReady) {
+        compliantPrograms.push(program);
+      }
+    }
+
+    const total = await ComplianceProgram.countDocuments(filter);
+
+    res.json({
+      success: true,
+      data: {
+        compliancePrograms: compliantPrograms,
+        pagination: {
+          current: parseInt(page),
+          pages: Math.ceil(total / parseInt(limit)),
+          total,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching compliant compliance programs:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching compliant compliance programs",
       error: error.message,
     });
   }
@@ -440,10 +506,6 @@ export const getComplianceProgramCategories = async (req, res) => {
 
 const sendComplianceProgramNotifications = async (program, action, creator) => {
   try {
-    console.log(
-      `📧 [COMPLIANCE PROGRAM] Sending ${action} notifications for: ${program.name}`
-    );
-
     const notificationService = new NotificationService();
 
     const allHODs = await User.find({
@@ -458,10 +520,6 @@ const sendComplianceProgramNotifications = async (program, action, creator) => {
             user.role && (user.role.name === "HOD" || user.role.level >= 700)
         )
       );
-
-    console.log(
-      `📧 [COMPLIANCE PROGRAM] Found ${allHODs.length} HODs to notify`
-    );
 
     const notifications = [];
 
@@ -537,13 +595,6 @@ const sendComplianceProgramNotifications = async (program, action, creator) => {
     }).populate("role department");
 
     const superAdmin = superAdmins.length > 0 ? superAdmins[0] : null;
-
-    console.log(
-      `🔍 [COMPLIANCE PROGRAM] Super Admin search result:`,
-      superAdmin
-        ? `${superAdmin.firstName} ${superAdmin.lastName} (level: ${superAdmin.role?.level})`
-        : "Not found"
-    );
 
     if (superAdmin) {
       if (superAdmin._id.toString() !== creator._id.toString()) {

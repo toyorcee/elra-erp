@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useDynamicSidebar } from "../../context/DynamicSidebarContext";
 import { useDebouncedNavigation } from "../../hooks/useDebouncedNavigation";
 import { useModulePreloader } from "../../hooks/useModulePreloader";
 import GradientSpinner from "../../components/common/GradientSpinner";
+import dashboardAPI from "../../services/dashboardAPI";
 import {
   UsersIcon,
   CurrencyDollarIcon,
@@ -28,22 +29,22 @@ import {
   MapPinIcon,
   ClockIcon,
   ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
   HomeIcon,
-  UserPlusIcon,
+  UserIcon,
   CheckIcon,
+  CogIcon,
+  ArrowTrendingDownIcon,
+  UserPlusIcon,
   PlusIcon,
   MinusIcon,
   ReceiptPercentIcon,
   ClipboardDocumentCheckIcon,
   BuildingOfficeIcon,
   BellIcon,
-  CogIcon,
   UserCircleIcon,
   PencilIcon,
   XCircleIcon,
   XMarkIcon,
-  UserIcon,
   CheckCircleIcon,
   StarIcon,
   ExclamationTriangleIcon,
@@ -51,6 +52,15 @@ import {
 } from "@heroicons/react/24/outline";
 import { userModulesAPI } from "../../services/userModules.js";
 import { getNavigationForRole } from "../../config/sidebarConfig.js";
+import { FinancialManagement } from "./modules/finance";
+import { ProjectManagement } from "./modules/projects";
+import HRModule from "./modules/hr/HRModule";
+import SelfService from "./modules/self-service/SelfService";
+import InventoryModule from "./modules/inventory/InventoryModule";
+import PayrollManagement from "./modules/payroll/PayrollManagement";
+import ProcurementModule from "./modules/procurement/ProcurementModule";
+import SalesMarketingModule from "./modules/sales-marketing/SalesMarketingModule";
+import LegalModule from "./modules/legal/LegalModule";
 
 const Dashboard = () => {
   const { user, loading: authLoading, initialized } = useAuth();
@@ -67,14 +77,18 @@ const Dashboard = () => {
   const { isModulePreloaded } = useModulePreloader();
   const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [isModulesCollapsed, setIsModulesCollapsed] = useState(false);
   const [hrDashboardData, setHrDashboardData] = useState(null);
   const [selfServiceDashboardData, setSelfServiceDashboardData] =
     useState(null);
+  const [auditData, setAuditData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [backendModules, setBackendModules] = useState([]);
   const [showAllActivities, setShowAllActivities] = useState(false);
   const [modulesLoading, setModulesLoading] = useState(false);
+
+  const [leaveRequestsData, setLeaveRequestsData] = useState(null);
+  const [payslipsData, setPayslipsData] = useState(null);
+  const [projectsData, setProjectsData] = useState(null);
 
   const getUserRoleLevel = () => {
     if (!user) return 0;
@@ -373,7 +387,28 @@ const Dashboard = () => {
     } else if (module === "department-management") {
       setLoading(false);
     }
+
+    // Always fetch audit data for recent activity
+    fetchAuditData();
   }, [module]);
+
+  // Fetch audit data when user becomes available
+  useEffect(() => {
+    if (user && !authLoading && initialized) {
+      console.log("🔄 [AUDIT] User is ready, fetching audit data...");
+      fetchAuditData();
+    }
+  }, [user, authLoading, initialized]);
+
+  // Fetch self-service data when user becomes available
+  useEffect(() => {
+    if (user && !authLoading && initialized) {
+      console.log(
+        "🔄 [SELF-SERVICE] User is ready, fetching self-service data..."
+      );
+      fetchSelfServiceData();
+    }
+  }, [user, authLoading, initialized]);
 
   const fetchHRDashboardData = async () => {
     try {
@@ -405,6 +440,108 @@ const Dashboard = () => {
     } catch (error) {
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAuditData = async () => {
+    try {
+      console.log("🔍 [AUDIT] Starting fetchAuditData...");
+      console.log("🔍 [AUDIT] User:", user);
+      console.log("🔍 [AUDIT] Auth loading:", authLoading);
+      console.log("🔍 [AUDIT] Auth initialized:", initialized);
+      console.log(
+        "🔍 [AUDIT] User department:",
+        user?.department?.name || user?.department
+      );
+
+      // Don't make API call if user is not available
+      if (!user || authLoading || !initialized) {
+        console.log("⏳ [AUDIT] Skipping API call - user not ready");
+        return;
+      }
+
+      const requestParams = {
+        limit: 10,
+        department: user?.department?.name || user?.department,
+      };
+
+      console.log("🔍 [AUDIT] Request parameters:", requestParams);
+      console.log("🔍 [AUDIT] User department object:", user?.department);
+      console.log("🔍 [AUDIT] User department name:", user?.department?.name);
+
+      const response = await dashboardAPI.getRecentActivity(requestParams);
+
+      console.log("🔍 [AUDIT] API Response:", response);
+      console.log("🔍 [AUDIT] Response data type:", typeof response.data);
+      console.log("🔍 [AUDIT] Response data length:", response.data?.length);
+
+      if (response.success) {
+        const activities = Array.isArray(response.data)
+          ? response.data
+          : response.data?.data || [];
+        setAuditData(activities);
+      } else {
+        console.log("❌ [AUDIT] API response not successful:", response);
+      }
+    } catch (error) {
+      console.error("❌ [AUDIT] Error fetching audit data:", error);
+      console.error(
+        "❌ [AUDIT] Error details:",
+        error.response?.data || error.message
+      );
+    }
+  };
+
+  // Fetch self-service data
+  const fetchSelfServiceData = async () => {
+    if (!user || authLoading || !initialized) return;
+
+    try {
+      // Fetch leave requests data
+      const leaveResponse = await dashboardAPI.getLeaveRequestsData();
+      console.log("🔍 [LEAVE] API Response:", leaveResponse);
+      console.log("🔍 [LEAVE] Data type:", typeof leaveResponse?.data);
+      console.log("🔍 [LEAVE] Is array:", Array.isArray(leaveResponse?.data));
+      console.log("🔍 [LEAVE] Data length:", leaveResponse?.data?.length);
+      console.log("🔍 [LEAVE] First request:", leaveResponse?.data?.[0]);
+      setLeaveRequestsData(leaveResponse);
+
+      // Fetch payslips data
+      const payslipsResponse = await dashboardAPI.getPayslipsData();
+      console.log("🔍 [PAYSLIPS] API Response:", payslipsResponse);
+      console.log("🔍 [PAYSLIPS] Data type:", typeof payslipsResponse?.data);
+      console.log(
+        "🔍 [PAYSLIPS] Is array:",
+        Array.isArray(payslipsResponse?.data)
+      );
+      console.log(
+        "🔍 [PAYSLIPS] First payslip summary:",
+        payslipsResponse?.data?.[0]?.summary
+      );
+      console.log(
+        "🔍 [PAYSLIPS] Net pay:",
+        payslipsResponse?.data?.[0]?.summary?.netPay
+      );
+      console.log(
+        "🔍 [PAYSLIPS] Gross pay:",
+        payslipsResponse?.data?.[0]?.summary?.grossPay
+      );
+      setPayslipsData(payslipsResponse);
+
+      // Fetch projects data
+      const projectsResponse = await dashboardAPI.getProjectsData();
+      console.log("🔍 [PROJECTS] API Response:", projectsResponse);
+      console.log("🔍 [PROJECTS] Data type:", typeof projectsResponse?.data);
+      console.log(
+        "🔍 [PROJECTS] Is array:",
+        Array.isArray(projectsResponse?.data)
+      );
+      setProjectsData(projectsResponse);
+    } catch (error) {
+      console.error(
+        "❌ [SELF-SERVICE] Error fetching self-service data:",
+        error
+      );
     }
   };
 
@@ -507,177 +644,39 @@ const Dashboard = () => {
     );
   };
 
-  // Render main dashboard content
-  const renderMainDashboard = () => {
-    return (
-      <div className="space-y-8">
-        {/* Welcome Section */}
-        <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-xl border border-gray-100">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6 gap-4">
-            <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
-              <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-lg">
-                <HomeIcon className="h-8 w-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
-                  Welcome back, {user?.firstName || "User"}!
-                </h1>
-                <p className="text-gray-600 text-base sm:text-lg">
-                  Access your ERP modules and manage your business operations
-                </p>
-              </div>
-            </div>
-
-            {/* Date and Time */}
-            <div className="text-left lg:text-right">
-              <div className="flex items-center space-x-2 mb-1">
-                <ClockIcon className="h-5 w-5 text-blue-600" />
-                <span className="text-lg font-semibold text-gray-800">
-                  {currentTime.toLocaleTimeString("en-US", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: "2-digit",
-                    hour12: true,
-                  })}
-                </span>
-              </div>
-              <div className="text-gray-600 text-sm">
-                {currentTime.toLocaleDateString("en-US", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 text-center border border-blue-200 shadow-sm">
-              <div className="text-lg font-bold text-blue-800">
-                {accessibleModules.length}
-              </div>
-              <div className="text-blue-600 text-sm">Available Modules</div>
-            </div>
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 text-center border border-green-200 shadow-sm">
-              <div className="text-lg font-bold text-green-800">
-                {(user?.role?.name || "USER").replace(/_/g, " ")}
-              </div>
-              <div className="text-green-600 text-sm">Your Role</div>
-            </div>
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 text-center border border-purple-200 shadow-sm sm:col-span-2 lg:col-span-1">
-              <div className="text-lg font-bold text-purple-800">
-                {roleLevel}
-              </div>
-              <div className="text-purple-600 text-sm">Access Level</div>
-            </div>
-          </div>
-        </div>
-
-        {/* ERP Modules Grid */}
-        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-[var(--elra-text-primary)] mb-2">
-                ERP Modules
-              </h2>
-              <p className="text-[var(--elra-text-secondary)]">
-                Access and manage different aspects of your business operations
-              </p>
-            </div>
-            <button
-              onClick={() => setIsModulesCollapsed(!isModulesCollapsed)}
-              className="p-2 text-gray-500 hover:text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] rounded-lg transition-colors cursor-pointer"
-              title={
-                isModulesCollapsed
-                  ? "Expand ERP Modules"
-                  : "Collapse ERP Modules"
-              }
-            >
-              {isModulesCollapsed ? (
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 15l7-7 7 7"
-                  />
-                </svg>
-              )}
-            </button>
-          </div>
-
-          {!isModulesCollapsed && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-              {modulesLoading ? (
-                <div className="col-span-full flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <GradientSpinner size="md" />
-                    <p className="text-[var(--elra-primary)] mt-4 text-sm font-medium">
-                      Loading your modules...
-                    </p>
-                  </div>
-                </div>
-              ) : accessibleModules.length > 0 ? (
-                accessibleModules.map(renderModuleCard)
-              ) : (
-                <div className="col-span-full text-center py-12">
-                  <div className="text-gray-500">
-                    <svg
-                      className="w-16 h-16 mx-auto mb-4 text-gray-300"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                    <p className="text-lg font-medium text-gray-600 mb-2">
-                      No Modules Available
-                    </p>
-                    <p className="text-gray-500 text-sm">
-                      Contact your administrator to get access to modules.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // Render dynamic module dashboard content
   const renderDynamicModuleDashboard = () => {
     const moduleInfo = getCurrentModuleInfo();
 
-    // If no module is specified, show the main dashboard
     if (!module) {
-      return renderMainDashboard();
+      return null;
+    }
+
+    if (module === "finance") {
+      return <FinancialManagement />;
+    }
+    if (module === "projects") {
+      return <ProjectManagement />;
+    }
+    if (module === "hr") {
+      return <HRModule />;
+    }
+    if (module === "self-service" || module === "self_service") {
+      return <SelfService />;
+    }
+    if (module === "inventory") {
+      return <InventoryModule />;
+    }
+    if (module === "payroll") {
+      return <PayrollManagement />;
+    }
+    if (module === "procurement") {
+      return <ProcurementModule />;
+    }
+    if (module === "sales" || module === "sales-marketing") {
+      return <SalesMarketingModule />;
+    }
+    if (module === "legal") {
+      return <LegalModule />;
     }
 
     console.log("🔍 [Dashboard] Debug module finding:", {
@@ -1924,6 +1923,105 @@ const Dashboard = () => {
 
   // Get module-specific recent activity
   const getModuleRecentActivity = (moduleKey) => {
+    // Use real audit data for all modules if available
+    if (auditData && auditData.length > 0) {
+      const activities = auditData.map((activity) => {
+        // Create meaningful descriptions based on action type
+        let description = "";
+        const action = activity.action || "";
+
+        // Project-related actions
+        if (action.includes("PROJECT")) {
+          if (action === "PROJECT_CREATED") {
+            description = `Created project: ${
+              activity.details?.projectName ||
+              activity.resourceDetails?.name ||
+              "New project"
+            }`;
+          } else if (action === "PROJECT_APPROVED") {
+            description = `Approved project: ${
+              activity.details?.projectName ||
+              activity.resourceDetails?.name ||
+              "Project"
+            }`;
+          } else if (action === "PROJECT_REJECTED") {
+            description = `Rejected project: ${
+              activity.details?.projectName ||
+              activity.resourceDetails?.name ||
+              "Project"
+            }`;
+          } else if (action === "PROJECT_UPDATED") {
+            description = `Updated project: ${
+              activity.details?.projectName ||
+              activity.resourceDetails?.name ||
+              "Project"
+            }`;
+          } else {
+            description = `Project action: ${
+              activity.details?.projectName ||
+              activity.resourceDetails?.name ||
+              "Project"
+            }`;
+          }
+        }
+        // Document-related actions
+        else if (action.includes("DOCUMENT")) {
+          if (action === "DOCUMENT_UPLOADED") {
+            description = `Uploaded document: ${
+              activity.details?.documentTitle || "Document"
+            }`;
+          } else if (action === "DOCUMENT_APPROVED") {
+            description = `Approved document: ${
+              activity.details?.documentTitle || "Document"
+            }`;
+          } else if (action === "DOCUMENT_REJECTED") {
+            description = `Rejected document: ${
+              activity.details?.documentTitle || "Document"
+            }`;
+          } else {
+            description = `Document action: ${
+              activity.details?.documentTitle || "Document"
+            }`;
+          }
+        }
+        // User-related actions
+        else if (action.includes("USER")) {
+          if (action === "USER_CREATED") {
+            description = `Created user account`;
+          } else if (action === "USER_UPDATED") {
+            description = `Updated user profile`;
+          } else if (action === "USER_LOGIN") {
+            description = `Logged into system`;
+          } else {
+            description = "User management action";
+          }
+        }
+        // System actions
+        else if (action.includes("SYSTEM")) {
+          description = "System configuration change";
+        }
+        // Default fallback
+        else {
+          description =
+            activity.details?.description ||
+            activity.details?.approvalComment ||
+            activity.details?.reason ||
+            "System activity";
+        }
+
+        return {
+          title: activity.action?.replace(/_/g, " ") || "Activity",
+          description: description,
+          icon: getActivityIcon(activity.action),
+          color: "text-[var(--elra-primary)]",
+          bgColor: "bg-[var(--elra-secondary-3)]",
+          time: formatTimeAgo(activity.timestamp),
+        };
+      });
+
+      return showAllActivities ? activities : activities.slice(0, 3);
+    }
+
     // For HR module, use real data from API
     if (moduleKey === "hr" && hrDashboardData?.recentActivity) {
       const activities = hrDashboardData.recentActivity.map((activity) => {
@@ -2014,200 +2112,14 @@ const Dashboard = () => {
       return showAllActivities ? activities : activities.slice(0, 3);
     }
 
-    // For Department Management module, provide mock activity data
-    if (moduleKey === "department-management") {
-      const mockActivities = [
-        {
-          title: "Project Approved",
-          description: "Approved 'Department Website Redesign' project",
-          icon: CheckIcon,
-          color: "text-green-600",
-          bgColor: "bg-green-50",
-          time: "2 hours ago",
-        },
-        {
-          title: "Leave Request Processed",
-          description: "Approved annual leave request from John Doe",
-          icon: ClockIcon,
-          color: "text-blue-600",
-          bgColor: "bg-blue-50",
-          time: "4 hours ago",
-        },
-        {
-          title: "Team Member Added",
-          description: "Added new team member Sarah Wilson",
-          icon: UserPlusIcon,
-          color: "text-purple-600",
-          bgColor: "bg-purple-50",
-          time: "1 day ago",
-        },
-        {
-          title: "Budget Review",
-          description: "Completed monthly budget utilization review",
-          icon: ChartBarIcon,
-          color: "text-orange-600",
-          bgColor: "bg-orange-50",
-          time: "2 days ago",
-        },
-      ];
-
-      return showAllActivities ? mockActivities : mockActivities.slice(0, 3);
-    }
-
-    // For Self-Service module, use real data from API
-    if (
-      (moduleKey === "self-service" || moduleKey === "self_service") &&
-      selfServiceDashboardData?.recentActivity
-    ) {
-      const activities = selfServiceDashboardData.recentActivity.map(
-        (activity) => {
-          return {
-            title: activity.action?.replace(/_/g, " ") || "Activity",
-            description:
-              activity.details?.description || "Self-service activity",
-            icon: getActivityIcon(activity.action),
-            color: "text-[var(--elra-primary)]",
-            bgColor: "bg-[var(--elra-secondary-3)]",
-            time: formatTimeAgo(activity.timestamp),
-          };
-        }
-      );
-
-      return showAllActivities ? activities : activities.slice(0, 3);
-    }
-
-    if (moduleKey === "hr") {
-      return [
-        {
-          title: "Loading...",
-          description: "Fetching recent activities",
-          icon: ClockIcon,
-          color: "text-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-secondary-3)]",
-          time: "Just now",
-        },
-      ];
-    }
-
-    if (moduleKey === "department-management") {
-      return [
-        {
-          title: "Loading...",
-          description: "Fetching recent activities",
-          icon: ClockIcon,
-          color: "text-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-secondary-3)]",
-          time: "Just now",
-        },
-      ];
-    }
-
-    // Fallback to hardcoded activities for Self-Service when API data not loaded
-    if (moduleKey === "self-service" || moduleKey === "self_service") {
-      return [
-        {
-          title: "Loading...",
-          description: "Fetching recent activities",
-          icon: ClockIcon,
-          color: "text-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-secondary-3)]",
-          time: "Just now",
-        },
-      ];
-    }
-
-    // Fallback to hardcoded activities for other modules
-    const activities = {
-      "department-management": [
-        {
-          title: "Project Approved",
-          description: "Approved 'Department Website Redesign' project",
-          icon: CheckIcon,
-          color: "text-green-600",
-          bgColor: "bg-green-50",
-          time: "2 hours ago",
-        },
-        {
-          title: "Leave Request Processed",
-          description: "Approved annual leave request from John Doe",
-          icon: ClockIcon,
-          color: "text-blue-600",
-          bgColor: "bg-blue-50",
-          time: "4 hours ago",
-        },
-        {
-          title: "Team Member Added",
-          description: "Added new team member Sarah Wilson",
-          icon: UserPlusIcon,
-          color: "text-purple-600",
-          bgColor: "bg-purple-50",
-          time: "1 day ago",
-        },
-      ],
-      payroll: [
-        {
-          title: "Payroll Processed",
-          description: "Monthly payroll completed for 156 employees",
-          icon: CheckIcon,
-          color: "text-green-600",
-          bgColor: "bg-green-50",
-          time: "2 hours ago",
-        },
-        {
-          title: "New Employee Added",
-          description: "John Doe added to payroll system",
-          icon: UserPlusIcon,
-          color: "text-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-secondary-3)]",
-          time: "4 hours ago",
-        },
-        {
-          title: "Tax Update",
-          description: "Tax rates updated for Q4",
-          icon: ReceiptPercentIcon,
-          color: "text-purple-600",
-          bgColor: "bg-purple-50",
-          time: "1 day ago",
-        },
-      ],
-      finance: [
-        {
-          title: "Invoice Paid",
-          description: "Client payment received - $15,000",
-          icon: CheckIcon,
-          color: "text-green-600",
-          bgColor: "bg-green-50",
-          time: "30 minutes ago",
-        },
-        {
-          title: "Expense Added",
-          description: "Office supplies - $450",
-          icon: MinusIcon,
-          color: "text-red-600",
-          bgColor: "bg-red-50",
-          time: "2 hours ago",
-        },
-        {
-          title: "Report Generated",
-          description: "Monthly financial report created",
-          icon: ChartBarIcon,
-          color: "text-[var(--elra-primary)]",
-          bgColor: "bg-[var(--elra-secondary-3)]",
-          time: "1 day ago",
-        },
-      ],
-    };
-
-    return activities[moduleKey] || [];
+    // If no real audit data available, return empty array
+    return [];
   };
 
   // Check if there are more activities to show
   const hasMoreActivities = () => {
-    if (module === "hr" && hrDashboardData?.recentActivity) {
-      return hrDashboardData.recentActivity.length > 3;
-    }
-    if (module === "department-management") {
-      return 4 > 3; // Mock data has 4 activities
+    if (auditData && auditData.length > 0) {
+      return auditData.length > 3;
     }
     return false;
   };
@@ -2254,6 +2166,22 @@ const Dashboard = () => {
     if (action.includes("DEPARTMENT_UPDATED")) return PencilIcon;
     if (action.includes("DEPARTMENT")) return BuildingOffice2Icon;
 
+    // Project actions
+    if (action.includes("PROJECT_CREATED")) return PlusIcon;
+    if (action.includes("PROJECT_APPROVED")) return CheckCircleIcon;
+    if (action.includes("PROJECT_REJECTED")) return XCircleIcon;
+    if (action.includes("PROJECT_UPDATED")) return PencilIcon;
+    if (action.includes("PROJECT")) return BriefcaseIcon;
+
+    // Document actions
+    if (action.includes("DOCUMENT_UPLOADED")) return DocumentIcon;
+    if (action.includes("DOCUMENT_APPROVED")) return CheckCircleIcon;
+    if (action.includes("DOCUMENT_REJECTED")) return XCircleIcon;
+    if (action.includes("DOCUMENT")) return DocumentTextIcon;
+
+    // System actions
+    if (action.includes("SYSTEM")) return CogIcon;
+
     // Default fallback
     return CheckIcon;
   };
@@ -2271,16 +2199,373 @@ const Dashboard = () => {
     return `${Math.floor(diffInMinutes / 1440)} days ago`;
   };
 
-  // Render dashboard content based on current view
-  const renderDashboardContent = () => {
-    // Main dashboard view - ALWAYS present as per user requirement
-    const mainDashboardContent = renderMainDashboard();
+  // Render main dashboard content
+  const renderMainDashboard = () => {
+    return (
+      <div className="space-y-8">
+        {/* Welcome Section */}
+        <div className="bg-gradient-to-br from-white via-blue-50 to-purple-50 rounded-3xl p-6 sm:p-8 shadow-2xl border border-gray-100 relative overflow-hidden">
+          {/* Background decoration */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full -translate-y-16 translate-x-16"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-green-400/20 to-blue-400/20 rounded-full translate-y-12 -translate-x-12"></div>
 
+          <div className="relative z-10">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8 gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
+                <div className="p-4 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-2xl shadow-xl w-fit">
+                  <HomeIcon className="h-10 w-10 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                    Welcome back, {user?.firstName || "User"}! 👋
+                  </h1>
+                  <p className="text-gray-600 text-lg sm:text-xl mt-2">
+                    Access your ERP modules and manage your business operations
+                  </p>
+                </div>
+              </div>
+
+              {/* Enhanced Date and Time */}
+              <div className="text-left lg:text-right">
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border border-white/20">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="p-2 bg-blue-500 rounded-lg">
+                      <ClockIcon className="h-5 w-5 text-white" />
+                    </div>
+                    <span className="text-xl font-bold text-gray-800">
+                      {currentTime.toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                        hour12: true,
+                      })}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 font-medium">
+                    {currentTime.toLocaleDateString("en-US", {
+                      weekday: "long",
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Enhanced Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-blue-100 text-sm font-medium mb-1">
+                      Available Modules
+                    </p>
+                    <p className="text-3xl font-bold">
+                      {accessibleModules.length}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-white/20 rounded-xl">
+                    <FolderIcon className="h-6 w-6" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-green-100 text-sm font-medium mb-1">
+                      Your Role
+                    </p>
+                    <p className="text-lg font-bold">
+                      {(user?.role?.name || "USER").replace(/_/g, " ")}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-white/20 rounded-xl">
+                    <ShieldCheckIcon className="h-6 w-6" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-6 text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-purple-100 text-sm font-medium mb-1">
+                      Access Level
+                    </p>
+                    <p className="text-3xl font-bold">{roleLevel}</p>
+                  </div>
+                  <div className="p-3 bg-white/20 rounded-xl">
+                    <StarIcon className="h-6 w-6" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions Section */}
+        <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">
+            Quick Actions
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {accessibleModules.slice(0, 6).map((module, index) => {
+              const IconComponent = module.icon;
+              return (
+                <Link
+                  key={module.key}
+                  to={module.path}
+                  className="p-4 rounded-xl bg-white border-2 border-[var(--elra-primary)] hover:bg-[var(--elra-primary)] hover:text-white transition-all duration-200 group shadow-lg hover:shadow-xl block"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="p-2 rounded-lg bg-[var(--elra-primary)] group-hover:bg-white transition-colors">
+                      <IconComponent className="h-5 w-5 text-white group-hover:text-[var(--elra-primary)] transition-colors" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-medium text-[var(--elra-primary)] group-hover:text-white transition-colors">
+                        {module.label}
+                      </p>
+                      <p className="text-sm text-[var(--elra-primary)]/80 group-hover:text-white/80 transition-colors">
+                        {module.description || "Access module"}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Self-Service Major Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Leave Requests Card */}
+          <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl p-6 text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-white/20 rounded-xl">
+                <ClockIcon className="h-6 w-6" />
+              </div>
+              <div className="text-right">
+                <p className="text-red-100 text-sm font-medium">
+                  Leave Requests
+                </p>
+                <p className="text-2xl font-bold">
+                  {Array.isArray(leaveRequestsData?.data)
+                    ? leaveRequestsData.data.length
+                    : 0}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-red-100">Pending</span>
+                <span className="text-white font-medium">
+                  {(() => {
+                    try {
+                      return Array.isArray(leaveRequestsData?.data)
+                        ? leaveRequestsData.data.filter(
+                            (req) => req.status === "pending"
+                          ).length
+                        : 0;
+                    } catch (error) {
+                      console.error(
+                        "Error filtering leave requests pending:",
+                        error
+                      );
+                      return 0;
+                    }
+                  })()}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-red-100">Approved</span>
+                <span className="text-white font-medium">
+                  {(() => {
+                    try {
+                      return Array.isArray(leaveRequestsData?.data)
+                        ? leaveRequestsData.data.filter(
+                            (req) => req.status === "approved"
+                          ).length
+                        : 0;
+                    } catch (error) {
+                      console.error(
+                        "Error filtering leave requests approved:",
+                        error
+                      );
+                      return 0;
+                    }
+                  })()}
+                </span>
+              </div>
+            </div>
+            <button className="w-full mt-4 bg-white/20 hover:bg-white/30 rounded-lg py-2 text-sm font-medium transition-colors">
+              View All Requests
+            </button>
+          </div>
+
+          {/* Payslip Card */}
+          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-white/20 rounded-xl">
+                <CurrencyDollarIcon className="h-6 w-6" />
+              </div>
+              <div className="text-right">
+                <p className="text-green-100 text-sm font-medium">
+                  Latest Payslip
+                </p>
+                <p className="text-lg font-bold">
+                  ₦
+                  {Array.isArray(payslipsData?.data) &&
+                  payslipsData.data.length > 0
+                    ? (
+                        payslipsData.data[0]?.summary?.netPay || 0
+                      ).toLocaleString()
+                    : 0}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-green-100">Net Pay</span>
+                <span className="text-white font-medium">
+                  ₦
+                  {Array.isArray(payslipsData?.data) &&
+                  payslipsData.data.length > 0
+                    ? (
+                        payslipsData.data[0]?.summary?.netPay || 0
+                      ).toLocaleString()
+                    : 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-green-100">Gross Pay</span>
+                <span className="text-white font-medium">
+                  ₦
+                  {Array.isArray(payslipsData?.data) &&
+                  payslipsData.data.length > 0
+                    ? (
+                        payslipsData.data[0]?.summary?.grossPay || 0
+                      ).toLocaleString()
+                    : 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-green-100">Deductions</span>
+                <span className="text-white font-medium">
+                  ₦
+                  {Array.isArray(payslipsData?.data) &&
+                  payslipsData.data.length > 0
+                    ? (
+                        payslipsData.data[0]?.summary?.totalDeductions || 0
+                      ).toLocaleString()
+                    : 0}
+                </span>
+              </div>
+            </div>
+            <button className="w-full mt-4 bg-white/20 hover:bg-white/30 rounded-lg py-2 text-sm font-medium transition-colors">
+              View Payslips
+            </button>
+          </div>
+
+          {/* Project Count Card */}
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-white/20 rounded-xl">
+                <BriefcaseIcon className="h-6 w-6" />
+              </div>
+              <div className="text-right">
+                <p className="text-blue-100 text-sm font-medium">
+                  Active Projects
+                </p>
+                <p className="text-2xl font-bold">
+                  {projectsData?.data?.totalProjects || 0}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-blue-100">Total Projects</span>
+                <span className="text-white font-medium">
+                  {projectsData?.data?.totalProjects || 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-blue-100">Active Projects</span>
+                <span className="text-white font-medium">
+                  {projectsData?.data?.totalProjects || 0}
+                </span>
+              </div>
+            </div>
+            <button className="w-full mt-4 bg-white/20 hover:bg-white/30 rounded-lg py-2 text-sm font-medium transition-colors">
+              View Projects
+            </button>
+          </div>
+        </div>
+
+        {/* Recent Activity Section */}
+        <div className="bg-white rounded-xl p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">
+            Recent Activity
+          </h2>
+          {auditData && auditData.length > 0 ? (
+            <div className="space-y-3">
+              {auditData.slice(0, 5).map((activity, index) => {
+                const colors = [
+                  { bg: "bg-blue-100", icon: "text-blue-600" },
+                  { bg: "bg-green-100", icon: "text-green-600" },
+                  { bg: "bg-purple-100", icon: "text-purple-600" },
+                  { bg: "bg-orange-100", icon: "text-orange-600" },
+                  { bg: "bg-pink-100", icon: "text-pink-600" },
+                ];
+                const colorScheme = colors[index % colors.length];
+
+                return (
+                  <div
+                    key={activity._id || index}
+                    className="flex items-center space-x-4 py-3 hover:bg-gray-50 rounded-lg transition-colors"
+                  >
+                    <div className={`p-2 rounded-lg ${colorScheme.bg}`}>
+                      {React.createElement(getActivityIcon(activity.action), {
+                        className: `h-5 w-5 ${colorScheme.icon}`,
+                      })}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-gray-800">
+                        {activity.action?.replace(/_/g, " ") || "Activity"}
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        {activity.details?.description ||
+                          activity.details?.projectName ||
+                          activity.details?.documentTitle ||
+                          "System activity"}
+                      </p>
+                    </div>
+                    <span className="text-xs text-gray-500 font-medium">
+                      {formatTimeAgo(activity.timestamp)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-6">
+              <div className="p-3 rounded-full bg-gray-100 mx-auto w-12 h-12 flex items-center justify-center mb-3">
+                <ClockIcon className="h-6 w-6 text-gray-400" />
+              </div>
+              <p className="text-gray-500 text-sm">No recent activity found</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderDashboardContent = () => {
     if (isModuleView && currentModule) {
       return (
         <div className="space-y-8">
           {/* Main Dashboard - ALWAYS PRESENT */}
-          {mainDashboardContent}
+          {renderMainDashboard()}
 
           {/* Module-specific content below the main dashboard */}
           <div className="pt-8">
@@ -2300,10 +2585,9 @@ const Dashboard = () => {
       );
     }
 
-    return mainDashboardContent;
+    return renderMainDashboard();
   };
 
-  // Show loading spinner only if auth is not initialized yet
   if (!initialized && authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50">
@@ -2347,9 +2631,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
-        {renderDashboardContent()}
-      </div>
+      <div className=" mx-auto p-4">{renderDashboardContent()}</div>
 
       {isModuleLoading && (
         <div className="fixed inset-0 bg-[var(--elra-bg-light)] flex items-center justify-center z-50">

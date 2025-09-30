@@ -10,6 +10,7 @@ import {
   getSalesCategories,
   getMarketingCategories,
   getOperationalBudget,
+  exportSalesMarketingReport,
 } from "../controllers/salesMarketingFinancialController.js";
 import {
   protect,
@@ -48,6 +49,7 @@ router.route("/approvals").get(getSalesMarketingApprovals);
 
 // Reports
 router.route("/reports").get(getSalesMarketingReports);
+router.route("/reports/export/:format").get(exportSalesMarketingReport);
 
 // Categories
 router.route("/categories/sales").get(getSalesCategories);

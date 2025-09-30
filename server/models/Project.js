@@ -251,6 +251,13 @@ const projectSchema = new mongoose.Schema(
       default: undefined,
     },
 
+    // Compliance Program (for legal approval)
+    complianceProgram: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ComplianceProgram",
+      default: undefined,
+    },
+
     // Delivery Address (for external projects with vendors)
     deliveryAddress: {
       type: String,
@@ -1193,15 +1200,23 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
         "📦 [WORKFLOW] Inventory will be created after procurement delivery"
       );
     } else if (this.projectScope === "departmental") {
-      // Departmental projects: No inventory/procurement triggers, go directly to implementation
       console.log(
-        "🏢 [WORKFLOW] Departmental project detected - skipping inventory and procurement triggers"
+        "🏢 [WORKFLOW] Departmental project detected - checking budget allocation requirement"
       );
-      console.log(
-        "💰 [WORKFLOW] Departmental project will be handled by finance reimbursement after implementation"
-      );
+
+      if (this.requiresBudgetAllocation === true) {
+        console.log(
+          "💰 [WORKFLOW] Departmental project with budget allocation - will trigger procurement and inventory AFTER budget allocation"
+        );
+        console.log(
+          "📋 [WORKFLOW] Budget allocation must be approved before procurement can proceed"
+        );
+      } else {
+        console.log(
+          "💰 [WORKFLOW] Departmental project without budget allocation - will be handled by finance reimbursement after implementation"
+        );
+      }
     } else {
-      // Personal projects: Check if budget allocation is required
       console.log(
         "👤 [WORKFLOW] Personal project detected - checking budget allocation requirement"
       );
@@ -1210,7 +1225,6 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
       );
 
       if (this.requiresBudgetAllocation === true) {
-        // Personal project with budget allocation - set status to pending_budget_allocation
         console.log(
           "💰 [WORKFLOW] Personal project requires budget allocation - setting status to pending_budget_allocation"
         );
@@ -1222,7 +1236,6 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
           "🛒 [WORKFLOW] Procurement will be triggered after budget allocation approval"
         );
 
-        // Notify Finance HOD about budget allocation requirement
         try {
           const NotificationService = await import(
             "../services/notificationService.js"
@@ -1314,9 +1327,14 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
           notificationsSent.procurementHOD =
             "Procurement initiation notification sent";
         } else if (this.projectScope === "departmental") {
-          notificationMessage = `Congratulations! Your project "${this.name}" with reimbursement has been approved. Finance will handle reimbursement for implementation.`;
-          notificationsSent.financeReimbursement =
-            "Finance reimbursement will be handled before implementation";
+          if (this.requiresBudgetAllocation === true) {
+            notificationMessage = `Project "${this.name}" approved! Finance will review budget calculations, then Executive will approve. After Executive approval, Finance will allocate budget and procurement will be initiated.`;
+            // No procurement/inventory notifications yet - will be sent after budget allocation
+          } else {
+            notificationMessage = `Congratulations! Your project "${this.name}" with reimbursement has been approved. Finance will handle reimbursement for implementation.`;
+            notificationsSent.financeReimbursement =
+              "Finance reimbursement will be handled before implementation";
+          }
         } else {
           // Personal project
           if (this.requiresBudgetAllocation === true) {
@@ -1370,7 +1388,11 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
           creatorMessage = `Project "${this.name}" approved! Legal review completed. Project will proceed to Executive approval, then procurement will be initiated.`;
         }
       } else if (this.projectScope === "departmental") {
-        creatorMessage = `Congratulations! Your project "${this.name}" with reimbursement has been approved. Finance will handle reimbursement for implementation.`;
+        if (this.requiresBudgetAllocation === true) {
+          creatorMessage = `Project "${this.name}" approved! Finance will review budget calculations, then Executive will approve. After Executive approval, Finance will allocate budget and procurement will be initiated.`;
+        } else {
+          creatorMessage = `Congratulations! Your project "${this.name}" with reimbursement has been approved. Finance will handle reimbursement for implementation.`;
+        }
       } else {
         // Personal project
         if (this.requiresBudgetAllocation === true) {
@@ -1467,7 +1489,11 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
               if (this.projectScope === "external") {
                 financeMessage = `Project "${this.name}" (${this.code}) that you reviewed has been fully approved and is now in implementation phase. Budget allocation will be required before procurement can proceed.`;
               } else if (this.projectScope === "departmental") {
-                financeMessage = `Project "${this.name}" (${this.code}) that you approved has been fully approved and is now in implementation phase. Finance will handle reimbursement for implementation.`;
+                if (this.requiresBudgetAllocation === true) {
+                  financeMessage = `Project "${this.name}" (${this.code}) that you approved has been fully approved and is now in implementation phase. Budget allocation will be required before procurement can proceed.`;
+                } else {
+                  financeMessage = `Project "${this.name}" (${this.code}) that you approved has been fully approved and is now in implementation phase. Finance will handle reimbursement for implementation.`;
+                }
               } else {
                 // Personal project
                 if (this.requiresBudgetAllocation === true) {
@@ -1528,7 +1554,11 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
             executiveMessage = `Project "${this.name}" (${this.code}) that you just approved is now in implementation phase. Procurement will be initiated.`;
           }
         } else if (this.projectScope === "departmental") {
-          executiveMessage = `Project "${this.name}" (${this.code}) that you just approved is now in implementation phase. Finance will handle reimbursement for implementation.`;
+          if (this.requiresBudgetAllocation === true) {
+            executiveMessage = `Project "${this.name}" (${this.code}) that you just approved is now in implementation phase. Budget allocation will be required before procurement can proceed.`;
+          } else {
+            executiveMessage = `Project "${this.name}" (${this.code}) that you just approved is now in implementation phase. Finance will handle reimbursement for implementation.`;
+          }
         } else {
           // Personal project
           if (this.requiresBudgetAllocation === true) {
@@ -2050,27 +2080,121 @@ projectSchema.methods.createStandardProcurementOrder = async function (
       calculatedSubtotal = totalBudget;
     }
 
+    // Check if project has vendor information to pre-populate
+    let supplierInfo = {
+      name: "TBD - Procurement HOD to assign",
+      contactPerson: "TBD",
+      email: "tbd@supplier.com",
+      phone: "TBD",
+    };
+
+    // Pre-populate vendor information if available
+    console.log(
+      `🔍 [PROCUREMENT] Checking vendor for project: ${this.name} (${this.code})`
+    );
+    console.log(`🔍 [PROCUREMENT] Project vendorId: ${this.vendorId}`);
+
+    if (this.vendorId) {
+      try {
+        const Vendor = mongoose.model("Vendor");
+        const vendor = await Vendor.findById(this.vendorId);
+
+        if (vendor) {
+          console.log(
+            `🏢 [PROCUREMENT] Pre-populating vendor information from project: ${vendor.name}`
+          );
+          supplierInfo = {
+            name: vendor.name,
+            contactPerson: vendor.contactPerson,
+            email: vendor.email,
+            phone: vendor.phone,
+            address: vendor.address || "",
+          };
+
+          console.log(
+            `✅ [PROCUREMENT] Vendor pre-populated: ${vendor.name} (${
+              vendor.email || "No email"
+            })`
+          );
+        } else {
+          console.log(
+            `⚠️ [PROCUREMENT] Vendor ID exists but vendor not found: ${this.vendorId}`
+          );
+        }
+      } catch (vendorError) {
+        console.error(
+          `❌ [PROCUREMENT] Error fetching vendor information:`,
+          vendorError
+        );
+        console.log(`⚠️ [PROCUREMENT] Continuing with default supplier info`);
+      }
+    } else {
+      console.log(
+        `ℹ️ [PROCUREMENT] No vendor assigned to project - using default supplier info`
+      );
+    }
+
+    console.log(`🔍 [PROCUREMENT] Final supplier info:`, supplierInfo);
+
+    // Calculate correct budget for external projects
+    let finalBudget = calculatedSubtotal;
+    let budgetDescription = `Procurement order for project: ${
+      this.name
+    } (Budget: ₦${totalBudget.toLocaleString()}) - Procurement HOD to process`;
+
+    if (
+      this.projectScope === "external" &&
+      this.budgetPercentage &&
+      this.budgetPercentage < 100
+    ) {
+      // For external projects with client contribution
+      const elraContribution =
+        (calculatedSubtotal * this.budgetPercentage) / 100;
+      const clientContribution = calculatedSubtotal - elraContribution;
+
+      finalBudget = elraContribution; // Only ELRA's portion
+      budgetDescription = `Procurement order for ${
+        this.projectScope
+      } project: ${this.name} - ELRA handles ${
+        this.budgetPercentage
+      }% (₦${elraContribution.toLocaleString()}) | Client handles ${
+        100 - this.budgetPercentage
+      }% (₦${clientContribution.toLocaleString()}) - Total: ₦${calculatedSubtotal.toLocaleString()}`;
+
+      console.log(`💰 [PROCUREMENT] External project budget breakdown:`);
+      console.log(
+        `  - Total Project Cost: ₦${calculatedSubtotal.toLocaleString()}`
+      );
+      console.log(
+        `  - ELRA Contribution (${
+          this.budgetPercentage
+        }%): ₦${elraContribution.toLocaleString()}`
+      );
+      console.log(
+        `  - Client Contribution (${
+          100 - this.budgetPercentage
+        }%): ₦${clientContribution.toLocaleString()}`
+      );
+      console.log(
+        `  - Procurement will use ELRA's portion: ₦${finalBudget.toLocaleString()}`
+      );
+    }
+
     const procurementOrder = new Procurement({
       poNumber: poNumber,
       title: `${this.name} - Procurement Order`,
-      description: `Procurement order for project: ${
-        this.name
-      } (Budget: ₦${totalBudget.toLocaleString()}) - Procurement HOD to process`,
+      description: budgetDescription,
       status: "draft",
       priority: this.priority,
-      supplier: {
-        name: "TBD - Procurement HOD to assign",
-        contactPerson: "TBD",
-        email: "tbd@supplier.com",
-        phone: "TBD",
-      },
+      supplier: supplierInfo,
       items: procurementItems,
-      subtotal: calculatedSubtotal,
+      subtotal: finalBudget,
       tax: 0,
       shipping: 0,
-      totalAmount: calculatedSubtotal,
+      totalAmount: finalBudget,
       paidAmount: 0,
       relatedProject: this._id,
+      vendorId: this.vendorId || null, // Link to vendor if available
       requestedBy: createdBy._id,
       approvedBy: createdBy._id,
       createdBy: createdBy._id,
@@ -2079,7 +2203,7 @@ projectSchema.methods.createStandardProcurementOrder = async function (
     console.log(`🛒 [PROCUREMENT] Saving procurement order to database...`);
     console.log(`🛒 [PROCUREMENT] PO Number: ${poNumber}`);
     console.log(
-      `🛒 [PROCUREMENT] Total Amount: ₦${calculatedSubtotal.toLocaleString()}`
+      `🛒 [PROCUREMENT] Total Amount: ₦${finalBudget.toLocaleString()}`
     );
     console.log(`🛒 [PROCUREMENT] Items: ${procurementItems.length} items`);
 
@@ -2091,15 +2215,25 @@ projectSchema.methods.createStandardProcurementOrder = async function (
     console.log(`✅ [PROCUREMENT] Saved PO ID: ${savedOrder._id}`);
 
     console.log(
-      `✅ [PROCUREMENT] Created procurement order ${poNumber} with ₦${totalBudget.toLocaleString()} budget for project: ${
+      `✅ [PROCUREMENT] Created procurement order ${poNumber} with ₦${finalBudget.toLocaleString()} budget for project: ${
         this.code
       }`
     );
     console.log(`✅ [PROCUREMENT] PO Details:`);
     console.log(`   - PO Number: ${poNumber}`);
-    console.log(`   - Total Amount: ₦${calculatedSubtotal.toLocaleString()}`);
+    console.log(`   - Total Amount: ₦${finalBudget.toLocaleString()}`);
     console.log(`   - Items Count: ${procurementItems.length}`);
     console.log(`   - Category: ${procurementCategory}`);
+    if (this.vendorId) {
+      console.log(`   - Vendor Pre-populated: Yes`);
+      console.log(`   - Vendor Name: ${supplierInfo.name}`);
+      console.log(`   - Vendor Email: ${supplierInfo.email}`);
+      console.log(`   - Vendor Phone: ${supplierInfo.phone}`);
+      console.log(`   - Vendor Address: ${supplierInfo.address}`);
+    } else {
+      console.log(`   - Vendor Pre-populated: No`);
+      console.log(`   - Supplier: ${supplierInfo.name}`);
+    }
     console.log(`   - Status: ${savedOrder.status}`);
     console.log(`   - Related Project: ${this.name} (${this.code})`);
     console.log(
@@ -2200,6 +2334,31 @@ projectSchema.methods.createInventoryFromProcurement = async function (
     console.log(
       `✅ [INVENTORY] Created ${createdItems.length} inventory items from procurement order ${procurementOrder.poNumber}`
     );
+
+    if (this.requiresBudgetAllocation === true) {
+      console.log(
+        `🚀 [INVENTORY] ${this.projectScope} project with budget allocation - setting to implementation status`
+      );
+      this.status = "implementation";
+
+      try {
+        await this.createImplementationTasks(triggeredByUser);
+        console.log(
+          `✅ [INVENTORY] Implementation tasks created for ${this.projectScope} project`
+        );
+      } catch (taskError) {
+        console.error(
+          `❌ [INVENTORY] Error creating implementation tasks:`,
+          taskError
+        );
+      }
+
+      // Save the project with updated status
+      await this.save();
+      console.log(
+        `✅ [INVENTORY] Project status updated to 'implementation' for project: ${this.code}`
+      );
+    }
 
     await this.notifyOperationsHODForInventory(
       procurementOrder,
@@ -3034,6 +3193,22 @@ projectSchema.methods.generateApprovalChain = async function () {
   } else if (this.projectScope === "departmental") {
     console.log("🏢 [APPROVAL] Departmental Project Workflow");
 
+    // Department HOD approval (creator's department) - ALWAYS FIRST
+    // Skip if creator is Special Case HOD of the same department
+    if (!(isSpecialCase && creatorDepartment === this.department?.name)) {
+      approvalChain.push({
+        level: "hod",
+        department: this.department,
+        status: "pending",
+        required: true,
+        type: "departmental_approval",
+      });
+    } else {
+      console.log(
+        `✅ [APPROVAL] Auto-approving Department HOD - creator is Special Case HOD (${creatorDepartment}) of their own department`
+      );
+    }
+
     // Project Management HOD approval (only if budget threshold requires it)
     if (needsFullApprovalChain) {
       // Skip if creator is Special Case Project Management HOD
@@ -3059,21 +3234,6 @@ projectSchema.methods.generateApprovalChain = async function () {
     } else {
       console.log(
         "ℹ️ [APPROVAL] Skipping Project Management approval - budget threshold allows department HOD final approval"
-      );
-    }
-
-    // HOD approval (skip if creator is Special Case HOD of the same department)
-    if (!(isSpecialCase && creatorDepartment === this.department?.name)) {
-      approvalChain.push({
-        level: "hod",
-        department: this.department,
-        status: "pending",
-        required: true,
-        type: "departmental_approval",
-      });
-    } else {
-      console.log(
-        `✅ [APPROVAL] Auto-approving Department HOD - creator is Special Case HOD (${creatorDepartment}) of their own department`
       );
     }
 
@@ -4216,6 +4376,11 @@ projectSchema.methods.completeInventory = async function (triggeredByUser) {
       );
       this.status = "implementation";
 
+      // Funds will be moved from reserved to used when procurement orders are marked as paid
+      console.log(
+        `💰 [INVENTORY] Funds will be moved from reserved to used when procurement orders are marked as paid`
+      );
+
       try {
         await this.createImplementationTasks(triggeredByUser);
         console.log(
@@ -4270,10 +4435,8 @@ projectSchema.methods.completeProcurement = async function (triggeredByUser) {
       timestamp: new Date(),
     });
 
-    // Update progress
     await this.updateTwoPhaseProgress();
 
-    // For any project with budget allocation, trigger inventory creation
     if (this.requiresBudgetAllocation === true) {
       console.log(
         `📦 [PROCUREMENT] ${this.projectScope} project with budget allocation - triggering inventory creation`
@@ -4291,7 +4454,6 @@ projectSchema.methods.completeProcurement = async function (triggeredByUser) {
       }
     }
 
-    // Check if both inventory and procurement are completed to trigger compliance review
     await this.checkComplianceReadiness();
 
     await this.save();

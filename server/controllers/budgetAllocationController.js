@@ -157,13 +157,43 @@ export const createBudgetAllocation = async (req, res) => {
       ) || 0;
     const previousBudget = project ? project.budget : 0;
 
-    const baseAmount = projectItemsTotal;
-    const newBudget = baseAmount;
+    // Calculate ELRA's actual contribution based on project scope and percentage
+    let elraContribution = projectItemsTotal;
+    let clientContribution = 0;
+    let baseAmount = projectItemsTotal;
+    let newBudget = projectItemsTotal;
+
+    if (project && project.projectScope === "external") {
+      // External project - use budgetPercentage to determine ELRA's share
+      const budgetPercentage = project.budgetPercentage || 100;
+      elraContribution = (projectItemsTotal * budgetPercentage) / 100;
+      clientContribution = projectItemsTotal - elraContribution;
+      baseAmount = elraContribution; // Only allocate ELRA's portion
+      newBudget = elraContribution; // Only allocate ELRA's portion
+
+      console.log(`🌍 [EXTERNAL PROJECT] Budget breakdown:`);
+      console.log(
+        `   - Total Project Cost: ₦${projectItemsTotal.toLocaleString()}`
+      );
+      console.log(`   - ELRA Percentage: ${budgetPercentage}%`);
+      console.log(
+        `   - ELRA Contribution: ₦${elraContribution.toLocaleString()}`
+      );
+      console.log(
+        `   - Client Contribution: ₦${clientContribution.toLocaleString()}`
+      );
+    } else {
+      // Internal project - ELRA pays 100%
+      console.log(
+        `🏢 [INTERNAL PROJECT] ELRA pays full amount: ₦${projectItemsTotal.toLocaleString()}`
+      );
+    }
 
     console.log(`💰 [BUDGET ALLOCATION] Allocation breakdown:`);
     console.log(
-      `   - Project Items Cost (Allocated): ₦${baseAmount.toLocaleString()}`
+      `   - Project Items Cost: ₦${projectItemsTotal.toLocaleString()}`
     );
+    console.log(`   - ELRA Allocation: ₦${baseAmount.toLocaleString()}`);
     console.log(`   - Total Allocation: ₦${newBudget.toLocaleString()}`);
 
     try {
@@ -173,15 +203,18 @@ export const createBudgetAllocation = async (req, res) => {
         allocatedBy
       );
 
-      if (elraWallet.availableFunds < newBudget) {
+      // Check projects category available funds instead of total available funds
+      const projectsAvailable = elraWallet.budgetCategories.projects.available;
+
+      if (projectsAvailable < newBudget) {
         return res.status(400).json({
           success: false,
-          message: `Insufficient ELRA funds. Available: ₦${elraWallet.availableFunds.toLocaleString()}, Required: ₦${newBudget.toLocaleString()}`,
+          message: `Insufficient ELRA funds. Available: ₦${projectsAvailable.toLocaleString()}, Required: ₦${newBudget.toLocaleString()}`,
         });
       }
 
       console.log(
-        `💳 [ELRA WALLET] Sufficient funds available: ₦${elraWallet.availableFunds.toLocaleString()}`
+        `💳 [ELRA WALLET] Sufficient projects funds available: ₦${projectsAvailable.toLocaleString()}`
       );
     } catch (walletError) {
       console.error("❌ [ELRA WALLET] Error checking wallet:", walletError);
@@ -206,6 +239,15 @@ export const createBudgetAllocation = async (req, res) => {
       entityType,
       entityName,
       entityCode,
+      // Add percentage breakdown for external projects
+      ...(project &&
+        project.projectScope === "external" && {
+          projectScope: "external",
+          budgetPercentage: project.budgetPercentage || 100,
+          totalProjectCost: projectItemsTotal,
+          elraContribution: elraContribution,
+          clientContribution: clientContribution,
+        }),
     });
 
     // Generate approval chain based on allocation type and amount
@@ -1038,6 +1080,9 @@ export const getProjectsNeedingBudgetAllocation = async (req, res) => {
       .populate("projectManager", "firstName lastName email")
       .populate("department", "name code")
       .populate("createdBy", "firstName lastName email")
+      .select(
+        "budgetPercentage projectScope budget projectItems name code description status requiresBudgetAllocation createdAt updatedAt"
+      )
       .sort({ createdAt: -1 });
 
     res.status(200).json({

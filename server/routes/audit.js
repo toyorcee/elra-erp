@@ -9,6 +9,7 @@ import {
   getAuditLogById,
   cleanOldLogs,
   getAuditDashboard,
+  createSampleAuditData,
 } from "../controllers/auditController.js";
 import { protect, restrictTo } from "../middleware/auth.js";
 
@@ -16,38 +17,21 @@ const router = express.Router();
 
 router.use(protect);
 
-router.get("/recent", getRecentActivity);
+router.get("/recent-activity", getRecentActivity);
 
-router.get(
-  "/dashboard",
-  restrictTo("PLATFORM_ADMIN", "SUPER_ADMIN", "ADMIN"),
-  getAuditDashboard
-);
-
-router.get(
-  "/stats",
-  restrictTo("PLATFORM_ADMIN", "SUPER_ADMIN", "ADMIN"),
-  getActivityStats
-);
-
-router.get(
-  "/logs",
-  restrictTo("PLATFORM_ADMIN", "SUPER_ADMIN", "ADMIN"),
-  getAuditLogs
-);
-
-router.get(
-  "/logs/:id",
-  restrictTo("PLATFORM_ADMIN", "SUPER_ADMIN", "ADMIN"),
-  getAuditLogById
-);
+router.get("/dashboard", getAuditDashboard);
+router.get("/activity-stats", getActivityStats);
+router.get("/logs", getAuditLogs);
+router.get("/logs/:id", getAuditLogById);
 
 router.get("/documents/:documentId", getDocumentAuditTrail);
 
 router.get("/users/:userId", getUserActivitySummary);
 
-router.get("/export", restrictTo("SUPER_ADMIN", "ADMIN"), exportAuditLogs);
+router.get("/export", exportAuditLogs);
+router.delete("/clean", cleanOldLogs);
 
-router.delete("/clean", restrictTo("SUPER_ADMIN"), cleanOldLogs);
+// Test endpoint to create sample audit data
+router.post("/sample-data", createSampleAuditData);
 
 export default router;

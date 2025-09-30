@@ -11,9 +11,6 @@ import {
   BanknotesIcon,
   ArrowPathIcon,
   UserIcon,
-  MapPinIcon,
-  EnvelopeIcon,
-  PhoneIcon,
   TrashIcon,
   DocumentCheckIcon,
   PencilIcon,
@@ -32,6 +29,7 @@ import {
   markProcurementAsIssued,
   markProcurementAsPaid,
   markProcurementAsDelivered,
+  getProjectVendor,
 } from "../../../../services/procurementAPI";
 import { fetchProjects } from "../../../../services/projectAPI";
 import { toast } from "react-toastify";
@@ -97,26 +95,15 @@ const PurchaseOrders = () => {
   const [selectedProject, setSelectedProject] = useState(null);
 
   const [completeFormData, setCompleteFormData] = useState({
+    hasVendor: false, // Matching project creation vendor fields
     supplier: {
       name: "",
       contactPerson: "",
       email: "",
       phone: "",
-      address: {
-        street: "",
-        city: "",
-        state: "",
-        postalCode: "",
-      },
+      address: "", // Changed to string to match project creation
     },
-    deliveryAddress: {
-      street: "",
-      city: "",
-      state: "",
-      postalCode: "",
-      contactPerson: "",
-      phone: "",
-    },
+    deliveryAddress: "",
     expectedDeliveryDate: "",
     notes: "",
   });
@@ -125,26 +112,15 @@ const PurchaseOrders = () => {
     title: "",
     description: "",
     priority: "medium",
+    hasVendor: false,
     supplier: {
       name: "",
       contactPerson: "",
       email: "",
       phone: "",
-      address: {
-        street: "",
-        city: "",
-        state: "",
-        postalCode: "",
-      },
+      address: "", // Changed to string to match project creation
     },
-    deliveryAddress: {
-      street: "",
-      city: "",
-      state: "",
-      postalCode: "",
-      contactPerson: "",
-      phone: "",
-    },
+    deliveryAddress: "",
     items: [
       {
         name: "",
@@ -335,30 +311,82 @@ const PurchaseOrders = () => {
     setShowDetailModal(true);
   };
 
-  const handleCompleteOrder = (order) => {
+  const handleCompleteOrder = async (order) => {
+    // Handle both string address (from project creation) and object address (from manual entry)
+    let supplierAddress = {
+      street: "",
+      city: "",
+      state: "",
+      postalCode: "",
+    };
+
+    if (typeof order.supplier?.address === "string") {
+      // Address is stored as string (from project creation)
+      supplierAddress.street = order.supplier.address;
+    } else if (
+      order.supplier?.address &&
+      typeof order.supplier.address === "object"
+    ) {
+      // Address is stored as object (from manual entry)
+      supplierAddress = {
+        street: order.supplier.address.street || "",
+        city: order.supplier.address.city || "",
+        state: order.supplier.address.state || "",
+        postalCode: order.supplier.address.postalCode || "",
+      };
+    }
+
+    // Check if vendor info is missing or shows "TBD" - use backup API
+    let supplierInfo = {
+      name: order.supplier?.name || "",
+      contactPerson: order.supplier?.contactPerson || "",
+      email: order.supplier?.email || "",
+      phone: order.supplier?.phone || "",
+      address: supplierAddress,
+    };
+
+    // If supplier shows "TBD" or is missing, try to fetch from project
+    if (
+      (order.supplier?.name === "TBD - Procurement HOD to assign" ||
+        !order.supplier?.name) &&
+      order.relatedProject?._id
+    ) {
+      try {
+        console.log(
+          `🔍 [PROCUREMENT] Fetching vendor details for project: ${order.relatedProject._id}`
+        );
+        const vendorResponse = await getProjectVendor(order.relatedProject._id);
+
+        if (vendorResponse.success && vendorResponse.data.vendor) {
+          const vendor = vendorResponse.data.vendor;
+          console.log(
+            `✅ [PROCUREMENT] Found vendor from project: ${vendor.name}`
+          );
+
+          supplierInfo = {
+            name: vendor.name,
+            contactPerson: vendor.contactPerson,
+            email: vendor.email,
+            phone: vendor.phone,
+            address: vendor.address || "", // Keep as string to match project creation
+          };
+        }
+      } catch (error) {
+        console.error(
+          "❌ [PROCUREMENT] Error fetching vendor from project:",
+          error
+        );
+      }
+    }
+
     setCompleteFormData({
-      supplier: {
-        name: order.supplier?.name || "",
-        contactPerson: order.supplier?.contactPerson || "",
-        email: order.supplier?.email || "",
-        phone: order.supplier?.phone || "",
-        address: {
-          street: order.supplier?.address?.street || "",
-          city: order.supplier?.address?.city || "",
-          state: order.supplier?.address?.state || "",
-          postalCode: order.supplier?.address?.postalCode || "",
-        },
-      },
-      deliveryAddress: {
-        street: "",
-        city: "",
-        state: "",
-        postalCode: "",
-        contactPerson: "",
-        phone: "",
-      },
+      supplier: supplierInfo,
+      deliveryAddress: order.deliveryAddress || "",
       expectedDeliveryDate: order.expectedDeliveryDate || "",
       notes: "",
+      hasVendor:
+        supplierInfo.name &&
+        supplierInfo.name !== "TBD - Procurement HOD to assign", // Auto-select if vendor exists
     });
     setOrderToComplete(order);
     setShowCompleteModal(true);
@@ -809,7 +837,7 @@ const PurchaseOrders = () => {
                 handleResendEmail(order);
               }}
               className="bg-orange-500 hover:bg-orange-600 text-white p-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
-              title="Resend Email to Supplier"
+              title="Send / Resend Email to Supplier"
             >
               <ArrowPathIcon className="w-4 h-4" />
             </button>
@@ -864,25 +892,22 @@ const PurchaseOrders = () => {
       if (parent === "deliveryAddress") {
         setFormData((prev) => ({
           ...prev,
-          deliveryAddress: {
-            ...prev.deliveryAddress,
-            [child]: value,
-          },
+          deliveryAddress: value,
         }));
       } else {
-      setFormData((prev) => ({
-        ...prev,
-        supplier: {
-          ...prev.supplier,
-          [parent]: {
-            ...prev.supplier[parent],
-            [child]: value,
+        setFormData((prev) => ({
+          ...prev,
+          supplier: {
+            ...prev.supplier,
+            [parent]: {
+              ...prev.supplier[parent],
+              [child]: value,
+            },
           },
-        },
-      }));
+        }));
       }
     } else {
-      // Handle top-level fields (shouldn't happen for supplier/deliveryAddress)
+      // Handle top-level fields (including address as string)
       setFormData((prev) => ({
         ...prev,
         supplier: {
@@ -1401,17 +1426,26 @@ const PurchaseOrders = () => {
                       <div className="mt-3">
                         <span className="text-gray-600">Address:</span>
                         <div className="text-sm text-gray-700 mt-1">
-                          {selectedOrder.supplier.address.street && (
-                            <p>{selectedOrder.supplier.address.street}</p>
-                          )}
-                          {selectedOrder.supplier.address.city && (
-                            <p>{selectedOrder.supplier.address.city}</p>
-                          )}
-                          {selectedOrder.supplier.address.state && (
-                            <p>{selectedOrder.supplier.address.state}</p>
-                          )}
-                          {selectedOrder.supplier.address.postalCode && (
-                            <p>{selectedOrder.supplier.address.postalCode}</p>
+                          {typeof selectedOrder.supplier.address ===
+                          "string" ? (
+                            <p>{selectedOrder.supplier.address}</p>
+                          ) : (
+                            <>
+                              {selectedOrder.supplier.address?.street && (
+                                <p>{selectedOrder.supplier.address.street}</p>
+                              )}
+                              {selectedOrder.supplier.address?.city && (
+                                <p>{selectedOrder.supplier.address.city}</p>
+                              )}
+                              {selectedOrder.supplier.address?.state && (
+                                <p>{selectedOrder.supplier.address.state}</p>
+                              )}
+                              {selectedOrder.supplier.address?.postalCode && (
+                                <p>
+                                  {selectedOrder.supplier.address.postalCode}
+                                </p>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -1821,130 +1855,98 @@ const PurchaseOrders = () => {
                   </div>
                 </div>
 
-                {/* Supplier Information */}
+                {/* Supplier Information - Matching Project Creation Vendor Fields */}
                 <div className="bg-gray-50 rounded-lg p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <UserIcon className="h-5 w-5 text-[var(--elra-primary)] mr-2" />
                     Supplier Information
+                    <span className="text-sm font-normal text-gray-600 ml-2">
+                      (Optional - matches project creation vendor fields)
+                    </span>
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Supplier Company Name*
-                      </label>
+
+                  {/* Has Vendor Checkbox - Matching Project Creation */}
+                  <div className="mb-4">
+                    <label className="flex items-center">
                       <input
-                        type="text"
-                        required
-                        value={formData.supplier.name}
+                        type="checkbox"
+                        checked={formData.hasVendor}
                         onChange={(e) =>
-                          handleSupplierChange("name", e.target.value)
+                          setFormData({
+                            ...formData,
+                            hasVendor: e.target.checked,
+                          })
                         }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter supplier name"
+                        className="mr-2 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] rounded"
                       />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Contact Person
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.supplier.contactPerson}
-                        onChange={(e) =>
-                          handleSupplierChange("contactPerson", e.target.value)
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter contact person name"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Email
-                      </label>
-                      <input
-                        type="email"
-                        value={formData.supplier.email}
-                        onChange={(e) =>
-                          handleSupplierChange("email", e.target.value)
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter supplier email"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Phone
-                      </label>
-                      <input
-                        type="tel"
-                        value={formData.supplier.phone}
-                        onChange={(e) =>
-                          handleSupplierChange("phone", e.target.value)
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter supplier phone"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Street Address
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.supplier.address.street}
-                        onChange={(e) =>
-                          handleSupplierChange("address.street", e.target.value)
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter street address"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        City
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.supplier.address.city}
-                        onChange={(e) =>
-                          handleSupplierChange("address.city", e.target.value)
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter city"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        State
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.supplier.address.state}
-                        onChange={(e) =>
-                          handleSupplierChange("address.state", e.target.value)
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter state"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Postal Code
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.supplier.address.postalCode}
-                        onChange={(e) =>
-                          handleSupplierChange(
-                            "address.postalCode",
-                            e.target.value
-                          )
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter postal code"
-                      />
-                    </div>
+                      <span className="text-sm font-semibold">
+                        Client has a preferred vendor/supplier
+                      </span>
+                    </label>
                   </div>
+
+                  {formData.hasVendor && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Vendor Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.supplier.name}
+                          onChange={(e) =>
+                            handleSupplierChange("name", e.target.value)
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                          placeholder="e.g., Microsoft, Oracle, etc."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Vendor Email <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          value={formData.supplier.email}
+                          onChange={(e) =>
+                            handleSupplierChange("email", e.target.value)
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                          placeholder="e.g., contact@microsoft.com"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Vendor Phone
+                        </label>
+                        <input
+                          type="tel"
+                          value={formData.supplier.phone}
+                          onChange={(e) =>
+                            handleSupplierChange("phone", e.target.value)
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                          placeholder="e.g., +1 555 123 4567"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Vendor Address
+                        </label>
+                        <textarea
+                          value={formData.supplier.address}
+                          onChange={(e) =>
+                            handleSupplierChange("address", e.target.value)
+                          }
+                          rows={2}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                          placeholder="Enter vendor's address..."
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Delivery Address Section */}
@@ -1953,109 +1955,19 @@ const PurchaseOrders = () => {
                     <TruckIcon className="h-5 w-5 text-[var(--elra-primary)] mr-2" />
                     Delivery Information
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Contact Person
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.deliveryAddress.contactPerson}
-                        onChange={(e) =>
-                          handleSupplierChange(
-                            "deliveryAddress.contactPerson",
-                            e.target.value
-                          )
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter delivery contact person"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Phone
-                      </label>
-                      <input
-                        type="tel"
-                        value={formData.deliveryAddress.phone}
-                        onChange={(e) =>
-                          handleSupplierChange(
-                            "deliveryAddress.phone",
-                            e.target.value
-                          )
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter delivery phone"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Street Address
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.deliveryAddress.street}
-                        onChange={(e) =>
-                          handleSupplierChange(
-                            "deliveryAddress.street",
-                            e.target.value
-                          )
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter delivery street address"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        City
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.deliveryAddress.city}
-                        onChange={(e) =>
-                          handleSupplierChange(
-                            "deliveryAddress.city",
-                            e.target.value
-                          )
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter delivery city"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        State
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.deliveryAddress.state}
-                        onChange={(e) =>
-                          handleSupplierChange(
-                            "deliveryAddress.state",
-                            e.target.value
-                          )
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter delivery state"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Postal Code
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.deliveryAddress.postalCode}
-                        onChange={(e) =>
-                          handleSupplierChange(
-                            "deliveryAddress.postalCode",
-                            e.target.value
-                          )
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter delivery postal code"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Delivery Address
+                    </label>
+                    <textarea
+                      value={formData.deliveryAddress}
+                      onChange={(e) =>
+                        handleSupplierChange("deliveryAddress", e.target.value)
+                      }
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                      placeholder="Enter complete delivery address..."
+                    />
                   </div>
                 </div>
 
@@ -2471,7 +2383,7 @@ const PurchaseOrders = () => {
                 ) : (
                   <>
                     <PlusIcon className="h-4 w-4 mr-2" />
-                Create Order
+                    Create Order
                   </>
                 )}
               </button>
@@ -2618,187 +2530,121 @@ const PurchaseOrders = () => {
                 }}
                 className="space-y-6"
               >
-                {/* Supplier Information */}
+                {/* Supplier Information - Matching Project Creation Vendor Fields */}
                 <div className="border-b border-gray-200 pb-6">
                   <h4 className="text-lg font-semibold text-gray-900 mb-4">
                     Supplier Information
+                    <span className="text-sm font-normal text-gray-600 ml-2">
+                      (Optional - matches project creation vendor fields)
+                    </span>
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Supplier Company Name *
-                      </label>
+
+                  {/* Has Vendor Checkbox - Matching Project Creation */}
+                  <div className="mb-4">
+                    <label className="flex items-center">
                       <input
-                        type="text"
-                        required
-                        value={completeFormData.supplier.name}
+                        type="checkbox"
+                        checked={completeFormData.hasVendor}
                         onChange={(e) =>
                           setCompleteFormData({
                             ...completeFormData,
-                            supplier: {
-                              ...completeFormData.supplier,
-                              name: e.target.value,
-                            },
+                            hasVendor: e.target.checked,
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter supplier name"
+                        className="mr-2 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] rounded"
                       />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Contact Person
-                      </label>
-                      <input
-                        type="text"
-                        value={completeFormData.supplier.contactPerson}
-                        onChange={(e) =>
-                          setCompleteFormData({
-                            ...completeFormData,
-                            supplier: {
-                              ...completeFormData.supplier,
-                              contactPerson: e.target.value,
-                            },
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter contact person"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Email *
-                      </label>
-                      <input
-                        type="email"
-                        required
-                        value={completeFormData.supplier.email}
-                        onChange={(e) =>
-                          setCompleteFormData({
-                            ...completeFormData,
-                            supplier: {
-                              ...completeFormData.supplier,
-                              email: e.target.value,
-                            },
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter supplier email"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Phone
-                      </label>
-                      <input
-                        type="tel"
-                        value={completeFormData.supplier.phone}
-                        onChange={(e) =>
-                          setCompleteFormData({
-                            ...completeFormData,
-                            supplier: {
-                              ...completeFormData.supplier,
-                              phone: e.target.value,
-                            },
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter phone number"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Street Address
-                      </label>
-                      <input
-                        type="text"
-                        value={completeFormData.supplier.address.street}
-                        onChange={(e) =>
-                          setCompleteFormData({
-                            ...completeFormData,
-                            supplier: {
-                              ...completeFormData.supplier,
-                              address: {
-                                ...completeFormData.supplier.address,
-                                street: e.target.value,
-                              },
-                            },
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter supplier street address"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        City
-                      </label>
-                      <input
-                        type="text"
-                        value={completeFormData.supplier.address.city}
-                        onChange={(e) =>
-                          setCompleteFormData({
-                            ...completeFormData,
-                            supplier: {
-                              ...completeFormData.supplier,
-                              address: {
-                                ...completeFormData.supplier.address,
-                                city: e.target.value,
-                              },
-                            },
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter supplier city"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        State
-                      </label>
-                      <input
-                        type="text"
-                        value={completeFormData.supplier.address.state}
-                        onChange={(e) =>
-                          setCompleteFormData({
-                            ...completeFormData,
-                            supplier: {
-                              ...completeFormData.supplier,
-                              address: {
-                                ...completeFormData.supplier.address,
-                                state: e.target.value,
-                              },
-                            },
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter supplier state"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Postal Code
-                      </label>
-                      <input
-                        type="text"
-                        value={completeFormData.supplier.address.postalCode}
-                        onChange={(e) =>
-                          setCompleteFormData({
-                            ...completeFormData,
-                            supplier: {
-                              ...completeFormData.supplier,
-                              address: {
-                                ...completeFormData.supplier.address,
-                                postalCode: e.target.value,
-                              },
-                            },
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter postal code"
-                      />
-                    </div>
+                      <span className="text-sm font-semibold">
+                        Client has a preferred vendor/supplier
+                      </span>
+                    </label>
                   </div>
+
+                  {completeFormData.hasVendor && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Vendor Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={completeFormData.supplier.name}
+                          onChange={(e) =>
+                            setCompleteFormData({
+                              ...completeFormData,
+                              supplier: {
+                                ...completeFormData.supplier,
+                                name: e.target.value,
+                              },
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                          placeholder="e.g., Microsoft, Oracle, etc."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Vendor Email <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          value={completeFormData.supplier.email}
+                          onChange={(e) =>
+                            setCompleteFormData({
+                              ...completeFormData,
+                              supplier: {
+                                ...completeFormData.supplier,
+                                email: e.target.value,
+                              },
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                          placeholder="e.g., contact@microsoft.com"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Vendor Phone
+                        </label>
+                        <input
+                          type="tel"
+                          value={completeFormData.supplier.phone}
+                          onChange={(e) =>
+                            setCompleteFormData({
+                              ...completeFormData,
+                              supplier: {
+                                ...completeFormData.supplier,
+                                phone: e.target.value,
+                              },
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                          placeholder="e.g., +1 555 123 4567"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Vendor Address
+                        </label>
+                        <textarea
+                          value={completeFormData.supplier.address}
+                          onChange={(e) =>
+                            setCompleteFormData({
+                              ...completeFormData,
+                              supplier: {
+                                ...completeFormData.supplier,
+                                address: e.target.value,
+                              },
+                            })
+                          }
+                          rows={2}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                          placeholder="Enter vendor's address..."
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Delivery Address Information */}
@@ -2806,132 +2652,23 @@ const PurchaseOrders = () => {
                   <h4 className="text-lg font-semibold text-gray-900 mb-4">
                     Delivery Address Information
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Street Address *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={completeFormData.deliveryAddress.street}
-                        onChange={(e) =>
-                          setCompleteFormData({
-                            ...completeFormData,
-                            deliveryAddress: {
-                              ...completeFormData.deliveryAddress,
-                              street: e.target.value,
-                            },
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter delivery street address"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        City *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={completeFormData.deliveryAddress.city}
-                        onChange={(e) =>
-                          setCompleteFormData({
-                            ...completeFormData,
-                            deliveryAddress: {
-                              ...completeFormData.deliveryAddress,
-                              city: e.target.value,
-                            },
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter delivery city"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        State *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={completeFormData.deliveryAddress.state}
-                        onChange={(e) =>
-                          setCompleteFormData({
-                            ...completeFormData,
-                            deliveryAddress: {
-                              ...completeFormData.deliveryAddress,
-                              state: e.target.value,
-                            },
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter delivery state"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Postal Code
-                      </label>
-                      <input
-                        type="text"
-                        value={completeFormData.deliveryAddress.postalCode}
-                        onChange={(e) =>
-                          setCompleteFormData({
-                            ...completeFormData,
-                            deliveryAddress: {
-                              ...completeFormData.deliveryAddress,
-                              postalCode: e.target.value,
-                            },
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter postal code"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Contact Person *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={completeFormData.deliveryAddress.contactPerson}
-                        onChange={(e) =>
-                          setCompleteFormData({
-                            ...completeFormData,
-                            deliveryAddress: {
-                              ...completeFormData.deliveryAddress,
-                              contactPerson: e.target.value,
-                            },
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter delivery contact person"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Contact Phone *
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        value={completeFormData.deliveryAddress.phone}
-                        onChange={(e) =>
-                          setCompleteFormData({
-                            ...completeFormData,
-                            deliveryAddress: {
-                              ...completeFormData.deliveryAddress,
-                              phone: e.target.value,
-                            },
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                        placeholder="Enter delivery contact phone"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Delivery Address *
+                    </label>
+                    <textarea
+                      required
+                      value={completeFormData.deliveryAddress}
+                      onChange={(e) =>
+                        setCompleteFormData({
+                          ...completeFormData,
+                          deliveryAddress: e.target.value,
+                        })
+                      }
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                      placeholder="Enter complete delivery address..."
+                    />
                   </div>
                 </div>
 

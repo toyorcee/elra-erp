@@ -1,5 +1,25 @@
 import SalesMarketingFinancialService from "../services/salesMarketingFinancialService.js";
 import ELRAWallet from "../models/ELRAWallet.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Helper function to load certificate images
+const loadSalesMarketingImage = (imageName) => {
+  try {
+    const imagePath = path.resolve(__dirname, "../assets/images", imageName);
+    if (fs.existsSync(imagePath)) {
+      const imageBuffer = fs.readFileSync(imagePath);
+      return `data:image/png;base64,${imageBuffer.toString("base64")}`;
+    }
+  } catch (error) {
+    console.warn(`⚠️ Could not load image ${imageName}:`, error.message);
+  }
+  return null;
+};
 
 // ===== DASHBOARD =====
 export const getSalesMarketingDashboard = async (req, res) => {
@@ -345,10 +365,33 @@ export const exportSalesMarketingReport = async (req, res) => {
 
       // ELRA Branding - Professional header like payslip
       const elraGreen = [13, 100, 73];
-      doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
-      doc.setFontSize(32);
-      doc.setFont("helvetica", "bold");
-      doc.text("ELRA", 105, 25, { align: "center" });
+
+      // Try to add ELRA logo image
+      const elraLogo = loadSalesMarketingImage("elra-logo.png");
+      if (elraLogo) {
+        try {
+          doc.addImage(elraLogo, "PNG", 85, 15, 20, 20);
+          doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+          doc.setFontSize(32);
+          doc.setFont("helvetica", "bold");
+          doc.text("ELRA", 110, 30, { align: "center" });
+        } catch (error) {
+          console.warn(
+            "⚠️ Could not add ELRA logo to sales marketing report, falling back to text:",
+            error.message
+          );
+          doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+          doc.setFontSize(32);
+          doc.setFont("helvetica", "bold");
+          doc.text("ELRA", 105, 25, { align: "center" });
+        }
+      } else {
+        // Fallback to text-only
+        doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+        doc.setFontSize(32);
+        doc.setFont("helvetica", "bold");
+        doc.text("ELRA", 105, 25, { align: "center" });
+      }
 
       // Reset to black for other text
       doc.setTextColor(0, 0, 0);

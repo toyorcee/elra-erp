@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import {
   ShoppingBagIcon,
   PlusIcon,
@@ -16,6 +17,9 @@ import {
   PencilIcon,
   ChevronDownIcon,
   TruckIcon,
+  ChartBarIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
 } from "@heroicons/react/24/outline";
 import { Listbox, Transition } from "@headlessui/react";
 import { useAuth } from "../../../../context/AuthContext";
@@ -60,6 +64,7 @@ const PurchaseOrders = () => {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderToComplete, setOrderToComplete] = useState(null);
+  const [isCompleting, setIsCompleting] = useState(false);
   const [showResendModal, setShowResendModal] = useState(false);
   const [orderToResend, setOrderToResend] = useState(null);
   const [isResending, setIsResending] = useState(false);
@@ -137,6 +142,18 @@ const PurchaseOrders = () => {
     ],
     expectedDeliveryDate: "",
   });
+
+  // Format an address object or string into a single readable string
+  const formatAddressToString = (addr) => {
+    if (!addr) return "";
+    if (typeof addr === "string") return addr;
+    try {
+      const { street, city, state, postalCode } = addr || {};
+      return [street, city, state, postalCode].filter(Boolean).join(", ");
+    } catch (_) {
+      return "";
+    }
+  };
 
   if (!user || user.role.level < 600) {
     return (
@@ -342,7 +359,7 @@ const PurchaseOrders = () => {
       contactPerson: order.supplier?.contactPerson || "",
       email: order.supplier?.email || "",
       phone: order.supplier?.phone || "",
-      address: supplierAddress,
+      address: formatAddressToString(supplierAddress),
     };
 
     // If supplier shows "TBD" or is missing, try to fetch from project
@@ -368,7 +385,7 @@ const PurchaseOrders = () => {
             contactPerson: vendor.contactPerson,
             email: vendor.email,
             phone: vendor.phone,
-            address: vendor.address || "", // Keep as string to match project creation
+            address: formatAddressToString(vendor.address),
           };
         }
       } catch (error) {
@@ -381,7 +398,7 @@ const PurchaseOrders = () => {
 
     setCompleteFormData({
       supplier: supplierInfo,
-      deliveryAddress: order.deliveryAddress || "",
+      deliveryAddress: formatAddressToString(order.deliveryAddress || ""),
       expectedDeliveryDate: order.expectedDeliveryDate || "",
       notes: "",
       hasVendor:
@@ -557,25 +574,21 @@ const PurchaseOrders = () => {
           orderToEdit.deliveryAddress?.postalCode,
       };
 
-      // Items are not editable - they remain as they are
-
-      // Update the procurement order
       await updateProcurement(orderToEdit._id, {
         title: orderToEdit.title,
         description: formData.get("description") || orderToEdit.description,
         supplier: updatedSupplier,
         deliveryAddress: updatedDeliveryAddress,
-        items: orderToEdit.items, // Keep original items since they're not editable
-        totalAmount: orderToEdit.totalAmount, // Keep original total since items aren't editable
+        items: orderToEdit.items,
+        totalAmount: orderToEdit.totalAmount,
         expectedDeliveryDate:
           formData.get("expectedDeliveryDate") ||
           orderToEdit.expectedDeliveryDate,
       });
 
-      // Resend email and PDF to supplier after update
-      await resendProcurementEmail(orderToEdit._id);
-
-      toast.success("Order updated and email sent to supplier successfully!");
+      toast.success(
+        "Order updated successfully. You can send the PO to the vendor from actions."
+      );
       setShowEditModal(false);
       setOrderToEdit(null);
       loadPurchaseOrders();
@@ -1117,79 +1130,140 @@ const PurchaseOrders = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Purchase Orders
-        </h1>
-        <p className="text-gray-600">
+    <div className="space-y-6 p-4">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl p-6 text-white">
+        <h1 className="text-3xl font-bold mb-2">Purchase Orders</h1>
+        <p className="text-white/80">
           Manage and track all procurement orders across projects
         </p>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        {/* Summary Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-center">
-              <ShoppingBagIcon className="h-8 w-8 text-[var(--elra-primary)] mr-3" />
-              <div>
-                <p className="text-sm text-gray-500">Total Orders</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {purchaseOrders.length}
-                </p>
-              </div>
+      {/* Summary Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        {/* Total Orders */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg border border-blue-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">
+                Total Orders
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-blue-900 mt-2 break-all leading-tight">
+                {purchaseOrders.length}
+              </p>
+            </div>
+            <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
+              <ShoppingBagIcon className="h-8 w-8 text-white" />
             </div>
           </div>
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-center">
-              <CurrencyDollarIcon className="h-8 w-8 text-green-600 mr-3" />
-              <div>
-                <p className="text-sm text-gray-500">Total Value</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {formatCurrency(
-                    purchaseOrders.reduce(
-                      (sum, po) => sum + (po.totalAmount || 0),
-                      0
-                    )
-                  )}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-center">
-              <CheckCircleIcon className="h-8 w-8 text-blue-600 mr-3" />
-              <div>
-                <p className="text-sm text-gray-500">Draft Orders</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {purchaseOrders.filter((po) => po.status === "draft").length}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-center">
-              <BanknotesIcon className="h-8 w-8 text-emerald-600 mr-3" />
-              <div>
-                <p className="text-sm text-gray-500">Paid</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.paid}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-center">
-              <CheckCircleIcon className="h-8 w-8 text-green-600 mr-3" />
-              <div>
-                <p className="text-sm text-gray-500">Delivered</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {stats.delivered}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+        </motion.div>
 
+        {/* Total Value */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-lg border border-green-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-green-700 uppercase tracking-wide">
+                Total Value
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-green-900 mt-2 break-all leading-tight">
+                {formatCurrency(
+                  purchaseOrders.reduce(
+                    (sum, po) => sum + (po.totalAmount || 0),
+                    0
+                  )
+                )}
+              </p>
+            </div>
+            <div className="p-4 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
+              <CurrencyDollarIcon className="h-8 w-8 text-white" />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Draft Orders */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl shadow-lg border border-purple-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-purple-700 uppercase tracking-wide">
+                Draft Orders
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-purple-900 mt-2 break-all leading-tight">
+                {purchaseOrders.filter((po) => po.status === "draft").length}
+              </p>
+            </div>
+            <div className="p-4 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
+              <CheckCircleIcon className="h-8 w-8 text-white" />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Paid Orders */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl shadow-lg border border-orange-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-orange-700 uppercase tracking-wide">
+                Paid Orders
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-orange-900 mt-2 break-all leading-tight">
+                {stats.paid}
+              </p>
+            </div>
+            <div className="p-4 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
+              <BanknotesIcon className="h-8 w-8 text-white" />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Delivered Orders */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl shadow-lg border border-indigo-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-indigo-700 uppercase tracking-wide">
+                Delivered Orders
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-indigo-900 mt-2 break-all leading-tight">
+                {stats.delivered}
+              </p>
+            </div>
+            <div className="p-4 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-lg">
+              <TruckIcon className="h-8 w-8 text-white" />
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Main Content */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+      >
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
           <div className="flex items-center space-x-4">
             <select
@@ -1299,7 +1373,7 @@ const PurchaseOrders = () => {
             showToggle: false,
           }}
         />
-      </div>
+      </motion.div>
 
       {/* Detail Modal - ELRA Branded */}
       {showDetailModal && selectedOrder && (
@@ -1332,12 +1406,39 @@ const PurchaseOrders = () => {
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-8 bg-white">
-              <div className="grid grid-cols-2 gap-6 mb-6">
+              {/* Quick Summary Chips */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <div className="text-sm text-gray-600">Status</div>
+                  <div>{getStatusBadge(selectedOrder.status)}</div>
+                </div>
+                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="flex items-center text-sm text-green-700">
+                    <BanknotesIcon className="w-4 h-4 mr-2" /> Total Amount
+                  </div>
+                  <div className="font-semibold text-green-700">
+                    {formatCurrency(selectedOrder.totalAmount)}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-center text-sm text-blue-700">
+                    <TruckIcon className="w-4 h-4 mr-2" /> Expected Delivery
+                  </div>
+                  <div className="text-blue-700 font-medium">
+                    {selectedOrder.expectedDeliveryDate
+                      ? new Date(
+                          selectedOrder.expectedDeliveryDate
+                        ).toLocaleDateString()
+                      : "—"}
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
                   <h4 className="font-medium text-gray-900 mb-3">
                     General Information
                   </h4>
-                  <div className="space-y-2">
+                  <div className="space-y-1 text-sm">
                     <p>
                       <span className="text-gray-600">PO Number:</span>{" "}
                       {selectedOrder.poNumber}
@@ -1362,22 +1463,27 @@ const PurchaseOrders = () => {
                   </div>
                 </div>
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-3">
+                  <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+                    <BanknotesIcon className="w-4 h-4 mr-2 text-green-600" />
                     Financial Information
                   </h4>
-                  <div className="space-y-2">
+                  <div className="space-y-1 text-sm">
                     <p>
                       <span className="text-gray-600">Total Amount:</span>{" "}
                       {formatCurrency(selectedOrder.totalAmount)}
                     </p>
-                    <p>
-                      <span className="text-gray-600">Paid Amount:</span>{" "}
-                      {formatCurrency(selectedOrder.paidAmount)}
-                    </p>
-                    <p>
-                      <span className="text-gray-600">Outstanding:</span>{" "}
-                      {formatCurrency(selectedOrder.outstandingAmount)}
-                    </p>
+                    {selectedOrder.paidAmount > 0 && (
+                      <p>
+                        <span className="text-gray-600">Paid Amount:</span>{" "}
+                        {formatCurrency(selectedOrder.paidAmount)}
+                      </p>
+                    )}
+                    {selectedOrder.outstandingAmount > 0 && (
+                      <p>
+                        <span className="text-gray-600">Outstanding:</span>{" "}
+                        {formatCurrency(selectedOrder.outstandingAmount)}
+                      </p>
+                    )}
                     <p>
                       <span className="text-gray-600">Payment Status:</span>{" "}
                       {selectedOrder.paymentStatus === "paid" ? (
@@ -1392,20 +1498,23 @@ const PurchaseOrders = () => {
                         </span>
                       )}
                     </p>
-                    <p>
-                      <span className="text-gray-600">Delivery Status:</span>{" "}
-                      {selectedOrder.deliveryStatus}
-                    </p>
+                    {selectedOrder.deliveryStatus && (
+                      <p>
+                        <span className="text-gray-600">Delivery Status:</span>{" "}
+                        {selectedOrder.deliveryStatus}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-3">
+                  <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+                    <UserIcon className="w-4 h-4 mr-2 text-gray-700" />
                     Supplier Information
                   </h4>
-                  <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="bg-gray-50 p-4 rounded-lg text-sm space-y-1">
                     <p>
                       <span className="text-gray-600">Name:</span>{" "}
                       {selectedOrder.supplier?.name}
@@ -1454,10 +1563,11 @@ const PurchaseOrders = () => {
                 </div>
 
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-3">
+                  <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+                    <TruckIcon className="w-4 h-4 mr-2 text-blue-600" />
                     Delivery Information
                   </h4>
-                  <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="bg-gray-50 p-4 rounded-lg text-sm space-y-1">
                     {selectedOrder.deliveryAddress ? (
                       <>
                         {selectedOrder.deliveryAddress.contactPerson && (
@@ -1521,12 +1631,13 @@ const PurchaseOrders = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-3">
+                  <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+                    <BuildingOfficeIcon className="w-4 h-4 mr-2 text-gray-700" />
                     Project Information
                   </h4>
-                  <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="bg-gray-50 p-4 rounded-lg text-sm space-y-1">
                     {selectedOrder.relatedProject ? (
                       <>
                         <p>
@@ -1545,10 +1656,11 @@ const PurchaseOrders = () => {
                 </div>
 
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-3">
+                  <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+                    <DocumentCheckIcon className="w-4 h-4 mr-2 text-blue-600" />
                     Approval Information
                   </h4>
-                  <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="bg-gray-50 p-4 rounded-lg text-sm space-y-1">
                     {selectedOrder.approvedBy ? (
                       <>
                         <p>
@@ -1584,47 +1696,59 @@ const PurchaseOrders = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div>
                   <h4 className="font-medium text-gray-900 mb-3">
                     Payment & Delivery Tracking
                   </h4>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    {selectedOrder.markedAsIssuedBy && (
-                      <p>
-                        <span className="text-gray-600">Issued By:</span>{" "}
-                        {selectedOrder.markedAsIssuedBy?.firstName}{" "}
-                        {selectedOrder.markedAsIssuedBy?.lastName}
-                      </p>
-                    )}
-                    {selectedOrder.issuedDate && (
-                      <p>
-                        <span className="text-gray-600">Issued Date:</span>{" "}
-                        {new Date(
-                          selectedOrder.issuedDate
-                        ).toLocaleDateString()}
-                      </p>
-                    )}
-                    {selectedOrder.markedAsPaidBy && (
-                      <p>
-                        <span className="text-gray-600">Paid By:</span>{" "}
-                        {selectedOrder.markedAsPaidBy?.firstName}{" "}
-                        {selectedOrder.markedAsPaidBy?.lastName}
-                      </p>
-                    )}
-                    {selectedOrder.paymentDate && (
-                      <p>
-                        <span className="text-gray-600">Payment Date:</span>{" "}
-                        {new Date(
-                          selectedOrder.paymentDate
-                        ).toLocaleDateString()}
-                      </p>
-                    )}
-                    {selectedOrder.markedAsDeliveredBy && (
-                      <p>
-                        <span className="text-gray-600">Delivered By:</span>{" "}
-                        {selectedOrder.markedAsDeliveredBy?.firstName}{" "}
-                        {selectedOrder.markedAsDeliveredBy?.lastName}
+                  <div className="bg-gray-50 p-4 rounded-lg text-sm space-y-1">
+                    {selectedOrder.markedAsIssuedBy ||
+                    selectedOrder.issuedDate ||
+                    selectedOrder.markedAsPaidBy ||
+                    selectedOrder.paymentDate ||
+                    selectedOrder.markedAsDeliveredBy ? (
+                      <>
+                        {selectedOrder.markedAsIssuedBy && (
+                          <p>
+                            <span className="text-gray-600">Issued By:</span>{" "}
+                            {selectedOrder.markedAsIssuedBy?.firstName}{" "}
+                            {selectedOrder.markedAsIssuedBy?.lastName}
+                          </p>
+                        )}
+                        {selectedOrder.issuedDate && (
+                          <p>
+                            <span className="text-gray-600">Issued Date:</span>{" "}
+                            {new Date(
+                              selectedOrder.issuedDate
+                            ).toLocaleDateString()}
+                          </p>
+                        )}
+                        {selectedOrder.markedAsPaidBy && (
+                          <p>
+                            <span className="text-gray-600">Paid By:</span>{" "}
+                            {selectedOrder.markedAsPaidBy?.firstName}{" "}
+                            {selectedOrder.markedAsPaidBy?.lastName}
+                          </p>
+                        )}
+                        {selectedOrder.paymentDate && (
+                          <p>
+                            <span className="text-gray-600">Payment Date:</span>{" "}
+                            {new Date(
+                              selectedOrder.paymentDate
+                            ).toLocaleDateString()}
+                          </p>
+                        )}
+                        {selectedOrder.markedAsDeliveredBy && (
+                          <p>
+                            <span className="text-gray-600">Delivered By:</span>{" "}
+                            {selectedOrder.markedAsDeliveredBy?.firstName}{" "}
+                            {selectedOrder.markedAsDeliveredBy?.lastName}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-gray-500 italic">
+                        No tracking updates yet
                       </p>
                     )}
                   </div>
@@ -1639,24 +1763,31 @@ const PurchaseOrders = () => {
                       <span className="text-gray-600">Currency:</span>{" "}
                       {selectedOrder.currency || "NGN"}
                     </p>
-                    <p>
-                      <span className="text-gray-600">Subtotal:</span>{" "}
-                      {formatCurrency(selectedOrder.subtotal)}
-                    </p>
-                    <p>
-                      <span className="text-gray-600">Tax:</span>{" "}
-                      {formatCurrency(selectedOrder.tax || 0)}
-                    </p>
-                    <p>
-                      <span className="text-gray-600">Shipping:</span>{" "}
-                      {formatCurrency(selectedOrder.shipping || 0)}
-                    </p>
-                    {selectedOrder.receivedPercentage !== undefined && (
+                    {selectedOrder.subtotal > 0 && (
                       <p>
-                        <span className="text-gray-600">Received %:</span>{" "}
-                        {selectedOrder.receivedPercentage}%
+                        <span className="text-gray-600">Subtotal:</span>{" "}
+                        {formatCurrency(selectedOrder.subtotal)}
                       </p>
                     )}
+                    {selectedOrder.tax > 0 && (
+                      <p>
+                        <span className="text-gray-600">Tax:</span>{" "}
+                        {formatCurrency(selectedOrder.tax)}
+                      </p>
+                    )}
+                    {selectedOrder.shipping > 0 && (
+                      <p>
+                        <span className="text-gray-600">Shipping:</span>{" "}
+                        {formatCurrency(selectedOrder.shipping)}
+                      </p>
+                    )}
+                    {selectedOrder.receivedPercentage !== undefined &&
+                      selectedOrder.receivedPercentage > 0 && (
+                        <p>
+                          <span className="text-gray-600">Received %:</span>{" "}
+                          {selectedOrder.receivedPercentage}%
+                        </p>
+                      )}
                   </div>
                 </div>
               </div>
@@ -2510,9 +2641,10 @@ const PurchaseOrders = () => {
               </div>
 
               <form
+                id="complete-procurement-form"
                 onSubmit={async (e) => {
                   e.preventDefault();
-                  setLoading(true);
+                  setIsCompleting(true);
                   try {
                     await completeProcurementOrder(
                       orderToComplete._id,
@@ -2520,12 +2652,13 @@ const PurchaseOrders = () => {
                     );
                     toast.success("Purchase order completed successfully!");
                     setShowCompleteModal(false);
+                    setOrderToComplete(null);
                     loadPurchaseOrders();
                   } catch (error) {
                     toast.error("Error completing purchase order");
                     console.error("Error:", error);
                   } finally {
-                    setLoading(false);
+                    setIsCompleting(false);
                   }
                 }}
                 className="space-y-6"
@@ -2732,28 +2865,11 @@ const PurchaseOrders = () => {
               </button>
               <button
                 type="submit"
-                onClick={async (e) => {
-                  e.preventDefault();
-                  setLoading(true);
-                  try {
-                    await completeProcurementOrder(
-                      orderToComplete._id,
-                      completeFormData
-                    );
-                    toast.success("Purchase order completed successfully!");
-                    loadPurchaseOrders();
-                    // Keep modal open to show success state
-                  } catch (error) {
-                    toast.error("Error completing purchase order");
-                    console.error("Error:", error);
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                disabled={loading}
+                form="complete-procurement-form"
+                disabled={isCompleting}
                 className="px-6 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               >
-                {loading ? (
+                {isCompleting ? (
                   <>
                     <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
                     Completing...
@@ -3119,7 +3235,7 @@ const PurchaseOrders = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                    <BanknotesIcon className="w-8 h-8" />
+                    <BanknotesIcon className="w-8 h-8 text-emerald-600" />
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold">Mark as Paid</h2>
@@ -3259,7 +3375,7 @@ const PurchaseOrders = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                    <CheckCircleIcon className="w-8 h-8" />
+                    <CheckCircleIcon className="w-8 h-8 text-blue-600" />
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold">Mark as Delivered</h2>
@@ -3384,7 +3500,7 @@ const PurchaseOrders = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                    <BanknotesIcon className="w-8 h-8" />
+                    <BanknotesIcon className="w-8 h-8 text-emerald-600" />
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold">Confirm Payment</h2>
@@ -3495,7 +3611,7 @@ const PurchaseOrders = () => {
                   </>
                 ) : (
                   <>
-                    <BanknotesIcon className="h-4 w-4 mr-2" />
+                    <BanknotesIcon className="h-4 w-4 mr-2 text-white" />
                     Confirm Payment
                   </>
                 )}
@@ -3514,7 +3630,7 @@ const PurchaseOrders = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                    <CheckCircleIcon className="w-8 h-8" />
+                    <CheckCircleIcon className="w-8 h-8 text-blue-600" />
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold">Confirm Delivery</h2>
@@ -3617,7 +3733,7 @@ const PurchaseOrders = () => {
                   </>
                 ) : (
                   <>
-                    <CheckCircleIcon className="h-4 w-4 mr-2" />
+                    <CheckCircleIcon className="h-4 w-4 mr-2 text-white" />
                     Confirm Delivery
                   </>
                 )}

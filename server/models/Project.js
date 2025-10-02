@@ -4030,75 +4030,30 @@ projectSchema.methods.updateTwoPhaseProgress = async function () {
     );
     console.log(`  - Total: ${overallProgress}%`);
   } else {
-    // EXTERNAL PROJECTS: Keep existing logic for now
-    let totalSteps = 0;
+    const approvalWeight = 50;
+    const implementationWeight = 50;
 
-    // 1. Document Submission Progress (25% weight)
-    if (this.requiredDocuments && this.requiredDocuments.length > 0) {
-      const submittedDocs = this.requiredDocuments.filter(
-        (doc) => doc.isSubmitted
-      ).length;
-      const docProgress = (submittedDocs / this.requiredDocuments.length) * 25;
-      overallProgress += docProgress;
-      totalSteps += 25;
-    }
+    const approvalProgressWeight =
+      (this.approvalProgress / 100) * approvalWeight;
 
-    // 2. Approval Progress (35% weight)
-    if (this.approvalChain && this.approvalChain.length > 0) {
-      const approvedSteps = this.approvalChain.filter(
-        (step) => step.status === "approved"
-      ).length;
-      const approvalProgress = (approvedSteps / this.approvalChain.length) * 35;
-      overallProgress += approvalProgress;
-      totalSteps += 35;
-    }
+    const implementationProgressWeight =
+      (this.implementationProgress / 100) * implementationWeight;
 
-    // 3. Workflow Progress (40% weight)
-    let workflowProgress = 0;
-    let workflowSteps = 0;
+    overallProgress = approvalProgressWeight + implementationProgressWeight;
 
-    // Check if this is an internal or external project
-    const isInternalProject =
-      !this.category || !this.category.includes("external");
-
-    // Inventory creation and completion (20% for internal, 15% for external)
-    const inventoryWeight = isInternalProject ? 20 : 15;
-    if (this.workflowTriggers?.inventoryCreated) {
-      workflowProgress += inventoryWeight * 0.33; // 33% of weight for creation
-    }
-    if (this.workflowTriggers?.inventoryCompleted) {
-      workflowProgress += inventoryWeight * 0.67; // 67% of weight for completion
-    }
-    workflowSteps += inventoryWeight;
-
-    // Procurement initiation and completion (20% for internal, 15% for external)
-    const procurementWeight = isInternalProject ? 20 : 15;
-    if (this.workflowTriggers?.procurementInitiated) {
-      workflowProgress += procurementWeight * 0.33; // 33% of weight for initiation
-    }
-    if (this.workflowTriggers?.procurementCompleted) {
-      workflowProgress += procurementWeight * 0.67; // 67% of weight for completion
-    }
-    workflowSteps += procurementWeight;
-
-    // Regulatory compliance (10%) - Only for external projects
-    if (this.category && this.category.includes("external")) {
-      if (this.workflowTriggers?.regulatoryComplianceCompleted) {
-        workflowProgress += 10;
-      }
-      workflowSteps += 10;
-    }
-
-    overallProgress += (workflowProgress / workflowSteps) * 40;
-    totalSteps += 40;
-
-    // Calculate final progress for legacy projects
-    overallProgress = totalSteps > 0 ? overallProgress : 0;
+    // Log progress breakdown for external projects
+    console.log(`📊 [EXTERNAL PROJECT] Progress breakdown:`);
+    console.log(
+      `  - Approval Progress: ${approvalProgressWeight}% (${this.approvalProgress}% of approvals)`
+    );
+    console.log(
+      `  - Implementation Progress: ${implementationProgressWeight}% (${this.implementationProgress}% of tasks)`
+    );
+    console.log(`  - Total: ${overallProgress}%`);
   }
 
   this.progress = Math.round(overallProgress);
 
-  // Save the project with updated progress values
   await this.save();
 
   // Log detailed progress information
@@ -4124,7 +4079,6 @@ projectSchema.methods.updateTwoPhaseProgress = async function () {
   );
   console.log(`  - Overall Progress: ${this.progress}%`);
 
-  // Log approval chain status for debugging
   console.log(
     `🔍 [TWO-PHASE PROGRESS] Approval chain status:`,
     this.approvalChain

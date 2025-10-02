@@ -100,3 +100,17 @@ export const getOverdueTasks = async () => {
     throw error;
   }
 };
+
+// Get my project tasks (user-specific tasks with optional project filter)
+export const getMyProjectTasks = async (projectId = null) => {
+  try {
+    const url = projectId 
+      ? `/projects/my-tasks?projectId=${projectId}`
+      : `/projects/my-tasks`;
+    const response = await api.get(url);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching my project tasks:", error);
+    throw error;
+  }
+};

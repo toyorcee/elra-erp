@@ -185,11 +185,7 @@ const DashboardLayout = () => {
         isMobile,
       }}
     >
-      <style>{`
-        .chat-modal-open .back-to-top-btn {
-          display: none !important;
-        }
-      `}</style>
+      
       <div className="min-h-screen bg-[var(--elra-bg-light)]">
         {/* Fixed Navbar */}
         <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-[var(--elra-border-primary)] shadow-lg shadow-[var(--elra-primary)]/10">
@@ -361,26 +357,7 @@ const DashboardLayout = () => {
         {/* Customer Care Floating Chat Button */}
         <CustomerCareChat />
 
-        {/* Back to Top Arrow - Shows everywhere, hidden when chat modal is open */}
-        <button
-          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          className="back-to-top-btn fixed bottom-6 left-6 z-50 p-3 bg-[var(--elra-primary)] text-white rounded-full shadow-lg hover:bg-[var(--elra-primary-dark)] transition-all duration-300 hover:scale-110"
-          title="Back to top"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M5 10l7-7m0 0l7 7m-7-7v18"
-            />
-          </svg>
-        </button>
+        
 
         {/* Main Content Area */}
         <div className="flex flex-1 pt-16 min-h-screen">

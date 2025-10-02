@@ -21,6 +21,7 @@ import { formatMessageTime } from "../../../../types/messageTypes";
 import messageService from "../../../../services/messageService";
 import defaultAvatar from "../../../../assets/defaulticon.jpg";
 import Skeleton from "../../../../components/common/Skeleton";
+import Profile from "../../Profile";
 
 const InternalMessages = () => {
   const { user } = useAuth();
@@ -58,6 +59,9 @@ const InternalMessages = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showProfileView, setShowProfileView] = useState(false);
+  const [profileUser, setProfileUser] = useState(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -111,8 +115,6 @@ const InternalMessages = () => {
       },
     ],
   };
-
-  // Sidebar for this module is populated automatically by DynamicSidebarContext
 
   // Image utility functions
   const getDefaultAvatar = () => {
@@ -202,6 +204,32 @@ const InternalMessages = () => {
     }
   };
 
+  const handleShowProfile = async () => {
+    try {
+      setIsLoadingProfile(true);
+      setShowProfileView(true);
+
+      if (selectedConversation && selectedConversation._id) {
+        const otherUser = selectedConversation._id;
+
+        setProfileUser(otherUser);
+      }
+
+      setTimeout(() => {
+        setIsLoadingProfile(false);
+      }, 1000);
+    } catch (error) {
+      console.error("Error loading profile:", error);
+      setIsLoadingProfile(false);
+    }
+  };
+
+  const handleBackToMessages = () => {
+    setShowProfileView(false);
+    setProfileUser(null);
+    setIsLoadingProfile(false);
+  };
+
   const cancelDeleteMessage = () => {
     setShowDeleteConfirm(false);
     setMessageToDelete(null);
@@ -247,7 +275,6 @@ const InternalMessages = () => {
     }
   };
 
-  // Handle typing
   const handleTyping = (e) => {
     setMessageText(e.target.value);
     setIsTyping(true);
@@ -261,7 +288,6 @@ const InternalMessages = () => {
     }, 1000);
   };
 
-  // Handle key press
   const handleKeyPress = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -269,17 +295,18 @@ const InternalMessages = () => {
     }
   };
 
-  // Start new conversation (no endpoint): select user and load history
   const handleStartNewConversation = async (user) => {
     try {
       setSelectedConversation({ _id: user });
+      setShowProfileView(false);
+      setProfileUser(null);
+      setIsLoadingProfile(false);
       await loadChatHistory(user._id);
     } catch (error) {
       console.error("Error starting conversation:", error);
     }
   };
 
-  // Get available users for new conversation
   const getAvailableUsers = async () => {
     setIsLoadingUsers(true);
     try {
@@ -343,8 +370,8 @@ const InternalMessages = () => {
       transition={{ duration: 0.5 }}
       className="h-screen bg-gray-50 flex"
     >
-      {/* Left Sidebar - 30% */}
-      <div className="w-1/3 bg-white border-r border-gray-200 flex flex-col">
+      {/* Left Sidebar - 30% - Fixed */}
+      <div className="w-1/3 bg-white border-r border-gray-200 flex flex-col h-screen overflow-hidden">
         {/* Header */}
         <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-pink-50 to-white">
           <div className="flex items-center justify-between mb-4">
@@ -500,6 +527,9 @@ const InternalMessages = () => {
                   }`}
                   onClick={async () => {
                     setSelectedConversation(conversation);
+                    setShowProfileView(false);
+                    setProfileUser(null);
+                    setIsLoadingProfile(false);
                     setIsLoadingMessages(true);
                     try {
                       await loadChatHistory(conversation._id._id);
@@ -620,228 +650,283 @@ const InternalMessages = () => {
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                  <button
+                    onClick={handleShowProfile}
+                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                    title="View Profile"
+                  >
                     <EllipsisVerticalIcon className="h-5 w-5" />
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {isLoadingMessages ? (
-                <div className="space-y-4">
-                  {/* Message Loading Skeletons */}
-                  {[1, 2, 3, 4].map((i) => (
-                    <div
-                      key={i}
-                      className={`flex ${
-                        i % 2 === 0 ? "justify-end" : "justify-start"
-                      }`}
-                    >
-                      <div
-                        className={`flex space-x-2 max-w-xs lg:max-w-md ${
-                          i % 2 === 0 ? "flex-row-reverse space-x-reverse" : ""
-                        }`}
-                      >
-                        <Skeleton
-                          width="w-8"
-                          height="h-8"
-                          rounded="rounded-full"
-                        />
-                        <div
-                          className={`px-4 py-2 rounded-lg ${
-                            i % 2 === 0 ? "bg-pink-200" : "bg-gray-200"
-                          }`}
-                        >
-                          <Skeleton width="w-32" height="h-4" />
-                          <Skeleton
-                            width="w-16"
-                            height="h-3"
-                            className="mt-1"
-                          />
-                        </div>
+            {/* Messages Area or Profile View */}
+            {showProfileView ? (
+              <div className="flex-1 flex flex-col">
+                {isLoadingProfile ? (
+                  <div className="p-8 space-y-4">
+                    {/* Profile Loading Skeleton */}
+                    <div className="flex items-center space-x-4 mb-6">
+                      <Skeleton
+                        width="w-16"
+                        height="h-16"
+                        rounded="rounded-full"
+                      />
+                      <div className="space-y-2">
+                        <Skeleton width="w-32" height="h-4" />
+                        <Skeleton width="w-24" height="h-3" />
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                getMessagesForUser(selectedConversation._id._id).map(
-                  (message) => {
-                    const isOwnMessage =
-                      message.sender._id === (user._id || user.id);
-
-                    return (
-                      <motion.div
-                        key={message._id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
+                    <div className="space-y-4">
+                      <Skeleton width="w-full" height="h-4" />
+                      <Skeleton width="w-3/4" height="h-4" />
+                      <Skeleton width="w-1/2" height="h-4" />
+                    </div>
+                    <div className="space-y-4 mt-8">
+                      <Skeleton width="w-full" height="h-20" />
+                      <Skeleton width="w-full" height="h-20" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col">
+                    <div className="p-4 border-b border-gray-200 bg-gray-50 flex-shrink-0">
+                      <button
+                        onClick={handleBackToMessages}
+                        className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
+                      >
+                        <XMarkIcon className="h-4 w-4" />
+                        <span>Back to Messages</span>
+                      </button>
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <Profile user={profileUser} isViewingOtherUser={true} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {isLoadingMessages ? (
+                  <div className="space-y-4">
+                    {/* Message Loading Skeletons */}
+                    {[1, 2, 3, 4].map((i) => (
+                      <div
+                        key={i}
                         className={`flex ${
-                          isOwnMessage ? "justify-end" : "justify-start"
+                          i % 2 === 0 ? "justify-end" : "justify-start"
                         }`}
                       >
                         <div
                           className={`flex space-x-2 max-w-xs lg:max-w-md ${
-                            isOwnMessage
+                            i % 2 === 0
                               ? "flex-row-reverse space-x-reverse"
                               : ""
                           }`}
                         >
-                          <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
-                            {getAvatarDisplay(message.sender)}
-                          </div>
+                          <Skeleton
+                            width="w-8"
+                            height="h-8"
+                            rounded="rounded-full"
+                          />
                           <div
                             className={`px-4 py-2 rounded-lg ${
-                              isOwnMessage
-                                ? "bg-[var(--elra-primary)] text-white"
-                                : "bg-gray-200 text-gray-900"
+                              i % 2 === 0 ? "bg-pink-200" : "bg-gray-200"
                             }`}
                           >
-                            <p className="text-sm">{message.content}</p>
-                            {message.document && (
-                              <div className="mt-2 p-2 bg-white bg-opacity-20 rounded-lg">
-                                <div className="flex items-center space-x-2">
-                                  <PaperClipIcon className="h-4 w-4" />
-                                  <span className="text-sm font-medium">
-                                    {message.document.originalFileName ||
-                                      message.document.title}
-                                  </span>
-                                  <button
-                                    onClick={() =>
-                                      window.open(
-                                        `/api/documents/${message.document._id}/view`,
-                                        "_blank"
-                                      )
-                                    }
-                                    className="text-xs bg-white bg-opacity-30 px-2 py-1 rounded hover:bg-opacity-50"
-                                  >
-                                    View
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                            <div
-                              className={`flex items-center justify-between mt-1 text-xs ${
-                                isOwnMessage
-                                  ? "text-[var(--elra-secondary-3)]"
-                                  : "text-gray-500"
-                              }`}
-                            >
-                              <span>
-                                {formatMessageTime(message.createdAt)}
-                              </span>
-                              {isOwnMessage && (
-                                <div className="flex items-center gap-1">
-                                  {message.status === "sent" && (
-                                    <CheckIcon className="h-3 w-3" />
-                                  )}
-                                  {message.status === "delivered" && (
-                                    <div className="flex">
-                                      <CheckIcon className="h-3 w-3" />
-                                      <CheckIcon className="h-3 w-3 -ml-1" />
-                                    </div>
-                                  )}
-                                  {message.status === "read" && (
-                                    <div className="flex">
-                                      <CheckIcon className="h-3 w-3 text-blue-500" />
-                                      <CheckIcon className="h-3 w-3 text-blue-500 -ml-1" />
-                                    </div>
-                                  )}
-                                  <button
-                                    onClick={() => handleDeleteMessage(message)}
-                                    className="ml-2 p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors"
-                                    title="Delete message"
-                                  >
-                                    <TrashIcon className="h-3 w-3" />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
+                            <Skeleton width="w-32" height="h-4" />
+                            <Skeleton
+                              width="w-16"
+                              height="h-3"
+                              className="mt-1"
+                            />
                           </div>
                         </div>
-                      </motion.div>
-                    );
-                  }
-                )
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  getMessagesForUser(selectedConversation._id._id).map(
+                    (message) => {
+                      const isOwnMessage =
+                        message.sender._id === (user._id || user.id);
+
+                      return (
+                        <motion.div
+                          key={message._id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className={`flex ${
+                            isOwnMessage ? "justify-end" : "justify-start"
+                          }`}
+                        >
+                          <div
+                            className={`flex space-x-2 max-w-xs lg:max-w-md ${
+                              isOwnMessage
+                                ? "flex-row-reverse space-x-reverse"
+                                : ""
+                            }`}
+                          >
+                            <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                              {getAvatarDisplay(message.sender)}
+                            </div>
+                            <div
+                              className={`px-4 py-2 rounded-lg ${
+                                isOwnMessage
+                                  ? "bg-[var(--elra-primary)] text-white"
+                                  : "bg-gray-200 text-gray-900"
+                              }`}
+                            >
+                              <p className="text-sm">{message.content}</p>
+                              {message.document && (
+                                <div className="mt-2 p-2 bg-white bg-opacity-20 rounded-lg">
+                                  <div className="flex items-center space-x-2">
+                                    <PaperClipIcon className="h-4 w-4" />
+                                    <span className="text-sm font-medium">
+                                      {message.document.originalFileName ||
+                                        message.document.title}
+                                    </span>
+                                    <button
+                                      onClick={() =>
+                                        window.open(
+                                          `/api/documents/${message.document._id}/view`,
+                                          "_blank"
+                                        )
+                                      }
+                                      className="text-xs bg-white bg-opacity-30 px-2 py-1 rounded hover:bg-opacity-50"
+                                    >
+                                      View
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                              <div
+                                className={`flex items-center justify-between mt-1 text-xs ${
+                                  isOwnMessage
+                                    ? "text-[var(--elra-secondary-3)]"
+                                    : "text-gray-500"
+                                }`}
+                              >
+                                <span>
+                                  {formatMessageTime(message.createdAt)}
+                                </span>
+                                {isOwnMessage && (
+                                  <div className="flex items-center gap-1">
+                                    {message.status === "sent" && (
+                                      <CheckIcon className="h-3 w-3" />
+                                    )}
+                                    {message.status === "delivered" && (
+                                      <div className="flex">
+                                        <CheckIcon className="h-3 w-3" />
+                                        <CheckIcon className="h-3 w-3 -ml-1" />
+                                      </div>
+                                    )}
+                                    {message.status === "read" && (
+                                      <div className="flex">
+                                        <CheckIcon className="h-3 w-3 text-blue-500" />
+                                        <CheckIcon className="h-3 w-3 text-blue-500 -ml-1" />
+                                      </div>
+                                    )}
+                                    <button
+                                      onClick={() =>
+                                        handleDeleteMessage(message)
+                                      }
+                                      className="ml-2 p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors"
+                                      title="Delete message"
+                                    >
+                                      <TrashIcon className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    }
+                  )
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            )}
 
             {/* Message Input */}
-            <div className="p-4 border-t border-gray-200 bg-white">
-              {/* Selected File Preview */}
-              {selectedFile && (
-                <div className="mb-3 p-3 bg-gray-50 rounded-lg flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
+            {!showProfileView && (
+              <div className="p-4 border-t border-gray-200 bg-white">
+                {/* Selected File Preview */}
+                {selectedFile && (
+                  <div className="mb-3 p-3 bg-gray-50 rounded-lg flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <PaperClipIcon className="h-5 w-5 text-gray-500" />
+                      <span className="text-sm text-gray-700">
+                        {selectedFile.name}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleRemoveFile}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <XMarkIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex space-x-2">
+                  {/* File Upload Button */}
+                  <label className="flex items-center justify-center px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
                     <PaperClipIcon className="h-5 w-5 text-gray-500" />
-                    <span className="text-sm text-gray-700">
-                      {selectedFile.name}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-                    </span>
+                    <input
+                      type="file"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif"
+                    />
+                  </label>
+
+                  <div className="flex-1 relative">
+                    <textarea
+                      value={messageText}
+                      onChange={handleTyping}
+                      onKeyPress={handleKeyPress}
+                      placeholder="Type a message..."
+                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
+                      rows="1"
+                    />
+                    {isTyping && (
+                      <div className="absolute right-2 top-2">
+                        <div className="flex space-x-1">
+                          <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"></div>
+                          <div
+                            className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"
+                            style={{ animationDelay: "0.1s" }}
+                          ></div>
+                          <div
+                            className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"
+                            style={{ animationDelay: "0.2s" }}
+                          ></div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <button
-                    onClick={handleRemoveFile}
-                    className="text-gray-400 hover:text-gray-600"
+                    onClick={handleSendMessage}
+                    disabled={
+                      (!messageText.trim() && !selectedFile) || isUploadingFile
+                    }
+                    className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    <XMarkIcon className="h-4 w-4" />
+                    {isUploadingFile ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    ) : (
+                      <PaperAirplaneIcon className="h-5 w-5" />
+                    )}
                   </button>
                 </div>
-              )}
-
-              <div className="flex space-x-2">
-                {/* File Upload Button */}
-                <label className="flex items-center justify-center px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                  <PaperClipIcon className="h-5 w-5 text-gray-500" />
-                  <input
-                    type="file"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif"
-                  />
-                </label>
-
-                <div className="flex-1 relative">
-                  <textarea
-                    value={messageText}
-                    onChange={handleTyping}
-                    onKeyPress={handleKeyPress}
-                    placeholder="Type a message..."
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
-                    rows="1"
-                  />
-                  {isTyping && (
-                    <div className="absolute right-2 top-2">
-                      <div className="flex space-x-1">
-                        <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div
-                          className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "0.1s" }}
-                        ></div>
-                        <div
-                          className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "0.2s" }}
-                        ></div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={handleSendMessage}
-                  disabled={
-                    (!messageText.trim() && !selectedFile) || isUploadingFile
-                  }
-                  className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isUploadingFile ? (
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  ) : (
-                    <PaperAirplaneIcon className="h-5 w-5" />
-                  )}
-                </button>
               </div>
-            </div>
+            )}
           </>
         ) : (
           /* No Conversation Selected */

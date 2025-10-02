@@ -3,9 +3,7 @@ import User from "../models/User.js";
 import Project from "../models/Project.js";
 import Procurement from "../models/Procurement.js";
 import mongoose from "mongoose";
-import { generateInventoryCompletionPDF } from "../utils/pdfUtils.js";
 import NotificationService from "../services/notificationService.js";
-import { sendInventoryCompletionEmail } from "../services/emailService.js";
 import { upload } from "../utils/fileUtils.js";
 import { uploadMultipleDocuments } from "../middleware/upload.js";
 import { UNIFIED_CATEGORIES } from "../constants/unifiedCategories.js";
@@ -193,14 +191,19 @@ export const getAllInventory = async (req, res) => {
     const currentUser = req.user;
     let query = { isActive: true };
 
-    // SUPER_ADMIN (1000) - see all inventory across all departments
+    if (req.query.projectId) {
+      query.project = req.query.projectId;
+      console.log(
+        "🔍 [INVENTORY] Filtering by projectId:",
+        req.query.projectId
+      );
+    }
+
     if (currentUser.role.level >= 1000) {
       console.log(
         "🔍 [INVENTORY] Super Admin - showing all inventory across all departments"
       );
-    }
-    // HOD (700) - see inventory in their department
-    else if (currentUser.role.level >= 700) {
+    } else if (currentUser.role.level >= 700) {
       if (!currentUser.department) {
         return res.status(403).json({
           success: false,
@@ -213,14 +216,10 @@ export const getAllInventory = async (req, res) => {
         "🔍 [INVENTORY] HOD - showing inventory for department:",
         currentUser.department.name
       );
-    }
-    // STAFF (300) - see inventory they manage
-    else if (currentUser.role.level >= 300) {
+    } else if (currentUser.role.level >= 300) {
       query.assignedTo = currentUser._id;
       console.log("🔍 [INVENTORY] Staff - showing assigned inventory only");
-    }
-    // Others - no access
-    else {
+    } else {
       return res.status(403).json({
         success: false,
         message: "Access denied. Insufficient permissions to view inventory.",
@@ -471,123 +470,9 @@ export const updateInventory = async (req, res) => {
       });
     }
 
-    let pdfBuffer = null;
-    let pdfDocument = null;
-
-    if (isCompletion) {
-      console.log(
-        `📄 [INVENTORY] ${
-          isEdit ? "Regenerating" : "Generating"
-        } completion PDF for: ${inventory.code}...`
-      );
-      console.log(`📄 [INVENTORY] PDF Generation Details:`, {
-        inventoryCode: inventory.code,
-        inventoryName: inventory.name,
-        projectId: inventory.project,
-        procurementId: inventory.procurementId,
-        completedBy: currentUser.username,
-        completedAt: new Date().toISOString(),
-        specifications: updateData.specifications,
-        deliveryInfo: {
-          condition: updateData.deliveryCondition,
-          receivedBy: updateData.receivedBy,
-          receivedDate: updateData.receivedDate,
-        },
-        maintenanceInfo: updateData.maintenance,
-        documentCount: updateData.documents?.length || 0,
-      });
-
-      try {
-        // Generate PDF
-        pdfBuffer = await generateInventoryCompletionPDF(
-          { ...inventory.toObject(), ...updateData },
-          inventory.project,
-          inventory.procurementId,
-          currentUser
-        );
-
-        const timestamp = new Date().toISOString().split("T")[0];
-        const filename = isEdit
-          ? `Inventory_Completion_${inventory.code}_${timestamp}_Updated.pdf`
-          : `Inventory_Completion_${inventory.code}_${timestamp}.pdf`;
-
-        const fs = await import("fs");
-        const path = await import("path");
-        const uploadsDir = path.join(process.cwd(), "uploads", "documents");
-
-        // Ensure uploads directory exists
-        if (!fs.existsSync(uploadsDir)) {
-          fs.mkdirSync(uploadsDir, { recursive: true });
-        }
-
-        const filePath = path.join(uploadsDir, filename);
-        fs.writeFileSync(filePath, pdfBuffer);
-
-        // Create Document record for the PDF
-        const Document = mongoose.model("Document");
-        const pdfDocumentRecord = new Document({
-          title: `Inventory Completion Certificate - ${inventory.code}`,
-          description: `Completion certificate for inventory item ${inventory.code}`,
-          fileName: filename,
-          originalFileName: filename,
-          fileUrl: filePath.replace(/\\/g, "/"),
-          fileSize: pdfBuffer.length,
-          mimeType: "application/pdf",
-          documentType: "report",
-          category: "administrative",
-          archiveCategory: "project",
-          status: "approved",
-          createdBy: currentUser._id,
-          uploadedBy: currentUser._id,
-          isActive: true,
-          metadata: {
-            inventoryCode: inventory.code,
-            inventoryName: inventory.name,
-            generatedAt: new Date(),
-            type: "completion_certificate",
-          },
-        });
-
-        const savedPdfDocument = await pdfDocumentRecord.save();
-        console.log(
-          `✅ [INVENTORY] PDF Document saved to database: ${savedPdfDocument._id}`
-        );
-
-        pdfDocument = {
-          _id: savedPdfDocument._id,
-          name: filename,
-          type: "completion_certificate",
-          filename: filename,
-          path: `/uploads/${filename}`,
-          uploadedAt: new Date(),
-          uploadedBy: currentUser._id,
-          size: pdfBuffer.length,
-          contentType: "application/pdf",
-        };
-
-        console.log(
-          `✅ [INVENTORY] PDF generated successfully for: ${inventory.code}`
-        );
-        console.log(
-          `   - PDF Size: ${(pdfBuffer.length / 1024).toFixed(2)} KB`
-        );
-        console.log(`   - PDF Filename: ${pdfDocument.name}`);
-        console.log(`   - PDF Type: ${pdfDocument.type}`);
-        console.log(
-          `   - Generated At: ${pdfDocument.uploadedAt.toISOString()}`
-        );
-      } catch (pdfError) {
-        console.error(
-          `❌ [INVENTORY] PDF generation failed for: ${inventory.code}:`,
-          pdfError
-        );
-        console.error(`❌ [INVENTORY] PDF Error Details:`, {
-          error: pdfError.message,
-          stack: pdfError.stack,
-          inventoryCode: inventory.code,
-        });
-      }
-    }
+    // Disable completion PDFs/emails: no PDF generation or document creation
+    const pdfBuffer = null;
+    const pdfDocument = null;
 
     // Essential log: What's being saved
     console.log("💾 [SAVING] Data being saved to database:", {
@@ -723,24 +608,52 @@ export const updateInventory = async (req, res) => {
         });
       }
 
-      console.log("📧 [NOTIFICATIONS] Sending completion notifications...");
-
+      console.log(
+        "📧 [NOTIFICATIONS] Sending completion notifications (no emails, no PDFs)..."
+      );
       await sendInventoryCompletionNotifications(
         updatedInventory,
         currentUser,
-        pdfBuffer,
+        null,
         isEdit
       );
 
-      if (updatedInventory.project?.requiresBudgetAllocation) {
+      const shouldTriggerImplementation =
+        updatedInventory.project?.requiresBudgetAllocation === true ||
+        updatedInventory.project?.projectScope === "external";
+
+      if (shouldTriggerImplementation) {
         console.log(
           "🚀 [IMPLEMENTATION] Setting project to implementation status:",
           {
             projectCode: updatedInventory.project.code,
             projectName: updatedInventory.project.name,
+            projectScope: updatedInventory.project.projectScope,
+            requiresBudgetAllocation:
+              updatedInventory.project.requiresBudgetAllocation,
             status: "implementation",
           }
         );
+
+        // Actually update the project status to implementation
+        try {
+          const Project = await import("../models/Project.js");
+          const project = await Project.default.findById(
+            updatedInventory.project._id
+          );
+
+          if (project) {
+            await project.completeInventory(currentUser._id);
+            console.log(
+              "✅ [IMPLEMENTATION] Project status updated to implementation"
+            );
+          }
+        } catch (projectError) {
+          console.error(
+            "❌ [IMPLEMENTATION] Error updating project status:",
+            projectError
+          );
+        }
       }
     }
 
@@ -752,8 +665,8 @@ export const updateInventory = async (req, res) => {
         ? "Inventory item completed successfully"
         : "Inventory item updated successfully",
       data: updatedInventory,
-      pdfGenerated: !!pdfBuffer,
-      pdfSize: pdfBuffer ? pdfBuffer.length : 0,
+      pdfGenerated: false,
+      pdfSize: 0,
     });
   } catch (error) {
     console.error("❌ [INVENTORY] Update inventory error:", error);

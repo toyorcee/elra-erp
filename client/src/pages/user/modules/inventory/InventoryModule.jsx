@@ -1,5 +1,6 @@
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { useAuth } from "../../../../context/AuthContext";
 import { GradientSpinner } from "../../../../components/common";
 import {
@@ -7,14 +8,7 @@ import {
   FaList,
   FaChartLine,
   FaSearch,
-  FaPlus,
-  FaEdit,
-  FaTrash,
-  FaEye,
-  FaWarehouse,
-  FaBarcode,
   FaClipboardList,
-  FaExclamationTriangle,
 } from "react-icons/fa";
 
 const InventoryModule = () => {
@@ -38,7 +32,6 @@ const InventoryModule = () => {
       return false;
     }
 
-    // Check hidden function
     if (item.hidden && typeof item.hidden === "function") {
       return !item.hidden(user);
     }
@@ -130,78 +123,91 @@ const InventoryModule = () => {
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto py-8 px-4">
-      {/* Header Section */}
-      <div className="mb-8">
-        <div className="flex items-center mb-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center mr-4">
-            <FaBoxes className="h-6 w-6 text-white" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50">
+      {/* Hero Section with Animated Background */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0">
+          <div className="absolute top-0 left-0 w-72 h-72 bg-gradient-to-br from-blue-400/20 to-cyan-400/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-emerald-400/20 to-teal-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute bottom-0 left-1/4 w-80 h-80 bg-gradient-to-tr from-cyan-400/20 to-blue-400/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
+        </div>
+        <div className="relative z-10 px-6 py-16">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="text-center mb-16"
+          >
+            <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-3xl mb-8 shadow-2xl">
+              <FaBoxes className="h-12 w-12 text-white" />
           </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Inventory Management
+            <h1 className="text-6xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-emerald-600 bg-clip-text text-transparent mb-6">
+              Inventory Hub
             </h1>
-            <p className="text-gray-600">
-              Comprehensive inventory tracking, management, and reporting tools
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+              Track stock, manage workflows, and get insights that power
+              reliable operations.
             </p>
-          </div>
+          </motion.div>
         </div>
       </div>
 
-      {/* Welcome Section */}
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Welcome to Inventory Management
+      {/* Features Section */}
+      <div className="px-6 pb-20">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="text-center mb-16"
+        >
+          <h2 className="text-4xl font-bold text-gray-900 mb-4">
+            Powerful Features
         </h2>
-        <p className="text-gray-600">
-          Manage your inventory, track stock levels, and generate comprehensive
-          reports for better business insights.
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Everything you need to manage inventory efficiently and effectively
         </p>
-      </div>
+        </motion.div>
 
-      {/* Core Features Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        {inventoryFeatures.map((feature) => {
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {inventoryFeatures.map((feature, index) => {
           const IconComponent = feature.icon;
           return (
-            <div
+              <motion.div
               key={feature.title}
-              className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer border border-gray-200 group"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 + index * 0.2 }}
+                className="group cursor-pointer"
               onClick={() => navigate(feature.path)}
             >
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`p-3 rounded-lg ${feature.color}`}>
-                    <IconComponent className="h-6 w-6 text-white" />
+                <div
+                  className={`relative bg-gradient-to-br from-white to-gray-50 rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 border border-white/20 backdrop-blur-sm`}
+                >
+                  <div className="relative z-10">
+                    <div className="flex items-start justify-between mb-6">
+                      <div
+                        className={`p-4 rounded-2xl ${feature.color} shadow-lg`}
+                      >
+                        <IconComponent className="h-8 w-8 text-white" />
                   </div>
-                  <div className="flex flex-col items-end">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        feature.status === "Active"
-                          ? "bg-green-100 text-green-800"
-                          : feature.status === "Available"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
+                      <div className="flex flex-col items-end space-y-2">
+                        <span className="px-3 py-1 bg-white/80 backdrop-blur-sm rounded-full text-xs font-semibold text-gray-700">
                       {feature.status}
                     </span>
-                    <span className="text-xs text-gray-500 mt-1">
+                        <span className="px-3 py-1 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full text-xs font-semibold">
                       {feature.badge}
                     </span>
                   </div>
                 </div>
-
-                <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-blue-600 transition-colors">
                   {feature.title}
                 </h3>
-                <p className="text-gray-600 text-sm leading-relaxed mb-4">
+                    <p className="text-gray-600 mb-6 leading-relaxed">
                   {feature.description}
                 </p>
-
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center text-blue-600 text-sm font-medium">
-                    <span>Access Feature</span>
+                      <div className="flex items-center text-blue-600 font-medium">
+                        <span>Explore</span>
                     <svg
                       className="ml-2 h-4 w-4 transform group-hover:translate-x-1 transition-transform"
                       fill="none"
@@ -219,34 +225,73 @@ const InventoryModule = () => {
                 </div>
               </div>
             </div>
+              </motion.div>
           );
         })}
       </div>
 
       {/* Quick Actions Section */}
-      <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+          className="mt-20"
+        >
+          <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20">
+            <div className="text-center mb-8">
+              <h3 className="text-3xl font-bold text-gray-900 mb-4">
           Quick Actions
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {quickActions.map((action) => {
+              <p className="text-gray-600">
+                Jump into the most common inventory tasks
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {quickActions.map((action, index) => {
             const IconComponent = action.icon;
             return (
-              <button
+                  <motion.button
                 key={action.title}
-                className="flex items-center p-4 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 group"
-                onClick={() => (window.location.href = action.path)}
-              >
-                <div className={`p-2 rounded-lg ${action.color} mr-3`}>
-                  <IconComponent className="h-5 w-5 text-white" />
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.9 + index * 0.1 }}
+                    className="group flex items-center p-6 rounded-2xl bg-gradient-to-r from-white to-gray-50 hover:from-blue-50 hover:to-cyan-50 border border-gray-200 hover:border-blue-300 transition-all duration-300 transform hover:scale-105"
+                    onClick={() => navigate(action.path)}
+                  >
+                    <div
+                      className={`p-3 rounded-xl ${action.color} mr-4 shadow-lg`}
+                    >
+                      <IconComponent className="h-6 w-6 text-white" />
                 </div>
-                <span className="text-gray-700 font-medium group-hover:text-blue-600 transition-colors">
+                    <div className="flex-1 text-left">
+                      <span className="text-gray-800 font-semibold group-hover:text-blue-600 transition-colors">
                   {action.title}
                 </span>
-              </button>
+                      <div className="flex items-center mt-1">
+                        <span className="text-sm text-gray-500">
+                          Access now
+                        </span>
+                        <svg
+                          className="ml-2 h-3 w-3 text-blue-500 transform group-hover:translate-x-1 transition-transform"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </motion.button>
             );
           })}
         </div>
+          </div>
+        </motion.div>
       </div>
     </div>
   );

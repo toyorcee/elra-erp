@@ -200,7 +200,7 @@ export const getNextProjectCode = async (req, res) => {
 const generateNextExternalProjectCode = async () => {
   try {
     const currentYear = new Date().getFullYear();
-    const prefix = "EXT"; // External project prefix
+    const prefix = "EXT";
 
     // Count external projects in current year
     const count = await Project.countDocuments({
@@ -493,14 +493,6 @@ export const addVendorToProject = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Project not found.",
-      });
-    }
-
-    // Check if project is in pending_vendor_assignment status
-    if (project.status !== "pending_vendor_assignment") {
-      return res.status(400).json({
-        success: false,
-        message: "Project is not in pending vendor assignment status.",
       });
     }
 
@@ -1771,9 +1763,38 @@ export const createProject = async (req, res) => {
             }
 
             if (Object.keys(approverQuery).length > 0) {
-              const approver = await User.findOne(approverQuery).populate(
+              let approver = await User.findOne(approverQuery).populate(
                 "department"
               );
+
+              // Fallback logic for Finance: if strict role+department match not found, try senior roles (level >= 700)
+              if (!approver && nextApproval.level === "finance") {
+                try {
+                  console.log(
+                    "⚠️ [NOTIFICATION] No Finance HOD found by role name, trying by role level"
+                  );
+                  const financeDept = await mongoose
+                    .model("Department")
+                    .findOne({ name: "Finance & Accounting" });
+                  const seniorRoles = await mongoose
+                    .model("Role")
+                    .find({ level: { $gte: 700 } }, { _id: 1 });
+                  const seniorRoleIds = seniorRoles.map((r) => r._id);
+
+                  if (financeDept && seniorRoleIds.length > 0) {
+                    approver = await User.findOne({
+                      department: financeDept._id,
+                      role: { $in: seniorRoleIds },
+                      isActive: true,
+                    }).populate("department");
+                  }
+                } catch (fallbackErr) {
+                  console.error(
+                    "❌ [NOTIFICATION] Finance fallback lookup error:",
+                    fallbackErr
+                  );
+                }
+              }
 
               if (approver) {
                 console.log(
@@ -5967,6 +5988,74 @@ export const getMyProjects = async (req, res) => {
   }
 };
 
+// @desc    Get my project tasks
+// @route   GET /api/projects/my-tasks
+// @access  Private
+export const getMyProjectTasks = async (req, res) => {
+  try {
+    const currentUser = req.user;
+    const { projectId } = req.query;
+
+    // Import Task model dynamically to avoid circular dependency
+    const TaskModule = await import("../models/Task.js");
+    const Task = TaskModule.default;
+
+    // Build query
+    let query = {
+      assignedTo: currentUser._id,
+      isActive: true,
+    };
+
+    // Add project filter if provided
+    if (projectId) {
+      query.project = projectId;
+      console.log("🔍 [PROJECT TASKS] Filtering by projectId:", projectId);
+    }
+
+    const tasks = await Task.find(query)
+      .populate("project", "name code projectScope status")
+      .populate("assignedBy", "firstName lastName email")
+      .populate("assignedTo", "firstName lastName email")
+      .sort({ createdAt: -1 });
+
+    let projects = [];
+    if (!projectId) {
+      projects = await Project.find({
+        $or: [
+          { createdBy: currentUser._id },
+          { projectManager: currentUser._id },
+          { "teamMembers.user": currentUser._id },
+        ],
+        isActive: true,
+      })
+        .select("name code projectScope status")
+        .sort({ createdAt: -1 });
+    }
+
+    console.log(
+      `📋 [MY TASKS] Found ${tasks.length} tasks for user ${
+        currentUser.firstName
+      } ${currentUser.lastName}${
+        projectId ? ` (filtered by project: ${projectId})` : ""
+      }`
+    );
+
+    res.status(200).json({
+      success: true,
+      data: tasks,
+      projects: projects,
+      totalTasks: tasks.length,
+    });
+  } catch (error) {
+    console.error("❌ [MY TASKS] Error getting user tasks:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get project tasks",
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Get project analytics
 // @route   GET /api/projects/analytics
 // @access  Private (HOD+)
@@ -6267,7 +6356,7 @@ export const getProjectProgress = async (req, res) => {
 
     // Get workflow status for external projects
     let workflowStatus = null;
-    if (project.scope === "external" && project.status === "approved") {
+    if (project.projectScope === "external" && project.status === "approved") {
       workflowStatus = {
         inventory: project.inventoryStatus || "pending",
         procurement: project.procurementStatus || "pending",
@@ -6325,7 +6414,7 @@ export const completeRegulatoryCompliance = async (req, res) => {
 
     // Check if project is external and in legal compliance stage
     if (
-      project.scope !== "external" ||
+      project.projectScope !== "external" ||
       project.status !== "pending_legal_compliance_approval"
     ) {
       return res.status(400).json({
@@ -6430,7 +6519,7 @@ export const getRegulatoryComplianceStatus = async (req, res) => {
     }
 
     // Only external projects have regulatory compliance
-    if (project.scope !== "external") {
+    if (project.projectScope !== "external") {
       return res.status(400).json({
         success: false,
         message: "Regulatory compliance only applies to external projects.",
@@ -6444,7 +6533,7 @@ export const getRegulatoryComplianceStatus = async (req, res) => {
           id: project._id,
           name: project.name,
           code: project.code,
-          scope: project.scope,
+          scope: project.projectScope,
         },
         compliance: {
           status: project.regulatoryComplianceStatus || "pending",
@@ -6701,7 +6790,7 @@ export const getProjectsNeedingInventory = async (req, res) => {
 
     // Find external projects that are approved but inventory is pending
     const projects = await Project.find({
-      scope: "external",
+      projectScope: "external",
       status: "approved",
       inventoryStatus: { $in: ["pending", null] },
       isActive: true,
@@ -7367,22 +7456,23 @@ For questions or clarifications, contact the Project Management Office.
   }
 };
 
-// Generate Compliance Certificate
-export const generateComplianceCertificate = async (req, res) => {
+// Generate Project Certificate (Unified for all project scopes)
+export const generateProjectCertificate = async (req, res) => {
   try {
     const { id } = req.params;
     const user = req.user;
 
     console.log(
-      `🏆 [COMPLIANCE CERTIFICATE] Generating certificate for project: ${id}`
+      `🏆 [PROJECT CERTIFICATE] Generating certificate for project: ${id}`
     );
 
-    // Find the project with compliance program
+    // Find the project with all necessary data
     const project = await Project.findById(id)
       .populate("complianceProgram")
       .populate("createdBy", "firstName lastName email")
       .populate("projectManager", "firstName lastName email")
-      .populate("department", "name code");
+      .populate("department", "name code")
+      .populate("approvalChain.approver", "firstName lastName email");
 
     if (!project) {
       return res.status(404).json({
@@ -7391,12 +7481,28 @@ export const generateComplianceCertificate = async (req, res) => {
       });
     }
 
-    // For external projects, check if compliance program is attached
-    if (project.projectScope === "external" && !project.complianceProgram) {
-      return res.status(400).json({
-        success: false,
-        message: "No compliance program attached to this external project",
-      });
+    // Check if project is eligible for certificate based on scope
+    if (project.projectScope === "external") {
+      // External projects: Check if both phases are 100% complete
+      if (
+        project.approvalProgress !== 100 ||
+        project.implementationProgress !== 100
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "External project certificate is available only after both approval and implementation phases are 100% complete.",
+        });
+      }
+    } else {
+      // Departmental/Personal projects: Check if project is completed
+      if (project.status !== "completed") {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Project certificate is available only after project completion.",
+        });
+      }
     }
 
     // Fetch compliance items (only for external projects with compliance programs)
@@ -7408,15 +7514,19 @@ export const generateComplianceCertificate = async (req, res) => {
       });
     }
 
-    // Generate certificate number
-    const certificateNumber = `ELRA-COMP-${Date.now()}`;
+    // Generate certificate number and details based on project scope
+    const certificateNumber =
+      project.projectScope === "external"
+        ? `ELRA-COMP-${Date.now()}`
+        : `ELRA-ACH-${Date.now()}`;
+
     const issueDate = new Date().toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
     });
 
-    // Create certificate data
+    // Create certificate data based on project scope
     const certificateData = {
       project: {
         name: project.name,
@@ -7428,7 +7538,18 @@ export const generateComplianceCertificate = async (req, res) => {
         createdBy: project.createdBy,
         projectManager: project.projectManager,
         department: project.department,
+        projectScope: project.projectScope,
+        approvalProgress: project.approvalProgress,
+        implementationProgress: project.implementationProgress,
+        overallProgress: project.progress,
+        clientName: null, // Client name not available in current schema
       },
+      approvalChain: project.approvalChain.map((approval) => ({
+        level: approval.level,
+        approver: approval.approver,
+        approvedAt: approval.approvedAt,
+        comments: approval.comments,
+      })),
       complianceProgram: project.complianceProgram
         ? {
             name: project.complianceProgram.name,
@@ -7454,33 +7575,44 @@ export const generateComplianceCertificate = async (req, res) => {
         number: certificateNumber,
         issueDate: issueDate,
         issuedBy: user.firstName + " " + user.lastName,
-        issuedByTitle: "Legal & Compliance HOD",
-        department: "Legal & Compliance",
+        issuedByTitle:
+          project.projectScope === "external"
+            ? "Legal & Compliance HOD"
+            : "Project Management HOD",
+        department:
+          project.projectScope === "external"
+            ? "Legal & Compliance"
+            : "Project Management",
+        type:
+          project.projectScope === "external"
+            ? "Compliance Certificate"
+            : "Achievement Certificate",
       },
     };
 
     console.log(
-      `✅ [COMPLIANCE CERTIFICATE] Certificate data prepared for project: ${project.name}`
+      `✅ [PROJECT CERTIFICATE] Certificate data prepared for project: ${project.name} (${project.projectScope})`
     );
 
-    // Generate PDF certificate
+    // Generate PDF certificate based on project scope
     const pdfBuffer = await generateComplianceCertificatePDF(certificateData);
 
-    // Set response headers for PDF download
+    // Set response headers for PDF download based on certificate type
+    const certificateType =
+      project.projectScope === "external" ? "Compliance" : "Achievement";
+    const filename = `ELRA-${certificateType}-Certificate-${project.code}.pdf`;
+
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="ELRA-Compliance-Certificate-${project.code}.pdf"`
-    );
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.send(pdfBuffer);
   } catch (error) {
     console.error(
-      "❌ [COMPLIANCE CERTIFICATE] Error generating certificate:",
+      "❌ [PROJECT CERTIFICATE] Error generating certificate:",
       error
     );
     res.status(500).json({
       success: false,
-      message: "Failed to generate compliance certificate",
+      message: "Failed to generate project certificate",
       error: error.message,
     });
   }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import {
   CubeIcon,
   ExclamationTriangleIcon,
@@ -10,6 +11,9 @@ import {
   CalendarIcon,
   CurrencyDollarIcon,
   XMarkIcon,
+  ChartBarIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../../../context/AuthContext";
 import inventoryService from "../../../../services/inventoryService";
@@ -26,7 +30,6 @@ const InventoryTracking = () => {
     type: "all",
     priority: "all",
   });
-  const [searchTerm, setSearchTerm] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -36,7 +39,8 @@ const InventoryTracking = () => {
   const userRole = user?.role?.name || user?.role;
   const userDepartment = user?.department?.name;
   const isSuperAdmin = user?.role?.level === 1000;
-  const isOperationsHOD = user?.role?.level === 700 && userDepartment === "Operations";
+  const isOperationsHOD =
+    user?.role?.level === 700 && userDepartment === "Operations";
   const hasAccess = user && (isSuperAdmin || isOperationsHOD);
 
   if (!hasAccess) {
@@ -47,7 +51,8 @@ const InventoryTracking = () => {
             Access Denied
           </h2>
           <p className="text-gray-600">
-            You don't have permission to access Inventory Tracking. This module is restricted to Super Admin and Operations HOD only.
+            You don't have permission to access Inventory Tracking. This module
+            is restricted to Super Admin and Operations HOD only.
           </p>
         </div>
       </div>
@@ -152,7 +157,7 @@ const InventoryTracking = () => {
     {
       header: "Item Details",
       accessor: "name",
-      cell: (item) => (
+      renderer: (item) => (
         <div className="flex items-center">
           <div className="text-2xl mr-3">{getTypeIcon(item.type)}</div>
           <div>
@@ -166,7 +171,7 @@ const InventoryTracking = () => {
     {
       header: "Maintenance Status",
       accessor: "maintenance",
-      cell: (item) => {
+      renderer: (item) => {
         const priority = getMaintenancePriority(item);
         const daysUntilService = item.maintenance?.nextServiceDate
           ? Math.ceil(
@@ -195,7 +200,7 @@ const InventoryTracking = () => {
     {
       header: "Next Service",
       accessor: "nextServiceDate",
-      cell: (item) => (
+      renderer: (item) => (
         <div>
           <div className="text-sm font-medium text-gray-900">
             {item.maintenance?.nextServiceDate
@@ -214,7 +219,7 @@ const InventoryTracking = () => {
     {
       header: "Location",
       accessor: "location",
-      cell: (item) => (
+      renderer: (item) => (
         <div>
           <div className="text-sm font-medium text-gray-900">
             {item.location?.warehouse || "N/A"}
@@ -225,35 +230,13 @@ const InventoryTracking = () => {
         </div>
       ),
     },
-    {
-      header: "Actions",
-      accessor: "actions",
-      cell: (item) => (
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => handleViewDetails(item._id)}
-            className="p-1 text-blue-600 hover:text-blue-800"
-            title="View Details"
-          >
-            <EyeIcon className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => loadData()}
-            className="p-1 text-gray-600 hover:text-gray-800"
-            title="Refresh"
-          >
-            <ArrowPathIcon className="h-4 w-4" />
-          </button>
-        </div>
-      ),
-    },
   ];
 
   const availableColumns = [
     {
       header: "Item Details",
       accessor: "name",
-      cell: (item) => (
+      renderer: (item) => (
         <div className="flex items-center">
           <div className="text-2xl mr-3">{getTypeIcon(item.type)}</div>
           <div>
@@ -267,7 +250,7 @@ const InventoryTracking = () => {
     {
       header: "Category & Description",
       accessor: "category",
-      cell: (item) => (
+      renderer: (item) => (
         <div>
           <div className="font-medium text-gray-900">{item.category}</div>
           <div className="text-sm text-gray-500 truncate max-w-xs">
@@ -279,7 +262,7 @@ const InventoryTracking = () => {
     {
       header: "Value",
       accessor: "currentValue",
-      cell: (item) => (
+      renderer: (item) => (
         <div className="flex items-center">
           <CurrencyDollarIcon className="h-4 w-4 text-gray-500 mr-1" />
           <span className="text-sm font-medium text-gray-900">
@@ -291,7 +274,7 @@ const InventoryTracking = () => {
     {
       header: "Location",
       accessor: "location",
-      cell: (item) => (
+      renderer: (item) => (
         <div>
           <div className="text-sm font-medium text-gray-900">
             {item.location?.warehouse || "N/A"}
@@ -299,28 +282,6 @@ const InventoryTracking = () => {
           <div className="text-xs text-gray-500">
             {item.location?.shelf || "No shelf"}
           </div>
-        </div>
-      ),
-    },
-    {
-      header: "Actions",
-      accessor: "actions",
-      cell: (item) => (
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => handleViewDetails(item._id)}
-            className="p-1 text-blue-600 hover:text-blue-800"
-            title="View Details"
-          >
-            <EyeIcon className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => loadData()}
-            className="p-1 text-gray-600 hover:text-gray-800"
-            title="Refresh"
-          >
-            <ArrowPathIcon className="h-4 w-4" />
-          </button>
         </div>
       ),
     },
@@ -347,66 +308,113 @@ const InventoryTracking = () => {
   );
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Inventory Tracking
-        </h1>
-        <p className="text-gray-600">
+    <div className="space-y-6 p-4">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl p-6 text-white">
+        <h1 className="text-3xl font-bold mb-2">Inventory Tracking</h1>
+        <p className="text-white/80">
           Track maintenance schedules and monitor available inventory items
         </p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow-sm p-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Critical Maintenance */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl shadow-lg border border-red-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Critical Maintenance</p>
-              <p className="text-2xl font-bold text-red-600">
+              <p className="text-sm font-semibold text-red-700 uppercase tracking-wide">
+                Critical Maintenance
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-red-900 mt-2 break-all leading-tight">
                 {criticalMaintenance}
               </p>
             </div>
-            <ExclamationTriangleIcon className="h-8 w-8 text-red-500" />
+            <div className="p-4 bg-gradient-to-br from-red-500 to-red-600 rounded-xl shadow-lg">
+              <ExclamationTriangleIcon className="h-8 w-8 text-white" />
+            </div>
           </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        </motion.div>
+
+        {/* High Priority */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl shadow-lg border border-orange-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">High Priority</p>
-              <p className="text-2xl font-bold text-orange-600">
+              <p className="text-sm font-semibold text-orange-700 uppercase tracking-wide">
+                High Priority
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-orange-900 mt-2 break-all leading-tight">
                 {highPriorityMaintenance}
               </p>
             </div>
-            <ClockIcon className="h-8 w-8 text-orange-500" />
+            <div className="p-4 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
+              <ClockIcon className="h-8 w-8 text-white" />
+            </div>
           </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        </motion.div>
+
+        {/* Available Items */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-lg border border-green-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Available Items</p>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-sm font-semibold text-green-700 uppercase tracking-wide">
+                Available Items
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-green-900 mt-2 break-all leading-tight">
                 {totalAvailable}
               </p>
             </div>
-            <CheckCircleIcon className="h-8 w-8 text-green-500" />
+            <div className="p-4 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
+              <CheckCircleIcon className="h-8 w-8 text-white" />
+            </div>
           </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        </motion.div>
+
+        {/* Available Value */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg border border-blue-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Available Value</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">
+                Available Value
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-blue-900 mt-2 break-all leading-tight">
                 {formatCurrency(totalValue)}
               </p>
             </div>
-            <CurrencyDollarIcon className="h-8 w-8 text-[var(--elra-primary)]" />
+            <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
+              <CurrencyDollarIcon className="h-8 w-8 text-white" />
+            </div>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Tab Navigation */}
-      <div className="bg-white rounded-lg shadow-sm mb-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+        className="bg-white rounded-xl shadow-lg border border-gray-200 mb-6"
+      >
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8 px-6">
             <button
@@ -433,10 +441,15 @@ const InventoryTracking = () => {
             </button>
           </nav>
         </div>
-      </div>
+      </motion.div>
 
       {/* Content */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+      >
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
           <div className="flex items-center space-x-4">
             <select
@@ -466,8 +479,14 @@ const InventoryTracking = () => {
           <DataTable
             columns={maintenanceColumns}
             data={maintenanceDue}
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
+            actions={{
+              showView: true,
+              onView: (item) => handleViewDetails(item._id),
+              showEdit: false,
+              showDelete: false,
+              showToggle: false,
+            }}
+            searchable={true}
             searchPlaceholder="Search maintenance items..."
           />
         )}
@@ -476,12 +495,18 @@ const InventoryTracking = () => {
           <DataTable
             columns={availableColumns}
             data={availableItems}
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
+            actions={{
+              showView: true,
+              onView: (item) => handleViewDetails(item._id),
+              showEdit: false,
+              showDelete: false,
+              showToggle: false,
+            }}
+            searchable={true}
             searchPlaceholder="Search available items..."
           />
         )}
-      </div>
+      </motion.div>
 
       {/* Item Details Modal */}
       {showDetailsModal && selectedItem && (

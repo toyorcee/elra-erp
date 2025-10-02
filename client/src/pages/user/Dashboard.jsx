@@ -2205,9 +2205,11 @@ const Dashboard = () => {
       <div className="space-y-8">
         {/* Welcome Section */}
         <div className="bg-gradient-to-br from-white via-blue-50 to-purple-50 rounded-3xl p-6 sm:p-8 shadow-2xl border border-gray-100 relative overflow-hidden">
-          {/* Background decoration */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full -translate-y-16 translate-x-16"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-green-400/20 to-blue-400/20 rounded-full translate-y-12 -translate-x-12"></div>
+          {/* Enhanced Background decoration */}
+          <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-blue-400/30 via-purple-400/25 to-pink-400/20 rounded-full -translate-y-20 translate-x-20 animate-pulse"></div>
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-green-400/25 via-emerald-400/20 to-blue-400/15 rounded-full translate-y-16 -translate-x-16 animate-pulse"></div>
+          <div className="absolute top-1/2 left-1/4 w-20 h-20 bg-gradient-to-br from-yellow-400/20 to-orange-400/15 rounded-full -translate-y-10 -translate-x-10 animate-bounce"></div>
+          <div className="absolute top-1/3 right-1/3 w-16 h-16 bg-gradient-to-br from-indigo-400/20 to-purple-400/15 rounded-full translate-y-8 translate-x-8 animate-pulse"></div>
 
           <div className="relative z-10">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8 gap-4">
@@ -2217,7 +2219,7 @@ const Dashboard = () => {
                 </div>
                 <div>
                   <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-                    Welcome back, {user?.firstName || "User"}! 👋
+                    Welcome back, {user?.firstName || "User"}!
                   </h1>
                   <p className="text-gray-600 text-lg sm:text-xl mt-2">
                     Access your ERP modules and manage your business operations

@@ -40,6 +40,10 @@ const Announcements = () => {
   const [viewingAnnouncement, setViewingAnnouncement] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+  const [viewingAttachments, setViewingAttachments] = useState([]);
+  const [attachmentAnnouncementTitle, setAttachmentAnnouncementTitle] =
+    useState("");
 
   const [formData, setFormData] = useState({
     title: "",
@@ -291,6 +295,15 @@ const Announcements = () => {
     }
   };
 
+  // Handle viewing attachments
+  const handleViewAttachments = (announcement) => {
+    if (announcement.attachments && announcement.attachments.length > 0) {
+      setViewingAttachments(announcement.attachments);
+      setAttachmentAnnouncementTitle(announcement.title);
+      setShowAttachmentModal(true);
+    }
+  };
+
   const announcementsTableColumns = [
     {
       header: "Title",
@@ -374,13 +387,17 @@ const Announcements = () => {
           return <span className="text-gray-400 text-sm">No files</span>;
         }
         return (
-          <div className="flex items-center space-x-1 min-w-0">
+          <button
+            onClick={() => handleViewAttachments(row)}
+            className="flex items-center space-x-1 min-w-0 hover:bg-blue-50 px-2 py-1 rounded-md transition-colors cursor-pointer"
+            title="Click to view attachments"
+          >
             <DocumentTextIcon className="h-4 w-4 text-blue-500 flex-shrink-0" />
-            <span className="text-blue-600 text-sm font-medium truncate">
+            <span className="text-blue-600 text-sm font-medium truncate hover:text-blue-800">
               {row.attachments.length} file
               {row.attachments.length > 1 ? "s" : ""}
             </span>
-          </div>
+          </button>
         );
       },
     },
@@ -437,7 +454,7 @@ const Announcements = () => {
       transition={{ duration: 0.5 }}
       className="min-h-screen bg-gray-50 p-6"
     >
-      <div className="max-w-7xl mx-auto">
+      <div className="p-4 mx-auto">
         {/* Header */}
         <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-2xl p-8 mb-8 text-white">
           <div className="flex items-center justify-between">
@@ -1181,6 +1198,181 @@ const Announcements = () => {
                 <div className="bg-gray-50 px-6 py-4 rounded-b-2xl flex justify-end">
                   <button
                     onClick={() => setShowViewModal(false)}
+                    className="px-6 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Attachment Viewer Modal */}
+        <AnimatePresence>
+          {showAttachmentModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
+              >
+                {/* Header */}
+                <div className="bg-[var(--elra-primary)] p-6 rounded-t-2xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-white rounded-lg">
+                        <DocumentTextIcon className="w-6 h-6 text-[var(--elra-primary)]" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-white">
+                          Attachments - {attachmentAnnouncementTitle}
+                        </h3>
+                        <p className="text-white/80 text-sm">
+                          {viewingAttachments.length} file
+                          {viewingAttachments.length > 1 ? "s" : ""} attached
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowAttachmentModal(false)}
+                      className="p-2 hover:bg-white/20 rounded-full transition-colors"
+                    >
+                      <XMarkIcon className="h-5 w-5 text-white" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="p-6 max-h-[70vh] overflow-y-auto">
+                  <div className="space-y-4">
+                    {viewingAttachments.map((attachment, index) => (
+                      <div
+                        key={attachment._id || index}
+                        className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div className="flex-shrink-0">
+                            {attachment.mimeType === "application/pdf" ? (
+                              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                                <span className="text-red-600 font-bold text-sm">
+                                  PDF
+                                </span>
+                              </div>
+                            ) : attachment.mimeType?.startsWith("image/") ? (
+                              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <span className="text-blue-600 font-bold text-sm">
+                                  IMG
+                                </span>
+                              </div>
+                            ) : attachment.mimeType?.includes("word") ||
+                              attachment.mimeType?.includes("document") ? (
+                              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <span className="text-blue-600 font-bold text-sm">
+                                  DOC
+                                </span>
+                              </div>
+                            ) : attachment.mimeType?.includes("excel") ||
+                              attachment.mimeType?.includes("spreadsheet") ? (
+                              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                                <span className="text-green-600 font-bold text-sm">
+                                  XLS
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                                <span className="text-gray-600 font-bold text-sm">
+                                  FILE
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {attachment.title ||
+                                attachment.originalFileName ||
+                                attachment.fileName ||
+                                `Attachment ${index + 1}`}
+                            </p>
+                            <div className="flex items-center space-x-4 text-xs text-gray-500">
+                              <span>
+                                {attachment.fileSize
+                                  ? `${(attachment.fileSize / 1024).toFixed(
+                                      1
+                                    )} KB`
+                                  : "Unknown size"}
+                              </span>
+                              <span>
+                                {attachment.mimeType
+                                  ?.split("/")[1]
+                                  ?.toUpperCase() || "Unknown type"}
+                              </span>
+                              {attachment.createdAt && (
+                                <span>
+                                  {new Date(
+                                    attachment.createdAt
+                                  ).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => {
+                              if (attachment._id) {
+                                window.open(
+                                  `/api/documents/${attachment._id}/view`,
+                                  "_blank"
+                                );
+                              } else if (attachment.fileUrl) {
+                                window.open(attachment.fileUrl, "_blank");
+                              }
+                            }}
+                            className="px-3 py-1 text-sm bg-[var(--elra-primary)] text-white rounded-md hover:bg-[var(--elra-primary-dark)] transition-colors"
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (attachment._id) {
+                                window.open(
+                                  `/api/documents/${attachment._id}/download`,
+                                  "_blank"
+                                );
+                              } else if (attachment.fileUrl) {
+                                const link = document.createElement("a");
+                                link.href = attachment.fileUrl;
+                                link.download =
+                                  attachment.title ||
+                                  attachment.originalFileName ||
+                                  attachment.fileName ||
+                                  `attachment_${index + 1}`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }
+                            }}
+                            className="px-3 py-1 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                          >
+                            Download
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="bg-gray-50 px-6 py-4 rounded-b-2xl flex justify-end">
+                  <button
+                    onClick={() => setShowAttachmentModal(false)}
                     className="px-6 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors"
                   >
                     Close

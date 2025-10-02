@@ -1003,31 +1003,11 @@ const BudgetAllocation = () => {
               {/* Modal Content */}
               <div className="flex-1 overflow-y-auto p-8">
                 <form onSubmit={handleCreateAllocation} className="space-y-8">
-                  {/* Allocation Type */}
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
-                    <label className="block text-lg font-semibold text-gray-900 mb-3">
-                      Allocation Type
-                    </label>
-                    <div className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-700 font-medium">
-                      Project Budget
-                    </div>
-                  </div>
-
                   {/* Project Selection */}
                   <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
                     <label className="block text-lg font-semibold text-gray-900 mb-3">
                       Selected Project
                     </label>
-                    <div className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-700 font-medium">
-                      {(() => {
-                        const selectedProject = projects.find(
-                          (p) => p._id === formData.projectId
-                        );
-                        return selectedProject
-                          ? `${selectedProject.name} - ${selectedProject.code}`
-                          : "No project selected";
-                      })()}
-                    </div>
 
                     {formData.projectId &&
                       (() => {
@@ -1753,98 +1733,6 @@ Finance HOD`}
                 </div>
 
                 <div className="space-y-6">
-                  {/* Project Progress Tracking */}
-                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
-                    <div className="flex items-center mb-4">
-                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                        <span className="text-green-600 text-lg">📊</span>
-                      </div>
-                      <h3 className="text-xl font-semibold text-gray-900">
-                        Approval Progress
-                      </h3>
-                    </div>
-
-                    {selectedProject.approvalChain &&
-                    selectedProject.approvalChain.length > 0 ? (
-                      <div className="space-y-4">
-                        {/* Overall Progress */}
-                        <div>
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm font-medium text-gray-700">
-                              Overall Approval Progress
-                            </span>
-                            <span className="text-sm font-bold text-green-600">
-                              {(() => {
-                                const completed =
-                                  selectedProject.approvalChain.filter(
-                                    (step) => step.status === "approved"
-                                  ).length;
-                                const total =
-                                  selectedProject.approvalChain.length;
-                                return `${completed}/${total} levels completed`;
-                              })()}
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-3">
-                            <div
-                              className="bg-gradient-to-r from-green-500 to-emerald-500 h-3 rounded-full transition-all duration-500"
-                              style={{
-                                width: `${(() => {
-                                  const completed =
-                                    selectedProject.approvalChain.filter(
-                                      (step) => step.status === "approved"
-                                    ).length;
-                                  const total =
-                                    selectedProject.approvalChain.length;
-                                  return total > 0
-                                    ? (completed / total) * 100
-                                    : 0;
-                                })()}%`,
-                              }}
-                            ></div>
-                          </div>
-                        </div>
-
-                        {/* Approval Chain Status */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {selectedProject.approvalChain.map((step, index) => (
-                            <div
-                              key={index}
-                              className={`flex items-center justify-between p-3 rounded-lg border ${
-                                step.status === "approved"
-                                  ? "bg-green-50 border-green-200"
-                                  : step.status === "pending"
-                                  ? "bg-yellow-50 border-yellow-200"
-                                  : "bg-gray-50 border-gray-200"
-                              }`}
-                            >
-                              <span className="text-sm font-medium text-gray-700">
-                                {step.level
-                                  .replace(/_/g, " ")
-                                  .replace(/\b\w/g, (l) => l.toUpperCase())}
-                              </span>
-                              <div className="flex items-center">
-                                {step.status === "approved" ? (
-                                  <CheckCircleIcon className="w-5 h-5 text-green-500" />
-                                ) : step.status === "pending" ? (
-                                  <ClockSolid className="w-5 h-5 text-yellow-500" />
-                                ) : (
-                                  <div className="w-5 h-5 rounded-full bg-gray-300"></div>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center py-4">
-                        <p className="text-gray-500">
-                          No approval chain data available
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
                   {/* Budget Allocation Information */}
                   {selectedProject.requiresBudgetAllocation && (
                     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">

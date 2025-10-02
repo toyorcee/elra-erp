@@ -9,6 +9,7 @@ import {
 } from "react-icons/hi2";
 import { useAuth } from "../../../../context/AuthContext";
 import DataTable from "../../../../components/common/DataTable";
+import { getImageUrl } from "../../../../utils/fileUtils.js";
 
 const TeamManagement = () => {
   const { user } = useAuth();
@@ -54,7 +55,8 @@ const TeamManagement = () => {
           department: "Information Technology",
           startDate: "2024-01-15",
           status: "active",
-          avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
+          avatar:
+            "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
         },
         {
           id: "2",
@@ -67,7 +69,8 @@ const TeamManagement = () => {
           department: "Information Technology",
           startDate: "2024-03-20",
           status: "active",
-          avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
+          avatar:
+            "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
         },
         {
           id: "3",
@@ -80,7 +83,8 @@ const TeamManagement = () => {
           department: "Information Technology",
           startDate: "2024-06-10",
           status: "active",
-          avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+          avatar:
+            "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
         },
       ];
       setTeamMembers(mockTeam);
@@ -206,7 +210,7 @@ const TeamManagement = () => {
       renderer: (row) => (
         <div className="flex items-center space-x-3">
           <img
-            src={row.avatar}
+            src={getImageUrl(row.avatar)}
             alt={`${row.firstName} ${row.lastName}`}
             className="w-10 h-10 rounded-full object-cover"
           />
@@ -236,7 +240,9 @@ const TeamManagement = () => {
         <div className="h-4 bg-gray-200 rounded w-20 animate-pulse"></div>
       ),
       renderer: (row) => (
-        <span className="text-sm font-mono text-gray-600">{row.employeeId}</span>
+        <span className="text-sm font-mono text-gray-600">
+          {row.employeeId}
+        </span>
       ),
     },
     {
@@ -256,7 +262,9 @@ const TeamManagement = () => {
         <div className="h-4 bg-gray-200 rounded w-20 animate-pulse"></div>
       ),
       renderer: (row) => (
-        <span className="text-sm text-gray-500">{formatDate(row.startDate)}</span>
+        <span className="text-sm text-gray-500">
+          {formatDate(row.startDate)}
+        </span>
       ),
     },
     {
@@ -266,11 +274,13 @@ const TeamManagement = () => {
         <div className="h-6 bg-gray-200 rounded-full w-16 animate-pulse"></div>
       ),
       renderer: (row) => (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-          row.status === "active" 
-            ? "bg-green-100 text-green-800" 
-            : "bg-gray-100 text-gray-800"
-        }`}>
+        <span
+          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+            row.status === "active"
+              ? "bg-green-100 text-green-800"
+              : "bg-gray-100 text-gray-800"
+          }`}
+        >
           {row.status.charAt(0).toUpperCase() + row.status.slice(1)}
         </span>
       ),
@@ -352,7 +362,8 @@ const TeamManagement = () => {
                 {user.department?.name} Department Team
               </h2>
               <p className="text-sm text-gray-500">
-                {teamMembers.length} team member{teamMembers.length !== 1 ? 's' : ''}
+                {teamMembers.length} team member
+                {teamMembers.length !== 1 ? "s" : ""}
               </p>
             </div>
             <button
@@ -378,7 +389,8 @@ const TeamManagement = () => {
             }}
             emptyMessage={{
               title: "No team members found",
-              description: "Start building your team by adding the first member",
+              description:
+                "Start building your team by adding the first member",
             }}
           />
         </div>
@@ -401,7 +413,9 @@ const TeamManagement = () => {
                     <input
                       type="text"
                       value={formData.firstName}
-                      onChange={(e) => setFormData({...formData, firstName: e.target.value})}
+                      onChange={(e) =>
+                        setFormData({ ...formData, firstName: e.target.value })
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
                       required
                     />
@@ -413,7 +427,9 @@ const TeamManagement = () => {
                     <input
                       type="text"
                       value={formData.lastName}
-                      onChange={(e) => setFormData({...formData, lastName: e.target.value})}
+                      onChange={(e) =>
+                        setFormData({ ...formData, lastName: e.target.value })
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
                       required
                     />
@@ -426,7 +442,9 @@ const TeamManagement = () => {
                   <input
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
                     required
                   />
@@ -438,7 +456,9 @@ const TeamManagement = () => {
                   <input
                     type="tel"
                     value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, phone: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
                   />
                 </div>
@@ -449,7 +469,9 @@ const TeamManagement = () => {
                   <input
                     type="text"
                     value={formData.position}
-                    onChange={(e) => setFormData({...formData, position: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, position: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
                   />
                 </div>
@@ -460,7 +482,9 @@ const TeamManagement = () => {
                   <input
                     type="text"
                     value={formData.employeeId}
-                    onChange={(e) => setFormData({...formData, employeeId: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, employeeId: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
                   />
                 </div>
@@ -471,7 +495,9 @@ const TeamManagement = () => {
                   <input
                     type="date"
                     value={formData.startDate}
-                    onChange={(e) => setFormData({...formData, startDate: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, startDate: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)]"
                   />
                 </div>
@@ -502,7 +528,11 @@ const TeamManagement = () => {
                     disabled={isSubmitting}
                     className="px-4 py-2 text-sm font-medium text-white bg-[var(--elra-primary)] rounded-md hover:bg-[var(--elra-primary-dark)] disabled:opacity-50"
                   >
-                    {isSubmitting ? "Saving..." : (showAddModal ? "Add Member" : "Update Member")}
+                    {isSubmitting
+                      ? "Saving..."
+                      : showAddModal
+                      ? "Add Member"
+                      : "Update Member"}
                   </button>
                 </div>
               </form>
@@ -527,15 +557,25 @@ const TeamManagement = () => {
                   }}
                   className="text-gray-400 hover:text-gray-600"
                 >
-                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="h-6 w-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </div>
-              
+
               <div className="flex items-start space-x-6">
                 <img
-                  src={selectedMember.avatar}
+                  src={getImageUrl(selectedMember.avatar)}
                   alt={`${selectedMember.firstName} ${selectedMember.lastName}`}
                   className="w-24 h-24 rounded-full object-cover"
                 />
@@ -561,24 +601,33 @@ const TeamManagement = () => {
                     </div>
                     <div>
                       <h4 className="font-medium text-gray-900">Employee ID</h4>
-                      <p className="text-gray-600 font-mono">{selectedMember.employeeId}</p>
+                      <p className="text-gray-600 font-mono">
+                        {selectedMember.employeeId}
+                      </p>
                     </div>
                     <div>
                       <h4 className="font-medium text-gray-900">Department</h4>
-                      <p className="text-gray-600">{selectedMember.department}</p>
+                      <p className="text-gray-600">
+                        {selectedMember.department}
+                      </p>
                     </div>
                     <div>
                       <h4 className="font-medium text-gray-900">Start Date</h4>
-                      <p className="text-gray-600">{formatDate(selectedMember.startDate)}</p>
+                      <p className="text-gray-600">
+                        {formatDate(selectedMember.startDate)}
+                      </p>
                     </div>
                     <div>
                       <h4 className="font-medium text-gray-900">Status</h4>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        selectedMember.status === "active" 
-                          ? "bg-green-100 text-green-800" 
-                          : "bg-gray-100 text-gray-800"
-                      }`}>
-                        {selectedMember.status.charAt(0).toUpperCase() + selectedMember.status.slice(1)}
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          selectedMember.status === "active"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {selectedMember.status.charAt(0).toUpperCase() +
+                          selectedMember.status.slice(1)}
                       </span>
                     </div>
                   </div>

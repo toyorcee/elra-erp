@@ -714,7 +714,7 @@ const EventsCalendar = () => {
       transition={{ duration: 0.5 }}
       className="min-h-screen bg-gray-50 p-6"
     >
-      <div className="max-w-7xl mx-auto">
+      <div className="p-4 mx-auto">
         {/* Enhanced Header */}
         <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-2xl p-8 mb-8 text-white">
           <div className="flex items-center justify-between">

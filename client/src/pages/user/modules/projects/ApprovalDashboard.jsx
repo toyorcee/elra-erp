@@ -2449,8 +2449,8 @@ const ApprovalDashboard = () => {
                   </div>
                 )}
 
-                {/* View Certificate Button */}
-                {selectedProject?.status === "approved" && (
+                {/* View Certificate Button - only after completion */}
+                {selectedProject?.status === "completed" && (
                   <div className="mt-6 flex justify-center">
                     <button
                       onClick={() =>

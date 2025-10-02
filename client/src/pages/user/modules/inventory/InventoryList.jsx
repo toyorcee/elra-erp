@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import {
   CubeIcon,
   EyeIcon,
@@ -13,6 +14,9 @@ import {
   XMarkIcon,
   WrenchScrewdriverIcon,
   DocumentIcon,
+  ChartBarIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../../../context/AuthContext";
 import inventoryService from "../../../../services/inventoryService";
@@ -68,6 +72,9 @@ const InventoryList = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showProjectItemsModal, setShowProjectItemsModal] = useState(false);
+  const [projectItems, setProjectItems] = useState([]);
+  const [loadingProjectItems, setLoadingProjectItems] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completionForm, setCompletionForm] = useState({
@@ -75,7 +82,7 @@ const InventoryList = () => {
     model: "",
     year: new Date().getFullYear(),
     serialNumber: "",
-    licenseType: "",
+    licenseType: null,
     numberOfUsers: "",
     location: "",
     dimensions: {
@@ -98,6 +105,7 @@ const InventoryList = () => {
     maintenanceInterval: 90,
     customMaintenanceInterval: null,
     maintenanceNotes: "",
+    status: "available",
   });
   const [isCalculatingMaintenance, setIsCalculatingMaintenance] =
     useState(false);
@@ -204,6 +212,26 @@ const InventoryList = () => {
     }
   };
 
+  // Load all inventory items for a project into a scrollable modal
+  const handleViewProjectItems = async (projectId) => {
+    if (!projectId) return;
+    setLoadingProjectItems(true);
+    try {
+      const resp = await inventoryService.getAllInventory({ projectId });
+      if (resp?.success) {
+        setProjectItems(resp.data || []);
+        setShowProjectItemsModal(true);
+      } else {
+        toast.error("Failed to load project inventory items");
+      }
+    } catch (e) {
+      console.error("Error loading project items:", e);
+      toast.error("Error loading project inventory items");
+    } finally {
+      setLoadingProjectItems(false);
+    }
+  };
+
   const handleStatusUpdate = async (itemId, newStatus) => {
     try {
       const response = await inventoryService.updateStatus(itemId, newStatus);
@@ -248,6 +276,7 @@ const InventoryList = () => {
       maintenanceInterval: 90,
       customMaintenanceInterval: null,
       maintenanceNotes: "",
+      status: "available",
     });
     setIsCalculatingMaintenance(false);
   };
@@ -276,7 +305,7 @@ const InventoryList = () => {
       brand: item.specifications?.brand || "",
       model: item.specifications?.model || "",
       year: item.specifications?.year || new Date().getFullYear(),
-      licenseType: item.specifications?.licenseType || "",
+      licenseType: item.specifications?.licenseType || null,
       numberOfUsers: item.specifications?.numberOfUsers || "",
       location: item.location || "",
       notes: item.notes?.map((n) => n.text).join("\n") || "",
@@ -293,6 +322,7 @@ const InventoryList = () => {
       maintenanceInterval: item.maintenance?.serviceInterval || 90,
       customMaintenanceInterval: null,
       maintenanceNotes: item.maintenance?.maintenanceNotes || "",
+      status: item.status || "available",
     });
     setShowCompletionModal(true);
     setLoadingComplete(null);
@@ -463,6 +493,7 @@ const InventoryList = () => {
           },
         },
         location: completionForm.location,
+        status: completionForm.status || completingItem.status,
         deliveryCondition: completionForm.deliveryCondition,
         receivedBy: completionForm.receivedBy,
         receivedDate: completionForm.receivedDate,
@@ -522,7 +553,7 @@ const InventoryList = () => {
       model: item.specifications?.model || "",
       year: item.specifications?.year || new Date().getFullYear(),
       serialNumber: item.specifications?.serialNumber || "",
-      licenseType: item.specifications?.licenseType || "",
+      licenseType: item.specifications?.licenseType || null,
       numberOfUsers: item.specifications?.numberOfUsers || "",
       location: item.location || "",
       dimensions: {
@@ -551,6 +582,7 @@ const InventoryList = () => {
       maintenanceInterval: item.maintenance?.serviceInterval || 90,
       customMaintenanceInterval: null,
       maintenanceNotes: item.maintenance?.maintenanceNotes || "",
+      status: item.status || "available",
     });
 
     setCompletingItem(item);
@@ -620,13 +652,11 @@ const InventoryList = () => {
     return typeIcons[type] || "📦";
   };
 
-  // Helper function to format text by replacing underscores with spaces
   const formatText = (text) => {
     if (!text) return "N/A";
     return text.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
-  // Helper function to get file type info for documents
   const getFileTypeInfoForFile = (filename) => {
     if (!filename) return { icon: "📄", name: "File", color: "text-gray-600" };
 
@@ -641,7 +671,6 @@ const InventoryList = () => {
     );
   };
 
-  // Helper function to get MIME type from file extension
   const getMimeTypeFromExtension = (extension) => {
     const mimeTypes = {
       pdf: "application/pdf",
@@ -935,11 +964,11 @@ const InventoryList = () => {
       renderer: (item) => {
         const incomplete = needsCompletion(item);
         return (
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1">
             <button
               onClick={() => handleViewDetails(item._id)}
               disabled={loadingView === item._id}
-              className="p-1 text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+              className="inline-flex items-center justify-center w-8 h-8 rounded-full border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
               title="View Details"
             >
               {loadingView === item._id ? (
@@ -952,16 +981,13 @@ const InventoryList = () => {
               <button
                 onClick={() => handleCompleteInventory(item)}
                 disabled={loadingComplete === item._id}
-                className="px-2 py-1 text-xs font-medium text-white bg-[var(--elra-primary)] rounded-md hover:bg-[var(--elra-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors flex items-center gap-1"
+                className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
                 title="Complete Inventory"
               >
                 {loadingComplete === item._id ? (
-                  <>
-                    <ButtonSpinner size="xs" />
-                    Loading...
-                  </>
+                  <ButtonSpinner size="xs" />
                 ) : (
-                  "Complete"
+                  <CheckCircleIcon className="h-4 w-4 text-white" />
                 )}
               </button>
             )}
@@ -970,7 +996,7 @@ const InventoryList = () => {
                 <button
                   onClick={() => handleEditInventory(item)}
                   disabled={loadingEdit === item._id}
-                  className="p-1 text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                  className="inline-flex items-center justify-center w-8 h-8 rounded-full border border-blue-200 text-blue-700 bg-white hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
                   title="Edit Inventory"
                 >
                   {loadingEdit === item._id ? (
@@ -981,7 +1007,7 @@ const InventoryList = () => {
                 </button>
                 <button
                   onClick={() => handleResendNotifications(item)}
-                  className="p-1 text-green-600 hover:text-green-800 cursor-pointer transition-colors"
+                  className="inline-flex items-center justify-center w-8 h-8 rounded-full border border-emerald-200 text-emerald-700 bg-white hover:bg-emerald-50 cursor-pointer transition-colors"
                   title="Resend Notifications"
                 >
                   <ArrowPathIcon className="h-4 w-4" />
@@ -1056,83 +1082,144 @@ const InventoryList = () => {
   );
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Inventory Management
-        </h1>
-        <p className="text-gray-600">
-          Manage and track all inventory items, equipment, and assets
+    <div className="space-y-6 p-4 overflow-x-hidden">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl p-6 text-white">
+        <h1 className="text-3xl font-bold mb-2">Inventory Management</h1>
+        <p className="text-white/80">
+          Comprehensive inventory tracking, management, and reporting system
         </p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow-sm p-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        {/* Total Items */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg border border-blue-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Total Items</p>
-              <p className="text-2xl font-bold text-gray-900">{totalItems}</p>
+              <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">
+                Total Items
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-blue-900 mt-2 break-all leading-tight">
+                {totalItems}
+              </p>
             </div>
-            <CubeIcon className="h-8 w-8 text-[var(--elra-primary)]" />
+            <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
+              <CubeIcon className="h-8 w-8 text-white" />
+            </div>
           </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        </motion.div>
+
+        {/* Available Items */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-lg border border-green-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Available</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-sm font-semibold text-green-700 uppercase tracking-wide">
+                Available
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-green-900 mt-2 break-all leading-tight">
                 {availableItems}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-green-600 mt-1">
                 {((availableItems / totalItems) * 100).toFixed(1)}% of total
               </p>
             </div>
-            <CheckCircleIcon className="h-8 w-8 text-green-500" />
+            <div className="p-4 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
+              <CheckCircleIcon className="h-8 w-8 text-white" />
+            </div>
           </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        </motion.div>
+
+        {/* Maintenance Due */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl shadow-lg border border-yellow-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Maintenance Due</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-sm font-semibold text-yellow-700 uppercase tracking-wide">
+                Maintenance Due
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-yellow-900 mt-2 break-all leading-tight">
                 {maintenanceDue}
               </p>
             </div>
-            <ExclamationTriangleIcon className="h-8 w-8 text-yellow-500" />
+            <div className="p-4 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg">
+              <ExclamationTriangleIcon className="h-8 w-8 text-white" />
+            </div>
           </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        </motion.div>
+
+        {/* Total Value */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl shadow-lg border border-purple-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Total Value</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-sm font-semibold text-purple-700 uppercase tracking-wide">
+                Total Value
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-purple-900 mt-2 break-all leading-tight">
                 {formatCurrency(totalValue)}
               </p>
             </div>
-            <CurrencyDollarIcon className="h-8 w-8 text-[var(--elra-primary)]" />
+            <div className="p-4 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
+              <CurrencyDollarIcon className="h-8 w-8 text-white" />
+            </div>
           </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        </motion.div>
+
+        {/* Needs Completion */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl shadow-lg border border-orange-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Needs Completion</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-sm font-semibold text-orange-700 uppercase tracking-wide">
+                Needs Completion
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-orange-900 mt-2 break-all leading-tight">
                 {incompleteItems}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-orange-600 mt-1">
                 {totalItems > 0
                   ? ((incompleteItems / totalItems) * 100).toFixed(1)
                   : 0}
                 % of total
               </p>
             </div>
-            <ExclamationTriangleIcon className="h-8 w-8 text-amber-500" />
+            <div className="p-4 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
+              <ExclamationTriangleIcon className="h-8 w-8 text-white" />
+            </div>
           </div>
-        </div>
+        </motion.div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm p-6">
+      {/* Main Content */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+      >
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
           <div className="flex items-center space-x-4 w-full">
             {/* Search Input */}
@@ -1225,7 +1312,7 @@ const InventoryList = () => {
             showToggle: false,
           }}
         />
-      </div>
+      </motion.div>
 
       {/* Item Details Modal */}
       {showDetailsModal && selectedItem && (
@@ -1372,6 +1459,84 @@ const InventoryList = () => {
                       </span>
                       <span className="text-sm font-semibold text-gray-900">
                         {formatDate(selectedItem.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                {!!selectedItem.project?._id && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() =>
+                        handleViewProjectItems(selectedItem.project._id)
+                      }
+                      className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+                    >
+                      View all items in this project
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Project & Procurement Card */}
+              <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <svg
+                      className="w-4 h-4 text-gray-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 7l9-4 9 4-9 4-9-4zm0 6l9 4 9-4M3 7v6m18-6v6"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Project & Procurement
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="text-sm font-medium text-gray-600">
+                        Project
+                      </span>
+                      <span className="text-sm font-semibold text-gray-900">
+                        {selectedItem.project?.name || "Standalone"}
+                      </span>
+                    </div>
+                    {selectedItem.project && (
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm font-medium text-gray-600">
+                          Project Category
+                        </span>
+                        <span className="text-sm text-gray-900">
+                          {formatText(selectedItem.project?.category)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="text-sm font-medium text-gray-600">
+                        PO Number
+                      </span>
+                      <span className="text-sm font-semibold text-gray-900">
+                        {selectedItem.procurementId?.poNumber || "N/A"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-sm font-medium text-gray-600">
+                        Supplier
+                      </span>
+                      <span className="text-sm text-gray-900 truncate max-w-[60%] text-right">
+                        {selectedItem.procurementId?.supplier?.name || "N/A"}
                       </span>
                     </div>
                   </div>
@@ -1620,6 +1785,69 @@ const InventoryList = () => {
         </div>
       )}
 
+      {/* Project Items Modal (Headless, scrollable) */}
+      {showProjectItemsModal && (
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-t-2xl flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold">Project Items</h2>
+                <button
+                  onClick={() => {
+                    setShowProjectItemsModal(false);
+                    setProjectItems([]);
+                  }}
+                  className="text-white hover:text-gray-200 transition-colors p-2 rounded-full hover:bg-white hover:bg-opacity-20"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {loadingProjectItems ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--elra-primary)]"></div>
+                </div>
+              ) : projectItems.length === 0 ? (
+                <div className="text-center text-gray-500 py-12">
+                  No inventory items found for this project.
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {projectItems.map((it) => (
+                    <div
+                      key={it._id}
+                      className="py-4 flex items-start justify-between"
+                    >
+                      <div>
+                        <div className="font-medium text-gray-900">
+                          {it.name}
+                        </div>
+                        <div className="text-xs text-gray-500">{it.code}</div>
+                        <div className="text-xs text-gray-400">
+                          {formatText(it.type)} • {formatText(it.category)}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-semibold text-gray-900">
+                          {formatCurrency(it.currentValue || it.purchasePrice)}
+                        </div>
+                        <div className="mt-1 inline-block">
+                          {getStatusBadge(it.status)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Inventory Completion Modal */}
       {showCompletionModal && completingItem && (
         <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50">
@@ -1693,7 +1921,6 @@ const InventoryList = () => {
                             ...completionForm,
                             brand: e.target.value,
                           });
-                          // Clear error when user starts typing
                           if (validationErrors.brand) {
                             setValidationErrors({
                               ...validationErrors,
@@ -1791,11 +2018,11 @@ const InventoryList = () => {
                         License Type
                       </label>
                       <select
-                        value={completionForm.licenseType}
+                        value={completionForm.licenseType || ""}
                         onChange={(e) =>
                           setCompletionForm({
                             ...completionForm,
-                            licenseType: e.target.value,
+                            licenseType: e.target.value || null,
                           })
                         }
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
@@ -1967,10 +2194,33 @@ const InventoryList = () => {
                 <div className="bg-gray-50 rounded-lg p-4">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <CheckCircleIcon className="h-5 w-5 mr-2 text-[var(--elra-primary)]" />
-                    Delivery & Receipt Information
+                    Delivery, Receipt & Status
                   </h3>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Inventory Status */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Inventory Status
+                      </label>
+                      <select
+                        value={completionForm.status}
+                        onChange={(e) =>
+                          setCompletionForm({
+                            ...completionForm,
+                            status: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                      >
+                        <option value="available">Available</option>
+                        <option value="unavailable">Unavailable</option>
+                        <option value="leased">Leased</option>
+                        <option value="maintenance">Maintenance</option>
+                        <option value="retired">Retired</option>
+                        <option value="lost">Lost</option>
+                      </select>
+                    </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Delivery Condition{" "}
@@ -2353,6 +2603,17 @@ const InventoryList = () => {
             {/* Footer */}
             <div className="flex justify-end space-x-3 p-6 pt-0 border-t border-gray-200 bg-white">
               <button
+                onClick={() => {
+                  setShowCompletionModal(false);
+                  setCompletingItem(null);
+                  resetCompletionForm();
+                }}
+                disabled={submittingCompletion}
+                className="px-5 py-2.5 mt-4 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
                 onClick={handleSubmitCompletion}
                 disabled={
                   submittingCompletion ||
@@ -2362,17 +2623,20 @@ const InventoryList = () => {
                   !completionForm.receivedBy ||
                   !completionForm.receivedDate
                 }
-                className="px-6 py-3 mt-4 text-sm font-medium text-white bg-[var(--elra-primary)] border border-transparent rounded-lg hover:bg-[var(--elra-primary-dark)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--elra-primary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center transition-all duration-300 cursor-pointer"
+                className="px-6 py-2.5 mt-4 text-sm font-semibold text-white bg-emerald-600 border border-transparent rounded-full hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all duration-200 cursor-pointer shadow-sm"
               >
                 {submittingCompletion ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    {isEditMode ? "Updating..." : "Completing..."}
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    <span>{isEditMode ? "Updating..." : "Completing..."}</span>
                   </>
-                ) : isEditMode ? (
-                  "Update Inventory"
                 ) : (
-                  "Complete Inventory"
+                  <>
+                    <CheckCircleIcon className="h-4 w-4 text-white" />
+                    <span>
+                      {isEditMode ? "Update Inventory" : "Complete Inventory"}
+                    </span>
+                  </>
                 )}
               </button>
             </div>

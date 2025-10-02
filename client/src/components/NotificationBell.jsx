@@ -250,10 +250,10 @@ const NotificationBell = ({ className = "" }) => {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-[var(--elra-border-primary)] z-50">
-          <div className="p-4 border-b border-[var(--elra-border-primary)]">
+        <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white rounded-lg shadow-xl border border-[var(--elra-border-primary)] z-50">
+          <div className="p-3 sm:p-4 border-b border-[var(--elra-border-primary)]">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-[var(--elra-text-primary)]">
+              <h3 className="text-xs sm:text-sm font-semibold text-[var(--elra-text-primary)]">
                 Notifications
               </h3>
               <div className="flex items-center gap-2">
@@ -304,13 +304,13 @@ const NotificationBell = ({ className = "" }) => {
             </div>
           </div>
 
-          <div className="max-h-96 overflow-y-auto">
+          <div className="max-h-80 sm:max-h-96 overflow-y-auto">
             {notificationsLoading ? (
-              <div className="p-4 text-center text-[var(--elra-text-muted)]">
+              <div className="p-3 sm:p-4 text-center text-[var(--elra-text-muted)] text-sm">
                 Loading...
               </div>
             ) : notifications.length === 0 ? (
-              <div className="p-4 text-center text-[var(--elra-text-muted)]">
+              <div className="p-3 sm:p-4 text-center text-[var(--elra-text-muted)] text-sm">
                 No notifications
               </div>
             ) : (
@@ -318,7 +318,7 @@ const NotificationBell = ({ className = "" }) => {
                 <div
                   key={notification._id}
                   onClick={() => handleNotificationClick(notification)}
-                  className="p-4 border-b border-[var(--elra-border-primary)] hover:bg-[var(--elra-secondary-3)] cursor-pointer transition-colors"
+                  className="p-3 sm:p-4 border-b border-[var(--elra-border-primary)] hover:bg-[var(--elra-secondary-3)] cursor-pointer transition-colors"
                 >
                   <div className="flex items-start space-x-3">
                     <div className="w-8 h-8 bg-[var(--elra-primary)] rounded-full flex items-center justify-center text-white text-xs font-bold">
@@ -366,13 +366,13 @@ const NotificationBell = ({ className = "" }) => {
           </div>
 
           {notifications.length > 0 && (
-            <div className="p-3 border-t border-[var(--elra-border-primary)]">
+            <div className="p-2 sm:p-3 border-t border-[var(--elra-border-primary)]">
               <button
                 onClick={() => {
                   setIsOpen(false);
                   navigate("/dashboard/notifications");
                 }}
-                className="w-full text-sm text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] font-medium"
+                className="w-full text-xs sm:text-sm text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] font-medium"
               >
                 View all notifications
               </button>

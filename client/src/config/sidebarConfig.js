@@ -696,9 +696,11 @@ export const getModulesForUser = (user) => {
     return roleLevel >= module.required.minLevel;
   });
 
-  // SUPER_ADMIN gets access to everything
+  // SUPER_ADMIN gets access to EVERYTHING (ignore department restrictions)
   if (roleLevel === 1000) {
-    return sidebarConfig;
+    const allDepartmentModules = Object.values(departmentModuleMapping).flat();
+    // Merge base + all department modules; consumer can de-dup by path if needed
+    return [...baseModules, ...allDepartmentModules];
   }
 
   // Return base modules + department-specific modules

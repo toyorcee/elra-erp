@@ -126,27 +126,27 @@ const NotificationModal = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 backdrop-blur-md z-[9999] flex items-center justify-center p-4"
+        className="fixed inset-0 bg-black/60 backdrop-blur-md z-[9999] flex items-center justify-center p-2 sm:p-4 md:p-6"
         onClick={onClose}
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
-          className="bg-white/95 backdrop-blur-xl rounded-2xl border border-white/30 shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto relative"
+          className="bg-white/95 backdrop-blur-xl rounded-2xl border border-white/30 shadow-2xl max-w-xs sm:max-w-md md:max-w-2xl w-full max-h-[90vh] sm:max-h-[85vh] md:max-h-[80vh] overflow-y-auto relative"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="p-6">
-            <div className="flex items-start justify-between mb-6">
-              <div className="flex items-center gap-4">
-                <span className="text-3xl">
+          <div className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-start justify-between mb-4 sm:mb-6">
+              <div className="flex items-center gap-2 sm:gap-4">
+                <span className="text-2xl sm:text-3xl">
                   {getNotificationIcon(notification.type)}
                 </span>
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
+                  <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">
                     {notification.title}
                   </h2>
-                  <p className="text-gray-600">
+                  <p className="text-sm sm:text-base text-gray-600">
                     {formatTimestamp(notification.createdAt)}
                   </p>
                 </div>
@@ -162,10 +162,12 @@ const NotificationModal = ({
               </motion.button>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2">Message</h3>
-                <p className="text-gray-700 leading-relaxed">
+                <h3 className="font-semibold text-gray-900 mb-2 text-sm sm:text-base">
+                  Message
+                </h3>
+                <p className="text-sm sm:text-base text-gray-700 leading-relaxed">
                   {notification.message}
                 </p>
               </div>
@@ -259,18 +261,20 @@ const NotificationModal = ({
                   </div>
                 )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Sender</h3>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[var(--elra-primary)] flex items-center justify-center text-white font-bold">
+                  <h3 className="font-semibold text-gray-900 mb-2 text-sm sm:text-base">
+                    Sender
+                  </h3>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[var(--elra-primary)] flex items-center justify-center text-white font-bold text-xs sm:text-sm">
                       {getSenderDisplay(notification.sender).avatar}
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">
+                      <p className="font-medium text-gray-900 text-sm sm:text-base">
                         {getSenderDisplay(notification.sender).name}
                       </p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-xs sm:text-sm text-gray-600">
                         {getSenderDisplay(notification.sender).email}
                       </p>
                     </div>
@@ -278,15 +282,17 @@ const NotificationModal = ({
                 </div>
 
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Status</h3>
-                  <span className="px-3 py-2 rounded-full text-sm font-semibold border text-[var(--elra-primary)] bg-[var(--elra-primary)]/10 border-[var(--elra-primary)]/20">
+                  <h3 className="font-semibold text-gray-900 mb-2 text-sm sm:text-base">
+                    Status
+                  </h3>
+                  <span className="px-2 py-1 sm:px-3 sm:py-2 rounded-full text-xs sm:text-sm font-semibold border text-[var(--elra-primary)] bg-[var(--elra-primary)]/10 border-[var(--elra-primary)]/20">
                     {notification.read ? "READ" : "UNREAD"}
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-3 sm:pt-4 border-t border-gray-200 gap-2 sm:gap-3">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                   {!notification.read && (
                     <motion.button
                       whileHover={{ scale: 1.05 }}
@@ -295,7 +301,7 @@ const NotificationModal = ({
                         onMarkAsRead(notification._id);
                         onClose();
                       }}
-                      className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-all duration-300 cursor-pointer"
+                      className="px-3 py-2 sm:px-4 sm:py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-all duration-300 cursor-pointer text-sm sm:text-base"
                     >
                       Mark as Read
                     </motion.button>
@@ -308,7 +314,7 @@ const NotificationModal = ({
                       onClick={() => {
                         window.location.href = notification.actionUrl;
                       }}
-                      className="px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-all duration-300 cursor-pointer"
+                      className="px-3 py-2 sm:px-4 sm:py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-all duration-300 cursor-pointer text-sm sm:text-base"
                     >
                       Take Action
                     </motion.button>
@@ -322,7 +328,7 @@ const NotificationModal = ({
                     onDelete(notification._id);
                     onClose();
                   }}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-300 cursor-pointer"
+                  className="px-3 py-2 sm:px-4 sm:py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-300 cursor-pointer text-sm sm:text-base"
                 >
                   Delete
                 </motion.button>

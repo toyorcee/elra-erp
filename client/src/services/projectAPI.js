@@ -536,3 +536,27 @@ export const exportProjectApprovalReport = async (format, params = {}) => {
     throw error;
   }
 };
+
+// Download project certificate
+export const downloadProjectCertificate = async (projectId, projectCode) => {
+  try {
+    const response = await api.get(`/projects/${projectId}/certificate`, {
+      responseType: "blob",
+    });
+
+    // Create download link
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `ELRA-Certificate-${projectCode}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+
+    return response.data;
+  } catch (error) {
+    console.error("Error downloading project certificate:", error);
+    throw error;
+  }
+};

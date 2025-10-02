@@ -23,6 +23,9 @@ import {
 } from "@heroicons/react/24/solid";
 import DataTable from "../../../../components/common/DataTable";
 import { toast } from "react-toastify";
+import { updateTaskStatus } from "../../../../services/taskAPI";
+import { getMyProjectTasks } from "../../../../services/projectTaskService";
+import { downloadProjectCertificate } from "../../../../services/projectAPI";
 import {
   formatNumberWithCommas,
   parseFormattedNumber,
@@ -82,6 +85,27 @@ const ExternalProjectManagement = () => {
   });
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  const [showImplementationTasksModal, setShowImplementationTasksModal] =
+    useState(false);
+  const [selectedProjectForTasks, setSelectedProjectForTasks] = useState(null);
+  const [projectTasks, setProjectTasks] = useState([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [updatingTask, setUpdatingTask] = useState(null);
+  const [projectTaskCounts, setProjectTaskCounts] = useState({});
+  const [showCertificateModal, setShowCertificateModal] = useState(false);
+  const [selectedProjectForCertificate, setSelectedProjectForCertificate] =
+    useState(null);
+  const [isGeneratingCertificate, setIsGeneratingCertificate] = useState(false);
+
+  const formatStatus = (status) => {
+    if (!status) return "N/A";
+    return status
+      .replace(/_/g, " ")
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
 
   const [currentDocumentStep, setCurrentDocumentStep] = useState(0);
   const [uploadedDocuments, setUploadedDocuments] = useState([]);
@@ -146,11 +170,9 @@ const ExternalProjectManagement = () => {
     vendorAddress: "",
     deliveryAddress: "",
 
-    // Custom category for "Other"
     customCategory: "",
   });
 
-  // Project items for external projects
   const [projectItems, setProjectItems] = useState([
     {
       name: "",
@@ -258,7 +280,9 @@ const ExternalProjectManagement = () => {
           toast.error("Failed to load external projects");
         }
 
-        console.log("✅ [INIT] Initial data loaded successfully");
+        setTimeout(() => {
+          fetchTaskCountsForProjects();
+        }, 1000);
       } catch (error) {
         console.error("❌ [INIT] Error loading initial data:", error);
         console.error("❌ [INIT] Error details:", {
@@ -277,7 +301,17 @@ const ExternalProjectManagement = () => {
     }
   }, [user]);
 
-  // Enhanced modal styles
+  useEffect(() => {
+    if (projects.length > 0) {
+      const hasImplementationProjects = projects.some(
+        (p) => p.status === "implementation"
+      );
+      if (hasImplementationProjects) {
+        fetchTaskCountsForProjects();
+      }
+    }
+  }, [projects]);
+
   useEffect(() => {
     const style = document.createElement("style");
     style.textContent = `
@@ -329,46 +363,20 @@ const ExternalProjectManagement = () => {
     {
       header: "Project Name",
       accessor: "name",
-      width: "w-80",
+      width: "w-60",
       renderer: (row) => (
         <div className="max-w-xs">
           <div
             className="font-semibold text-gray-900 break-words"
             title={row.name}
           >
-            {sliceToWords(row.name, 10)}
+            {sliceToWords(row.name, 8)}
           </div>
           <div
             className="text-sm text-gray-500 break-words"
             title={row.description}
           >
-            {sliceToWords(row.description, 15)}
-          </div>
-        </div>
-      ),
-    },
-    {
-      header: "Client",
-      accessor: "clientName",
-      width: "w-48",
-      renderer: (row) => (
-        <div className="flex items-center max-w-xs">
-          <BuildingOfficeIcon className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
-          <div>
-            <span
-              className="text-sm font-medium truncate block"
-              title={row.clientName}
-            >
-              {row.clientName}
-            </span>
-            {row.clientCompany && (
-              <span
-                className="text-xs text-gray-500 truncate block"
-                title={row.clientCompany}
-              >
-                {row.clientCompany}
-              </span>
-            )}
+            {sliceToWords(row.description, 12)}
           </div>
         </div>
       ),
@@ -400,9 +408,27 @@ const ExternalProjectManagement = () => {
         return (
           <div className="flex flex-col space-y-1">
             <span
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusInfo.color}`}
+              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color}`}
             >
-              <StatusIcon className="h-3 w-3 mr-1" />
+              <span
+                className={`w-2 h-2 mr-2 rounded-full ${
+                  statusInfo.color.includes("green")
+                    ? "bg-green-500"
+                    : statusInfo.color.includes("yellow")
+                    ? "bg-yellow-500"
+                    : statusInfo.color.includes("orange")
+                    ? "bg-orange-500"
+                    : statusInfo.color.includes("red")
+                    ? "bg-red-500"
+                    : statusInfo.color.includes("blue")
+                    ? "bg-blue-500"
+                    : statusInfo.color.includes("purple")
+                    ? "bg-purple-500"
+                    : statusInfo.color.includes("indigo")
+                    ? "bg-indigo-500"
+                    : "bg-gray-500"
+                }`}
+              ></span>
               {statusInfo.label}
             </span>
             {row.status === "pending_legal_compliance_approval" && (
@@ -432,7 +458,7 @@ const ExternalProjectManagement = () => {
     {
       header: "Vendor",
       accessor: "vendorId",
-      width: "w-48",
+      width: "w-40",
       renderer: (row) => (
         <div className="flex items-center max-w-xs">
           <BuildingOfficeIcon className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
@@ -508,66 +534,98 @@ const ExternalProjectManagement = () => {
   });
 
   const getStatusInfo = (status) => {
+    const formattedStatus = formatStatus(status);
+
     switch (status) {
       case "in_progress":
         return {
-          color: "text-green-600 bg-green-100",
+          color: "bg-green-100 text-green-800",
           icon: CheckCircleIconSolid,
-          label: "In Progress",
+          label: formattedStatus,
         };
       case "pending_approval":
         return {
-          color: "text-yellow-600 bg-yellow-100",
+          color: "bg-yellow-100 text-yellow-800",
           icon: ClockIconSolid,
-          label: "Pending Approval",
+          label: formattedStatus,
         };
       case "pending_legal_compliance_approval":
         return {
-          color: "text-orange-600 bg-orange-100",
+          color: "bg-orange-100 text-orange-800",
           icon: ClockIconSolid,
-          label: "Pending Legal Approval",
+          label: formattedStatus,
         };
       case "pending_vendor_assignment":
         return {
-          color: "text-red-600 bg-red-100",
+          color: "bg-red-100 text-red-800",
           icon: ClockIconSolid,
-          label: "Pending Vendor Assignment",
+          label: formattedStatus,
         };
       case "approved":
         return {
-          color: "text-blue-600 bg-blue-100",
+          color: "bg-blue-100 text-blue-800",
           icon: CheckCircleIconSolid,
-          label: "Approved",
+          label: formattedStatus,
         };
       case "implementation":
         return {
-          color: "text-indigo-600 bg-indigo-100",
+          color: "bg-purple-100 text-purple-800",
           icon: CheckCircleIconSolid,
-          label: "Implementation",
+          label: formattedStatus,
         };
       case "completed":
         return {
-          color: "text-purple-600 bg-purple-100",
+          color: "bg-green-100 text-green-800",
           icon: CheckCircleIconSolid,
-          label: "Completed",
+          label: formattedStatus,
         };
       case "rejected":
         return {
-          color: "text-red-600 bg-red-100",
+          color: "bg-red-100 text-red-800",
           icon: ClockIconSolid,
-          label: "Rejected",
+          label: formattedStatus,
         };
       case "cancelled":
         return {
-          color: "text-gray-600 bg-gray-100",
+          color: "bg-gray-100 text-gray-800",
           icon: ClockIconSolid,
-          label: "Cancelled",
+          label: formattedStatus,
+        };
+      case "pending_finance_approval":
+        return {
+          color: "bg-yellow-100 text-yellow-800",
+          icon: ClockIconSolid,
+          label: formattedStatus,
+        };
+      case "pending_executive_approval":
+        return {
+          color: "bg-purple-100 text-purple-800",
+          icon: ClockIconSolid,
+          label: formattedStatus,
+        };
+      case "pending_procurement":
+        return {
+          color: "bg-orange-100 text-orange-800",
+          icon: ClockIconSolid,
+          label: formattedStatus,
+        };
+      case "pending_hod_approval":
+        return {
+          color: "bg-blue-100 text-blue-800",
+          icon: ClockIconSolid,
+          label: formattedStatus,
+        };
+      case "pending_project_management_approval":
+        return {
+          color: "bg-indigo-100 text-indigo-800",
+          icon: ClockIconSolid,
+          label: formattedStatus,
         };
       default:
         return {
-          color: "text-gray-600 bg-gray-100",
+          color: "bg-gray-100 text-gray-800",
           icon: ClockIconSolid,
-          label: status || "Unknown",
+          label: formattedStatus,
         };
     }
   };
@@ -1014,6 +1072,10 @@ const ExternalProjectManagement = () => {
         const externalProjects =
           projectsResponse.data.projects || projectsResponse.data || [];
         setProjects(externalProjects);
+
+        setTimeout(() => {
+          fetchTaskCountsForProjects();
+        }, 500);
       } else {
         toast.error("Failed to refresh projects");
       }
@@ -1063,6 +1125,196 @@ const ExternalProjectManagement = () => {
     );
     setSelectedProjectForDocument(project);
     setShowDocumentViewModal(true);
+  };
+
+  const handleStartImplementation = async (project) => {
+    console.log(
+      "🚀 [IMPLEMENTATION] Start implementation button clicked for project:",
+      project
+    );
+    setSelectedProjectForTasks(project);
+    setShowImplementationTasksModal(true);
+    await fetchProjectTasks(project._id);
+  };
+
+  const fetchProjectTasks = async (projectId) => {
+    try {
+      setLoadingTasks(true);
+      const data = await getMyProjectTasks(projectId);
+      setProjectTasks(data.data || []);
+      console.log("📋 [TASKS] Fetched project tasks:", data.data);
+    } catch (error) {
+      console.error("❌ [TASKS] Error fetching tasks:", error);
+      toast.error("Error loading project tasks");
+    } finally {
+      setLoadingTasks(false);
+    }
+  };
+
+  const fetchTaskCountsForProjects = async () => {
+    try {
+      const implementationProjects = projects.filter(
+        (p) => p.status === "implementation"
+      );
+      const taskCounts = {};
+
+      for (const project of implementationProjects) {
+        try {
+          const data = await getMyProjectTasks(project._id);
+          const tasks = data.data || [];
+          const completedTasks = tasks.filter(
+            (task) => task.status === "completed"
+          ).length;
+          const startedTasks = tasks.filter(
+            (task) =>
+              task.status === "in_progress" || task.status === "completed"
+          ).length;
+          const totalTasks = tasks.length;
+
+          taskCounts[project._id] = {
+            completed: completedTasks,
+            started: startedTasks,
+            total: totalTasks,
+          };
+        } catch (error) {
+          console.error(
+            `❌ [TASK COUNTS] Error fetching tasks for project ${project._id}:`,
+            error
+          );
+          taskCounts[project._id] = { completed: 0, total: 0 };
+        }
+      }
+
+      setProjectTaskCounts(taskCounts);
+      console.log("📊 [TASK COUNTS] Updated task counts:", taskCounts);
+
+      // Debug: Log certificate eligibility for each project
+      for (const project of implementationProjects) {
+        console.log(`🔍 [CERTIFICATE DEBUG] Project: ${project.name}`);
+        console.log(`  - Approval Progress: ${project.approvalProgress}%`);
+        console.log(
+          `  - Implementation Progress: ${project.implementationProgress}%`
+        );
+        console.log(`  - Overall Progress: ${project.progress}%`);
+        console.log(
+          `  - Certificate Eligible: ${
+            project.approvalProgress === 100 &&
+            project.implementationProgress === 100
+          }`
+        );
+      }
+    } catch (error) {
+      console.error("❌ [TASK COUNTS] Error fetching task counts:", error);
+    }
+  };
+
+  const canCompleteTask = (task) => {
+    if (task.status === "completed") return false;
+
+    const sortedTasks = [...projectTasks].sort(
+      (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+    );
+    const currentTaskIndex = sortedTasks.findIndex((t) => t._id === task._id);
+
+    for (let i = 0; i < currentTaskIndex; i++) {
+      if (sortedTasks[i].status !== "completed") {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const handleDownloadCertificate = (project) => {
+    console.log(
+      "📜 [CERTIFICATE] Opening certificate modal for project:",
+      project.name
+    );
+    setSelectedProjectForCertificate(project);
+    setShowCertificateModal(true);
+  };
+
+  const handleConfirmCertificateDownload = async () => {
+    try {
+      setIsGeneratingCertificate(true);
+      console.log("🔄 [CERTIFICATE] Starting certificate generation...");
+
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      await downloadProjectCertificate(
+        selectedProjectForCertificate._id,
+        selectedProjectForCertificate.code
+      );
+
+      toast.success("Certificate downloaded successfully");
+
+      setShowCertificateModal(false);
+      setSelectedProjectForCertificate(null);
+    } catch (error) {
+      console.error("❌ [CERTIFICATE] Error downloading certificate:", error);
+      toast.error("Error downloading certificate");
+    } finally {
+      setIsGeneratingCertificate(false);
+    }
+  };
+
+  const handleUpdateTaskStatus = async (taskId, newStatus) => {
+    try {
+      setUpdatingTask(taskId);
+      const data = await updateTaskStatus(taskId, newStatus);
+      console.log("✅ [TASK] Task status updated:", data);
+
+      setProjectTasks((prevTasks) =>
+        prevTasks.map((task) =>
+          task._id === taskId
+            ? {
+                ...task,
+                status: newStatus,
+                completedAt:
+                  newStatus === "completed" ? new Date().toISOString() : null,
+              }
+            : task
+        )
+      );
+
+      // Update task counts for the project
+      if (selectedProjectForTasks) {
+        const updatedTasks = projectTasks.map((task) =>
+          task._id === taskId
+            ? {
+                ...task,
+                status: newStatus,
+                completedAt:
+                  newStatus === "completed" ? new Date().toISOString() : null,
+              }
+            : task
+        );
+
+        const completedTasks = updatedTasks.filter(
+          (task) => task.status === "completed"
+        ).length;
+        const startedTasks = updatedTasks.filter(
+          (task) => task.status === "in_progress" || task.status === "completed"
+        ).length;
+        const totalTasks = updatedTasks.length;
+
+        setProjectTaskCounts((prev) => ({
+          ...prev,
+          [selectedProjectForTasks._id]: {
+            completed: completedTasks,
+            started: startedTasks,
+            total: totalTasks,
+          },
+        }));
+      }
+
+      toast.success(`Task marked as ${newStatus.replace(/_/g, " ")}`);
+    } catch (error) {
+      console.error("❌ [TASK] Error updating task status:", error);
+      toast.error("Error updating task status");
+    } finally {
+      setUpdatingTask(null);
+    }
   };
 
   const handleDownloadDocument = async (documentId) => {
@@ -1420,10 +1672,10 @@ const ExternalProjectManagement = () => {
               showDelete: false,
               showToggle: false,
               customActions: (row) => (
-                <div className="flex space-x-2">
+                <div className="flex space-x-2 min-w-[200px]">
                   <button
                     onClick={() => handleViewProject(row)}
-                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    className="p-2 bg-blue-100 text-blue-600 hover:bg-blue-200 hover:text-blue-700 rounded-lg transition-colors cursor-pointer"
                     title="View Details"
                   >
                     <EyeIcon className="h-4 w-4" />
@@ -1433,7 +1685,7 @@ const ExternalProjectManagement = () => {
                       user?.role?.level >= 1000) && (
                       <button
                         onClick={() => handleAddVendor(row)}
-                        className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                        className="p-2 bg-green-100 text-green-600 hover:bg-green-200 hover:text-green-700 rounded-lg transition-colors cursor-pointer"
                         title="Add Vendor"
                       >
                         <svg
@@ -1449,6 +1701,36 @@ const ExternalProjectManagement = () => {
                             d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                           />
                         </svg>
+                      </button>
+                    )}
+                  {/* Implementation Tasks Button - Show for projects in implementation status */}
+                  {row.status === "implementation" && (
+                    <button
+                      onClick={() => handleStartImplementation(row)}
+                      className="p-2 bg-purple-100 text-purple-600 hover:bg-purple-200 hover:text-purple-700 rounded-lg transition-colors cursor-pointer relative"
+                      title={`Implementation Tasks - ${
+                        projectTaskCounts[row._id]?.started || 0
+                      }/${projectTaskCounts[row._id]?.total || 0} started`}
+                    >
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+                        />
+                      </svg>
+                      {projectTaskCounts[row._id] &&
+                        projectTaskCounts[row._id].total > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-purple-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                            {projectTaskCounts[row._id].started}
+                          </span>
+                        )}
                       </button>
                     )}
                   {/* Documents Icon - Always show for document management */}
@@ -1479,8 +1761,8 @@ const ExternalProjectManagement = () => {
                       row.requiredDocuments &&
                       row.requiredDocuments.filter((doc) => doc.isSubmitted)
                         .length === row.requiredDocuments.length
-                        ? "text-green-600 hover:text-green-800 hover:bg-green-50"
-                        : "text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                        ? "bg-green-100 text-green-600 hover:bg-green-200 hover:text-green-700"
+                        : "bg-orange-100 text-orange-600 hover:bg-orange-200 hover:text-orange-700"
                     }`}
                     title={
                       row.requiredDocuments && row.requiredDocuments.length > 0
@@ -1512,6 +1794,31 @@ const ExternalProjectManagement = () => {
                         </span>
                       )}
                   </button>
+                  {/* Certificate Button - Show for completed external projects */}
+                  {row.status === "implementation" &&
+                    row.projectScope === "external" &&
+                    row.approvalProgress === 100 &&
+                    row.implementationProgress === 100 && (
+                      <button
+                        onClick={() => handleDownloadCertificate(row)}
+                        className="p-2 bg-yellow-100 text-yellow-600 hover:bg-yellow-200 hover:text-yellow-700 rounded-lg transition-colors cursor-pointer"
+                        title="Download Completion Certificate"
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          />
+                        </svg>
+                      </button>
+                    )}
                 </div>
               ),
             }}
@@ -3777,6 +4084,564 @@ const ExternalProjectManagement = () => {
                     <p className="text-gray-500">No documents uploaded yet</p>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Implementation Tasks Modal */}
+        {showImplementationTasksModal && selectedProjectForTasks && (
+          <div className="fixed inset-0 modal-backdrop-enhanced flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl modal-shadow-enhanced max-w-6xl w-full max-h-[90vh] flex flex-col border border-gray-100">
+              {/* ELRA Branded Header */}
+              <div className="bg-gradient-to-br from-[var(--elra-primary)] via-[var(--elra-primary-dark)] to-[var(--elra-primary)] text-white p-8 rounded-t-2xl flex-shrink-0 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+                <div className="relative flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                      <svg
+                        className="w-6 h-6 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-white">
+                        Implementation Tasks
+                      </h3>
+                      <p className="text-white/80 text-sm mt-1">
+                        {selectedProjectForTasks.name} -{" "}
+                        {selectedProjectForTasks.code}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowImplementationTasksModal(false);
+                      // Refresh task counts when modal is closed
+                      fetchTaskCountsForProjects();
+                    }}
+                    className="text-white/80 hover:text-white hover:bg-white/10 p-2 rounded-lg transition-colors"
+                  >
+                    <svg
+                      className="h-6 w-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-8 flex-1 overflow-y-auto">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-center">
+                    <svg
+                      className="w-5 h-5 text-blue-600 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <div>
+                      <h4 className="text-sm font-medium text-blue-800">
+                        Implementation Phase Active
+                      </h4>
+                      <p className="text-sm text-blue-700 mt-1">
+                        This project is now in implementation phase. Complete
+                        the tasks below to progress through the implementation.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Task Management Component */}
+                <div className="bg-white rounded-lg border border-gray-200">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h4 className="text-lg font-semibold text-gray-900">
+                          Project Implementation Tasks
+                        </h4>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Complete these tasks to progress through the
+                          implementation phase
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          fetchProjectTasks(selectedProjectForTasks._id);
+                          // Also refresh task counts
+                          setTimeout(() => {
+                            fetchTaskCountsForProjects();
+                          }, 500);
+                        }}
+                        className="bg-blue-50 text-blue-600 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
+                        disabled={loadingTasks}
+                      >
+                        {loadingTasks ? "Refreshing..." : "Refresh Tasks"}
+                      </button>
+                    </div>
+
+                    {/* Task List */}
+                    {loadingTasks ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--elra-primary)] mx-auto"></div>
+                        <p className="text-gray-500 mt-2">Loading tasks...</p>
+                      </div>
+                    ) : projectTasks.length > 0 ? (
+                      <div className="space-y-4">
+                        {projectTasks.map((task) => (
+                          <div
+                            key={task._id}
+                            className="bg-gray-50 rounded-lg p-4 border border-gray-200"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-3 mb-2">
+                                  <div
+                                    className={`w-3 h-3 rounded-full ${
+                                      task.status === "completed"
+                                        ? "bg-green-500"
+                                        : task.status === "in_progress"
+                                        ? "bg-yellow-500"
+                                        : "bg-gray-400"
+                                    }`}
+                                  ></div>
+                                  <h5 className="font-medium text-gray-900">
+                                    {task.title}
+                                  </h5>
+                                  <span
+                                    className={`px-2 py-1 text-xs rounded-full ${
+                                      task.status === "completed"
+                                        ? "bg-green-100 text-green-800"
+                                        : task.status === "in_progress"
+                                        ? "bg-yellow-100 text-yellow-800"
+                                        : "bg-gray-100 text-gray-800"
+                                    }`}
+                                  >
+                                    {task.status.replace("_", " ")}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-600 mb-3">
+                                  {task.description}
+                                </p>
+                                <div className="flex items-center space-x-4 text-xs text-gray-500">
+                                  <span>Priority: {task.priority}</span>
+                                  <span>
+                                    Due:{" "}
+                                    {task.dueDate
+                                      ? new Date(
+                                          task.dueDate
+                                        ).toLocaleDateString()
+                                      : "No due date"}
+                                  </span>
+                                  {task.completedAt && (
+                                    <span className="text-green-600">
+                                      Completed:{" "}
+                                      {new Date(
+                                        task.completedAt
+                                      ).toLocaleDateString()}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex space-x-2 ml-4">
+                                {task.status === "pending" && (
+                                  <button
+                                    onClick={() =>
+                                      handleUpdateTaskStatus(
+                                        task._id,
+                                        "in_progress"
+                                      )
+                                    }
+                                    disabled={updatingTask === task._id}
+                                    className="inline-flex items-center px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                  >
+                                    {updatingTask === task._id ? (
+                                      <>
+                                        <svg
+                                          className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                                          fill="none"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <circle
+                                            className="opacity-25"
+                                            cx="12"
+                                            cy="12"
+                                            r="10"
+                                            stroke="currentColor"
+                                            strokeWidth="4"
+                                          ></circle>
+                                          <path
+                                            className="opacity-75"
+                                            fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                          ></path>
+                                        </svg>
+                                        Starting...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <svg
+                                          className="w-4 h-4 mr-2"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                          />
+                                        </svg>
+                                        Start Task
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+                                {task.status === "in_progress" && (
+                                  <button
+                                    onClick={() =>
+                                      handleUpdateTaskStatus(
+                                        task._id,
+                                        "completed"
+                                      )
+                                    }
+                                    disabled={
+                                      updatingTask === task._id ||
+                                      !canCompleteTask(task)
+                                    }
+                                    className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${
+                                      canCompleteTask(task)
+                                        ? "bg-green-600 text-white hover:bg-green-700 focus:ring-green-500"
+                                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                    title={
+                                      !canCompleteTask(task)
+                                        ? "Complete previous tasks first"
+                                        : "Mark task as completed"
+                                    }
+                                  >
+                                    {updatingTask === task._id ? (
+                                      <>
+                                        <svg
+                                          className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                                          fill="none"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <circle
+                                            className="opacity-25"
+                                            cx="12"
+                                            cy="12"
+                                            r="10"
+                                            stroke="currentColor"
+                                            strokeWidth="4"
+                                          ></circle>
+                                          <path
+                                            className="opacity-75"
+                                            fill="currentColor"
+                                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                          ></path>
+                                        </svg>
+                                        Completing...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <svg
+                                          className="w-4 h-4 mr-2"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M5 13l4 4L19 7"
+                                          />
+                                        </svg>
+                                        Mark Complete
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+                                {task.status === "completed" && (
+                                  <div className="inline-flex items-center px-3 py-2 bg-green-100 text-green-800 text-sm font-medium rounded-lg">
+                                    <svg
+                                      className="w-4 h-4 mr-2"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M5 13l4 4L19 7"
+                                      />
+                                    </svg>
+                                    Completed
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <svg
+                          className="h-12 w-12 text-gray-400 mx-auto mb-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+                          />
+                        </svg>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                          No Implementation Tasks Found
+                        </h3>
+                        <p className="text-gray-500 mb-4">
+                          No tasks have been created for this project yet. Tasks
+                          are automatically generated when a project moves to
+                          implementation status.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Certificate Download Confirmation Modal */}
+        {showCertificateModal && selectedProjectForCertificate && (
+          <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4">
+              <div className="p-6">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center">
+                    <div className="p-2 bg-yellow-100 rounded-lg mr-3">
+                      <svg
+                        className="h-6 w-6 text-yellow-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Download Completion Certificate
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowCertificateModal(false);
+                      setSelectedProjectForCertificate(null);
+                    }}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg
+                      className="h-6 w-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Project Info */}
+                <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                  <h4 className="font-medium text-gray-900 mb-2">
+                    {selectedProjectForCertificate.name}
+                  </h4>
+                  <p className="text-sm text-gray-600 mb-2">
+                    Project Code: {selectedProjectForCertificate.code}
+                  </p>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Approval Progress:</span>
+                    <span className="font-medium text-green-600">
+                      {selectedProjectForCertificate.approvalProgress}%
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">
+                      Implementation Progress:
+                    </span>
+                    <span className="font-medium text-green-600">
+                      {selectedProjectForCertificate.implementationProgress}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* What the certificate includes */}
+                <div className="mb-6">
+                  <h4 className="font-medium text-gray-900 mb-3">
+                    Certificate will include:
+                  </h4>
+                  <ul className="space-y-2 text-sm text-gray-600">
+                    <li className="flex items-center">
+                      <svg
+                        className="h-4 w-4 text-green-500 mr-2"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Project completion details and timeline
+                    </li>
+                    <li className="flex items-center">
+                      <svg
+                        className="h-4 w-4 text-green-500 mr-2"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      All approval signatures and dates
+                    </li>
+                    <li className="flex items-center">
+                      <svg
+                        className="h-4 w-4 text-green-500 mr-2"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Implementation task completion summary
+                    </li>
+                    <li className="flex items-center">
+                      <svg
+                        className="h-4 w-4 text-green-500 mr-2"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Official ELRA completion stamp
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowCertificateModal(false);
+                      setSelectedProjectForCertificate(null);
+                    }}
+                    disabled={isGeneratingCertificate}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmCertificateDownload}
+                    disabled={isGeneratingCertificate}
+                    className="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isGeneratingCertificate ? (
+                      <>
+                        <svg
+                          className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Generating Certificate...
+                      </>
+                    ) : (
+                      <>
+                        <svg
+                          className="h-4 w-4 mr-2"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          />
+                        </svg>
+                        Download
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

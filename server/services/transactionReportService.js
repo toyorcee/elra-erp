@@ -8,6 +8,20 @@ import ELRAWallet from "../models/ELRAWallet.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Helper function to load certificate images
+const loadReportImage = (imageName) => {
+  try {
+    const imagePath = path.resolve(__dirname, "../assets/images", imageName);
+    if (fs.existsSync(imagePath)) {
+      const imageBuffer = fs.readFileSync(imagePath);
+      return `data:image/png;base64,${imageBuffer.toString("base64")}`;
+    }
+  } catch (error) {
+    console.warn(`⚠️ Could not load image ${imageName}:`, error.message);
+  }
+  return null;
+};
+
 class TransactionReportService {
   constructor() {
     this.reportsDir = path.join(__dirname, "../uploads/transaction-reports");
@@ -93,10 +107,30 @@ class TransactionReportService {
 
     // Header with ELRA branding (matching payslip style)
     const elraGreen = [13, 100, 73];
-    doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
-    doc.setFontSize(32);
-    doc.setFont("helvetica", "bold");
-    doc.text("ELRA", pageWidth / 2, 25, { align: "center" });
+    
+    // Try to add ELRA logo image
+    const elraLogo = loadReportImage("elra-logo.png");
+    if (elraLogo) {
+      try {
+        doc.addImage(elraLogo, "PNG", pageWidth / 2 - 10, 15, 20, 20);
+        doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+        doc.setFontSize(32);
+        doc.setFont("helvetica", "bold");
+        doc.text("ELRA", pageWidth / 2, 40, { align: "center" });
+      } catch (error) {
+        console.warn("⚠️ Could not add ELRA logo to transaction report, falling back to text:", error.message);
+        doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+        doc.setFontSize(32);
+        doc.setFont("helvetica", "bold");
+        doc.text("ELRA", pageWidth / 2, 25, { align: "center" });
+      }
+    } else {
+      // Fallback to text-only
+      doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+      doc.setFontSize(32);
+      doc.setFont("helvetica", "bold");
+      doc.text("ELRA", pageWidth / 2, 25, { align: "center" });
+    }
 
     // Reset to black for subtitle
     doc.setTextColor(0, 0, 0);

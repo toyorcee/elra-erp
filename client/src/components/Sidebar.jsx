@@ -68,6 +68,7 @@ import {
 import { userModulesAPI } from "../services/userModules.js";
 import { useAuth } from "../context/AuthContext";
 import { useDynamicSidebar } from "../context/DynamicSidebarContext";
+import { getImageUrl } from "../utils/fileUtils.js";
 
 const Sidebar = ({ isOpen, onToggle, isMobile }) => {
   const { user, logout } = useAuth();
@@ -420,10 +421,10 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
         <Link
           to={item.path}
           onClick={handleClick}
-          className={`group flex items-center px-3 py-2 text-sm font-medium rounded-full transition-all duration-200 relative cursor-pointer ${
+          className={`group flex items-center px-3 py-2 text-sm font-medium rounded-xl transition-all duration-300 relative cursor-pointer ${
             isItemActive
-              ? "bg-[var(--elra-primary)] text-white font-semibold"
-              : "text-gray-700 hover:bg-gray-100 hover:text-[var(--elra-primary)]"
+              ? "bg-[var(--elra-primary)] text-white font-semibold shadow-lg shadow-emerald-500/20"
+              : "text-gray-800 hover:bg-emerald-50 hover:text-emerald-700"
           } ${!shouldShowExpanded && "justify-center"}`}
         >
           <div className="relative">
@@ -431,10 +432,10 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
               className={`h-5 w-5 ${
                 isItemActive
                   ? "text-white"
-                  : "text-gray-600 group-hover:text-[var(--elra-primary)]"
+                  : "text-gray-600 group-hover:text-emerald-600"
               } ${
                 !shouldShowExpanded && "mx-auto"
-              } transition-transform duration-200 group-hover:scale-110`}
+              } transition-all duration-300 group-hover:scale-110`}
             />
           </div>
           {shouldShowExpanded && (
@@ -443,7 +444,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                 className={`ml-3 flex-1 ${
                   isItemActive
                     ? "text-white"
-                    : "text-gray-700 group-hover:text-[var(--elra-primary)]"
+                    : "text-gray-800 group-hover:text-emerald-700"
                 }`}
               >
                 {item.label}
@@ -495,6 +496,49 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     );
   };
 
+  // Loading skeletons for ERP modules while fetching from backend
+  const renderERPLoading = () => {
+    if (!shouldShowExpanded) {
+      return (
+        <div className="mb-8 mt-8 px-2">
+          <div className="grid grid-cols-2 gap-2">
+            {Array.from({ length: 8 }).map((_, idx) => (
+              <div
+                key={idx}
+                className="flex flex-col items-center p-2 rounded-full min-h-[60px] justify-center animate-pulse bg-gray-100"
+                style={{ height: "60px" }}
+              >
+                <div className="h-5 w-5 mb-1 rounded-full bg-gray-300" />
+                <div className="h-3 w-12 rounded bg-gray-300" />
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mb-8 mt-8">
+        <div className="w-full px-4 text-sm font-bold uppercase tracking-wider mb-3 py-3 flex items-center justify-between text-[var(--elra-primary)]">
+          <div className="flex items-center">
+            <span>ERP MODULES</span>
+          </div>
+        </div>
+        <div className="space-y-2 px-4">
+          {Array.from({ length: 8 }).map((_, idx) => (
+            <div
+              key={idx}
+              className="flex items-center px-3 py-2 rounded-full animate-pulse bg-gray-100"
+            >
+              <div className="h-5 w-5 rounded-full bg-gray-300" />
+              <div className="ml-3 h-3 w-40 rounded bg-gray-300" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   // Special renderer for ERP modules when sidebar is collapsed
   const renderCollapsedERPModules = () => {
     if (shouldShowExpanded || sections.erp.length === 0) return null;
@@ -510,18 +554,14 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex flex-col items-center p-2 rounded-full transition-all duration-200 cursor-pointer min-h-[60px] justify-center ${
+                className={`flex items-center justify-center p-3 rounded-xl transition-all duration-300 cursor-pointer ${
                   isItemActive
-                    ? "bg-[var(--elra-primary)] text-white"
-                    : "text-gray-700 hover:bg-gray-100 hover:text-[var(--elra-primary)]"
+                    ? "bg-[var(--elra-primary)] text-white shadow-lg shadow-emerald-500/20"
+                    : "text-gray-800 hover:bg-emerald-50 hover:text-emerald-700"
                 }`}
                 title={item.label}
-                style={{ height: "60px" }}
               >
-                <IconComponent className="h-5 w-5 mb-1" />
-                <span className="text-xs text-center leading-tight truncate w-full">
-                  {item.label.split(" ")[0]}
-                </span>
+                <IconComponent className="h-5 w-5" />
               </Link>
             );
           })}
@@ -639,7 +679,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
               >
                 {user?.avatar ? (
                   <img
-                    src={user.avatar}
+                    src={getImageUrl(user.avatar)}
                     alt={`${user?.firstName} ${user?.lastName}`}
                     className="w-full h-full object-cover"
                     onError={(e) => {
@@ -693,7 +733,11 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             {shouldShowExpanded && sections.main.map(renderNavItem)}
 
             {shouldShowExpanded
-              ? renderSection("erp", "ERP Modules", sections.erp)
+              ? loadingModules
+                ? renderERPLoading()
+                : renderSection("erp", "ERP Modules", sections.erp)
+              : loadingModules
+              ? renderERPLoading()
               : renderCollapsedERPModules()}
 
             {shouldShowExpanded && (
@@ -758,18 +802,18 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                                     <div key={itemIndex} className="relative">
                                       <Link
                                         to={item.path}
-                                        className={`group flex items-center px-4 py-2 text-xs font-medium rounded-full transition-all duration-200 cursor-pointer ${
+                                        className={`group flex items-center px-4 py-2 text-xs font-medium rounded-xl transition-all duration-300 cursor-pointer ${
                                           isItemActive
-                                            ? "bg-[var(--elra-primary)] text-white font-semibold"
-                                            : "text-gray-700 hover:bg-gray-100 hover:text-[var(--elra-primary)]"
+                                            ? "bg-[var(--elra-primary)] text-white font-semibold shadow-lg shadow-emerald-500/20"
+                                            : "text-gray-800 hover:bg-emerald-50 hover:text-emerald-700"
                                         }`}
                                       >
                                         <IconComponent
                                           className={`h-4 w-4 ${
                                             isItemActive
                                               ? "text-white"
-                                              : "text-gray-600 group-hover:text-[var(--elra-primary)]"
-                                          } transition-transform duration-200 group-hover:scale-110`}
+                                              : "text-gray-600 group-hover:text-emerald-600"
+                                          } transition-all duration-300 group-hover:scale-110`}
                                         />
                                         <span className="ml-3 flex-1">
                                           {item.label}

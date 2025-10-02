@@ -1,5 +1,25 @@
 import nodemailer from "nodemailer";
 import mongoose from "mongoose";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Helper function to load certificate images
+const loadEmailImage = (imageName) => {
+  try {
+    const imagePath = path.resolve(__dirname, "../assets/images", imageName);
+    if (fs.existsSync(imagePath)) {
+      const imageBuffer = fs.readFileSync(imagePath);
+      return `data:image/png;base64,${imageBuffer.toString("base64")}`;
+    }
+  } catch (error) {
+    console.warn(`⚠️ Could not load image ${imageName}:`, error.message);
+  }
+  return null;
+};
 
 // Create transporter
 const createTransporter = () => {
@@ -134,7 +154,16 @@ const createEmailTemplate = (
     </head>
     <body>
             <div class="header">
-        <h1>ELRA</h1>
+        <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px;">
+          ${(() => {
+            const elraLogo = loadEmailImage("elra-logo.png");
+            if (elraLogo) {
+              return `<img src="${elraLogo}" alt="ELRA Logo" style="height: 24px; width: auto; max-width: 24px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));" />`;
+            }
+            return "";
+          })()}
+          <h1 style="margin: 0; font-size: 32px; font-weight: bold;">ELRA</h1>
+        </div>
         <div class="tagline">
           <p>You Lease, We Regulate</p>
                 </div>
@@ -1316,11 +1345,16 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
         <div class="email-container">
           <div class="header">
             <div class="logo-container">
-              <svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" class="logo-image">
-                <rect width="60" height="60" rx="8" fill="#ffffff" opacity="0.1"/>
-                <text x="30" y="35" font-family="Poppins, sans-serif" font-size="24" font-weight="800" text-anchor="middle" fill="#ffffff">ELRA</text>
-              </svg>
+              <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 10px;">
+                ${(() => {
+                  const elraLogo = loadEmailImage("elra-logo.png");
+                  if (elraLogo) {
+                    return `<img src="${elraLogo}" alt="ELRA Logo" style="height: 60px; width: auto; max-width: 60px; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));" />`;
+                  }
+                  return "";
+                })()}
             <div class="logo-text">ELRA</div>
+              </div>
             </div>
             <div class="subtitle">You Lease, We Regulate...</div>
           </div>
@@ -1612,7 +1646,16 @@ const sendPayslipEmail = async ({
                  <div class="email-container">
            <div class="header">
              <div class="logo-container">
+               <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 10px;">
+                 ${(() => {
+                   const elraLogo = loadEmailImage("elra-logo.png");
+                   if (elraLogo) {
+                     return `<img src="${elraLogo}" alt="ELRA Logo" style="height: 60px; width: auto; max-width: 60px; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));" />`;
+                   }
+                   return "";
+                 })()}
                <div class="logo-text">ELRA</div>
+               </div>
              </div>
              <div class="subtitle">You Lease, We Regulate...</div>
            </div>

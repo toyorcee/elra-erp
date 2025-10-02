@@ -16,9 +16,14 @@ import { userModulesAPI } from "../../services/userModules.js";
 import { useAuth } from "../../context/AuthContext";
 import defaultAvatar from "../../assets/defaulticon.jpg";
 
-const Profile = () => {
-  const { user, updateProfile } = useAuth();
+const Profile = ({ user: propUser, isViewingOtherUser = false }) => {
+  const { user: authUser, updateProfile } = useAuth();
+  const user = propUser || authUser;
 
+  console.log("🔄 Profile: propUser passed:", propUser);
+  console.log("🔄 Profile: authUser from context:", authUser);
+  console.log("🔄 Profile: Final user being used:", user);
+  console.log("🔄 Profile: isViewingOtherUser:", isViewingOtherUser);
   console.log("🔄 Profile: User avatar updated:", user?.avatar);
   const [profile, setProfile] = useState({
     firstName: "",
@@ -65,8 +70,15 @@ const Profile = () => {
 
   useEffect(() => {
     loadProfile();
-    loadDepartmentsAndRoles();
-  }, [user]); // Only reload when user changes
+    // Only load departments and roles if viewing own profile and user has permissions
+    if (
+      !isViewingOtherUser &&
+      authUser &&
+      (authUser.roleLevel >= 1000 || authUser.role?.name === "HR HOD")
+    ) {
+      loadDepartmentsAndRoles();
+    }
+  }, [user, isViewingOtherUser, authUser]); // Only reload when user changes
 
   // Update avatarPreview when user avatar changes
   useEffect(() => {
@@ -77,13 +89,46 @@ const Profile = () => {
     );
     if (user?.avatar) {
       console.log("🔄 [Avatar] Clearing avatarPreview to use context avatar");
-      setAvatarPreview(null); // Clear any old preview
+      setAvatarPreview(null);
     }
   }, [user?.avatar]);
 
   const loadProfile = async () => {
     try {
       setLoading(true);
+
+      if (isViewingOtherUser && propUser) {
+        console.log(
+          "🔄 Profile: Using passed user data for other user profile"
+        );
+        setProfile({
+          firstName: propUser.firstName || "",
+          lastName: propUser.lastName || "",
+          email: propUser.email || "",
+          phone: propUser.phone || "",
+          dateOfBirth: propUser.dateOfBirth || "",
+          bio: propUser.bio || "",
+          address: propUser.address || "",
+          city: propUser.city || "",
+          state: propUser.state || "",
+          zipCode: propUser.zipCode || "",
+          emergencyContact: propUser.emergencyContact || {
+            name: "",
+            relationship: "",
+            phone: "",
+          },
+          skills: propUser.skills || "",
+          certifications: propUser.certifications || "",
+          workExperience: propUser.workExperience || "",
+          education: propUser.education || "",
+          department: propUser.department?.name || propUser.department || "",
+          role: propUser.role?.name || propUser.role || "",
+          position: propUser.position || "",
+        });
+        setLoading(false);
+        return;
+      }
+
       const response = await userModulesAPI.profile.getProfile();
       if (response.success && response.data && response.data.user) {
         // Handle address object properly
@@ -564,12 +609,14 @@ const Profile = () => {
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6 border border-[var(--elra-border-primary)]">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
-              <button
-                onClick={() => window.history.back()}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ArrowLeftIcon className="h-5 w-5 text-[var(--elra-text-secondary)]" />
-              </button>
+              {!isViewingOtherUser && (
+                <button
+                  onClick={() => window.history.back()}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <ArrowLeftIcon className="h-5 w-5 text-[var(--elra-text-secondary)]" />
+                </button>
+              )}
               <div className="p-2 bg-[var(--elra-primary)] rounded-lg">
                 <UserIcon className="h-6 w-6 text-white" />
               </div>
@@ -583,7 +630,7 @@ const Profile = () => {
               </div>
             </div>
             <div className="flex items-center space-x-3">
-              {!editing && (
+              {!editing && !isViewingOtherUser && (
                 <button
                   onClick={() => setEditing(true)}
                   className="inline-flex items-center px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors font-medium cursor-pointer"

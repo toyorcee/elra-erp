@@ -3,6 +3,29 @@ import autoTable from "jspdf-autotable";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
+
+// Resolve this module's directory (works in ESM and on Windows)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Helper to load an image from server/assets/images and return base64 data URL
+const loadCertificateImage = (filename) => {
+  try {
+    const assetsDir = path.resolve(__dirname, "../assets/images");
+    const filePath = path.join(assetsDir, filename);
+    if (fs.existsSync(filePath)) {
+      const base64 = fs.readFileSync(filePath).toString("base64");
+      const ext = path.extname(filePath).toLowerCase();
+      const mime =
+        ext === ".jpg" || ext === ".jpeg" ? "image/jpeg" : "image/png"; // jsPDF supports PNG/JPEG
+      return `data:${mime};base64,${base64}`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
 
 /**
  * Generate PDF from data with jsPDF
@@ -2806,68 +2829,95 @@ export const generateComplianceCertificatePDF = async (certificateData) => {
       format: "a4",
     });
 
-    // Nigerian Government colors
-    const nigerianGreen = [0, 102, 51]; // Nigerian flag green
-    const gold = [255, 215, 0]; // Gold
-    const darkGreen = [0, 51, 25]; // Dark green
+    // =====================
+    // BRAND COLORS
+    // =====================
+    const elraGreen = [0, 102, 51];
+    const darkGreen = [0, 51, 25];
+    const lightBg = [252, 253, 252]; // Much lighter background to match image backgrounds
+    const lineGray = [170, 170, 170];
+    const textGray = [90, 90, 90];
 
-    // Add decorative border with gold flowers
-    doc.setDrawColor(gold[0], gold[1], gold[2]);
-    doc.setLineWidth(3);
-    doc.rect(10, 10, 190, 277); // Outer border
+    // =====================
+    // BACKGROUND + FRAME
+    // =====================
+    doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+    doc.rect(0, 0, 210, 297, "F");
 
-    // Inner decorative border
-    doc.setDrawColor(nigerianGreen[0], nigerianGreen[1], nigerianGreen[2]);
-    doc.setLineWidth(2);
-    doc.rect(15, 15, 180, 267); // Inner border
+    // Outer frame (slightly rounded corners)
+    doc.setDrawColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+    doc.setLineWidth(1.2);
+    doc.roundedRect(12, 12, 186, 273, 3, 3);
 
-    // Corner decorations (gold flowers)
-    const cornerSize = 20;
-    const corners = [
-      [15, 15], // Top-left
-      [175, 15], // Top-right
-      [15, 252], // Bottom-left
-      [175, 252], // Bottom-right
-    ];
+    // Inner frame (slightly rounded corners)
+    doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(18, 18, 174, 261, 2, 2);
 
-    corners.forEach(([x, y]) => {
-      // Gold flower decorations
-      doc.setFillColor(gold[0], gold[1], gold[2]);
-      doc.circle(x + 10, y + 10, 8, "F"); // Center
-      // Petals
-      for (let i = 0; i < 8; i++) {
-        const angle = (i * Math.PI) / 4;
-        const petalX = x + 10 + Math.cos(angle) * 12;
-        const petalY = y + 10 + Math.sin(angle) * 12;
-        doc.circle(petalX, petalY, 4, "F");
-      }
-    });
+    // Corner flourishes (subtle, ELRA green) inside inner frame
+    const drawCornerFlourish = (cx, cy, scale = 1) => {
+      const r = 1.6 * scale;
+      const petal = 1.1 * scale;
+      doc.setDrawColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+      doc.setLineWidth(0.3);
+      // center dot
+      doc.circle(cx, cy, r, "S");
+      // four small petals
+      doc.circle(cx + 3 * scale, cy, petal, "S");
+      doc.circle(cx - 3 * scale, cy, petal, "S");
+      doc.circle(cx, cy + 3 * scale, petal, "S");
+      doc.circle(cx, cy - 3 * scale, petal, "S");
+    };
+    // positions just inside inner frame corners
+    drawCornerFlourish(22, 22, 1);
+    drawCornerFlourish(190, 22, 1);
+    drawCornerFlourish(22, 278, 1);
+    drawCornerFlourish(190, 278, 1);
 
-    // Federal Republic of Nigeria header
-    doc.setTextColor(nigerianGreen[0], nigerianGreen[1], nigerianGreen[2]);
+    // =====================
+    // HEADER
+    // =====================
+    doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("FEDERAL REPUBLIC OF NIGERIA", 105, 40, { align: "center" });
+    doc.text("FEDERAL REPUBLIC OF NIGERIA", 105, 38, { align: "center" });
 
-    // Equipment Leasing Registration Authority
-    doc.setFontSize(14);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(textGray[0], textGray[1], textGray[2]);
+    doc.text("in partnership with", 105, 46, { align: "center" });
+
     doc.setFont("helvetica", "bold");
-    doc.text("EQUIPMENT LEASING REGISTRATION AUTHORITY", 105, 50, {
+    doc.setFontSize(11);
+    doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+    doc.text("FEDERAL MINISTRY OF FINANCE", 105, 54, { align: "center" });
+
+    doc.setFontSize(11);
+    doc.text("EQUIPMENT LEASING REGISTRATION AUTHORITY", 105, 62, {
       align: "center",
     });
 
-    // ELRA logo area with gold circle
-    doc.setFillColor(gold[0], gold[1], gold[2]);
-    doc.circle(105, 70, 15, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("ELRA", 105, 75, { align: "center" });
+    // Coat of arms (optional)
+    const coaDataUrl = loadCertificateImage("nigeria-coat-of-arms.png");
+    if (coaDataUrl) {
+      doc.addImage(coaDataUrl, "PNG", 96, 23, 14, 9);
+    }
 
-    // Certificate title - different for different project types
-    doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-    doc.setFontSize(24);
+    // =====================
+    // TITLE + LOGO
+    // =====================
+    const elraLogoDataUrl = loadCertificateImage("elra-logo.png");
+    if (elraLogoDataUrl) {
+      // Slightly reduce size and tighten vertical spacing
+      doc.addImage(elraLogoDataUrl, "PNG", 93, 74, 22, 22);
+    } else {
+      doc.setFillColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+      doc.circle(105, 87, 11.5, "F");
+    doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
+      doc.text("ELRA", 105, 90, { align: "center" });
+    }
 
     let certificateTitle = "PROJECT COMPLETION CERTIFICATE";
     if (
@@ -2877,36 +2927,52 @@ export const generateComplianceCertificatePDF = async (certificateData) => {
       certificateTitle = "COMPLIANCE CERTIFICATE";
     }
 
-    doc.text(certificateTitle, 105, 100, { align: "center" });
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
+    doc.setFontSize(18);
+    doc.text(certificateTitle, 105, 116, { align: "center" });
 
-    // Decorative line
-    doc.setDrawColor(gold[0], gold[1], gold[2]);
-    doc.setLineWidth(2);
-    doc.line(60, 105, 150, 105);
+    // Decorative divider
+    doc.setDrawColor(lineGray[0], lineGray[1], lineGray[2]);
+    doc.setLineWidth(0.45);
+    doc.line(60, 121, 150, 121);
 
-    // Certificate number
-    doc.setTextColor(100, 100, 100);
-    doc.setFontSize(10);
+    // =====================
+    // CERTIFICATE BODY
+    // =====================
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(textGray[0], textGray[1], textGray[2]);
     doc.text(
       `Certificate No: ${certificateData.certificate.number}`,
       105,
-      115,
+      131,
       { align: "center" }
     );
 
-    // Project information
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text(certificateData.project.name, 105, 135, { align: "center" });
+    doc.text(certificateData.project.name, 105, 148, { align: "center" });
 
-    // Project status badge
-    doc.setFillColor(0, 150, 0);
-    doc.rect(80, 145, 50, 8, "F");
+    if (
+      certificateData.project.projectScope === "external" &&
+      certificateData.project.clientName
+    ) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+      doc.text(`Awarded to: ${certificateData.project.clientName}`, 105, 160, {
+        align: "center",
+      });
+    }
+
+    // Status ribbon
+    doc.setFillColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+    doc.roundedRect(81, 171, 48, 8, 2, 2, "F");
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
 
     let statusText = "PROJECT APPROVED";
     if (
@@ -2915,15 +2981,14 @@ export const generateComplianceCertificatePDF = async (certificateData) => {
     ) {
       statusText = "FULLY COMPLIANT";
     }
+    doc.text(statusText, 105, 176, { align: "center" });
 
-    doc.text(statusText, 105, 151, { align: "center" });
-
-    // Project details
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(12);
+    // Project details (left aligned for balance)
+    let yPos = 186;
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
 
-    let yPos = 170;
     const details = [
       { label: "Project Code:", value: certificateData.project.code },
       {
@@ -2942,126 +3007,70 @@ export const generateComplianceCertificatePDF = async (certificateData) => {
     ];
 
     details.forEach(({ label, value }) => {
-      doc.text(`${label} ${value}`, 20, yPos);
-      yPos += 8;
+      doc.text(`${label} ${value}`, 25, yPos);
+      yPos += 7;
     });
 
-    // Compliance program section (only for external projects with compliance programs)
-    if (
-      certificateData.project.projectScope === "external" &&
-      certificateData.complianceProgram
-    ) {
-      yPos += 10;
-      doc.setFontSize(14);
+    // =====================
+    // SIGNATURE SECTION
+    // =====================
+    yPos = 226;
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(nigerianGreen[0], nigerianGreen[1], nigerianGreen[2]);
-      doc.text("ATTACHED COMPLIANCE PROGRAM", 105, yPos, { align: "center" });
-
-      yPos += 15;
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(0, 0, 0);
-      doc.text(`Program: ${certificateData.complianceProgram.name}`, 20, yPos);
-      yPos += 8;
-      doc.text(
-        `Category: ${certificateData.complianceProgram.category}`,
-        20,
-        yPos
-      );
-      yPos += 8;
-      doc.text(`Status: ${certificateData.complianceProgram.status}`, 20, yPos);
-      yPos += 8;
-      doc.text(
-        `Priority: ${certificateData.complianceProgram.priority}`,
-        20,
-        yPos
-      );
-
-      // Compliance items
-      yPos += 15;
-      doc.setFontSize(14);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(nigerianGreen[0], nigerianGreen[1], nigerianGreen[2]);
-      doc.text("COMPLIANCE ITEMS VERIFICATION", 105, yPos, { align: "center" });
-
-      yPos += 10;
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(0, 0, 0);
-      doc.text(
-        `${certificateData.complianceItems.length} Items • All Compliant`,
-        105,
-        yPos,
-        { align: "center" }
-      );
-
-      // List compliance items
-      yPos += 15;
-      certificateData.complianceItems.forEach((item, index) => {
-        if (yPos > 250) {
-          doc.addPage();
-          yPos = 20;
-        }
-        doc.text(`✓ ${item.title} (${item.category})`, 20, yPos);
-        yPos += 6;
-      });
-    }
-
-    // Signature section
-    yPos = 220;
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(nigerianGreen[0], nigerianGreen[1], nigerianGreen[2]);
+    doc.setFontSize(11);
+    doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
     doc.text("AUTHORIZED SIGNATURE", 60, yPos);
-    doc.text("ISSUE DATE", 140, yPos);
+    doc.text("ISSUE DATE", 145, yPos);
 
-    yPos += 20;
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
+    yPos += 12;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
     doc.text(certificateData.certificate.issuedBy, 60, yPos);
-    doc.text(certificateData.certificate.issueDate, 140, yPos);
+    doc.text(certificateData.certificate.issueDate, 145, yPos);
 
     yPos += 5;
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
+    doc.setTextColor(textGray[0], textGray[1], textGray[2]);
     doc.text(certificateData.certificate.issuedByTitle, 60, yPos);
-    doc.text("Certificate Valid Until Review", 140, yPos);
+    doc.text("Certificate Valid Until Review", 145, yPos);
 
-    // Official stamp area
-    yPos += 15;
-    doc.setDrawColor(gold[0], gold[1], gold[2]);
-    doc.setLineWidth(2);
-    doc.circle(105, yPos, 20);
-    doc.setTextColor(gold[0], gold[1], gold[2]);
-    doc.setFontSize(8);
+    yPos += 10;
+    try {
+      const stampDataUrl = loadCertificateImage("official-stamp.png");
+      if (stampDataUrl) {
+        doc.addImage(stampDataUrl, "PNG", 93, yPos - 12, 24, 24);
+      } else {
+        doc.setDrawColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+        doc.setLineWidth(1.0);
+        doc.circle(105, yPos, 13);
+        doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
     doc.setFont("helvetica", "bold");
-    doc.text("OFFICIAL", 105, yPos - 5, { align: "center" });
-    doc.text("STAMP", 105, yPos + 5, { align: "center" });
+        doc.setFontSize(7.5);
+        doc.text("OFFICIAL", 105, yPos - 2.5, { align: "center" });
+        doc.text("STAMP", 105, yPos + 3.5, { align: "center" });
+      }
+    } catch {}
 
-    // Footer
-    yPos += 30;
+    // =====================
+    // FOOTER
+    // =====================
+    yPos += 22; // move footer section up to avoid clipping at bottom and reduce whitespace
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(nigerianGreen[0], nigerianGreen[1], nigerianGreen[2]);
+    doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
     doc.text(
-      "This project has been verified and approved by ELRA's Legal & Compliance Department",
+      "This project has been verified and approved by ELRA.",
       105,
       yPos,
-      { align: "center" }
+      {
+        align: "center",
+      }
     );
+    // Reduced footer to a single concise line
 
-    yPos += 8;
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100, 100, 100);
-    doc.text(
-      "All regulatory requirements have been met and documented. This certificate serves as official proof of compliance with ELRA's regulatory standards.",
-      105,
-      yPos,
-      { align: "center" }
-    );
-
-    // Add metadata
+    // =====================
+    // METADATA
+    // =====================
     doc.setProperties({
       title: "ELRA Compliance Certificate",
       subject: "Regulatory Compliance Certificate",

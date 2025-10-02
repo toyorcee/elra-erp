@@ -793,6 +793,29 @@ export const updateTaskStatus = async (req, res) => {
       });
     }
 
+    if (status === "completed" && task.project?.projectScope === "external") {
+      const Task = await import("../models/Task.js");
+      const allTasks = await Task.default
+        .find({
+          project: task.project._id,
+          isActive: true,
+        })
+        .sort({ createdAt: 1 });
+
+      const currentTaskIndex = allTasks.findIndex(
+        (t) => t._id.toString() === task._id.toString()
+      );
+
+      for (let i = 0; i < currentTaskIndex; i++) {
+        if (allTasks[i].status !== "completed") {
+          return res.status(400).json({
+            success: false,
+            message: `Cannot complete "${task.title}" until previous tasks are completed. Please complete "${allTasks[i].title}" first.`,
+          });
+        }
+      }
+    }
+
     // Update task status
     task.status = status;
 
@@ -805,11 +828,128 @@ export const updateTaskStatus = async (req, res) => {
 
     await task.save();
 
+    // Create audit log for task status update
+    try {
+      const AuditLog = await import("../models/AuditLog.js");
+      await AuditLog.default.create({
+        action: "PROJECT_TASK_STATUS_CHANGED",
+        resourceType: "TASK",
+        resourceId: task._id,
+        userId: currentUser._id,
+        projectId: task.project,
+        details: {
+          taskTitle: task.title,
+          oldStatus: task.status,
+          newStatus: status,
+          projectName: task.project?.name || "Unknown Project",
+        },
+        metadata: {
+          ipAddress: req.ip,
+          userAgent: req.get("User-Agent"),
+          timestamp: new Date(),
+        },
+      });
+      console.log(
+        `📝 [AUDIT] Task status update logged for task: ${task.title}`
+      );
+    } catch (auditError) {
+      console.error(
+        "❌ [AUDIT] Error creating task update audit log:",
+        auditError
+      );
+    }
+
     // Update project progress if task is completed
     if (status === "completed") {
       const project = await Project.findById(task.project);
       if (project) {
         await project.updateTwoPhaseProgress();
+
+        // Check if this is an external project and both phases are 100% complete
+        if (project.projectScope === "external") {
+          console.log(
+            `🔍 [CERTIFICATE CHECK] Project: ${project.name}, Approval: ${project.approvalProgress}%, Implementation: ${project.implementationProgress}%`
+          );
+
+          // If both approval and implementation phases are 100% complete, notify Super Admin and Executive HODs
+          if (project.approvalProgress === 100 && project.implementationProgress === 100) {
+            console.log(
+              "🎉 [EXTERNAL PROJECT] Both phases completed (100% approval + 100% implementation)! Notifying Super Admin and Executive HODs..."
+            );
+
+            try {
+              const superAdmins = await User.find({
+                $or: [{ "role.level": 1000 }, { isSuperadmin: true }],
+                isActive: true,
+              }).select("_id firstName lastName email");
+
+              const executiveHODs = await User.find({
+                "role.level": { $gte: 700 },
+                "department.name": "Executive Office",
+                isActive: true,
+              }).select("_id firstName lastName email");
+
+              let projectApprover = null;
+              if (project.approvalChain && project.approvalChain.length > 0) {
+                const lastApproval =
+                  project.approvalChain[project.approvalChain.length - 1];
+                if (lastApproval.approvedBy) {
+                  projectApprover = await User.findById(
+                    lastApproval.approvedBy
+                  ).select("_id firstName lastName email");
+                }
+              }
+
+              const recipients = [...superAdmins, ...executiveHODs];
+
+              if (projectApprover) {
+                const isAlreadyIncluded = recipients.some(
+                  (recipient) =>
+                    recipient._id.toString() === projectApprover._id.toString()
+                );
+                if (!isAlreadyIncluded) {
+                  recipients.push(projectApprover);
+                }
+              }
+
+              if (recipients.length > 0) {
+                const Notification = await import("../models/Notification.js");
+                const notifications = recipients.map((recipient) => ({
+                  recipient: recipient._id,
+                  type: "PROJECT_CERTIFICATE_READY",
+                  title: "Project Certificate Ready",
+                  message: `External project "${project.name}" (${project.code}) has completed all implementation tasks. You can now download the completion certificate.`,
+                  data: {
+                    projectId: project._id,
+                    projectName: project.name,
+                    projectCode: project.code,
+                    completedTasks: completedTasks.length,
+                    totalTasks: allTasks.length,
+                    priority: "high",
+                  },
+                  isRead: false,
+                  isActive: true,
+                }));
+
+                await Notification.default.insertMany(notifications);
+
+                console.log(
+                  `📢 [NOTIFICATIONS] Sent certificate ready notifications to ${
+                    recipients.length
+                  } recipients (Super Admins, Executive HODs${
+                    projectApprover ? ", and Project Approver" : ""
+                  }) for project: ${project.name}`
+                );
+              }
+            } catch (notificationError) {
+              console.error(
+                "❌ [NOTIFICATIONS] Error sending certificate ready notifications:",
+                notificationError
+              );
+              // Don't fail the request if notifications fail
+            }
+          }
+        }
       }
     }
 

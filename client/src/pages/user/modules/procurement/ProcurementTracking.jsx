@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import {
   FolderIcon,
   DocumentTextIcon,
@@ -7,6 +8,9 @@ import {
   EyeIcon,
   ArrowPathIcon,
   XMarkIcon,
+  ChartBarIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../../../context/AuthContext";
 import {
@@ -58,14 +62,14 @@ const ProcurementTracking = () => {
       if (response.success) {
         // Group POs by project
         const projectMap = new Map();
-        response.data.forEach(po => {
+        response.data.forEach((po) => {
           if (!projectMap.has(po.relatedProject._id)) {
             projectMap.set(po.relatedProject._id, {
               _id: po.relatedProject._id,
               name: po.relatedProject.name,
               code: po.relatedProject.code,
               budget: po.relatedProject.budget,
-              purchaseOrders: []
+              purchaseOrders: [],
             });
           }
           projectMap.get(po.relatedProject._id).purchaseOrders.push(po);
@@ -148,12 +152,8 @@ const ProcurementTracking = () => {
         <div className="flex items-center">
           <FolderIcon className="h-5 w-5 text-[var(--elra-primary)] mr-2" />
           <div>
-            <div className="font-medium text-gray-900">
-              {project.name}
-            </div>
-            <div className="text-sm text-gray-500">
-              {project.code}
-            </div>
+            <div className="font-medium text-gray-900">{project.name}</div>
+            <div className="text-sm text-gray-500">{project.code}</div>
           </div>
         </div>
       ),
@@ -162,8 +162,14 @@ const ProcurementTracking = () => {
       header: "Budget & Spending",
       accessor: "budget",
       cell: (project) => {
-        const totalPOAmount = project.purchaseOrders?.reduce((sum, po) => sum + (po.totalAmount || 0), 0) || 0;
-        const budgetUtilization = project.budget ? (totalPOAmount / project.budget) * 100 : 0;
+        const totalPOAmount =
+          project.purchaseOrders?.reduce(
+            (sum, po) => sum + (po.totalAmount || 0),
+            0
+          ) || 0;
+        const budgetUtilization = project.budget
+          ? (totalPOAmount / project.budget) * 100
+          : 0;
         
         return (
           <div className="space-y-1">
@@ -182,9 +188,11 @@ const ProcurementTracking = () => {
             <div className="w-full bg-gray-200 rounded-full h-1.5">
               <div
                 className={`h-1.5 rounded-full ${
-                  budgetUtilization > 90 ? 'bg-red-500' : 
-                  budgetUtilization > 70 ? 'bg-yellow-500' : 
-                  'bg-green-500'
+                  budgetUtilization > 90
+                    ? "bg-red-500"
+                    : budgetUtilization > 70
+                    ? "bg-yellow-500"
+                    : "bg-green-500"
                 }`}
                 style={{ width: `${Math.min(budgetUtilization, 100)}%` }}
               ></div>
@@ -198,20 +206,26 @@ const ProcurementTracking = () => {
       accessor: "purchaseOrders",
       cell: (project) => {
         const poCount = project.purchaseOrders?.length || 0;
-        const draftPOs = project.purchaseOrders?.filter(po => po.status === 'draft').length || 0;
-        const approvedPOs = project.purchaseOrders?.filter(po => po.status === 'approved').length || 0;
+        const draftPOs =
+          project.purchaseOrders?.filter((po) => po.status === "draft")
+            .length || 0;
+        const approvedPOs =
+          project.purchaseOrders?.filter((po) => po.status === "approved")
+            .length || 0;
         
         return (
           <div className="space-y-1">
             <div className="flex items-center">
               <ShoppingCartIcon className="h-4 w-4 text-gray-400 mr-1" />
               <span className="text-sm font-medium text-gray-900">
-                {poCount} PO{poCount !== 1 ? 's' : ''}
+                {poCount} PO{poCount !== 1 ? "s" : ""}
               </span>
             </div>
             {poCount > 0 && (
               <div className="text-xs text-gray-500">
-                {draftPOs > 0 && <span className="mr-2">Draft: {draftPOs}</span>}
+                {draftPOs > 0 && (
+                  <span className="mr-2">Draft: {draftPOs}</span>
+                )}
                 {approvedPOs > 0 && <span>Approved: {approvedPOs}</span>}
               </div>
             )}
@@ -223,14 +237,18 @@ const ProcurementTracking = () => {
       header: "Latest PO",
       accessor: "latestPO",
       cell: (project) => {
-        const latestPO = project.purchaseOrders?.sort((a, b) => 
-          new Date(b.createdAt) - new Date(a.createdAt)
+        const latestPO = project.purchaseOrders?.sort(
+          (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
         )[0];
 
-        if (!latestPO) return <span className="text-sm text-gray-500">No POs</span>;
+        if (!latestPO)
+          return <span className="text-sm text-gray-500">No POs</span>;
 
         return (
-          <div className="space-y-1 cursor-pointer" onClick={() => handleViewPO(latestPO._id)}>
+          <div
+            className="space-y-1 cursor-pointer"
+            onClick={() => handleViewPO(latestPO._id)}
+          >
             <div className="text-sm font-medium text-gray-900">
               {latestPO.poNumber}
             </div>
@@ -281,75 +299,144 @@ const ProcurementTracking = () => {
     );
   }
 
-  const filteredProjects = projects.filter(project => {
-    if (filters.status !== 'all' && project.purchaseOrders?.some(po => po.status === filters.status)) {
+  const filteredProjects = projects.filter((project) => {
+    if (
+      filters.status !== "all" &&
+      project.purchaseOrders?.some((po) => po.status === filters.status)
+    ) {
       return true;
     }
-    return filters.status === 'all';
+    return filters.status === "all";
   });
 
   const totalPOs = purchaseOrders.length;
-  const draftPOs = purchaseOrders.filter(po => po.status === 'draft').length;
-  const approvedPOs = purchaseOrders.filter(po => po.status === 'approved').length;
-  const totalBudget = projects.reduce((sum, project) => sum + (project.budget || 0), 0);
-  const totalPOAmount = purchaseOrders.reduce((sum, po) => sum + (po.totalAmount || 0), 0);
+  const draftPOs = purchaseOrders.filter((po) => po.status === "draft").length;
+  const approvedPOs = purchaseOrders.filter(
+    (po) => po.status === "approved"
+  ).length;
+  const totalBudget = projects.reduce(
+    (sum, project) => sum + (project.budget || 0),
+    0
+  );
+  const totalPOAmount = purchaseOrders.reduce(
+    (sum, po) => sum + (po.totalAmount || 0),
+    0
+  );
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Procurement Tracking</h1>
-        <p className="text-gray-600">
+    <div className="space-y-6 p-4">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl p-6 text-white">
+        <h1 className="text-3xl font-bold mb-2">Procurement Tracking</h1>
+        <p className="text-white/80">
           Track procurement status and purchase orders across all projects
         </p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow-sm p-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Total Projects */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg border border-blue-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Total Projects</p>
-              <p className="text-2xl font-bold text-gray-900">{projects.length}</p>
+              <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">
+                Total Projects
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-blue-900 mt-2 break-all leading-tight">
+                {projects.length}
+              </p>
             </div>
-            <FolderIcon className="h-8 w-8 text-[var(--elra-primary)]" />
+            <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
+              <FolderIcon className="h-8 w-8 text-white" />
+            </div>
           </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        </motion.div>
+
+        {/* Purchase Orders */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-lg border border-green-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Purchase Orders</p>
-              <p className="text-2xl font-bold text-gray-900">{totalPOs}</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-sm font-semibold text-green-700 uppercase tracking-wide">
+                Purchase Orders
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-green-900 mt-2 break-all leading-tight">
+                {totalPOs}
+              </p>
+              <p className="text-xs text-green-600 mt-1">
                 {draftPOs} Draft · {approvedPOs} Approved
               </p>
             </div>
-            <ShoppingCartIcon className="h-8 w-8 text-[var(--elra-primary)]" />
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Total Budget</p>
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalBudget)}</p>
+            <div className="p-4 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
+              <ShoppingCartIcon className="h-8 w-8 text-white" />
             </div>
-            <CurrencyDollarIcon className="h-8 w-8 text-[var(--elra-primary)]" />
           </div>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        </motion.div>
+
+        {/* Total Budget */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl shadow-lg border border-purple-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">PO Amount</p>
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalPOAmount)}</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-sm font-semibold text-purple-700 uppercase tracking-wide">
+                Total Budget
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-purple-900 mt-2 break-all leading-tight">
+                {formatCurrency(totalBudget)}
+              </p>
+            </div>
+            <div className="p-4 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
+              <CurrencyDollarIcon className="h-8 w-8 text-white" />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* PO Amount */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl shadow-lg border border-orange-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-orange-700 uppercase tracking-wide">
+                PO Amount
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-orange-900 mt-2 break-all leading-tight">
+                {formatCurrency(totalPOAmount)}
+              </p>
+              <p className="text-xs text-orange-600 mt-1">
                 {((totalPOAmount / totalBudget) * 100).toFixed(1)}% of Budget
               </p>
             </div>
-            <DocumentTextIcon className="h-8 w-8 text-[var(--elra-primary)]" />
+            <div className="p-4 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
+              <DocumentTextIcon className="h-8 w-8 text-white" />
+            </div>
           </div>
-        </div>
+        </motion.div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm p-6">
+      {/* Main Content */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+        className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+      >
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
           <div className="flex items-center space-x-4">
             <select
@@ -383,7 +470,7 @@ const ProcurementTracking = () => {
           setSearchTerm={setSearchTerm}
           searchPlaceholder="Search by project name, code, or PO number..."
         />
-      </div>
+      </motion.div>
 
       {/* PO Detail Modal */}
       {showPOModal && selectedPO && (
@@ -395,9 +482,7 @@ const ProcurementTracking = () => {
                   <h2 className="text-2xl font-bold text-gray-900">
                     Purchase Order Details
                   </h2>
-                  <p className="text-sm text-gray-500">
-                    {selectedPO.poNumber}
-                  </p>
+                  <p className="text-sm text-gray-500">{selectedPO.poNumber}</p>
                 </div>
                 <button
                   onClick={() => {
@@ -417,20 +502,36 @@ const ProcurementTracking = () => {
                   </h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Status</label>
-                      <div className="mt-1">{getStatusBadge(selectedPO.status)}</div>
+                      <label className="text-sm font-medium text-gray-500">
+                        Status
+                      </label>
+                      <div className="mt-1">
+                        {getStatusBadge(selectedPO.status)}
+                      </div>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Priority</label>
-                      <div className="mt-1">{getPriorityBadge(selectedPO.priority)}</div>
+                      <label className="text-sm font-medium text-gray-500">
+                        Priority
+                      </label>
+                      <div className="mt-1">
+                        {getPriorityBadge(selectedPO.priority)}
+                      </div>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Created By</label>
-                      <p className="mt-1 text-sm text-gray-900">{selectedPO.createdBy?.name || 'N/A'}</p>
+                      <label className="text-sm font-medium text-gray-500">
+                        Created By
+                      </label>
+                      <p className="mt-1 text-sm text-gray-900">
+                        {selectedPO.createdBy?.name || "N/A"}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Created Date</label>
-                      <p className="mt-1 text-sm text-gray-900">{formatDate(selectedPO.createdAt)}</p>
+                      <label className="text-sm font-medium text-gray-500">
+                        Created Date
+                      </label>
+                      <p className="mt-1 text-sm text-gray-900">
+                        {formatDate(selectedPO.createdAt)}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -441,16 +542,28 @@ const ProcurementTracking = () => {
                   </h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Project</label>
-                      <p className="mt-1 text-sm text-gray-900">{selectedPO.relatedProject?.name || 'N/A'}</p>
+                      <label className="text-sm font-medium text-gray-500">
+                        Project
+                      </label>
+                      <p className="mt-1 text-sm text-gray-900">
+                        {selectedPO.relatedProject?.name || "N/A"}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Supplier</label>
-                      <p className="mt-1 text-sm text-gray-900">{selectedPO.supplier?.name || 'N/A'}</p>
+                      <label className="text-sm font-medium text-gray-500">
+                        Supplier
+                      </label>
+                      <p className="mt-1 text-sm text-gray-900">
+                        {selectedPO.supplier?.name || "N/A"}
+                      </p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Expected Delivery</label>
-                      <p className="mt-1 text-sm text-gray-900">{formatDate(selectedPO.expectedDeliveryDate)}</p>
+                      <label className="text-sm font-medium text-gray-500">
+                        Expected Delivery
+                      </label>
+                      <p className="mt-1 text-sm text-gray-900">
+                        {formatDate(selectedPO.expectedDeliveryDate)}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -483,7 +596,9 @@ const ProcurementTracking = () => {
                         <tr key={index}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {item.name}
-                            <div className="text-xs text-gray-500">{item.description}</div>
+                            <div className="text-xs text-gray-500">
+                              {item.description}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                             {item.quantity}
@@ -499,7 +614,10 @@ const ProcurementTracking = () => {
                     </tbody>
                     <tfoot>
                       <tr>
-                        <td colSpan="3" className="px-6 py-4 text-sm font-medium text-gray-900 text-right">
+                        <td
+                          colSpan="3"
+                          className="px-6 py-4 text-sm font-medium text-gray-900 text-right"
+                        >
                           Subtotal
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
@@ -507,7 +625,10 @@ const ProcurementTracking = () => {
                         </td>
                       </tr>
                       <tr>
-                        <td colSpan="3" className="px-6 py-4 text-sm font-medium text-gray-900 text-right">
+                        <td
+                          colSpan="3"
+                          className="px-6 py-4 text-sm font-medium text-gray-900 text-right"
+                        >
                           Tax
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
@@ -515,7 +636,10 @@ const ProcurementTracking = () => {
                         </td>
                       </tr>
                       <tr>
-                        <td colSpan="3" className="px-6 py-4 text-sm font-medium text-gray-900 text-right">
+                        <td
+                          colSpan="3"
+                          className="px-6 py-4 text-sm font-medium text-gray-900 text-right"
+                        >
                           Shipping
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
@@ -523,7 +647,10 @@ const ProcurementTracking = () => {
                         </td>
                       </tr>
                       <tr className="bg-gray-50">
-                        <td colSpan="3" className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                        <td
+                          colSpan="3"
+                          className="px-6 py-4 text-sm font-bold text-gray-900 text-right"
+                        >
                           Total Amount
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
@@ -545,9 +672,12 @@ const ProcurementTracking = () => {
                       <div key={index} className="bg-gray-50 rounded-lg p-4">
                         <div className="flex items-start">
                           <div className="flex-1">
-                            <p className="text-sm text-gray-900">{note.content}</p>
+                            <p className="text-sm text-gray-900">
+                              {note.content}
+                            </p>
                             <div className="mt-1 text-xs text-gray-500">
-                              By {note.createdBy?.name} on {formatDate(note.createdAt)}
+                              By {note.createdBy?.name} on{" "}
+                              {formatDate(note.createdAt)}
                             </div>
                           </div>
                         </div>

@@ -2,37 +2,28 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   ChartBarIcon,
-  CubeIcon,
+  DocumentTextIcon,
   CurrencyDollarIcon,
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
-  ClockIcon,
   ArrowPathIcon,
   DocumentArrowDownIcon,
+  CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../../../context/AuthContext";
-import inventoryService from "../../../../services/inventoryService";
+import { fetchPurchaseOrders } from "../../../../services/procurementAPI";
 import { toast } from "react-toastify";
 import { formatCurrency, formatDate } from "../../../../utils/formatters";
 
-const InventoryReports = () => {
+const ProcurementReports = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(false);
-  const [reportType, setReportType] = useState("overview");
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().getFullYear(), 0, 1).toISOString().split("T")[0],
     end: new Date().toISOString().split("T")[0],
   });
 
-  const userRole = user?.role?.name || user?.role;
-  const userDepartment = user?.department?.name;
-  const isSuperAdmin = user?.role?.level === 1000;
-  const isOperationsHOD =
-    user?.role?.level === 700 && userDepartment === "Operations";
-  const hasAccess = user && (isSuperAdmin || isOperationsHOD);
-
-  if (!hasAccess) {
+  // Access control - only Manager+ can access
+  if (!user || user.role.level < 600) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -40,8 +31,8 @@ const InventoryReports = () => {
             Access Denied
           </h2>
           <p className="text-gray-600">
-            You don't have permission to access Inventory Reports. This module
-            is restricted to Super Admin and Operations HOD only.
+            You don't have permission to access Procurement Reports. This module
+            is restricted to Manager level and above.
           </p>
         </div>
       </div>
@@ -55,18 +46,74 @@ const InventoryReports = () => {
   const loadStats = async () => {
     setLoading(true);
     try {
-      const response = await inventoryService.getInventoryStats();
+      const response = await fetchPurchaseOrders();
       if (response.success) {
-        setStats(response.data);
+        const orders = response.data;
+        const stats = calculateStats(orders);
+        setStats(stats);
       } else {
-        toast.error("Failed to load inventory statistics");
+        toast.error("Failed to load procurement statistics");
       }
     } catch (error) {
-      console.error("Error loading inventory stats:", error);
-      toast.error("Error loading inventory statistics");
+      console.error("Error loading procurement stats:", error);
+      toast.error("Error loading procurement statistics");
     } finally {
       setLoading(false);
     }
+  };
+
+  const calculateStats = (orders) => {
+    const totalOrders = orders.length;
+    const totalValue = orders.reduce(
+      (sum, order) => sum + (order.totalAmount || 0),
+      0
+    );
+    const draftOrders = orders.filter(
+      (order) => order.status === "draft"
+    ).length;
+    const approvedOrders = orders.filter(
+      (order) => order.status === "approved"
+    ).length;
+    const completedOrders = orders.filter(
+      (order) => order.status === "completed"
+    ).length;
+    const cancelledOrders = orders.filter(
+      (order) => order.status === "cancelled"
+    ).length;
+
+    const statusBreakdown = {
+      draft: {
+        count: draftOrders,
+        value: orders
+          .filter((o) => o.status === "draft")
+          .reduce((sum, o) => sum + (o.totalAmount || 0), 0),
+      },
+      approved: {
+        count: approvedOrders,
+        value: orders
+          .filter((o) => o.status === "approved")
+          .reduce((sum, o) => sum + (o.totalAmount || 0), 0),
+      },
+      completed: {
+        count: completedOrders,
+        value: orders
+          .filter((o) => o.status === "completed")
+          .reduce((sum, o) => sum + (o.totalAmount || 0), 0),
+      },
+      cancelled: {
+        count: cancelledOrders,
+        value: orders
+          .filter((o) => o.status === "cancelled")
+          .reduce((sum, o) => sum + (o.totalAmount || 0), 0),
+      },
+    };
+
+    return {
+      totalOrders,
+      totalValue,
+      statusBreakdown,
+      averageOrderValue: totalOrders > 0 ? totalValue / totalOrders : 0,
+    };
   };
 
   const generateReport = async () => {
@@ -79,7 +126,7 @@ const InventoryReports = () => {
 
       // Create a simple CSV download for now (replace with actual PDF generation)
       const csvData = [
-        ["Inventory Report", ""],
+        ["Procurement Report", ""],
         ["Generated:", new Date().toLocaleDateString()],
         [
           "Date Range:",
@@ -87,19 +134,15 @@ const InventoryReports = () => {
         ],
         [""],
         ["Summary", ""],
-        ["Total Items", statusStats.totalItems],
-        ["Total Value", formatCurrency(statusStats.totalValue)],
-        ["Purchase Value", formatCurrency(statusStats.totalPurchasePrice)],
-        ["Depreciation", formatCurrency(statusStats.depreciation)],
+        ["Total Orders", stats.totalOrders || 0],
+        ["Total Value", formatCurrency(stats.totalValue || 0)],
+        ["Average Order Value", formatCurrency(stats.averageOrderValue || 0)],
         [""],
         ["Status Breakdown", ""],
-        ...Object.entries(stats).map(([status, data]) => [
+        ...Object.entries(stats.statusBreakdown || {}).map(([status, data]) => [
           status.replace("_", " ").toUpperCase(),
-          `${data.count || 0} items (${(
-            ((data.count || 0) / statusStats.totalItems) *
-            100
-          ).toFixed(1)}%)`,
-          formatCurrency(data.totalValue || 0),
+          `${data.count || 0} orders`,
+          formatCurrency(data.value || 0),
         ]),
       ];
 
@@ -108,7 +151,7 @@ const InventoryReports = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `inventory-report-${
+      a.download = `procurement-report-${
         new Date().toISOString().split("T")[0]
       }.csv`;
       document.body.appendChild(a);
@@ -123,30 +166,6 @@ const InventoryReports = () => {
     }
   };
 
-  const getStatusStats = () => {
-    const totalItems = Object.values(stats).reduce(
-      (sum, status) => sum + (status.count || 0),
-      0
-    );
-    const totalValue = Object.values(stats).reduce(
-      (sum, status) => sum + (status.totalValue || 0),
-      0
-    );
-    const totalPurchasePrice = Object.values(stats).reduce(
-      (sum, status) => sum + (status.totalPurchasePrice || 0),
-      0
-    );
-
-    return {
-      totalItems,
-      totalValue,
-      totalPurchasePrice,
-      depreciation: totalPurchasePrice - totalValue,
-    };
-  };
-
-  const statusStats = getStatusStats();
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -159,9 +178,9 @@ const InventoryReports = () => {
     <div className="space-y-6 p-4">
       {/* Header */}
       <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl p-6 text-white">
-        <h1 className="text-3xl font-bold mb-2">Inventory Reports</h1>
+        <h1 className="text-3xl font-bold mb-2">Procurement Reports</h1>
         <p className="text-white/80">
-          Comprehensive reports and analytics for inventory management
+          Comprehensive reports and analytics for procurement management
         </p>
       </div>
 
@@ -218,7 +237,7 @@ const InventoryReports = () => {
 
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total Items */}
+        {/* Total Orders */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -228,14 +247,14 @@ const InventoryReports = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">
-                Total Items
+                Total Orders
               </p>
               <p className="text-2xl sm:text-3xl font-bold text-blue-900 mt-2 break-all leading-tight">
-                {statusStats.totalItems}
+                {stats.totalOrders || 0}
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
-              <CubeIcon className="h-8 w-8 text-white" />
+              <DocumentTextIcon className="h-8 w-8 text-white" />
             </div>
           </div>
         </motion.div>
@@ -253,7 +272,7 @@ const InventoryReports = () => {
                 Total Value
               </p>
               <p className="text-2xl sm:text-3xl font-bold text-green-900 mt-2 break-all leading-tight">
-                {formatCurrency(statusStats.totalValue)}
+                {formatCurrency(stats.totalValue || 0)}
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
@@ -262,7 +281,7 @@ const InventoryReports = () => {
           </div>
         </motion.div>
 
-        {/* Purchase Value */}
+        {/* Average Order Value */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -272,10 +291,10 @@ const InventoryReports = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold text-purple-700 uppercase tracking-wide">
-                Purchase Value
+                Average Order
               </p>
               <p className="text-2xl sm:text-3xl font-bold text-purple-900 mt-2 break-all leading-tight">
-                {formatCurrency(statusStats.totalPurchasePrice)}
+                {formatCurrency(stats.averageOrderValue || 0)}
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
@@ -284,7 +303,7 @@ const InventoryReports = () => {
           </div>
         </motion.div>
 
-        {/* Depreciation */}
+        {/* Completed Orders */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -294,14 +313,14 @@ const InventoryReports = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold text-orange-700 uppercase tracking-wide">
-                Depreciation
+                Completed
               </p>
               <p className="text-2xl sm:text-3xl font-bold text-orange-900 mt-2 break-all leading-tight">
-                {formatCurrency(statusStats.depreciation)}
+                {stats.statusBreakdown?.completed?.count || 0}
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
-              <ExclamationTriangleIcon className="h-8 w-8 text-white" />
+              <CheckCircleIcon className="h-8 w-8 text-white" />
             </div>
           </div>
         </motion.div>
@@ -315,13 +334,13 @@ const InventoryReports = () => {
         className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
       >
         <h3 className="text-lg font-medium text-gray-900 mb-4">
-          Inventory Status Overview
+          Order Status Overview
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Object.entries(stats).map(([status, data]) => {
+          {Object.entries(stats.statusBreakdown || {}).map(([status, data]) => {
             const percentage =
-              statusStats.totalItems > 0
-                ? ((data.count || 0) / statusStats.totalItems) * 100
+              stats.totalOrders > 0
+                ? ((data.count || 0) / stats.totalOrders) * 100
                 : 0;
 
             return (
@@ -335,8 +354,7 @@ const InventoryReports = () => {
                   </span>
                 </div>
                 <div className="text-xs text-gray-500">
-                  {percentage.toFixed(1)}% •{" "}
-                  {formatCurrency(data.totalValue || 0)}
+                  {percentage.toFixed(1)}% • {formatCurrency(data.value || 0)}
                 </div>
               </div>
             );
@@ -353,7 +371,7 @@ const InventoryReports = () => {
       >
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-medium text-gray-900">
-            Inventory Report Summary
+            Procurement Report Summary
           </h3>
           <div className="text-sm text-gray-500">
             {formatDate(dateRange.start)} - {formatDate(dateRange.end)}
@@ -363,21 +381,21 @@ const InventoryReports = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="text-center p-4 bg-blue-50 rounded-lg">
             <div className="text-2xl font-bold text-blue-900 mb-1">
-              {statusStats.totalItems}
+              {stats.totalOrders || 0}
             </div>
-            <div className="text-sm text-blue-700">Total Items</div>
+            <div className="text-sm text-blue-700">Total Orders</div>
           </div>
           <div className="text-center p-4 bg-green-50 rounded-lg">
             <div className="text-2xl font-bold text-green-900 mb-1">
-              {formatCurrency(statusStats.totalValue)}
+              {formatCurrency(stats.totalValue || 0)}
             </div>
             <div className="text-sm text-green-700">Total Value</div>
           </div>
-          <div className="text-center p-4 bg-orange-50 rounded-lg">
-            <div className="text-2xl font-bold text-orange-900 mb-1">
-              {formatCurrency(statusStats.depreciation)}
+          <div className="text-center p-4 bg-purple-50 rounded-lg">
+            <div className="text-2xl font-bold text-purple-900 mb-1">
+              {formatCurrency(stats.averageOrderValue || 0)}
             </div>
-            <div className="text-sm text-orange-700">Depreciation</div>
+            <div className="text-sm text-purple-700">Average Order</div>
           </div>
         </div>
       </motion.div>
@@ -385,4 +403,4 @@ const InventoryReports = () => {
   );
 };
 
-export default InventoryReports;
+export default ProcurementReports;

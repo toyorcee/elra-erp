@@ -1268,7 +1268,7 @@ const MyProjects = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-full mx-auto">
         {/* Enhanced Header */}
         <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-2xl p-8 text-white mb-8">
           <div className="flex items-center justify-between">
@@ -1491,7 +1491,7 @@ const MyProjects = () => {
                   header: "Project",
                   accessor: "name",
                   renderer: (project) => (
-                    <div className="flex items-center min-w-0 max-w-[200px]">
+                    <div className="flex items-center min-w-0 max-w-[300px]">
                       <FolderIcon className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
                       <div className="min-w-0 flex-1">
                         <div
@@ -1590,7 +1590,7 @@ const MyProjects = () => {
                   header: "General Progress",
                   accessor: "progress",
                   renderer: (project) => (
-                    <div className="min-w-0 max-w-32">
+                    <div className="min-w-0 max-w-40">
                       <div className="flex justify-between text-sm text-gray-600 mb-1">
                         <span>{project.progress}%</span>
                       </div>

@@ -5,6 +5,26 @@ import Session from "../models/Session.js";
 import Notification from "../models/Notification.js";
 import notificationService from "../services/notificationService.js";
 import mongoose from "mongoose";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Helper function to load certificate images
+const loadCustomerCareImage = (imageName) => {
+  try {
+    const imagePath = path.resolve(__dirname, "../assets/images", imageName);
+    if (fs.existsSync(imagePath)) {
+      const imageBuffer = fs.readFileSync(imagePath);
+      return `data:image/png;base64,${imageBuffer.toString("base64")}`;
+    }
+  } catch (error) {
+    console.warn(`⚠️ Could not load image ${imageName}:`, error.message);
+  }
+  return null;
+};
 
 export const getComplaints = async (req, res) => {
   try {
@@ -1393,16 +1413,27 @@ export const exportCustomerCareReport = async (req, res) => {
       // ELRA Branding - Green color scheme
       // ELRA Branding - Official ELRA color scheme
       const elraGreen = [13, 100, 73];
-      doc.setFontSize(24);
-      doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
-      doc.text("ELRA Customer Care Report", 20, 20);
-
-      // Add ELRA logo placeholder (ELRA green rectangle)
-      doc.setFillColor(elraGreen[0], elraGreen[1], elraGreen[2]);
-      doc.rect(150, 15, 30, 10, "F");
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(12);
-      doc.text("ELRA", 155, 22);
+      
+      // Try to add ELRA logo image
+      const elraLogo = loadCustomerCareImage("elra-logo.png");
+      if (elraLogo) {
+        try {
+          doc.addImage(elraLogo, "PNG", 20, 15, 20, 20);
+          doc.setFontSize(24);
+          doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+          doc.text("ELRA Customer Care Report", 50, 30);
+        } catch (error) {
+          console.warn("⚠️ Could not add ELRA logo to customer care report, falling back to text:", error.message);
+          doc.setFontSize(24);
+          doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+          doc.text("ELRA Customer Care Report", 20, 20);
+        }
+      } else {
+        // Fallback to text-only
+        doc.setFontSize(24);
+        doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+        doc.text("ELRA Customer Care Report", 20, 20);
+      }
 
       doc.setFontSize(12);
       doc.setTextColor(0, 0, 0);

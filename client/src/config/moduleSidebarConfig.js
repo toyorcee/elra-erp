@@ -157,6 +157,13 @@ export const moduleSidebarConfig = {
             description:
               "Access your archived documents and historical records",
           },
+          {
+            label: "My Project Tasks",
+            icon: "ClipboardDocumentCheckIcon",
+            path: "/dashboard/modules/self-service/project-tasks",
+            required: { minLevel: 300 },
+            description: "View and manage your assigned project tasks",
+          },
         ],
       },
       // {

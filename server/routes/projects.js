@@ -19,7 +19,7 @@ import {
   rejectProject,
   resubmitProject,
   legalApproveProject,
-  generateComplianceCertificate,
+  generateProjectCertificate,
   triggerPostApprovalWorkflow,
   getProjectWorkflowStatus,
   getPendingApprovalProjects,
@@ -31,6 +31,7 @@ import {
   exportProjectApprovalReport,
   getProjectAuditTrail,
   getMyProjects,
+  getMyProjectTasks,
   getProjectAnalytics,
   getProjectDashboard,
   getProjectBudget,
@@ -223,6 +224,7 @@ router.get(
 
 // Self-service routes for projects (must come before /:id routes)
 router.get("/my-projects", protect, getMyProjects);
+router.get("/my-tasks", protect, getMyProjectTasks);
 
 // Pending approval projects - HOD+ only
 router.get("/pending-approval", checkRole(700), getPendingApprovalProjects);
@@ -348,11 +350,16 @@ router.post(
   legalApproveProject
 );
 
-// Certificate generation route
+// Certificate generation routes
 router.get(
   "/:id/compliance-certificate",
   checkLegalApprovalAccess,
-  generateComplianceCertificate
+  generateProjectCertificate
+);
+router.get(
+  "/:id/certificate",
+  protect,
+  generateProjectCertificate
 );
 router.post("/:id/resubmit", protect, resubmitProject);
 

@@ -22,7 +22,9 @@ const SelfService = () => {
       title: "My Payslips",
       description: "View and download your personal payslips",
       icon: FaCreditCard,
-      color: "bg-gradient-to-br from-green-500 to-emerald-600",
+      gradient: "from-emerald-500 via-teal-500 to-cyan-500",
+      bgGradient: "from-emerald-50 to-teal-50",
+      iconBg: "bg-gradient-to-br from-emerald-500 to-teal-600",
       path: "/dashboard/modules/self-service/payslips",
       status: "Active",
       badge: "Payroll",
@@ -31,7 +33,9 @@ const SelfService = () => {
       title: "My Documents",
       description: "View, upload, and scan documents with OCR processing",
       icon: FaFileAlt,
-      color: "bg-gradient-to-br from-blue-500 to-cyan-600",
+      gradient: "from-blue-500 via-indigo-500 to-purple-500",
+      bgGradient: "from-blue-50 to-indigo-50",
+      iconBg: "bg-gradient-to-br from-blue-500 to-indigo-600",
       path: "/dashboard/modules/self-service/documents",
       status: "Active",
       badge: "Core Feature",
@@ -40,7 +44,9 @@ const SelfService = () => {
       title: "My Projects",
       description: "Create and manage your personal projects",
       icon: FaProjectDiagram,
-      color: "bg-gradient-to-br from-orange-500 to-red-600",
+      gradient: "from-orange-500 via-amber-500 to-yellow-500",
+      bgGradient: "from-orange-50 to-amber-50",
+      iconBg: "bg-gradient-to-br from-orange-500 to-amber-600",
       path: "/dashboard/modules/self-service/my-projects",
       status: "Active",
       badge: "Projects",
@@ -49,7 +55,9 @@ const SelfService = () => {
       title: "My Leave Requests",
       description: "View your leave and other requests",
       icon: FaCalendarAlt,
-      color: "bg-gradient-to-br from-purple-500 to-violet-600",
+      gradient: "from-rose-500 via-pink-500 to-fuchsia-500",
+      bgGradient: "from-rose-50 to-pink-50",
+      iconBg: "bg-gradient-to-br from-rose-500 to-pink-600",
       path: "/dashboard/modules/self-service/leave-requests",
       status: "Active",
       badge: "HR",
@@ -58,7 +66,9 @@ const SelfService = () => {
       title: "My Archive",
       description: "Access your archived documents and historical records",
       icon: FaArchive,
-      color: "bg-gradient-to-br from-emerald-500 to-teal-600",
+      gradient: "from-slate-500 via-gray-500 to-zinc-500",
+      bgGradient: "from-slate-50 to-gray-50",
+      iconBg: "bg-gradient-to-br from-slate-500 to-gray-600",
       path: "/dashboard/modules/self-service/my-archive",
       status: "Active",
       badge: "Archive",
@@ -95,215 +105,176 @@ const SelfService = () => {
   }
 
   return (
-    <motion.div
-      className="w-full max-w-7xl mx-auto py-8 px-4"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-    >
-      {/* Header Section */}
-      <motion.div
-        className="mb-8"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-      >
-        <div className="flex items-center mb-4">
-          <motion.div
-            className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center mr-4"
-            whileHover={{ scale: 1.05, rotate: 5 }}
-            transition={{ type: "spring", stiffness: 300 }}
-          >
-            <FaUser className="h-6 w-6 text-white" />
-          </motion.div>
-          <div>
-            <motion.h1
-              className="text-3xl font-bold text-gray-900"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-            >
-              Self-Service
-            </motion.h1>
-            <motion.p
-              className="text-gray-600"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-            >
-              Personal services and self-management tools for all employees
-            </motion.p>
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0">
+          <div className="absolute top-0 left-0 w-72 h-72 bg-gradient-to-br from-blue-400/20 to-indigo-400/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-emerald-400/20 to-cyan-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute bottom-0 left-1/4 w-80 h-80 bg-gradient-to-tr from-orange-400/20 to-amber-400/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
         </div>
-      </motion.div>
+        <div className="relative z-10 px-6 py-16">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="text-center mb-16"
+          >
+            <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl mb-8 shadow-2xl">
+              <FaUser className="h-12 w-12 text-white" />
+            </div>
+            <h1 className="text-6xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent mb-6">
+              Self-Service
+            </h1>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+              Personal services and self-management tools for all employees.
+            </p>
+          </motion.div>
+        </div>
+      </div>
 
-      {/* Welcome Section */}
-      <motion.div
-        className="mb-8"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
-      >
-        <motion.h2
-          className="text-2xl font-bold text-gray-900 mb-2"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.5 }}
+      {/* Features Section */}
+      <div className="px-6 pb-20">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="text-center mb-16"
         >
-          Welcome to Self-Service
-        </motion.h2>
-        <motion.p
-          className="text-gray-600"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
-        >
-          Access your personal information, manage requests, and handle your own
-          administrative tasks.
-        </motion.p>
-      </motion.div>
+          <h2 className="text-4xl font-bold text-gray-900 mb-4">Your Tools</h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Access your personal information, manage requests, and handle your
+            own administrative tasks.
+          </p>
+        </motion.div>
 
-      {/* Core Features Grid */}
-      <motion.div
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.7 }}
-      >
-        {selfServiceFeatures.map((feature, index) => {
-          const IconComponent = feature.icon;
-          return (
-            <motion.div
-              key={feature.title}
-              className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer border border-gray-200 group"
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                duration: 0.5,
-                delay: 0.8 + index * 0.1,
-                type: "spring",
-                stiffness: 100,
-              }}
-              whileHover={{
-                scale: 1.02,
-                y: -5,
-                transition: { duration: 0.2 },
-              }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <Link to={feature.path} className="block">
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <motion.div
-                      className={`p-3 rounded-lg ${feature.color}`}
-                      whileHover={{ scale: 1.1, rotate: 5 }}
-                      transition={{ type: "spring", stiffness: 300 }}
-                    >
-                      <IconComponent className="h-6 w-6 text-white" />
-                    </motion.div>
-                    <div className="flex flex-col items-end">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          feature.status === "Active"
-                            ? "bg-green-100 text-green-800"
-                            : feature.status === "Available"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {feature.status}
-                      </span>
-                      <span className="text-xs text-gray-500 mt-1">
-                        {feature.badge}
-                      </span>
-                    </div>
-                  </div>
-
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
-                    {feature.title}
-                  </h3>
-                  <p className="text-gray-600 text-sm leading-relaxed mb-4">
-                    {feature.description}
-                  </p>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center text-blue-600 text-sm font-medium">
-                      <span>Access Feature</span>
-                      <svg
-                        className="ml-2 h-4 w-4 transform group-hover:translate-x-1 transition-transform"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            </motion.div>
-          );
-        })}
-      </motion.div>
-
-      {/* Quick Actions Section */}
-      <motion.div
-        className="bg-white rounded-lg shadow-md border border-gray-200 p-6"
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 1.3 }}
-      >
-        <motion.h3
-          className="text-lg font-semibold text-gray-900 mb-4"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 1.4 }}
-        >
-          Quick Actions
-        </motion.h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {quickActions.map((action, index) => {
-            const IconComponent = action.icon;
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {selfServiceFeatures.map((feature, index) => {
+            const IconComponent = feature.icon;
             return (
               <motion.div
-                key={action.title}
-                initial={{ opacity: 0, y: 20 }}
+                key={feature.title}
+                initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  duration: 0.4,
-                  delay: 1.5 + index * 0.1,
-                  type: "spring",
-                  stiffness: 100,
-                }}
-                whileHover={{
-                  scale: 1.02,
-                  y: -2,
-                  transition: { duration: 0.2 },
-                }}
-                whileTap={{ scale: 0.98 }}
+                transition={{ delay: 0.4 + index * 0.2 }}
+                className="group cursor-pointer"
               >
-                <Link
-                  to={action.path}
-                  className="flex items-center p-4 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 group"
-                >
-                  <div className={`p-2 rounded-lg ${action.color} mr-3`}>
-                    <IconComponent className="h-5 w-5 text-white" />
+                <Link to={feature.path} className="block">
+                  <div
+                    className={`relative bg-gradient-to-br ${
+                      feature.bgGradient || "from-white to-gray-50"
+                    } rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 border border-white/20 backdrop-blur-sm`}
+                  >
+                    <div
+                      className={`absolute inset-0 bg-gradient-to-br ${
+                        feature.gradient || ""
+                      } opacity-0 group-hover:opacity-10 rounded-3xl transition-opacity duration-500`}
+                    ></div>
+                    <div className="relative z-10">
+                      <div className="flex items-start justify-between mb-6">
+                        <div
+                          className={`p-4 rounded-2xl ${
+                            feature.iconBg || "bg-blue-500"
+                          } shadow-lg`}
+                        >
+                          <IconComponent className="h-8 w-8 text-white" />
+                        </div>
+                        <div className="flex flex-col items-end space-y-2">
+                          <span className="px-3 py-1 bg-white/80 backdrop-blur-sm rounded-full text-xs font-semibold text-gray-700">
+                            {feature.status}
+                          </span>
+                          <span className="px-3 py-1 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-full text-xs font-semibold">
+                            {feature.badge}
+                          </span>
+                        </div>
+                      </div>
+                      <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-blue-600 transition-colors">
+                        {feature.title}
+                      </h3>
+                      <p className="text-gray-600 mb-6 leading-relaxed">
+                        {feature.description}
+                      </p>
+                      <div className="flex items-center text-blue-600 font-medium">
+                        <span>Explore</span>
+                        <svg
+                          className="ml-2 h-4 w-4 transform group-hover:translate-x-1 transition-transform"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-gray-700 font-medium group-hover:text-blue-600 transition-colors">
-                    {action.title}
-                  </span>
                 </Link>
               </motion.div>
             );
           })}
         </div>
-      </motion.div>
-    </motion.div>
+
+        {/* Quick Actions Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+          className="mt-20"
+        >
+          <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20">
+            <div className="text-center mb-8">
+              <h3 className="text-3xl font-bold text-gray-900 mb-4">
+                Quick Actions
+              </h3>
+              <p className="text-gray-600">
+                Jump to the most-used self-service tools
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {quickActions.map((action, index) => {
+                const IconComponent = action.icon;
+                return (
+                  <motion.div
+                    key={action.title}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.4,
+                      delay: 1.5 + index * 0.1,
+                      type: "spring",
+                      stiffness: 100,
+                    }}
+                    whileHover={{
+                      scale: 1.02,
+                      y: -2,
+                      transition: { duration: 0.2 },
+                    }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Link
+                      to={action.path}
+                      className="group flex items-center p-6 rounded-2xl bg-gradient-to-r from-white to-gray-50 hover:from-blue-50 hover:to-indigo-50 border border-gray-200 hover:border-blue-300 transition-all duration-300 transform hover:scale-105"
+                    >
+                      <div
+                        className={`p-3 rounded-xl ${action.color} mr-4 shadow-lg`}
+                      >
+                        <IconComponent className="h-6 w-6 text-white" />
+                      </div>
+                      <span className="text-gray-800 font-semibold group-hover:text-blue-600 transition-colors">
+                        {action.title}
+                      </span>
+                    </Link>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </div>
   );
 };
 

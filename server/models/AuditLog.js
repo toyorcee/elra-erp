@@ -138,6 +138,12 @@ const auditLogSchema = new mongoose.Schema(
         "CREATE_SALES_MARKETING_TRANSACTION",
         "APPROVE_SALES_MARKETING_TRANSACTION",
         "REJECT_SALES_MARKETING_TRANSACTION",
+
+        // Procurement actions
+        "PROCUREMENT_CREATED",
+        "PROCUREMENT_MARKED_ISSUED",
+        "PROCUREMENT_MARKED_PAID",
+        "PROCUREMENT_MARKED_DELIVERED",
       ],
       required: true,
     },
@@ -163,6 +169,7 @@ const auditLogSchema = new mongoose.Schema(
         "TASK",
         "ELRAWallet",
         "ELRAWALLET",
+        "PROCUREMENT",
       ],
     },
 
@@ -188,6 +195,7 @@ const auditLogSchema = new mongoose.Schema(
         "WorkflowTemplate",
         "Task",
         "ELRAWallet",
+        "Procurement",
       ],
     },
 
@@ -367,19 +375,12 @@ auditLogSchema.statics.getRecentActivity = async function (options = {}) {
 
   // Add department filter if provided
   if (department) {
-    // Only show activities from users in the same department
-    // If user has no department (N/A), don't show any activities
     if (department !== "N/A") {
-      // Filter by the user's actual department, not the userDetails.department field
-      // Since userDetails.department is often "N/A", we'll use the userId to get the user's department
-      // For now, let's not filter by department to show all user activities
     } else {
-      // If the logged-in user has no department, don't show any activities
       query["userDetails.department"] = "NONEXISTENT_DEPARTMENT";
     }
   }
 
-  // If userId is provided, filter by the specific user (show only their activities)
   if (userId) {
     query.userId = userId;
   }

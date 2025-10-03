@@ -1766,8 +1766,7 @@ projectSchema.methods.createStandardInventoryItems = async function (
     );
 
     // Generate inventory code
-    const inventoryCount = await Inventory.countDocuments();
-    const inventoryCode = `INV${String(inventoryCount + 1).padStart(4, "0")}`;
+    const inventoryCode = await this.constructor.generateUniqueInventoryCode();
 
     const standardItems = [
       {
@@ -2250,7 +2249,49 @@ projectSchema.methods.createStandardProcurementOrder = async function (
   }
 };
 
-// Instance method to create inventory from procurement when goods are delivered
+// Static method to generate unique inventory codes
+projectSchema.statics.generateUniqueInventoryCode = async function () {
+  let attempts = 0;
+  const maxAttempts = 100; 
+
+  while (attempts < maxAttempts) {
+    const Inventory = mongoose.model("Inventory");
+    const lastInventory = await Inventory.findOne(
+      { code: { $regex: /^INV\d+$/ } },
+      { code: 1 },
+      { sort: { code: -1 } }
+    );
+
+    let nextNumber = 1;
+    if (lastInventory) {
+      // Extract number from the last code (e.g., "INV0003" -> 3)
+      const match = lastInventory.code.match(/INV(\d+)/);
+      if (match) {
+        nextNumber = parseInt(match[1]) + 1;
+      }
+    }
+
+    const candidateCode = `INV${String(nextNumber).padStart(4, "0")}`;
+
+    // Check if this code already exists
+    const existing = await Inventory.findOne({ code: candidateCode });
+    if (!existing) {
+      console.log(`🔢 [INVENTORY] Generated unique code: ${candidateCode}`);
+      return candidateCode;
+    }
+
+    attempts++;
+    console.log(
+      `⚠️ [INVENTORY] Code ${candidateCode} already exists, trying next...`
+    );
+  }
+
+  const timestamp = Date.now().toString().slice(-6);
+  const fallbackCode = `INV${timestamp}`;
+  console.log(`🔄 [INVENTORY] Using fallback code: ${fallbackCode}`);
+  return fallbackCode;
+};
+
 projectSchema.methods.createInventoryFromProcurement = async function (
   procurementOrder,
   triggeredByUser
@@ -2265,12 +2306,10 @@ projectSchema.methods.createInventoryFromProcurement = async function (
     const Inventory = mongoose.model("Inventory");
     const inventoryItems = [];
 
-    // Create inventory items from procurement items
     for (const procurementItem of procurementOrder.items) {
-      const inventoryCount = await Inventory.countDocuments();
-      const inventoryCode = `INV${String(inventoryCount + 1).padStart(4, "0")}`;
+      const inventoryCode =
+        await this.constructor.generateUniqueInventoryCode();
 
-      // Map project category to valid inventory category
       const getInventoryCategory = (projectCategory) => {
         const categoryMap = {
           equipment_lease: "industrial_equipment",

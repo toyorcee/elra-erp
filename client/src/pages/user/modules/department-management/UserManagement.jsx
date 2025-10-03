@@ -7,13 +7,8 @@ import {
   FunnelIcon,
   UserIcon,
   EnvelopeIcon,
-  PhoneIcon,
-  MapPinIcon,
   BriefcaseIcon,
   CalendarIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  ClockIcon,
 } from "@heroicons/react/24/outline";
 import {
   CheckCircleIcon as CheckCircleIconSolid,
@@ -23,6 +18,7 @@ import {
 import DataTable from "../../../../components/common/DataTable";
 import { useAuth } from "../../../../context/AuthContext";
 import { formatDate } from "../../../../utils/formatters";
+import { getDepartmentUsers } from "../../../../services/users";
 import defaultAvatar from "../../../../assets/defaulticon.jpg";
 
 const UserManagement = () => {
@@ -39,12 +35,7 @@ const UserManagement = () => {
   const fetchDepartmentUsers = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/users/department", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-      const result = await response.json();
+      const result = await getDepartmentUsers();
 
       if (result.success) {
         setUsers(result.data);

@@ -7,12 +7,19 @@ import {
   FolderIcon,
   CheckCircleIcon,
   UserGroupIcon as UserGroupSolid,
+  EyeIcon,
+  TrashIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import { UserGroupIcon as UserGroupFilled } from "@heroicons/react/24/solid";
+import { Dialog, Transition } from "@headlessui/react";
+import { Fragment } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   fetchComprehensiveProjectData,
   fetchProjectsAvailableForTeams,
   fetchAllTeamMembers,
+  fetchTeamMembersByProject,
   fetchAvailableUsers,
   addTeamMemberNew,
   removeTeamMemberNew,
@@ -25,7 +32,6 @@ import DataTable from "../../../../components/common/DataTable";
 const ProjectTeams = () => {
   const { user } = useAuth();
 
-  // Add custom CSS for animations
   useEffect(() => {
     const style = document.createElement("style");
     style.textContent = `
@@ -62,6 +68,12 @@ const ProjectTeams = () => {
   const [deletingMemberId, setDeletingMemberId] = useState(null);
   const [showEmptyState, setShowEmptyState] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [selectedProjectTeam, setSelectedProjectTeam] = useState(null);
+  const [projectTeamMembers, setProjectTeamMembers] = useState([]);
+  const [loadingTeamMembers, setLoadingTeamMembers] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -105,7 +117,6 @@ const ProjectTeams = () => {
         });
         setTeamMembers(teamData.data || []);
 
-        // For HODs, calculate available projects (projects without team members)
         if (projectsData.data && teamData.data) {
           const projectsWithMembers = new Set();
           teamData.data.forEach((member) => {
@@ -181,7 +192,6 @@ const ProjectTeams = () => {
         `${newMemberData.selectedUsers.length} team member(s) added successfully`
       );
 
-      // Reset form and reload data
       setNewMemberData({
         projectId: "",
         selectedUsers: [],
@@ -199,12 +209,23 @@ const ProjectTeams = () => {
     }
   };
 
-  const handleRemoveTeamMember = async (teamMemberId) => {
+  const handleRemoveTeamMember = (member) => {
+    setMemberToDelete(member);
+    setShowTeamModal(false);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmRemoveTeamMember = async () => {
+    if (!memberToDelete) return;
+
     try {
-      setDeletingMemberId(teamMemberId);
-      await removeTeamMemberNew(teamMemberId);
+      setDeletingMemberId(memberToDelete._id);
+      await removeTeamMemberNew(memberToDelete._id);
       toast.success("Team member removed successfully");
       loadData();
+      setShowDeleteConfirm(false);
+      setMemberToDelete(null);
+      setShowTeamModal(true);
     } catch (error) {
       console.error("Error removing team member:", error);
       toast.error("Failed to remove team member");
@@ -222,7 +243,59 @@ const ProjectTeams = () => {
     }));
   };
 
-  // Avatar handling functions
+  const handleViewTeamMembers = async (project) => {
+    setSelectedProjectTeam(project);
+    setShowTeamModal(true);
+    setLoadingTeamMembers(true);
+
+    try {
+      const result = await fetchTeamMembersByProject(project._id);
+      if (result.success) {
+        setProjectTeamMembers(result.data);
+        console.log("🔍 Fetched team members for project:", result.data);
+      } else {
+        console.error("Failed to fetch team members:", result.message);
+        setProjectTeamMembers([]);
+      }
+    } catch (error) {
+      console.error("Error fetching team members:", error);
+      setProjectTeamMembers([]);
+    } finally {
+      setLoadingTeamMembers(false);
+    }
+  };
+
+  const handleCloseTeamModal = () => {
+    setShowTeamModal(false);
+    setSelectedProjectTeam(null);
+    setProjectTeamMembers([]);
+    setLoadingTeamMembers(false);
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setMemberToDelete(null);
+    setShowTeamModal(true);
+  };
+
+  const matchesAnyField = (obj, term) => {
+    if (!term) return true;
+    try {
+      const haystack = JSON.stringify(obj || {}).toLowerCase();
+      return haystack.includes(term.toLowerCase());
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const filteredTeamMembers = projectTeamMembers.filter((member) =>
+    matchesAnyField(member, searchTerm)
+  );
+
+  const filteredProjects = (projectData?.projects || []).filter((project) =>
+    matchesAnyField(project, searchTerm)
+  );
+
   const getDefaultAvatar = (user = null) => {
     if (user && user.firstName && user.lastName) {
       const firstName = user.firstName.charAt(0).toUpperCase();
@@ -370,6 +443,21 @@ const ProjectTeams = () => {
         </span>
       ),
     },
+    {
+      header: "Actions",
+      accessor: "actions",
+      renderer: (project) => (
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => handleViewTeamMembers(project)}
+            className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-[var(--elra-primary)] bg-[var(--elra-primary)]/10 rounded-lg hover:bg-[var(--elra-primary)]/20 transition-colors cursor-pointer"
+          >
+            <EyeIcon className="h-4 w-4 mr-1" />
+            View Team
+          </button>
+        </div>
+      ),
+    },
   ];
 
   // Team members table columns
@@ -477,7 +565,9 @@ const ProjectTeams = () => {
                 Total Projects
               </h3>
               <p className="text-3xl font-bold text-blue-600">
-                {projectData?.projects?.length || 0}
+                {projectData?.statistics?.total?.totalProjects ||
+                  projectData?.projects?.length ||
+                  0}
               </p>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
@@ -485,10 +575,13 @@ const ProjectTeams = () => {
                 Active Projects
               </h3>
               <p className="text-3xl font-bold text-green-600">
-                {projectData?.projects?.filter(
-                  (p) =>
-                    p.status === "implementation" || p.status === "in_progress"
-                ).length || 0}
+                {projectData?.statistics?.activeProjects ||
+                  projectData?.projects?.filter(
+                    (p) =>
+                      p.status === "implementation" ||
+                      p.status === "in_progress"
+                  )?.length ||
+                  0}
               </p>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
@@ -496,8 +589,12 @@ const ProjectTeams = () => {
                 Completed Projects
               </h3>
               <p className="text-3xl font-bold text-purple-600">
-                {projectData?.projects?.filter((p) => p.status === "completed")
-                  .length || 0}
+                {projectData?.statistics?.byStatus?.find(
+                  (s) => s._id === "completed"
+                )?.count ||
+                  projectData?.projects?.filter((p) => p.status === "completed")
+                    ?.length ||
+                  0}
               </p>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
@@ -505,10 +602,12 @@ const ProjectTeams = () => {
                 Total Team Members
               </h3>
               <p className="text-3xl font-bold text-orange-600">
-                {projectData?.projects?.reduce(
-                  (total, project) => total + (project.teamMemberCount || 0),
-                  0
-                ) || 0}
+                {projectData?.statistics?.totalTeamMembers ||
+                  projectData?.projects?.reduce(
+                    (total, project) => total + (project.teamMemberCount || 0),
+                    0
+                  ) ||
+                  0}
               </p>
             </div>
           </div>
@@ -517,9 +616,11 @@ const ProjectTeams = () => {
       {/* Team Members List */}
       <div>
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {selectedProject ? "Project Team Members" : "All Team Members"}
-          </h2>
+          <div className="flex items-center space-x-4">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {selectedProject ? "Project Team Members" : "Team Members"}
+            </h2>
+          </div>
           {user.role.level >= 600 && (
             <button
               onClick={() => {
@@ -543,6 +644,54 @@ const ProjectTeams = () => {
             </button>
           )}
         </div>
+
+        {/* Global Search Input */}
+        <div className="mb-4">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search anything (projects or team members)..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+            />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg
+                className="h-4 w-4 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </div>
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              >
+                <svg
+                  className="h-4 w-4 text-gray-400 hover:text-gray-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Projects List (SUPER_ADMIN or PM HOD) */}
@@ -552,12 +701,21 @@ const ProjectTeams = () => {
         projectData && (
           <div className="mb-8">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">
-                All Projects
-              </h2>
+              <div className="flex items-center space-x-4">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Projects
+                </h2>
+                <div className="text-sm text-gray-500">
+                  {filteredProjects?.length || 0} of{" "}
+                  {projectData?.projects?.length || 0} projects
+                </div>
+              </div>
             </div>
+
+            {/* Projects use the global search above */}
+
             <DataTable
-              data={projectData.projects || []}
+              data={filteredProjects}
               columns={projectColumns}
               loading={false}
               actions={{
@@ -1076,6 +1234,445 @@ const ProjectTeams = () => {
           </div>
         </div>
       )}
+
+      {/* Team Members Modal */}
+      <Transition appear show={showTeamModal} as={Fragment}>
+        <Dialog
+          as="div"
+          className="relative z-50"
+          onClose={handleCloseTeamModal}
+        >
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-white bg-opacity-50 backdrop-blur-sm" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4 text-center">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-4xl transform overflow-hidden rounded-2xl bg-white text-left align-middle shadow-2xl transition-all">
+                  {/* ELRA Branded Header */}
+                  <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"></div>
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-16 translate-x-16"></div>
+                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-12 -translate-x-12"></div>
+
+                    <div className="relative z-10 flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm border border-white/20">
+                          <UserGroupIcon className="w-8 h-8 text-white" />
+                        </div>
+                        <div>
+                          <Dialog.Title
+                            as="h3"
+                            className="text-2xl font-bold text-white"
+                          >
+                            {selectedProjectTeam?.name} Team
+                          </Dialog.Title>
+                          <p className="text-white/80 text-sm">
+                            {selectedProjectTeam?.code} •{" "}
+                            {selectedProjectTeam?.teamMemberCount || 0} team
+                            members
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleCloseTeamModal}
+                        className="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-lg transition-all duration-200"
+                      >
+                        <XMarkIcon className="h-6 w-6" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Team Members Content */}
+                  <div className="p-6 max-h-[70vh] overflow-y-auto">
+                    {selectedProjectTeam && (
+                      <div className="space-y-6">
+                        {/* Project Info */}
+                        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                          <h4 className="text-lg font-semibold text-gray-800 mb-3">
+                            Project Information
+                          </h4>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">
+                                Project Manager
+                              </label>
+                              <p className="text-gray-900 font-semibold">
+                                {selectedProjectTeam.projectManager?.firstName}{" "}
+                                {selectedProjectTeam.projectManager?.lastName}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {selectedProjectTeam.projectManager?.email}
+                              </p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-gray-600">
+                                Status
+                              </label>
+                              <span
+                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                  selectedProjectTeam.status ===
+                                    "implementation" ||
+                                  selectedProjectTeam.status === "in_progress"
+                                    ? "bg-green-100 text-green-800"
+                                    : selectedProjectTeam.status === "completed"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : selectedProjectTeam.status.includes(
+                                        "pending"
+                                      )
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-gray-100 text-gray-800"
+                                }`}
+                              >
+                                {selectedProjectTeam.status
+                                  ?.split("_")
+                                  .map(
+                                    (word) =>
+                                      word.charAt(0).toUpperCase() +
+                                      word.slice(1)
+                                  )
+                                  .join(" ")}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Team Members List */}
+                        <div>
+                          {/* Search Input */}
+                          <div className="mb-4">
+                            <div className="relative">
+                              <input
+                                type="text"
+                                placeholder="Search team members by name, email, department, or role..."
+                                value={teamMemberSearchTerm}
+                                onChange={(e) =>
+                                  setTeamMemberSearchTerm(e.target.value)
+                                }
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                              />
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg
+                                  className="h-4 w-4 text-gray-400"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                                  />
+                                </svg>
+                              </div>
+                              {teamMemberSearchTerm && (
+                                <button
+                                  onClick={() => setTeamMemberSearchTerm("")}
+                                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                                >
+                                  <svg
+                                    className="h-4 w-4 text-gray-400 hover:text-gray-600"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M6 18L18 6M6 6l12 12"
+                                    />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          {(() => {
+                            console.log(
+                              "🔍 Debug - selectedProjectTeam:",
+                              selectedProjectTeam
+                            );
+                            console.log(
+                              "🔍 Debug - projectTeamMembers:",
+                              projectTeamMembers
+                            );
+
+                            if (loadingTeamMembers) {
+                              return (
+                                <div className="text-center py-12">
+                                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--elra-primary)] mx-auto mb-4"></div>
+                                  <p className="text-gray-500">
+                                    Loading team members...
+                                  </p>
+                                </div>
+                              );
+                            }
+
+                            if (filteredTeamMembers.length === 0) {
+                              return (
+                                <div className="text-center py-12">
+                                  <UserGroupIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                                    {teamMemberSearchTerm
+                                      ? "No Matching Team Members"
+                                      : "No Team Members Found"}
+                                  </h3>
+                                  <p className="text-gray-500 mb-4">
+                                    {teamMemberSearchTerm
+                                      ? `No team members match "${teamMemberSearchTerm}". Try adjusting your search terms.`
+                                      : "This project doesn't have any team members assigned yet."}
+                                  </p>
+                                  {teamMemberSearchTerm && (
+                                    <button
+                                      onClick={() =>
+                                        setTeamMemberSearchTerm("")
+                                      }
+                                      className="mt-2 px-4 py-2 text-sm text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-colors"
+                                    >
+                                      Clear Search
+                                    </button>
+                                  )}
+                                  <div className="text-xs text-gray-400 bg-gray-50 p-3 rounded">
+                                    <p>Debug Info:</p>
+                                    <p>
+                                      Fetched team members:{" "}
+                                      {projectTeamMembers.length}
+                                    </p>
+                                    <p>
+                                      Selected project ID:{" "}
+                                      {selectedProjectTeam._id}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div className="grid gap-4">
+                                {filteredTeamMembers.map((member) => (
+                                  <div
+                                    key={member._id}
+                                    className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center space-x-4">
+                                        <div className="flex-shrink-0">
+                                          {getAvatarDisplay(member.user)}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center space-x-2">
+                                            <h5 className="text-sm font-medium text-gray-900 truncate">
+                                              {member.user?.firstName}{" "}
+                                              {member.user?.lastName}
+                                            </h5>
+                                            <span
+                                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                                member.status === "active"
+                                                  ? "bg-green-100 text-green-800"
+                                                  : member.status === "inactive"
+                                                  ? "bg-yellow-100 text-yellow-800"
+                                                  : "bg-red-100 text-red-800"
+                                              }`}
+                                            >
+                                              {member.status}
+                                            </span>
+                                          </div>
+                                          <p className="text-sm text-gray-500 truncate">
+                                            {member.user?.email}
+                                          </p>
+                                          <p className="text-xs text-gray-400">
+                                            {member.department?.name} •{" "}
+                                            {member.role?.name}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center space-x-3">
+                                        <div className="text-right">
+                                          <div className="text-sm font-medium text-gray-900">
+                                            {getRoleDisplayName(member.role)}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            {member.allocationPercentage || 0}%
+                                            allocation
+                                          </div>
+                                        </div>
+                                        {user.role.level >= 600 && (
+                                          <button
+                                            onClick={() =>
+                                              handleRemoveTeamMember(member)
+                                            }
+                                            disabled={
+                                              deletingMemberId === member._id
+                                            }
+                                            className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                                          >
+                                            {deletingMemberId === member._id ? (
+                                              <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin"></div>
+                                            ) : (
+                                              <TrashIcon className="h-4 w-4" />
+                                            )}
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="bg-gray-50 px-6 py-4 flex justify-end space-x-3">
+                    <button
+                      onClick={handleCloseTeamModal}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Close
+                    </button>
+                    {user.role.level >= 600 && (
+                      <button
+                        onClick={() => {
+                          handleCloseTeamModal();
+                          setShowAddMember(true);
+                          handleProjectChange(selectedProjectTeam._id);
+                        }}
+                        className="px-4 py-2 text-sm font-medium text-white bg-[var(--elra-primary)] rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors"
+                      >
+                        <PlusIcon className="h-4 w-4 inline mr-1" />
+                        Add Member
+                      </button>
+                    )}
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+
+      {/* Delete Team Member Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteConfirm && memberToDelete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-[9999] p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
+            >
+              <div className="bg-red-600 p-6 rounded-t-2xl">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-white rounded-lg">
+                    <TrashIcon className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">
+                      Remove Team Member
+                    </h3>
+                    <p className="text-white/80 text-sm">
+                      This action will notify the team member
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6">
+                <div className="flex items-center space-x-4 mb-4">
+                  <div className="flex-shrink-0">
+                    {getAvatarDisplay(memberToDelete.user)}
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-medium text-gray-900">
+                      {memberToDelete.user?.firstName}{" "}
+                      {memberToDelete.user?.lastName}
+                    </h4>
+                    <p className="text-xs text-gray-400">
+                      {getRoleDisplayName(memberToDelete.role)}
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-gray-700 mb-4">
+                  Are you sure you want to remove this team member from the
+                  project? They will be notified about this change and can focus
+                  on other important tasks.
+                </p>
+
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-start space-x-3">
+                    <ExclamationTriangleIcon className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-medium text-red-800">
+                        Important Notice
+                      </h4>
+                      <p className="text-sm text-red-700 mt-1">
+                        This action will send a positive notification to the
+                        team member and cannot be undone. The team member will
+                        be marked as inactive but their contribution history
+                        will be preserved.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={handleCancelDelete}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    disabled={deletingMemberId === memberToDelete._id}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmRemoveTeamMember}
+                    disabled={deletingMemberId === memberToDelete._id}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+                  >
+                    {deletingMemberId === memberToDelete._id ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Removing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <TrashIcon className="w-4 h-4" />
+                        <span>Remove Member</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

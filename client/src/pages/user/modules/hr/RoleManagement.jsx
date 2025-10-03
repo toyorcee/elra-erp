@@ -99,7 +99,7 @@ const RoleManagement = () => {
 
   return (
     <div className="min-h-screen bg-[var(--elra-bg-light)] p-6">
-      <div className="max-w-7xl mx-auto">
+      <div className="mx-auto">
         {/* Header */}
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6 border border-[var(--elra-border-primary)]">
           <div className="flex items-center justify-between">

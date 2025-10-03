@@ -119,9 +119,8 @@ import ERPFlowchart from "./pages/ERPFlowchart";
 import Profile from "./pages/user/Profile";
 import PurchaseOrders from "./pages/user/modules/procurement/PurchaseOrders";
 import ProcurementTracking from "./pages/user/modules/procurement/ProcurementTracking";
-
+import ProcurementReports from "./pages/user/modules/procurement/ProcurementReports";
 // Inventory Module imports
-import InventoryManagement from "./pages/user/modules/inventory/InventoryManagement";
 import InventoryList from "./pages/user/modules/inventory/InventoryList";
 import InventoryTracking from "./pages/user/modules/inventory/InventoryTracking";
 import InventoryReports from "./pages/user/modules/inventory/InventoryReports";
@@ -200,9 +199,6 @@ const AppRoutes = () => {
           <Route path="approvals" element={<SalesMarketingApprovals />} />
           <Route path="reports" element={<SalesMarketingReports />} />
         </Route>
-
-        {/* Module routes - dynamic module dashboards */}
-        <Route path="modules/:module" element={<Dashboard />} />
 
         {/* HR Module Routes */}
         <Route path="modules/hr" element={<HRModule />} />
@@ -445,6 +441,10 @@ const AppRoutes = () => {
         <Route
           path="modules/procurement/tracking"
           element={<ProcurementTracking />}
+        />
+        <Route
+          path="modules/procurement/reports"
+          element={<ProcurementReports />}
         />
 
         {/* Legal Module Routes */}

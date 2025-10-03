@@ -2969,8 +2969,6 @@ export const getComprehensiveProjectData = async (req, res) => {
     const { page = 1, limit = 50, status, scope, department } = req.query;
 
     let query = { isActive: true };
-
-    // Apply filters
     if (status) query.status = status;
     if (scope) query.scope = scope;
     if (department) query.department = department;
@@ -3299,16 +3297,14 @@ export const removeTeamMember = async (req, res) => {
       });
     }
 
-    // Remove team member using project method
     await project.removeTeamMember(userId);
 
-    // Send notification to removed team member
     try {
       await sendProjectNotification(req, {
         recipient: userId,
         type: "TEAM_MEMBER_REMOVED",
-        title: "Removed from Project Team",
-        message: `You have been removed from the project "${project.name}" (${project.code}).`,
+        title: "Project Team Assignment Update",
+        message: `Your assignment to the project "${project.name}" (${project.code}) has been updated. This change allows you to focus on other important tasks and projects. Thank you for your valuable contribution to this project!`,
         data: {
           projectId: project._id,
           projectName: project.name,

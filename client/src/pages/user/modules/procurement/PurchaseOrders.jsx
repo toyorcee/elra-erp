@@ -17,11 +17,7 @@ import {
   PencilIcon,
   ChevronDownIcon,
   TruckIcon,
-  ChartBarIcon,
-  ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
 } from "@heroicons/react/24/outline";
-import { Listbox, Transition } from "@headlessui/react";
 import { useAuth } from "../../../../context/AuthContext";
 import {
   fetchPurchaseOrders,
@@ -39,7 +35,6 @@ import { fetchProjects } from "../../../../services/projectAPI";
 import { toast } from "react-toastify";
 import DataTable from "../../../../components/common/DataTable";
 import {
-  UNIFIED_CATEGORIES,
   CATEGORY_DISPLAY_NAMES,
   CATEGORY_GROUPS,
 } from "../../../../constants/unifiedCategories";
@@ -100,13 +95,13 @@ const PurchaseOrders = () => {
   const [selectedProject, setSelectedProject] = useState(null);
 
   const [completeFormData, setCompleteFormData] = useState({
-    hasVendor: false, // Matching project creation vendor fields
+    hasVendor: false,
     supplier: {
       name: "",
       contactPerson: "",
       email: "",
       phone: "",
-      address: "", // Changed to string to match project creation
+      address: "",
     },
     deliveryAddress: "",
     expectedDeliveryDate: "",
@@ -117,13 +112,13 @@ const PurchaseOrders = () => {
     title: "",
     description: "",
     priority: "medium",
-    hasVendor: false,
+    hasVendor: true,
     supplier: {
       name: "",
       contactPerson: "",
       email: "",
       phone: "",
-      address: "", // Changed to string to match project creation
+      address: "",
     },
     deliveryAddress: "",
     items: [
@@ -338,13 +333,11 @@ const PurchaseOrders = () => {
     };
 
     if (typeof order.supplier?.address === "string") {
-      // Address is stored as string (from project creation)
       supplierAddress.street = order.supplier.address;
     } else if (
       order.supplier?.address &&
       typeof order.supplier.address === "object"
     ) {
-      // Address is stored as object (from manual entry)
       supplierAddress = {
         street: order.supplier.address.street || "",
         city: order.supplier.address.city || "",
@@ -353,7 +346,6 @@ const PurchaseOrders = () => {
       };
     }
 
-    // Check if vendor info is missing or shows "TBD" - use backup API
     let supplierInfo = {
       name: order.supplier?.name || "",
       contactPerson: order.supplier?.contactPerson || "",
@@ -403,7 +395,7 @@ const PurchaseOrders = () => {
       notes: "",
       hasVendor:
         supplierInfo.name &&
-        supplierInfo.name !== "TBD - Procurement HOD to assign", // Auto-select if vendor exists
+        supplierInfo.name !== "TBD - Procurement HOD to assign",
     });
     setOrderToComplete(order);
     setShowCompleteModal(true);
@@ -556,29 +548,18 @@ const PurchaseOrders = () => {
         phone: formData.get("supplierPhone") || orderToEdit.supplier?.phone,
       };
 
-      // Build updated delivery address data
-      const updatedDeliveryAddress = {
-        ...orderToEdit.deliveryAddress,
-        contactPerson:
-          formData.get("deliveryContactPerson") ||
-          orderToEdit.deliveryAddress?.contactPerson,
-        phone:
-          formData.get("deliveryPhone") || orderToEdit.deliveryAddress?.phone,
-        street:
-          formData.get("deliveryStreet") || orderToEdit.deliveryAddress?.street,
-        city: formData.get("deliveryCity") || orderToEdit.deliveryAddress?.city,
-        state:
-          formData.get("deliveryState") || orderToEdit.deliveryAddress?.state,
-        postalCode:
-          formData.get("deliveryPostalCode") ||
-          orderToEdit.deliveryAddress?.postalCode,
-      };
+      // Get delivery address as string (matching creation modal format)
+      const deliveryAddressString =
+        formData.get("deliveryAddress") ||
+        (typeof orderToEdit.deliveryAddress === "string"
+          ? orderToEdit.deliveryAddress
+          : formatAddressToString(orderToEdit.deliveryAddress));
 
       await updateProcurement(orderToEdit._id, {
         title: orderToEdit.title,
         description: formData.get("description") || orderToEdit.description,
         supplier: updatedSupplier,
-        deliveryAddress: updatedDeliveryAddress,
+        deliveryAddress: deliveryAddressString,
         items: orderToEdit.items,
         totalAmount: orderToEdit.totalAmount,
         expectedDeliveryDate:
@@ -899,42 +880,38 @@ const PurchaseOrders = () => {
   };
 
   const handleSupplierChange = (field, value) => {
+    if (field === "deliveryAddress") {
+      setFormData((prev) => ({ ...prev, deliveryAddress: value }));
+      return;
+    }
+
     if (field.includes(".")) {
       const [parent, child] = field.split(".");
-
-      if (parent === "deliveryAddress") {
-        setFormData((prev) => ({
-          ...prev,
-          deliveryAddress: value,
-        }));
-      } else {
-        setFormData((prev) => ({
-          ...prev,
-          supplier: {
-            ...prev.supplier,
-            [parent]: {
-              ...prev.supplier[parent],
-              [child]: value,
-            },
-          },
-        }));
-      }
-    } else {
-      // Handle top-level fields (including address as string)
       setFormData((prev) => ({
         ...prev,
         supplier: {
           ...prev.supplier,
-          [field]: value,
+          [parent]: {
+            ...prev.supplier[parent],
+            [child]: value,
+          },
         },
       }));
+      return;
     }
+
+    setFormData((prev) => ({
+      ...prev,
+      supplier: {
+        ...prev.supplier,
+        [field]: value,
+      },
+    }));
   };
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
 
-    // Handle formatted number fields
     if (field === "quantity" || field === "unitPrice") {
       const numericValue = parseFormattedNumber(value);
       newItems[index][field] = numericValue;
@@ -951,7 +928,6 @@ const PurchaseOrders = () => {
       newItems[index][field] = value;
     }
 
-    // Calculate total price for the item
     if (field === "quantity" || field === "unitPrice") {
       newItems[index].totalPrice =
         newItems[index].quantity * newItems[index].unitPrice;
@@ -1039,7 +1015,6 @@ const PurchaseOrders = () => {
           "Purchase order created successfully and email sent to supplier!"
         );
         loadPurchaseOrders();
-        // Clear form and close modal
         resetForm();
         setShowCreateModal(false);
         setIsProjectTied(false);
@@ -1986,98 +1961,93 @@ const PurchaseOrders = () => {
                   </div>
                 </div>
 
-                {/* Supplier Information - Matching Project Creation Vendor Fields */}
+                {/* Supplier Information (Required for standalone ELRA orders) */}
                 <div className="bg-gray-50 rounded-lg p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <UserIcon className="h-5 w-5 text-[var(--elra-primary)] mr-2" />
                     Supplier Information
                     <span className="text-sm font-normal text-gray-600 ml-2">
-                      (Optional - matches project creation vendor fields)
+                      (Required)
                     </span>
                   </h3>
-
-                  {/* Has Vendor Checkbox - Matching Project Creation */}
-                  <div className="mb-4">
-                    <label className="flex items-center">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Vendor Name <span className="text-red-500">*</span>
+                      </label>
                       <input
-                        type="checkbox"
-                        checked={formData.hasVendor}
+                        type="text"
+                        required
+                        value={formData.supplier.name}
                         onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            hasVendor: e.target.checked,
-                          })
+                          handleSupplierChange("name", e.target.value)
                         }
-                        className="mr-2 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] rounded"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="e.g., Microsoft, Oracle, etc."
                       />
-                      <span className="text-sm font-semibold">
-                        Client has a preferred vendor/supplier
-                      </span>
-                    </label>
-                  </div>
-
-                  {formData.hasVendor && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Vendor Name <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={formData.supplier.name}
-                          onChange={(e) =>
-                            handleSupplierChange("name", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                          placeholder="e.g., Microsoft, Oracle, etc."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Vendor Email <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="email"
-                          required
-                          value={formData.supplier.email}
-                          onChange={(e) =>
-                            handleSupplierChange("email", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                          placeholder="e.g., contact@microsoft.com"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Vendor Phone
-                        </label>
-                        <input
-                          type="tel"
-                          value={formData.supplier.phone}
-                          onChange={(e) =>
-                            handleSupplierChange("phone", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                          placeholder="e.g., +1 555 123 4567"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Vendor Address
-                        </label>
-                        <textarea
-                          value={formData.supplier.address}
-                          onChange={(e) =>
-                            handleSupplierChange("address", e.target.value)
-                          }
-                          rows={2}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                          placeholder="Enter vendor's address..."
-                        />
-                      </div>
                     </div>
-                  )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Vendor Email <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={formData.supplier.email}
+                        onChange={(e) =>
+                          handleSupplierChange("email", e.target.value)
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="e.g., contact@microsoft.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Vendor Contact Person
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.supplier.contactPerson}
+                        onChange={(e) =>
+                          handleSupplierChange("contactPerson", e.target.value)
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="e.g., Jane Doe"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Vendor Phone
+                      </label>
+                      <input
+                        type="tel"
+                        value={formData.supplier.phone}
+                        onChange={(e) =>
+                          handleSupplierChange("phone", e.target.value)
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="e.g., +1 555 123 4567"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Vendor Address
+                      </label>
+                      <textarea
+                        value={
+                          typeof formData.supplier.address === "string"
+                            ? formData.supplier.address
+                            : formatAddressToString(formData.supplier.address)
+                        }
+                        onChange={(e) =>
+                          handleSupplierChange("address", e.target.value)
+                        }
+                        rows={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                        placeholder="Enter vendor's address..."
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Delivery Address Section */}
@@ -2091,7 +2061,11 @@ const PurchaseOrders = () => {
                       Delivery Address
                     </label>
                     <textarea
-                      value={formData.deliveryAddress}
+                      value={
+                        typeof formData.deliveryAddress === "string"
+                          ? formData.deliveryAddress
+                          : formatAddressToString(formData.deliveryAddress)
+                      }
                       onChange={(e) =>
                         handleSupplierChange("deliveryAddress", e.target.value)
                       }
@@ -2109,164 +2083,7 @@ const PurchaseOrders = () => {
                     Purchase Order Items
                   </h3>
 
-                  {/* Project Type Selection */}
-                  <div className="mb-6">
-                    <div className="flex items-center space-x-3 mb-4">
-                      <input
-                        type="checkbox"
-                        id="isProjectTied"
-                        checked={isProjectTied}
-                        onChange={(e) => {
-                          setIsProjectTied(e.target.checked);
-                          if (!e.target.checked) {
-                            setSelectedProject(null);
-                          }
-                        }}
-                        className="h-4 w-4 text-[var(--elra-primary)] focus:ring-[var(--elra-primary)] border-gray-300 rounded"
-                      />
-                      <label
-                        htmlFor="isProjectTied"
-                        className="text-sm font-medium text-gray-700"
-                      >
-                        Tie this purchase order to a project
-                      </label>
-                    </div>
-
-                    {/* Project Selection Dropdown - Only show when checkbox is checked */}
-                    <Transition
-                      show={isProjectTied}
-                      enter="transition ease-out duration-200"
-                      enterFrom="opacity-0 transform scale-95"
-                      enterTo="opacity-100 transform scale-100"
-                      leave="transition ease-in duration-150"
-                      leaveFrom="opacity-100 transform scale-100"
-                      leaveTo="opacity-0 transform scale-95"
-                    >
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Select Project
-                        </label>
-                        <Listbox
-                          value={selectedProject}
-                          onChange={setSelectedProject}
-                        >
-                          <div className="relative">
-                            <Listbox.Button className="relative w-full cursor-default rounded-lg bg-white py-3 pl-3 pr-10 text-left shadow-sm focus:outline-none focus-visible:border-[var(--elra-primary)] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--elra-primary)] sm:text-sm border border-gray-300">
-                              <span className="block truncate">
-                                {loadingProjects ? (
-                                  <span className="text-gray-500">
-                                    Loading projects...
-                                  </span>
-                                ) : selectedProject ? (
-                                  `${selectedProject.name} (${selectedProject.code})`
-                                ) : (
-                                  <span className="text-gray-500">
-                                    Choose a project...
-                                  </span>
-                                )}
-                              </span>
-                              <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                                <ChevronDownIcon
-                                  className="h-5 w-5 text-gray-400"
-                                  aria-hidden="true"
-                                />
-                              </span>
-                            </Listbox.Button>
-                            <Transition
-                              as={React.Fragment}
-                              leave="transition ease-in duration-100"
-                              leaveFrom="opacity-100"
-                              leaveTo="opacity-0"
-                            >
-                              <Listbox.Options className="absolute mt-1 max-h-80 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-gray-200 focus:outline-none sm:text-sm z-10">
-                                {projects.map((project) => (
-                                  <Listbox.Option
-                                    key={project._id}
-                                    className={({ active }) =>
-                                      `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                                        active
-                                          ? "bg-[var(--elra-primary)] text-white"
-                                          : "text-gray-900"
-                                      }`
-                                    }
-                                    value={project}
-                                  >
-                                    {({ selected, active }) => (
-                                      <>
-                                        <span
-                                          className={`block truncate ${
-                                            selected
-                                              ? "font-medium"
-                                              : "font-normal"
-                                          }`}
-                                        >
-                                          {project.name} ({project.code})
-                                        </span>
-                                        {selected ? (
-                                          <span
-                                            className={`absolute inset-y-0 left-0 flex items-center pl-3 ${
-                                              active
-                                                ? "text-white"
-                                                : "text-[var(--elra-primary)]"
-                                            }`}
-                                          >
-                                            <CheckCircleIcon
-                                              className="h-5 w-5"
-                                              aria-hidden="true"
-                                            />
-                                          </span>
-                                        ) : null}
-                                      </>
-                                    )}
-                                  </Listbox.Option>
-                                ))}
-                              </Listbox.Options>
-                            </Transition>
-                          </div>
-                        </Listbox>
-                        <p className="text-xs text-gray-500">
-                          {loadingProjects ? (
-                            <span className="text-gray-500">
-                              Loading projects...
-                            </span>
-                          ) : selectedProject ? (
-                            <span className="text-blue-600">
-                              ✓ This PO will be tied to: {selectedProject.name}
-                            </span>
-                          ) : (
-                            <span className="text-orange-600">
-                              ⚠ Please select a project
-                            </span>
-                          )}
-                          {!loadingProjects && projects.length > 0 && (
-                            <span className="text-gray-400 ml-2">
-                              ({projects.length} projects available)
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </Transition>
-
-                    {/* Standalone indicator */}
-                    {!isProjectTied && (
-                      <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0">
-                            <BuildingOfficeIcon className="h-5 w-5 text-orange-400" />
-                          </div>
-                          <div className="ml-3">
-                            <p className="text-sm font-medium text-orange-800">
-                              Standalone Purchase
-                            </p>
-                            <p className="text-sm text-orange-700">
-                              This purchase order will not be tied to any
-                              project
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  {/* Standalone creation only - project tie removed for simplicity */}
 
                   {/* Items List */}
                   <div className="space-y-4">
@@ -3928,101 +3745,39 @@ const PurchaseOrders = () => {
                     <h3 className="font-semibold text-gray-900 mb-3">
                       Delivery Information
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Delivery Contact Person
-                        </label>
-                        <input
-                          type="text"
-                          name="deliveryContactPerson"
-                          defaultValue={
-                            orderToEdit.deliveryAddress?.contactPerson || ""
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Delivery Phone
-                        </label>
-                        <input
-                          type="tel"
-                          name="deliveryPhone"
-                          defaultValue={
-                            orderToEdit.deliveryAddress?.phone || ""
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Street Address
-                        </label>
-                        <input
-                          type="text"
-                          name="deliveryStreet"
-                          defaultValue={
-                            orderToEdit.deliveryAddress?.street || ""
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          City
-                        </label>
-                        <input
-                          type="text"
-                          name="deliveryCity"
-                          defaultValue={orderToEdit.deliveryAddress?.city || ""}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          State
-                        </label>
-                        <input
-                          type="text"
-                          name="deliveryState"
-                          defaultValue={
-                            orderToEdit.deliveryAddress?.state || ""
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Postal Code
-                        </label>
-                        <input
-                          type="text"
-                          name="deliveryPostalCode"
-                          defaultValue={
-                            orderToEdit.deliveryAddress?.postalCode || ""
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Expected Delivery Date
-                        </label>
-                        <input
-                          type="date"
-                          name="expectedDeliveryDate"
-                          min={new Date().toISOString().split("T")[0]}
-                          defaultValue={
-                            orderToEdit.expectedDeliveryDate
-                              ? new Date(orderToEdit.expectedDeliveryDate)
-                                  .toISOString()
-                                  .split("T")[0]
-                              : ""
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Delivery Address
+                      </label>
+                      <textarea
+                        name="deliveryAddress"
+                        rows={3}
+                        defaultValue={
+                          typeof orderToEdit.deliveryAddress === "string"
+                            ? orderToEdit.deliveryAddress
+                            : formatAddressToString(orderToEdit.deliveryAddress)
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="Enter complete delivery address..."
+                      />
+                    </div>
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Expected Delivery Date
+                      </label>
+                      <input
+                        type="date"
+                        name="expectedDeliveryDate"
+                        min={new Date().toISOString().split("T")[0]}
+                        defaultValue={
+                          orderToEdit.expectedDeliveryDate
+                            ? new Date(orderToEdit.expectedDeliveryDate)
+                                .toISOString()
+                                .split("T")[0]
+                            : ""
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
                     </div>
                   </div>
 
@@ -4066,12 +3821,12 @@ const PurchaseOrders = () => {
                   {isEditing ? (
                     <>
                       <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                      <span>Updating & Sending Email...</span>
+                      <span>Updating</span>
                     </>
                   ) : (
                     <>
                       <PencilIcon className="w-4 h-4" />
-                      <span>Update & Send Email</span>
+                      <span>Update Order</span>
                     </>
                   )}
                 </button>

@@ -76,7 +76,7 @@ const Profile = ({ user: propUser, isViewingOtherUser = false }) => {
       authUser &&
       (authUser.roleLevel >= 1000 || authUser.role?.name === "HR HOD")
     ) {
-      loadDepartmentsAndRoles();
+    loadDepartmentsAndRoles();
     }
   }, [user, isViewingOtherUser, authUser]); // Only reload when user changes
 
@@ -610,12 +610,12 @@ const Profile = ({ user: propUser, isViewingOtherUser = false }) => {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
               {!isViewingOtherUser && (
-                <button
-                  onClick={() => window.history.back()}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <ArrowLeftIcon className="h-5 w-5 text-[var(--elra-text-secondary)]" />
-                </button>
+              <button
+                onClick={() => window.history.back()}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <ArrowLeftIcon className="h-5 w-5 text-[var(--elra-text-secondary)]" />
+              </button>
               )}
               <div className="p-2 bg-[var(--elra-primary)] rounded-lg">
                 <UserIcon className="h-6 w-6 text-white" />

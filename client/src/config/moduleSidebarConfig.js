@@ -763,6 +763,21 @@ export const moduleSidebarConfig = {
           },
         ],
       },
+      {
+        title: "Reports & Analytics",
+        collapsible: true,
+        defaultExpanded: false,
+        items: [
+          {
+            label: "Procurement Reports",
+            icon: "ChartBarIcon",
+            path: "/dashboard/modules/procurement/reports",
+            required: { minLevel: 600 },
+            description:
+              "Generate comprehensive procurement reports and analytics",
+          },
+        ],
+      },
     ],
   },
 

@@ -1,18 +1,12 @@
 import Procurement from "../models/Procurement.js";
-
 import User from "../models/User.js";
-
 import Transaction from "../models/Transaction.js";
-
 import { sendEmail } from "../services/emailService.js";
-
 import { generateProcurementOrderPDF } from "../utils/pdfUtils.js";
-
 import nodemailer from "nodemailer";
-
 import mongoose from "mongoose";
-
 import NotificationService from "../services/notificationService.js";
+import AuditService from "../services/auditService.js";
 
 // ============================================================================
 
@@ -530,30 +524,46 @@ export const createProcurement = async (req, res) => {
     console.log(
       `\n✅ [PROCUREMENT] Order created successfully - No emails sent`
     );
-
     console.log(`   - PO Number: ${procurement.poNumber}`);
-
     console.log(`   - Title: ${procurement.title}`);
     console.log(`   - Supplier: ${procurement.supplier.name}`);
-
     console.log(
       `   - Total Amount: ₦${procurement.totalAmount?.toLocaleString()}`
     );
     console.log(`   - Status: ${procurement.status}`);
-
     console.log(`\n🏢 [PROCUREMENT] Supplier Information:`);
     console.log(`   - Name: ${procurement.supplier.name}`);
     console.log(`   - Email: ${procurement.supplier.email}`);
     console.log(`   - Phone: ${procurement.supplier.phone}`);
     console.log(`   - Address: ${procurement.supplier.address}`);
-
     console.log(`\n🚚 [PROCUREMENT] Delivery Information:`);
     console.log(`   - Delivery Address: ${procurement.deliveryAddress}`);
-
     console.log(`\n💾 [PROCUREMENT] Database Save Status:`);
     console.log(`   - Document saved successfully`);
     console.log(`   - Timestamp: ${new Date().toISOString()}`);
     console.log(`   - Version: ${procurement.__v}`);
+
+    // Audit: PROCUREMENT_CREATED
+    try {
+      await AuditService.logActivity({
+        userId: currentUser._id,
+        action: "PROCUREMENT_CREATED",
+        resourceType: "PROCUREMENT",
+        resourceId: procurement._id,
+        details: {
+          poNumber: procurement.poNumber,
+          title: procurement.title,
+          totalAmount: procurement.totalAmount,
+          supplier: procurement.supplier?.name,
+          standalone: !procurement.relatedProject,
+        },
+      });
+    } catch (auditError) {
+      console.error(
+        "⚠️ [AUDIT] Failed to log PROCUREMENT_CREATED:",
+        auditError
+      );
+    }
 
     res.status(201).json({
       success: true,
@@ -1514,6 +1524,25 @@ export const markAsIssued = async (req, res) => {
       `✅ [PROCUREMENT] Order ${procurement.poNumber} marked as issued successfully`
     );
 
+    // Audit: PROCUREMENT_MARKED_ISSUED
+    try {
+      await AuditService.logActivity({
+        userId: currentUser._id,
+        action: "PROCUREMENT_MARKED_ISSUED",
+        resourceType: "PROCUREMENT",
+        resourceId: procurement._id,
+        details: {
+          poNumber: procurement.poNumber,
+          notes: confirmationNotes || null,
+        },
+      });
+    } catch (auditError) {
+      console.error(
+        "⚠️ [AUDIT] Failed to log PROCUREMENT_MARKED_ISSUED:",
+        auditError
+      );
+    }
+
     res.status(200).json({
       success: true,
 
@@ -1842,6 +1871,26 @@ export const markAsPaid = async (req, res) => {
       `✅ [PROCUREMENT] Successfully marked as paid - PO: ${procurement.poNumber}`
     );
 
+    // Audit: PROCUREMENT_MARKED_PAID
+    try {
+      await AuditService.logActivity({
+        userId: currentUser._id,
+        action: "PROCUREMENT_MARKED_PAID",
+        resourceType: "PROCUREMENT",
+        resourceId: procurement._id,
+        details: {
+          poNumber: procurement.poNumber,
+          method: paymentMethod || "manual",
+          amount: procurement.totalAmount,
+        },
+      });
+    } catch (auditError) {
+      console.error(
+        "⚠️ [AUDIT] Failed to log PROCUREMENT_MARKED_PAID:",
+        auditError
+      );
+    }
+
     res.status(200).json({
       success: true,
 
@@ -1963,6 +2012,26 @@ export const markAsDelivered = async (req, res) => {
       `✅ [PROCUREMENT] Successfully marked as delivered - PO: ${procurement.poNumber}`
     );
 
+    // Audit: PROCUREMENT_MARKED_DELIVERED
+    try {
+      await AuditService.logActivity({
+        userId: currentUser._id,
+        action: "PROCUREMENT_MARKED_DELIVERED",
+        resourceType: "PROCUREMENT",
+        resourceId: procurement._id,
+        details: {
+          poNumber: procurement.poNumber,
+          notes: deliveryNotes || null,
+          standalone: !procurement.relatedProject,
+        },
+      });
+    } catch (auditError) {
+      console.error(
+        "⚠️ [AUDIT] Failed to log PROCUREMENT_MARKED_DELIVERED:",
+        auditError
+      );
+    }
+
     if (procurement.relatedProject) {
       try {
         console.log(
@@ -2034,6 +2103,252 @@ export const markAsDelivered = async (req, res) => {
 
       message: "Error marking procurement order as delivered",
 
+      error: error.message,
+    });
+  }
+};
+
+// @desc    Export procurement reports as PDF
+// @route   GET /api/procurement/reports/export/pdf
+// @access  Private (HOD+)
+export const exportProcurementReport = async (req, res) => {
+  try {
+    const { reportType = "monthly", period } = req.query;
+    const currentUser = req.user;
+
+    // Get procurement data based on filters
+    let query = { isActive: true };
+
+    // Apply date filters based on period
+    if (period) {
+      if (reportType === "monthly") {
+        const [month, year] = period.split("/");
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0, 23, 59, 59);
+        query.createdAt = { $gte: startDate, $lte: endDate };
+      } else if (reportType === "yearly") {
+        const startDate = new Date(period, 0, 1);
+        const endDate = new Date(period, 11, 31, 23, 59, 59);
+        query.createdAt = { $gte: startDate, $lte: endDate };
+      }
+    }
+
+    // Role-based filtering
+    if (currentUser.role.level >= 1000) {
+      // Super Admin - see all
+    } else if (currentUser.role.level >= 700) {
+      // HOD - see all procurement
+    } else if (currentUser.role.level >= 300) {
+      query.createdBy = currentUser._id;
+    } else {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Insufficient permissions.",
+      });
+    }
+
+    const procurement = await Procurement.find(query)
+      .populate("createdBy", "firstName lastName email")
+      .populate("relatedProject", "name code")
+      .sort({ createdAt: -1 });
+
+    // Generate PDF using jsPDF
+    const { jsPDF } = await import("jspdf");
+    const autoTable = (await import("jspdf-autotable")).default;
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    // ELRA Branding
+    const elraGreen = [13, 100, 73];
+
+    // Try to add ELRA logo
+    try {
+      const fs = await import("fs");
+      const path = await import("path");
+      const logoPath = path.join(
+        process.cwd(),
+        "server",
+        "assets",
+        "images",
+        "elra-logo.png"
+      );
+
+      if (fs.existsSync(logoPath)) {
+        const logoData = fs.readFileSync(logoPath);
+        const base64Logo = logoData.toString("base64");
+        doc.addImage(
+          `data:image/png;base64,${base64Logo}`,
+          "PNG",
+          85,
+          15,
+          20,
+          20
+        );
+      }
+    } catch (logoError) {
+      console.warn(
+        "Could not add ELRA logo to procurement report:",
+        logoError.message
+      );
+    }
+
+    doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+    doc.setFontSize(32);
+    doc.setFont("helvetica", "bold");
+    doc.text("ELRA", 105, 30, { align: "center" });
+
+    // Reset to black for other text
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "normal");
+    doc.text("Procurement Report", 105, 40, { align: "center" });
+
+    // Report details
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(
+      `Generated for: ${currentUser.firstName} ${currentUser.lastName}`,
+      20,
+      55
+    );
+    doc.text(`Department: ${currentUser.department?.name || "N/A"}`, 20, 62);
+    doc.text(`Position: ${currentUser.role?.name}`, 20, 69);
+    doc.text(`Report Type: ${reportType.toUpperCase()}`, 20, 76);
+    doc.text(`Period: ${period}`, 20, 83);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 90);
+
+    let yPosition = 105;
+
+    const totalPOs = procurement.length;
+    const totalAmount = procurement.reduce(
+      (sum, po) => sum + (parseFloat(po.totalAmount) || 0),
+      0
+    );
+    const projectTiedPOs = procurement.filter((po) => po.relatedProject).length;
+    const standalonePOs = procurement.filter((po) => !po.relatedProject).length;
+
+    const summaryData = [
+      ["Total Purchase Orders", totalPOs.toString()],
+      ["Total Amount", `₦${totalAmount.toLocaleString()}`],
+      ["Project-tied POs", projectTiedPOs.toString()],
+      ["Standalone POs", standalonePOs.toString()],
+    ];
+
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+             doc.text("Summary Statistics", 20, yPosition);
+             yPosition += 10;
+
+             const formattedSummaryData = summaryData.map(([metric, value]) => [
+               metric,
+               metric.includes("Amount") ? `NGN ${parseInt(value.toString().replace(/[₦,]/g, '') || 0).toLocaleString()}` : value
+             ]);
+
+             autoTable(doc, {
+               startY: yPosition,
+               head: [["Metric", "Value"]],
+               body: formattedSummaryData,
+               theme: "grid",
+               headStyles: { fillColor: elraGreen },
+               styles: { fontSize: 10 },
+             });
+
+    yPosition = doc.lastAutoTable.finalY + 15;
+
+    // Status Breakdown
+    const statusBreakdown = {};
+    procurement.forEach((po) => {
+      statusBreakdown[po.status] = (statusBreakdown[po.status] || 0) + 1;
+    });
+
+    const statusData = Object.entries(statusBreakdown).map(
+      ([status, count]) => [status.toUpperCase(), count.toString()]
+    );
+
+    doc.text("Status Breakdown", 20, yPosition);
+    yPosition += 10;
+
+    autoTable(doc, {
+      startY: yPosition,
+      head: [["Status", "Count"]],
+      body: statusData,
+      theme: "grid",
+      headStyles: { fillColor: elraGreen },
+      styles: { fontSize: 10 },
+    });
+
+    yPosition = doc.lastAutoTable.finalY + 15;
+
+    // Recent Purchase Orders Table
+    if (procurement.length > 0) {
+      doc.text("Recent Purchase Orders", 20, yPosition);
+      yPosition += 10;
+
+      const poData = procurement
+        .slice(0, 20)
+        .map((po) => [
+          po.poNumber,
+          po.title,
+          po.supplier?.name || "N/A",
+          `NGN ${(po.totalAmount || 0).toLocaleString()}`,
+          po.status.toUpperCase(),
+          new Date(po.createdAt).toLocaleDateString(),
+        ]);
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [
+          ["PO Number", "Title", "Supplier", "Amount", "Status", "Created"],
+        ],
+        body: poData,
+        theme: "grid",
+        headStyles: { fillColor: elraGreen },
+        styles: { fontSize: 8 },
+        columnStyles: {
+          0: { cellWidth: 25 },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 30 },
+          3: { cellWidth: 25 },
+          4: { cellWidth: 20 },
+          5: { cellWidth: 25 },
+        },
+      });
+    }
+
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text(
+        `Page ${i} of ${pageCount} - Generated by ELRA Procurement System`,
+        105,
+        290,
+        { align: "center" }
+      );
+    }
+
+    // Set response headers
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="procurement-report-${reportType}-${
+        period || "all"
+      }.pdf"`
+    );
+
+    const pdfBuffer = doc.output("arraybuffer");
+    res.send(Buffer.from(pdfBuffer));
+  } catch (error) {
+    console.error("❌ [PROCUREMENT] Export report error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error generating procurement report",
       error: error.message,
     });
   }

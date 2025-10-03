@@ -17,6 +17,7 @@ import {
   markAsIssued,
   markAsPaid,
   markAsDelivered,
+  exportProcurementReport,
 } from "../controllers/procurementController.js";
 import {
   protect,
@@ -167,5 +168,8 @@ router.put("/:id/mark-paid", checkProcurementAccess, markAsPaid);
 
 // Mark as delivered - Procurement HOD+
 router.put("/:id/mark-delivered", checkProcurementAccess, markAsDelivered);
+
+// Export procurement reports - Manager+
+router.get("/reports/export/pdf", checkRole(600), exportProcurementReport);
 
 export default router;

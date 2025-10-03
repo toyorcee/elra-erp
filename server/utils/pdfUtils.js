@@ -2877,22 +2877,23 @@ export const generateComplianceCertificatePDF = async (certificateData) => {
     // =====================
     // HEADER
     // =====================
+    // Enhanced header typography
     doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
+    doc.setFontSize(18);
     doc.text("FEDERAL REPUBLIC OF NIGERIA", 105, 38, { align: "center" });
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(textGray[0], textGray[1], textGray[2]);
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
     doc.text("in partnership with", 105, 46, { align: "center" });
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
+    doc.setFontSize(12);
     doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
     doc.text("FEDERAL MINISTRY OF FINANCE", 105, 54, { align: "center" });
 
-    doc.setFontSize(11);
+    doc.setFontSize(12);
     doc.text("EQUIPMENT LEASING REGISTRATION AUTHORITY", 105, 62, {
       align: "center",
     });
@@ -2913,8 +2914,8 @@ export const generateComplianceCertificatePDF = async (certificateData) => {
     } else {
       doc.setFillColor(elraGreen[0], elraGreen[1], elraGreen[2]);
       doc.circle(105, 87, 11.5, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
       doc.setFontSize(9.5);
       doc.text("ELRA", 105, 90, { align: "center" });
     }
@@ -2927,9 +2928,10 @@ export const generateComplianceCertificatePDF = async (certificateData) => {
       certificateTitle = "COMPLIANCE CERTIFICATE";
     }
 
+    // Enhanced title with better typography
     doc.setFont("helvetica", "bold");
     doc.setTextColor(darkGreen[0], darkGreen[1], darkGreen[2]);
-    doc.setFontSize(18);
+    doc.setFontSize(20);
     doc.text(certificateTitle, 105, 116, { align: "center" });
 
     // Decorative divider
@@ -2940,9 +2942,10 @@ export const generateComplianceCertificatePDF = async (certificateData) => {
     // =====================
     // CERTIFICATE BODY
     // =====================
+    // Certificate number with enhanced styling
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(textGray[0], textGray[1], textGray[2]);
+    doc.setFontSize(10);
+    doc.setTextColor(80, 80, 80);
     doc.text(
       `Certificate No: ${certificateData.certificate.number}`,
       105,
@@ -2950,29 +2953,74 @@ export const generateComplianceCertificatePDF = async (certificateData) => {
       { align: "center" }
     );
 
+    // Project name with elegant typography
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(16);
+    doc.setTextColor(30, 30, 30);
     doc.text(certificateData.project.name, 105, 148, { align: "center" });
 
+    // Add formal certificate language with improved typography
+    let yPos = 158;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(60, 60, 60);
+    doc.text(
+      "This certificate is hereby awarded for the successful completion of",
+      105,
+      yPos,
+      { align: "center" }
+    );
+    yPos += 6;
+    doc.text(
+      "the above-mentioned project in partnership with the Federal Ministry of Finance",
+      105,
+      yPos,
+      { align: "center" }
+    );
+    yPos += 6;
+    doc.text(
+      "and the Equipment Leasing Registration Authority (ELRA).",
+      105,
+      yPos,
+      { align: "center" }
+    );
+
+    yPos += 8;
     if (
       certificateData.project.projectScope === "external" &&
       certificateData.project.clientName
     ) {
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
       doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
-      doc.text(`Awarded to: ${certificateData.project.clientName}`, 105, 160, {
+      doc.text(`Awarded to: ${certificateData.project.clientName}`, 105, yPos, {
         align: "center",
       });
+      yPos += 10;
+    } else if (
+      certificateData.project.projectScope === "departmental" &&
+      certificateData.project.department
+    ) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+      doc.text(
+        `Awarded to: ${certificateData.project.department.name} Department`,
+        105,
+        yPos,
+        {
+          align: "center",
+        }
+      );
+      yPos += 10;
     }
 
-    // Status ribbon
+    // Enhanced status ribbon
     doc.setFillColor(elraGreen[0], elraGreen[1], elraGreen[2]);
-    doc.roundedRect(81, 171, 48, 8, 2, 2, "F");
+    doc.roundedRect(81, yPos + 5, 48, 10, 3, 3, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
+    doc.setFontSize(10);
 
     let statusText = "PROJECT APPROVED";
     if (
@@ -2981,10 +3029,11 @@ export const generateComplianceCertificatePDF = async (certificateData) => {
     ) {
       statusText = "FULLY COMPLIANT";
     }
-    doc.text(statusText, 105, 176, { align: "center" });
+    doc.text(statusText, 105, yPos + 11, { align: "center" });
 
-    // Project details (left aligned for balance)
-    let yPos = 186;
+    // Project details section - CLEAN VERSION
+    yPos = yPos + 20;
+
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
@@ -3007,23 +3056,24 @@ export const generateComplianceCertificatePDF = async (certificateData) => {
     ];
 
     details.forEach(({ label, value }) => {
-      doc.text(`${label} ${value}`, 25, yPos);
-      yPos += 7;
+      doc.text(`${label} ${value}`, 105, yPos, { align: "center" });
+      yPos += 8;
     });
 
     // =====================
-    // SIGNATURE SECTION
+    // SIGNATURE SECTION - CLEAN VERSION
     // =====================
-    yPos = 226;
-      doc.setFont("helvetica", "bold");
+    yPos = 240;
+
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
     doc.text("AUTHORIZED SIGNATURE", 60, yPos);
     doc.text("ISSUE DATE", 145, yPos);
 
     yPos += 12;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
     doc.text(certificateData.certificate.issuedBy, 60, yPos);
     doc.text(certificateData.certificate.issueDate, 145, yPos);
@@ -3044,7 +3094,7 @@ export const generateComplianceCertificatePDF = async (certificateData) => {
         doc.setLineWidth(1.0);
         doc.circle(105, yPos, 13);
         doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
-    doc.setFont("helvetica", "bold");
+        doc.setFont("helvetica", "bold");
         doc.setFontSize(7.5);
         doc.text("OFFICIAL", 105, yPos - 2.5, { align: "center" });
         doc.text("STAMP", 105, yPos + 3.5, { align: "center" });

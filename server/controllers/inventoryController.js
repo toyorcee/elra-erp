@@ -12,6 +12,49 @@ import { UNIFIED_CATEGORIES } from "../constants/unifiedCategories.js";
 // INVENTORY CONTROLLERS
 // ============================================================================
 
+// Helper function to generate unique inventory codes
+const generateUniqueInventoryCode = async () => {
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (attempts < maxAttempts) {
+    const lastInventory = await Inventory.findOne(
+      { code: { $regex: /^INV\d+$/ } },
+      { code: 1 },
+      { sort: { code: -1 } }
+    );
+
+    let nextNumber = 1;
+    if (lastInventory) {
+      // Extract number from the last code (e.g., "INV0003" -> 3)
+      const match = lastInventory.code.match(/INV(\d+)/);
+      if (match) {
+        nextNumber = parseInt(match[1]) + 1;
+      }
+    }
+
+    const candidateCode = `INV${String(nextNumber).padStart(4, "0")}`;
+
+    // Check if this code already exists
+    const existing = await Inventory.findOne({ code: candidateCode });
+    if (!existing) {
+      console.log(`🔢 [INVENTORY] Generated unique code: ${candidateCode}`);
+      return candidateCode;
+    }
+
+    attempts++;
+    console.log(
+      `⚠️ [INVENTORY] Code ${candidateCode} already exists, trying next...`
+    );
+  }
+
+  // Fallback: use timestamp-based code if we can't find a unique sequential one
+  const timestamp = Date.now().toString().slice(-6);
+  const fallbackCode = `INV${timestamp}`;
+  console.log(`🔄 [INVENTORY] Using fallback code: ${fallbackCode}`);
+  return fallbackCode;
+};
+
 // Note: Document uploads are now handled via the centralized /api/documents/upload endpoint
 
 // @desc    Create inventory items from delivered procurement (standalone)
@@ -30,8 +73,7 @@ export const createInventoryFromProcurement = async (
 
     // Create inventory items from procurement items
     for (const procurementItem of procurement.items) {
-      const inventoryCount = await Inventory.countDocuments();
-      const inventoryCode = `INV${String(inventoryCount + 1).padStart(4, "0")}`;
+      const inventoryCode = await generateUniqueInventoryCode();
 
       // Map procurement category to valid inventory category using UNIFIED_CATEGORIES
       const getInventoryCategory = (procurementCategory) => {
@@ -152,14 +194,13 @@ const notifyStakeholdersOfStandaloneInventoryCreation = async (
       recipients.add(projectManagementHOD._id.toString());
     }
 
-    // Add Super Admin
     if (superAdmin) {
       recipients.add(superAdmin._id.toString());
     }
 
-    // Create notification for each recipient
+    const notificationService = new NotificationService();
     for (const recipientId of recipients) {
-      await NotificationService.createNotification({
+      await notificationService.createNotification({
         recipient: recipientId,
         type: "inventory_created",
         title: "New Inventory Items Created",
@@ -1843,6 +1884,288 @@ export const getEquipmentCategories = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error retrieving equipment categories",
+      error: error.message,
+    });
+  }
+};
+
+// ============================================================================
+// INVENTORY REPORTS EXPORT
+// ============================================================================
+
+export const exportInventoryReport = async (req, res) => {
+  try {
+    const { reportType = "monthly", period } = req.query;
+    const currentUser = req.user;
+
+    let query = { isActive: true };
+
+    if (period) {
+      if (reportType === "monthly") {
+        const [month, year] = period.split("/");
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0, 23, 59, 59);
+        query.createdAt = { $gte: startDate, $lte: endDate };
+      } else if (reportType === "yearly") {
+        const startDate = new Date(period, 0, 1);
+        const endDate = new Date(period, 11, 31, 23, 59, 59);
+        query.createdAt = { $gte: startDate, $lte: endDate };
+      }
+    }
+
+    // Access control
+    if (currentUser.role.level >= 1000) {
+      // Super Admin - see all
+    } else if (currentUser.role.level >= 700) {
+      // HOD - see all inventory
+    } else if (currentUser.role.level >= 300) {
+      query.createdBy = currentUser._id;
+    } else {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Insufficient permissions.",
+      });
+    }
+
+    const inventory = await Inventory.find(query)
+      .populate("createdBy", "firstName lastName email")
+      .populate("project", "name code")
+      .sort({ createdAt: -1 });
+
+    const { jsPDF } = await import("jspdf");
+    const autoTable = (await import("jspdf-autotable")).default;
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    const elraGreen = [13, 100, 73];
+
+    // Add ELRA logo
+    try {
+      const fs = await import("fs");
+      const path = await import("path");
+      const logoPath = path.join(
+        process.cwd(),
+        "server",
+        "assets",
+        "images",
+        "elra-logo.png"
+      );
+
+      if (fs.existsSync(logoPath)) {
+        const logoData = fs.readFileSync(logoPath);
+        const base64Logo = logoData.toString("base64");
+        doc.addImage(
+          `data:image/png;base64,${base64Logo}`,
+          "PNG",
+          85,
+          15,
+          20,
+          20
+        );
+      }
+    } catch (logoError) {
+      console.warn(
+        "Could not add ELRA logo to inventory report:",
+        logoError.message
+      );
+    }
+
+    // Header
+    doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+    doc.setFontSize(32);
+    doc.setFont("helvetica", "bold");
+    doc.text("ELRA", 105, 30, { align: "center" });
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "normal");
+    doc.text("Inventory Report", 105, 40, { align: "center" });
+
+    // Report details
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(
+      `Generated for: ${currentUser.firstName} ${currentUser.lastName}`,
+      20,
+      55
+    );
+    doc.text(`Department: ${currentUser.department?.name || "N/A"}`, 20, 62);
+    doc.text(`Position: ${currentUser.role?.name}`, 20, 69);
+    doc.text(`Report Type: ${reportType.toUpperCase()}`, 20, 76);
+    doc.text(`Period: ${period || "All Time"}`, 20, 83);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 90);
+
+    let yPosition = 105;
+
+    // Summary statistics
+    const totalItems = inventory.length;
+    const totalValue = inventory.reduce(
+      (sum, item) => sum + (parseFloat(item.currentValue) || 0),
+      0
+    );
+    const projectTiedItems = inventory.filter((item) => item.project).length;
+    const standaloneItems = inventory.filter((item) => !item.project).length;
+
+    const summaryData = [
+      ["Total Items", totalItems.toString()],
+      ["Total Value", `NGN ${totalValue.toLocaleString()}`],
+      ["Project-tied Items", projectTiedItems.toString()],
+      ["Standalone Items", standaloneItems.toString()],
+    ];
+
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Summary Statistics", 20, yPosition);
+    yPosition += 10;
+
+    autoTable(doc, {
+      startY: yPosition,
+      head: [["Metric", "Value"]],
+      body: summaryData,
+      theme: "grid",
+      headStyles: { fillColor: elraGreen },
+      styles: { fontSize: 10 },
+    });
+
+    yPosition = doc.lastAutoTable.finalY + 15;
+
+    // Status breakdown
+    const statusBreakdown = {};
+    inventory.forEach((item) => {
+      statusBreakdown[item.status] = (statusBreakdown[item.status] || 0) + 1;
+    });
+
+    const statusData = Object.entries(statusBreakdown).map(
+      ([status, count]) => [status.toUpperCase(), count.toString()]
+    );
+
+    doc.text("Status Breakdown", 20, yPosition);
+    yPosition += 10;
+
+    autoTable(doc, {
+      startY: yPosition,
+      head: [["Status", "Count"]],
+      body: statusData,
+      theme: "grid",
+      headStyles: { fillColor: elraGreen },
+      styles: { fontSize: 10 },
+    });
+
+    yPosition = doc.lastAutoTable.finalY + 15;
+
+    // Category breakdown
+    const categoryBreakdown = {};
+    inventory.forEach((item) => {
+      categoryBreakdown[item.category] =
+        (categoryBreakdown[item.category] || 0) + 1;
+    });
+
+    const categoryData = Object.entries(categoryBreakdown)
+      .sort(([, a], [, b]) => b - a)
+      .map(([category, count]) => [category, count.toString()]);
+
+    doc.text("Category Breakdown", 20, yPosition);
+    yPosition += 10;
+
+    autoTable(doc, {
+      startY: yPosition,
+      head: [["Category", "Count"]],
+      body: categoryData,
+      theme: "grid",
+      headStyles: { fillColor: elraGreen },
+      styles: { fontSize: 10 },
+    });
+
+    yPosition = doc.lastAutoTable.finalY + 15;
+
+    // Recent inventory items
+    if (inventory.length > 0) {
+      doc.text("Recent Inventory Items", 20, yPosition);
+      yPosition += 10;
+
+      const inventoryData = inventory
+        .slice(0, 15) // Reduced from 20 to 15 to fit better
+        .map((item) => [
+          item.code,
+          item.name.length > 25
+            ? item.name.substring(0, 25) + "..."
+            : item.name, // Truncate long names
+          item.category,
+          `NGN ${(item.currentValue || 0).toLocaleString()}`,
+          item.status.toUpperCase(),
+          (item.location?.warehouse || item.location || "N/A").length > 15
+            ? (item.location?.warehouse || item.location || "N/A").substring(
+                0,
+                15
+              ) + "..."
+            : item.location?.warehouse || item.location || "N/A",
+          new Date(item.createdAt).toLocaleDateString(),
+        ]);
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [
+          [
+            "Code",
+            "Name",
+            "Category",
+            "Value",
+            "Status",
+            "Location",
+            "Created",
+          ],
+        ],
+        body: inventoryData,
+        theme: "grid",
+        headStyles: { fillColor: elraGreen },
+        styles: { fontSize: 8 },
+        columnStyles: {
+          0: { cellWidth: 18 },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 25 },
+          4: { cellWidth: 18 },
+          5: { cellWidth: 25 },
+          6: { cellWidth: 18 },
+        },
+        margin: { top: 20, right: 20, bottom: 20, left: 20 },
+        tableWidth: "wrap",
+        showHead: "everyPage", // Show header on every page
+        didDrawPage: function (data) {
+          // Add page numbers at the bottom
+          const pageCount = doc.internal.getNumberOfPages();
+          const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+          doc.setFontSize(8);
+          doc.setTextColor(100, 100, 100);
+          doc.text(
+            `Page ${currentPage} of ${pageCount} - Generated by ELRA Inventory System`,
+            105,
+            290,
+            { align: "center" }
+          );
+        },
+      });
+    }
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="inventory-report-${reportType}-${
+        period || "all"
+      }.pdf"`
+    );
+
+    const pdfBuffer = doc.output("arraybuffer");
+    res.send(Buffer.from(pdfBuffer));
+  } catch (error) {
+    console.error("❌ [INVENTORY] Export report error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error generating inventory report",
       error: error.message,
     });
   }

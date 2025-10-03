@@ -208,3 +208,17 @@ export const getProjectVendor = async (projectId) => {
     throw error;
   }
 };
+
+// Export procurement report as PDF
+export const exportProcurementReportPDF = async (params = {}) => {
+  try {
+    const response = await api.get("/procurement/reports/export/pdf", {
+      params,
+      responseType: "blob",
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error exporting procurement report:", error);
+    throw error;
+  }
+};

@@ -24,16 +24,17 @@ import { formatCurrency, formatDate } from "../../../../utils/formatters";
 const ProcurementTracking = () => {
   const { user } = useAuth();
   const [projects, setProjects] = useState([]);
+  const [standalonePOs, setStandalonePOs] = useState([]);
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
     status: "all",
     department: "all",
   });
-  const [searchTerm, setSearchTerm] = useState("");
   const [selectedPO, setSelectedPO] = useState(null);
   const [showPOModal, setShowPOModal] = useState(false);
   const [loadingPO, setLoadingPO] = useState(false);
+  const [viewMode, setViewMode] = useState("project-tied"); 
 
   // Access control - only Manager+ can access
   if (!user || user.role.level < 600) {
@@ -60,22 +61,31 @@ const ProcurementTracking = () => {
     try {
       const response = await fetchPurchaseOrders();
       if (response.success) {
-        // Group POs by project
+        // Group procurement by project
         const projectMap = new Map();
+        const standalonePOs = [];
+
         response.data.forEach((po) => {
-          if (!projectMap.has(po.relatedProject._id)) {
-            projectMap.set(po.relatedProject._id, {
-              _id: po.relatedProject._id,
-              name: po.relatedProject.name,
-              code: po.relatedProject.code,
-              budget: po.relatedProject.budget,
-              purchaseOrders: [],
-            });
+          if (po.relatedProject && po.relatedProject._id) {
+            // Project-tied procurement
+            if (!projectMap.has(po.relatedProject._id)) {
+              projectMap.set(po.relatedProject._id, {
+                _id: po.relatedProject._id,
+                name: po.relatedProject.name,
+                code: po.relatedProject.code,
+                budget: 0, // Budget not available in procurement data
+                purchaseOrders: [],
+              });
+            }
+            projectMap.get(po.relatedProject._id).purchaseOrders.push(po);
+          } else {
+            // Standalone procurement
+            standalonePOs.push(po);
           }
-          projectMap.get(po.relatedProject._id).purchaseOrders.push(po);
         });
-        
+
         setProjects(Array.from(projectMap.values()));
+        setStandalonePOs(standalonePOs);
         setPurchaseOrders(response.data);
       } else {
         toast.error("Failed to load procurement data");
@@ -144,152 +154,208 @@ const ProcurementTracking = () => {
     );
   };
 
-  const columns = [
-    {
-      header: "Project Details",
-      accessor: "code",
-      cell: (project) => (
-        <div className="flex items-center">
-          <FolderIcon className="h-5 w-5 text-[var(--elra-primary)] mr-2" />
-          <div>
-            <div className="font-medium text-gray-900">{project.name}</div>
-            <div className="text-sm text-gray-500">{project.code}</div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      header: "Budget & Spending",
-      accessor: "budget",
-      cell: (project) => {
-        const totalPOAmount =
-          project.purchaseOrders?.reduce(
-            (sum, po) => sum + (po.totalAmount || 0),
-            0
-          ) || 0;
-        const budgetUtilization = project.budget
-          ? (totalPOAmount / project.budget) * 100
-          : 0;
-        
-        return (
-          <div className="space-y-1">
+  // Unified columns for both project-tied and standalone views
+  const getColumns = () => {
+    if (viewMode === "project-tied") {
+      return [
+        {
+          header: "Project Details",
+          key: "name",
+          renderer: (project) => (
             <div className="flex items-center">
-              <CurrencyDollarIcon className="h-4 w-4 text-gray-500 mr-1" />
-              <span className="text-sm font-medium text-gray-900">
-                Budget: {formatCurrency(project.budget || 0)}
-              </span>
-            </div>
-            <div className="flex items-center">
-              <ShoppingCartIcon className="h-4 w-4 text-gray-500 mr-1" />
-              <span className="text-sm text-gray-600">
-                PO Total: {formatCurrency(totalPOAmount)}
-              </span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-1.5">
-              <div
-                className={`h-1.5 rounded-full ${
-                  budgetUtilization > 90
-                    ? "bg-red-500"
-                    : budgetUtilization > 70
-                    ? "bg-yellow-500"
-                    : "bg-green-500"
-                }`}
-                style={{ width: `${Math.min(budgetUtilization, 100)}%` }}
-              ></div>
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      header: "Purchase Orders",
-      accessor: "purchaseOrders",
-      cell: (project) => {
-        const poCount = project.purchaseOrders?.length || 0;
-        const draftPOs =
-          project.purchaseOrders?.filter((po) => po.status === "draft")
-            .length || 0;
-        const approvedPOs =
-          project.purchaseOrders?.filter((po) => po.status === "approved")
-            .length || 0;
-        
-        return (
-          <div className="space-y-1">
-            <div className="flex items-center">
-              <ShoppingCartIcon className="h-4 w-4 text-gray-400 mr-1" />
-              <span className="text-sm font-medium text-gray-900">
-                {poCount} PO{poCount !== 1 ? "s" : ""}
-              </span>
-            </div>
-            {poCount > 0 && (
-              <div className="text-xs text-gray-500">
-                {draftPOs > 0 && (
-                  <span className="mr-2">Draft: {draftPOs}</span>
-                )}
-                {approvedPOs > 0 && <span>Approved: {approvedPOs}</span>}
+              <FolderIcon className="h-5 w-5 text-[var(--elra-primary)] mr-2" />
+              <div>
+                <div className="font-medium text-gray-900">{project.name}</div>
+                <div className="text-sm text-gray-500">{project.code}</div>
               </div>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      header: "Latest PO",
-      accessor: "latestPO",
-      cell: (project) => {
-        const latestPO = project.purchaseOrders?.sort(
-          (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-        )[0];
-
-        if (!latestPO)
-          return <span className="text-sm text-gray-500">No POs</span>;
-
-        return (
-          <div
-            className="space-y-1 cursor-pointer"
-            onClick={() => handleViewPO(latestPO._id)}
-          >
-            <div className="text-sm font-medium text-gray-900">
-              {latestPO.poNumber}
             </div>
+          ),
+        },
+        {
+          header: "Budget & Spending",
+          key: "budget",
+          renderer: (project) => {
+            const totalPOAmount =
+              project.purchaseOrders?.reduce(
+                (sum, po) => sum + (po.totalAmount || 0),
+                0
+              ) || 0;
+
+            return (
+              <div className="space-y-1">
+                <div className="flex items-center">
+                  <CurrencyDollarIcon className="h-4 w-4 text-gray-500 mr-1" />
+                  <span className="text-sm font-medium text-gray-900">
+                    Budget: {formatCurrency(project.budget || 0)}
+                  </span>
+                </div>
+                <div className="flex items-center">
+                  <ShoppingCartIcon className="h-4 w-4 text-gray-500 mr-1" />
+                  <span className="text-sm text-gray-600">
+                    PO Total: {formatCurrency(totalPOAmount)}
+                  </span>
+                </div>
+              </div>
+            );
+          },
+        },
+        {
+          header: "Purchase Orders",
+          key: "purchaseOrders",
+          renderer: (project) => {
+            const poCount = project.purchaseOrders?.length || 0;
+            const draftPOs =
+              project.purchaseOrders?.filter((po) => po.status === "draft")
+                .length || 0;
+            const approvedPOs =
+              project.purchaseOrders?.filter((po) => po.status === "approved")
+                .length || 0;
+
+            return (
+              <div className="space-y-1">
+                <div className="flex items-center">
+                  <ShoppingCartIcon className="h-4 w-4 text-gray-400 mr-1" />
+                  <span className="text-sm font-medium text-gray-900">
+                    {poCount} PO{poCount !== 1 ? "s" : ""}
+                  </span>
+                </div>
+                {poCount > 0 && (
+                  <div className="text-xs text-gray-500">
+                    {draftPOs > 0 && (
+                      <span className="mr-2">Draft: {draftPOs}</span>
+                    )}
+                    {approvedPOs > 0 && <span>Approved: {approvedPOs}</span>}
+                  </div>
+                )}
+              </div>
+            );
+          },
+        },
+        {
+          header: "Latest PO",
+          key: "latestPO",
+          renderer: (project) => {
+            const latestPO = project.purchaseOrders?.sort(
+              (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+            )[0];
+
+            if (!latestPO)
+              return <span className="text-sm text-gray-500">No POs</span>;
+
+            return (
+              <div
+                className="space-y-1 cursor-pointer"
+                onClick={() => handleViewPO(latestPO._id)}
+              >
+                <div className="text-sm font-medium text-gray-900">
+                  {latestPO.poNumber}
+                </div>
+                <div className="flex items-center space-x-2">
+                  {getStatusBadge(latestPO.status)}
+                  {getPriorityBadge(latestPO.priority)}
+                </div>
+              </div>
+            );
+          },
+        },
+        {
+          header: "Actions",
+          key: "actions",
+          renderer: (project) => (
             <div className="flex items-center space-x-2">
-              {getStatusBadge(latestPO.status)}
-              {getPriorityBadge(latestPO.priority)}
+              <button
+                onClick={() => {
+                  const latestPO = project.purchaseOrders?.[0];
+                  if (latestPO) {
+                    handleViewPO(latestPO._id);
+                  } else {
+                    toast.info("No purchase orders available");
+                  }
+                }}
+                className="p-1 text-blue-600 hover:text-blue-800"
+                title="View Purchase Orders"
+              >
+                <EyeIcon className="h-4 w-4" />
+              </button>
             </div>
-          </div>
-        );
-      },
-    },
-    {
-      header: "Actions",
-      accessor: "actions",
-      cell: (project) => (
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => {
-              const latestPO = project.purchaseOrders?.[0];
-              if (latestPO) {
-                handleViewPO(latestPO._id);
-              } else {
-                toast.info("No purchase orders available");
-              }
-            }}
-            className="p-1 text-blue-600 hover:text-blue-800"
-            title="View Purchase Orders"
-          >
-            <EyeIcon className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => loadData()}
-            className="p-1 text-gray-600 hover:text-gray-800"
-            title="Refresh Data"
-          >
-            <ArrowPathIcon className="h-4 w-4" />
-          </button>
-        </div>
-      ),
-    },
-  ];
+          ),
+        },
+      ];
+    } else {
+      // Standalone view columns
+      return [
+        {
+          header: "PO Details",
+          key: "poNumber",
+          renderer: (po) => (
+            <div className="flex items-center">
+              <DocumentTextIcon className="h-5 w-5 text-[var(--elra-primary)] mr-2" />
+              <div>
+                <div className="font-medium text-gray-900">{po.poNumber}</div>
+                <div className="text-sm text-gray-500">{po.title}</div>
+              </div>
+            </div>
+          ),
+        },
+        {
+          header: "Supplier",
+          key: "supplier",
+          renderer: (po) => (
+            <div>
+              <div className="font-medium text-gray-900">
+                {po.supplier?.name || "N/A"}
+              </div>
+              <div className="text-sm text-gray-500">
+                {po.supplier?.email || ""}
+              </div>
+            </div>
+          ),
+        },
+        {
+          header: "Amount & Status",
+          key: "totalAmount",
+          renderer: (po) => (
+            <div className="space-y-1">
+              <div className="flex items-center">
+                <CurrencyDollarIcon className="h-4 w-4 text-gray-500 mr-1" />
+                <span className="text-sm font-medium text-gray-900">
+                  {formatCurrency(po.totalAmount || 0)}
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                {getStatusBadge(po.status)}
+                {getPriorityBadge(po.priority)}
+              </div>
+            </div>
+          ),
+        },
+        {
+          header: "Delivery",
+          key: "expectedDeliveryDate",
+          renderer: (po) => (
+            <div className="text-sm text-gray-900">
+              {formatDate(po.expectedDeliveryDate)}
+            </div>
+          ),
+        },
+        {
+          header: "Actions",
+          key: "actions",
+          renderer: (po) => (
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => handleViewPO(po._id)}
+                className="p-1 text-blue-600 hover:text-blue-800"
+                title="View Details"
+              >
+                <EyeIcon className="h-4 w-4" />
+              </button>
+            </div>
+          ),
+        },
+      ];
+    }
+  };
 
   if (loading) {
     return (
@@ -439,6 +505,30 @@ const ProcurementTracking = () => {
       >
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
           <div className="flex items-center space-x-4">
+            {/* View Mode Toggle */}
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode("project-tied")}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  viewMode === "project-tied"
+                    ? "bg-white text-[var(--elra-primary)] shadow-sm"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Project-tied
+              </button>
+              <button
+                onClick={() => setViewMode("standalone")}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  viewMode === "standalone"
+                    ? "bg-white text-[var(--elra-primary)] shadow-sm"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Standalone
+              </button>
+            </div>
+
             <select
               value={filters.status}
               onChange={(e) =>
@@ -463,18 +553,22 @@ const ProcurementTracking = () => {
           </div>
         </div>
 
+        {/* Single DataTable */}
         <DataTable
-          columns={columns}
-          data={filteredProjects}
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          searchPlaceholder="Search by project name, code, or PO number..."
+          columns={getColumns()}
+          data={viewMode === "project-tied" ? filteredProjects : standalonePOs}
+          loading={loading}
+          actions={{
+            showEdit: false,
+            showDelete: false,
+            showToggle: false,
+          }}
         />
       </motion.div>
 
       {/* PO Detail Modal */}
       {showPOModal && selectedPO && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-start mb-6">

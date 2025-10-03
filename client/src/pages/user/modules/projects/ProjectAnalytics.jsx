@@ -3,22 +3,17 @@ import { motion } from "framer-motion";
 import {
   ChartBarIcon,
   FolderIcon,
-  UserGroupIcon,
   CurrencyDollarIcon,
   ClockIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
   XCircleIcon,
   BuildingOfficeIcon,
-  EyeIcon,
-  ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
   WrenchScrewdriverIcon,
   DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../../../context/AuthContext";
 import {
-  fetchProjectAnalytics,
   getProjectDashboard,
   getProjectBudget,
 } from "../../../../services/projectAPI.js";
@@ -169,6 +164,28 @@ const ProjectDashboard = () => {
               </p>
             </div>
             <div className="p-4 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
+              <CheckCircleIcon className="h-8 w-8 text-white" />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Completed Projects */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl shadow-lg border border-purple-200 p-6 hover:shadow-xl transition-all duration-300"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-purple-700 uppercase tracking-wide">
+                Completed Projects
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-purple-900 mt-2 break-all leading-tight">
+                {analytics?.byStatus?.completed || 0}
+              </p>
+            </div>
+            <div className="p-4 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
               <CheckCircleIcon className="h-8 w-8 text-white" />
             </div>
           </div>
@@ -675,16 +692,6 @@ const ProjectDashboard = () => {
                   >
                     {project.status.replace(/_/g, " ")}
                   </span>
-                  <button
-                    onClick={() => {
-                      // Navigate to project details
-                      window.location.href = `/dashboard/modules/projects/${project.id}`;
-                    }}
-                    className="inline-flex items-center justify-center w-8 h-8 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                    title="View Project Details"
-                  >
-                    <EyeIcon className="h-4 w-4" />
-                  </button>
                 </div>
               </div>
             ))

@@ -368,17 +368,19 @@ const InternalMessages = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="h-screen bg-gray-50 flex"
+      className="h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex"
     >
       {/* Left Sidebar - 30% - Fixed */}
-      <div className="w-1/3 bg-white border-r border-gray-200 flex flex-col h-screen overflow-hidden">
+      <div className="w-1/3 bg-white/80 backdrop-blur-sm border-r border-gray-200/50 shadow-xl flex flex-col h-screen overflow-hidden">
         {/* Header */}
-        <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-pink-50 to-white">
+        <div className="p-6 border-b border-gray-200/50 bg-gradient-to-r from-pink-50 via-purple-50 to-white shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Messages</h2>
+            <h2 className="text-xl font-bold bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
+              Messages
+            </h2>
             <button
               onClick={getAvailableUsers}
-              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gradient-to-r hover:from-pink-100 hover:to-purple-100 rounded-xl transition-all duration-300 hover:scale-105 shadow-sm"
               title="Refresh conversations"
             >
               <PlusIcon className="h-5 w-5" />
@@ -399,7 +401,7 @@ const InternalMessages = () => {
               }
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-10 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              className="w-full pl-10 pr-10 py-3 border border-gray-200/50 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-white/70 backdrop-blur-sm shadow-sm transition-all duration-300 hover:shadow-md focus:shadow-lg"
             />
             {searchTerm && (
               <button
@@ -444,7 +446,8 @@ const InternalMessages = () => {
                     key={user._id}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-gray-50"
+                    whileHover={{ scale: 1.02, x: 4 }}
+                    className="p-4 rounded-xl cursor-pointer transition-all duration-300 hover:bg-gradient-to-r hover:from-pink-50 hover:to-purple-50 hover:shadow-md border border-transparent hover:border-pink-200/50"
                     onClick={async () => {
                       try {
                         await handleStartNewConversation(user);
@@ -520,10 +523,11 @@ const InternalMessages = () => {
                   key={conversation._id._id}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className={`p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+                  whileHover={{ scale: 1.02, x: 4 }}
+                  className={`p-4 rounded-xl cursor-pointer transition-all duration-300 ${
                     selectedConversation?._id._id === conversation._id._id
-                      ? "bg-pink-50 border border-pink-200"
-                      : "hover:bg-gray-50"
+                      ? "bg-gradient-to-r from-pink-100 to-purple-100 border border-pink-300 shadow-lg"
+                      : "hover:bg-gradient-to-r hover:from-pink-50 hover:to-purple-50 hover:shadow-md border border-transparent hover:border-pink-200/50"
                   }`}
                   onClick={async () => {
                     setSelectedConversation(conversation);
@@ -570,9 +574,13 @@ const InternalMessages = () => {
                           {getDisplayName(conversation._id)}
                         </p>
                         {unreadCounts[conversation._id._id] > 0 && (
-                          <span className="bg-pink-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
+                          <motion.span
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="bg-gradient-to-r from-pink-500 to-purple-600 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center shadow-lg animate-pulse"
+                          >
                             {unreadCounts[conversation._id._id]}
-                          </span>
+                          </motion.span>
                         )}
                       </div>
                       <div className="flex items-center gap-2">
@@ -609,7 +617,7 @@ const InternalMessages = () => {
         {selectedConversation ? (
           <>
             {/* Chat Header */}
-            <div className="p-4 border-b border-gray-200 bg-white">
+            <div className="p-6 border-b border-gray-200/50 bg-gradient-to-r from-white via-pink-50/30 to-white shadow-sm backdrop-blur-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="relative w-10 h-10">
@@ -652,7 +660,7 @@ const InternalMessages = () => {
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={handleShowProfile}
-                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gradient-to-r hover:from-pink-100 hover:to-purple-100 rounded-xl transition-all duration-300 hover:scale-105 cursor-pointer shadow-sm"
                     title="View Profile"
                   >
                     <EllipsisVerticalIcon className="h-5 w-5" />
@@ -690,23 +698,23 @@ const InternalMessages = () => {
                   </div>
                 ) : (
                   <div className="flex-1 flex flex-col">
-                    <div className="p-4 border-b border-gray-200 bg-gray-50 flex-shrink-0">
+                    <div className="p-6 border-b border-gray-200/50 bg-gradient-to-r from-pink-50/50 via-purple-50/30 to-white flex-shrink-0 shadow-sm">
                       <button
                         onClick={handleBackToMessages}
-                        className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
+                        className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-all duration-300 hover:scale-105"
                       >
                         <XMarkIcon className="h-4 w-4" />
                         <span>Back to Messages</span>
                       </button>
                     </div>
-                    <div className="flex-1 overflow-hidden">
+                    <div className="flex-1 overflow-hidden bg-gradient-to-br from-gray-50/30 to-white">
                       <Profile user={profileUser} isViewingOtherUser={true} />
                     </div>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-gray-50/50 to-white">
                 {isLoadingMessages ? (
                   <div className="space-y-4">
                     {/* Message Loading Skeletons */}
@@ -771,15 +779,15 @@ const InternalMessages = () => {
                               {getAvatarDisplay(message.sender)}
                             </div>
                             <div
-                              className={`px-4 py-2 rounded-lg ${
+                              className={`px-6 py-3 rounded-2xl shadow-sm ${
                                 isOwnMessage
-                                  ? "bg-[var(--elra-primary)] text-white"
-                                  : "bg-gray-200 text-gray-900"
+                                  ? "bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg"
+                                  : "bg-white text-gray-900 border border-gray-200/50 shadow-md"
                               }`}
                             >
                               <p className="text-sm">{message.content}</p>
                               {message.document && (
-                                <div className="mt-2 p-2 bg-white bg-opacity-20 rounded-lg">
+                                <div className="mt-3 p-3 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30">
                                   <div className="flex items-center space-x-2">
                                     <PaperClipIcon className="h-4 w-4" />
                                     <span className="text-sm font-medium">
@@ -793,7 +801,7 @@ const InternalMessages = () => {
                                           "_blank"
                                         )
                                       }
-                                      className="text-xs bg-white bg-opacity-30 px-2 py-1 rounded hover:bg-opacity-50"
+                                      className="text-xs bg-white/30 backdrop-blur-sm px-3 py-1.5 rounded-lg hover:bg-white/50 transition-all duration-200 hover:scale-105 shadow-sm"
                                     >
                                       View
                                     </button>
@@ -852,10 +860,10 @@ const InternalMessages = () => {
 
             {/* Message Input */}
             {!showProfileView && (
-              <div className="p-4 border-t border-gray-200 bg-white">
+              <div className="p-6 border-t border-gray-200/50 bg-gradient-to-r from-white via-pink-50/30 to-white backdrop-blur-sm shadow-lg">
                 {/* Selected File Preview */}
                 {selectedFile && (
-                  <div className="mb-3 p-3 bg-gray-50 rounded-lg flex items-center justify-between">
+                  <div className="mb-4 p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl border border-pink-200/50 flex items-center justify-between shadow-sm">
                     <div className="flex items-center space-x-2">
                       <PaperClipIcon className="h-5 w-5 text-gray-500" />
                       <span className="text-sm text-gray-700">
@@ -876,7 +884,7 @@ const InternalMessages = () => {
 
                 <div className="flex space-x-2">
                   {/* File Upload Button */}
-                  <label className="flex items-center justify-center px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                  <label className="flex items-center justify-center px-4 py-3 border border-gray-200/50 rounded-xl hover:bg-gradient-to-r hover:from-pink-50 hover:to-purple-50 cursor-pointer transition-all duration-300 hover:scale-105 shadow-sm">
                     <PaperClipIcon className="h-5 w-5 text-gray-500" />
                     <input
                       type="file"
@@ -892,19 +900,19 @@ const InternalMessages = () => {
                       onChange={handleTyping}
                       onKeyPress={handleKeyPress}
                       placeholder="Type a message..."
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
+                      className="w-full px-4 py-3 border border-gray-200/50 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none bg-white/70 backdrop-blur-sm shadow-sm transition-all duration-300 hover:shadow-md focus:shadow-lg"
                       rows="1"
                     />
                     {isTyping && (
-                      <div className="absolute right-2 top-2">
+                      <div className="absolute right-3 top-3">
                         <div className="flex space-x-1">
-                          <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full animate-bounce"></div>
                           <div
-                            className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"
+                            className="w-2 h-2 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full animate-bounce"
                             style={{ animationDelay: "0.1s" }}
                           ></div>
                           <div
-                            className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"
+                            className="w-2 h-2 bg-gradient-to-r from-pink-400 to-purple-500 rounded-full animate-bounce"
                             style={{ animationDelay: "0.2s" }}
                           ></div>
                         </div>
@@ -916,7 +924,7 @@ const InternalMessages = () => {
                     disabled={
                       (!messageText.trim() && !selectedFile) || isUploadingFile
                     }
-                    className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl hover:from-pink-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
                   >
                     {isUploadingFile ? (
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
@@ -930,18 +938,22 @@ const InternalMessages = () => {
           </>
         ) : (
           /* No Conversation Selected */
-          <div className="flex-1 flex items-center justify-center bg-gray-50">
+          <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-50 via-pink-50/30 to-purple-50/30">
             <div className="text-center">
-              <ChatBubbleLeftRightIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <div className="relative mb-6">
+                <div className="absolute inset-0 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full blur-xl opacity-20"></div>
+                <ChatBubbleLeftRightIcon className="relative h-16 w-16 text-gray-400 mx-auto" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-3 bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent">
                 Select a conversation
               </h3>
-              <p className="text-gray-500 mb-6">
-                Choose a conversation from the sidebar to start messaging
+              <p className="text-gray-600 mb-8 text-center max-w-md">
+                Choose a conversation from the sidebar to start messaging or
+                search for new users to connect with
               </p>
               <button
                 onClick={getAvailableUsers}
-                className="inline-flex items-center px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors"
+                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl hover:from-pink-600 hover:to-purple-700 transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
               >
                 <UserPlusIcon className="h-5 w-5 mr-2" />
                 Start New Conversation
@@ -964,10 +976,10 @@ const InternalMessages = () => {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
+              className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl w-full max-w-md border border-gray-200/50"
             >
               <div className="p-6">
-                <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
+                <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-gradient-to-r from-red-100 to-pink-100 rounded-full shadow-lg">
                   <TrashIcon className="h-6 w-6 text-red-600" />
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
@@ -981,14 +993,14 @@ const InternalMessages = () => {
                   <button
                     onClick={cancelDeleteMessage}
                     disabled={isDeleting}
-                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all duration-300 hover:scale-105 shadow-sm disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={confirmDeleteMessage}
                     disabled={isDeleting}
-                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-lg hover:from-red-600 hover:to-pink-700 transition-all duration-300 hover:scale-105 shadow-lg disabled:opacity-50 flex items-center justify-center"
                   >
                     {isDeleting ? (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

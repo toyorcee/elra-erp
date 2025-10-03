@@ -131,6 +131,7 @@ class AuditService {
       // Map resource types to their corresponding models
       const resourceModelMap = {
         ELRAWALLET: "ELRAWallet",
+        PROCUREMENT: "Procurement",
         DOCUMENT: "Document",
         USER: "User",
         DEPARTMENT: "Department",

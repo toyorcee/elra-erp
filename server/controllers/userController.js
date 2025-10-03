@@ -1032,35 +1032,20 @@ export const getDepartmentUsers = async (req, res) => {
         });
       }
 
-      if (currentUser.department.name === "Project Management") {
-        // PM HOD can see all users across all departments
-        query = {
-          $or: [
-            { isActive: true },
-            { status: "PENDING_REGISTRATION" },
-            { status: "INVITED" },
-            { status: "ACTIVE" },
-          ],
-        };
-        console.log(
-          "👥 [DEPARTMENT USERS] PM HOD - showing all users across all departments"
-        );
-      } else {
-        // Other HODs can only see users in their department
-        query = {
-          department: currentUser.department._id,
-          $or: [
-            { isActive: true },
-            { status: "PENDING_REGISTRATION" },
-            { status: "INVITED" },
-            { status: "ACTIVE" },
-          ],
-        };
-        console.log(
-          "👥 [DEPARTMENT USERS] HOD - showing users from department:",
-          currentUser.department.name
-        );
-      }
+      // ALL HODs (including PM HOD) can only see users in their department
+      query = {
+        department: currentUser.department._id,
+        $or: [
+          { isActive: true },
+          { status: "PENDING_REGISTRATION" },
+          { status: "INVITED" },
+          { status: "ACTIVE" },
+        ],
+      };
+      console.log(
+        "👥 [DEPARTMENT USERS] HOD - showing users from department:",
+        currentUser.department.name
+      );
     }
 
     // Fetch users with populated fields

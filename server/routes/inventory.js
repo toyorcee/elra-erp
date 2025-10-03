@@ -21,6 +21,8 @@ import {
   completeProjectInventory,
   getEquipmentCategories,
   resendInventoryNotifications,
+  // Reports
+  exportInventoryReport,
 } from "../controllers/inventoryController.js";
 import { protect, checkRole } from "../middleware/auth.js";
 
@@ -189,6 +191,9 @@ router.post(
   checkRole(700),
   resendInventoryNotifications
 );
+
+// Export inventory reports - Manager+
+router.get("/reports/export", checkRole(600), exportInventoryReport);
 
 // Note: Document uploads are now handled via the centralized /api/documents/upload endpoint
 

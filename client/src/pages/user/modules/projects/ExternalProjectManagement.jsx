@@ -1731,8 +1731,8 @@ const ExternalProjectManagement = () => {
                             {projectTaskCounts[row._id].started}
                           </span>
                         )}
-                      </button>
-                    )}
+                    </button>
+                  )}
                   {/* Documents Icon - Always show for document management */}
                   <button
                     onClick={() => {

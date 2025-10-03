@@ -158,13 +158,10 @@ const InventoryTracking = () => {
       header: "Item Details",
       accessor: "name",
       renderer: (item) => (
-        <div className="flex items-center">
-          <div className="text-2xl mr-3">{getTypeIcon(item.type)}</div>
-          <div>
-            <div className="font-medium text-gray-900">{item.name}</div>
-            <div className="text-sm text-gray-500">{item.code}</div>
-            <div className="text-xs text-gray-400">{item.type}</div>
-          </div>
+        <div>
+          <div className="font-medium text-gray-900">{item.name}</div>
+          <div className="text-sm text-gray-500">{item.code}</div>
+          <div className="text-xs text-gray-400">{item.type}</div>
         </div>
       ),
     },
@@ -222,10 +219,9 @@ const InventoryTracking = () => {
       renderer: (item) => (
         <div>
           <div className="text-sm font-medium text-gray-900">
-            {item.location?.warehouse || "N/A"}
-          </div>
-          <div className="text-xs text-gray-500">
-            {item.location?.shelf || "No shelf"}
+            {typeof item.location === "string"
+              ? item.location
+              : item.location?.warehouse || "N/A"}
           </div>
         </div>
       ),
@@ -237,13 +233,10 @@ const InventoryTracking = () => {
       header: "Item Details",
       accessor: "name",
       renderer: (item) => (
-        <div className="flex items-center">
-          <div className="text-2xl mr-3">{getTypeIcon(item.type)}</div>
-          <div>
-            <div className="font-medium text-gray-900">{item.name}</div>
-            <div className="text-sm text-gray-500">{item.code}</div>
-            <div className="text-xs text-gray-400">{item.type}</div>
-          </div>
+        <div>
+          <div className="font-medium text-gray-900">{item.name}</div>
+          <div className="text-sm text-gray-500">{item.code}</div>
+          <div className="text-xs text-gray-400">{item.type}</div>
         </div>
       ),
     },
@@ -277,10 +270,9 @@ const InventoryTracking = () => {
       renderer: (item) => (
         <div>
           <div className="text-sm font-medium text-gray-900">
-            {item.location?.warehouse || "N/A"}
-          </div>
-          <div className="text-xs text-gray-500">
-            {item.location?.shelf || "No shelf"}
+            {typeof item.location === "string"
+              ? item.location
+              : item.location?.warehouse || "N/A"}
           </div>
         </div>
       ),

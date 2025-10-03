@@ -41,7 +41,7 @@ const MyProjectTasks = () => {
     try {
       setLoading(true);
       const data = await getMyProjectTasks();
-      setTasks(data.data.tasks || []);
+        setTasks(data.data.tasks || []);
     } catch (error) {
       console.error("Error fetching project tasks:", error);
       toast.error("Error loading project tasks");
@@ -53,7 +53,7 @@ const MyProjectTasks = () => {
   const fetchMyProjectsData = async () => {
     try {
       const data = await fetchMyProjects();
-      setProjects(data.data.projects || []);
+        setProjects(data.data.projects || []);
     } catch (error) {
       console.error("Error fetching projects:", error);
     }
@@ -62,7 +62,7 @@ const MyProjectTasks = () => {
   const updateTaskStatusHandler = async (taskId, newStatus) => {
     try {
       await updateTaskStatus(taskId, newStatus);
-      toast.success("Task status updated successfully");
+        toast.success("Task status updated successfully");
       fetchMyProjectTasks();
     } catch (error) {
       console.error("Error updating task status:", error);
@@ -168,14 +168,14 @@ const MyProjectTasks = () => {
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
                   <ChartBarIcon className="h-6 w-6 text-white" />
                 </div>
-                <div>
+        <div>
                   <h1 className="text-3xl font-bold text-gray-900">
-                    My Project Tasks
+            My Project Tasks
                   </h1>
                   <p className="text-gray-600 mt-1">
                     Manage and track tasks from projects you're assigned to
-                  </p>
-                </div>
+          </p>
+        </div>
               </div>
               <div className="mt-4 lg:mt-0">
                 <button
@@ -186,8 +186,8 @@ const MyProjectTasks = () => {
                   Refresh
                 </button>
               </div>
-            </div>
-          </div>
+        </div>
+      </div>
         </motion.div>
 
         {/* Stats Cards */}
@@ -198,60 +198,60 @@ const MyProjectTasks = () => {
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
         >
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center">
+          <div className="flex items-center">
               <div className="p-3 bg-blue-100 rounded-lg">
                 <ChartBarIcon className="h-6 w-6 text-blue-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Tasks</p>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Tasks</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {tasks.length}
-                </p>
-              </div>
+                {tasks.length}
+              </p>
             </div>
           </div>
+        </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center">
+          <div className="flex items-center">
               <div className="p-3 bg-yellow-100 rounded-lg">
-                <ClockIcon className="h-6 w-6 text-yellow-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Pending</p>
+              <ClockIcon className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Pending</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {tasks.filter((t) => t.status === "pending").length}
-                </p>
-              </div>
+                {tasks.filter((t) => t.status === "pending").length}
+              </p>
             </div>
           </div>
+        </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center">
+          <div className="flex items-center">
               <div className="p-3 bg-green-100 rounded-lg">
-                <CheckCircleIcon className="h-6 w-6 text-green-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Completed</p>
+              <CheckCircleIcon className="h-6 w-6 text-green-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Completed</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {tasks.filter((t) => t.status === "completed").length}
-                </p>
-              </div>
+                {tasks.filter((t) => t.status === "completed").length}
+              </p>
             </div>
           </div>
+        </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center">
+          <div className="flex items-center">
               <div className="p-3 bg-red-100 rounded-lg">
-                <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Overdue</p>
+              <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Overdue</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {tasks.filter((t) => t.status === "overdue").length}
-                </p>
-              </div>
+                {tasks.filter((t) => t.status === "overdue").length}
+              </p>
             </div>
           </div>
+        </div>
         </motion.div>
 
         {/* Filters and Search */}
@@ -310,7 +310,7 @@ const MyProjectTasks = () => {
                   </option>
                 ))}
               </select>
-            </div>
+      </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -341,14 +341,14 @@ const MyProjectTasks = () => {
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">
-                Project Tasks ({filteredTasks.length})
-              </h3>
+            Project Tasks ({filteredTasks.length})
+          </h3>
               <div className="flex items-center space-x-2 text-sm text-gray-500">
                 <FunnelIcon className="h-4 w-4" />
                 <span>Filtered results</span>
               </div>
+        </div>
             </div>
-          </div>
 
           <div className="overflow-x-auto">
             <DataTable
@@ -400,8 +400,8 @@ const MyProjectTasks = () => {
                       <UserIcon className="h-4 w-4 text-gray-400 mr-2" />
                       <span className="text-sm text-gray-900">
                         {task.assignedTo?.firstName} {task.assignedTo?.lastName}
-                      </span>
-                    </div>
+                        </span>
+                      </div>
                   ),
                 },
                 {
@@ -412,22 +412,22 @@ const MyProjectTasks = () => {
                       <CalendarIcon className="h-4 w-4 text-gray-400 mr-2" />
                       <span className="text-sm text-gray-900">
                         {formatDate(task.dueDate)}
-                      </span>
-                    </div>
+                        </span>
+                      </div>
                   ),
                 },
                 {
                   header: "Status",
                   accessor: "status",
                   renderer: (task) => (
-                    <div className="flex items-center space-x-2">
-                      <span
+                      <div className="flex items-center space-x-2">
+                        <span
                         className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                          task.status
-                        )}`}
-                      >
-                        {task.status.replace("_", " ")}
-                      </span>
+                            task.status
+                          )}`}
+                        >
+                          {task.status.replace("_", " ")}
+                        </span>
                     </div>
                   ),
                 },
@@ -435,13 +435,13 @@ const MyProjectTasks = () => {
                   header: "Priority",
                   accessor: "priority",
                   renderer: (task) => (
-                    <span
+                        <span
                       className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getPriorityColor(
-                        task.priority
-                      )}`}
-                    >
-                      {task.priority}
-                    </span>
+                            task.priority
+                          )}`}
+                        >
+                          {task.priority}
+                        </span>
                   ),
                 },
                 {
@@ -449,46 +449,46 @@ const MyProjectTasks = () => {
                   accessor: "actions",
                   renderer: (task) => (
                     <div className="flex space-x-2">
-                      {task.status === "pending" && (
-                        <>
-                          <button
-                            onClick={() =>
-                              updateTaskStatusHandler(task._id, "in_progress")
-                            }
-                            className="inline-flex items-center px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-                          >
-                            <ClockIcon className="h-3 w-3 mr-1" />
-                            Start
-                          </button>
-                          <button
-                            onClick={() =>
-                              updateTaskStatusHandler(task._id, "completed")
-                            }
-                            className="inline-flex items-center px-3 py-1 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
-                          >
-                            <CheckCircleIcon className="h-3 w-3 mr-1" />
-                            Complete
-                          </button>
-                        </>
-                      )}
-                      {task.status === "in_progress" && (
+                    {task.status === "pending" && (
+                      <>
                         <button
+                          onClick={() =>
+                              updateTaskStatusHandler(task._id, "in_progress")
+                          }
+                            className="inline-flex items-center px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                        >
+                            <ClockIcon className="h-3 w-3 mr-1" />
+                          Start
+                        </button>
+                        <button
+                          onClick={() =>
+                              updateTaskStatusHandler(task._id, "completed")
+                          }
+                            className="inline-flex items-center px-3 py-1 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
+                        >
+                            <CheckCircleIcon className="h-3 w-3 mr-1" />
+                          Complete
+                        </button>
+                      </>
+                    )}
+                    {task.status === "in_progress" && (
+                      <button
                           onClick={() =>
                             updateTaskStatusHandler(task._id, "completed")
                           }
                           className="inline-flex items-center px-3 py-1 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
                         >
                           <CheckCircleIcon className="h-3 w-3 mr-1" />
-                          Complete
-                        </button>
-                      )}
+                        Complete
+                      </button>
+                    )}
                       {task.status === "completed" && (
                         <div className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-lg">
                           <HiCheckCircle className="h-3 w-3 mr-1" />
                           Completed
-                        </div>
-                      )}
-                    </div>
+              </div>
+          )}
+        </div>
                   ),
                 },
               ]}

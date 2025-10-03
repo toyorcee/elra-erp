@@ -660,7 +660,6 @@ export const removeTeamMember = async (req, res) => {
     teamMember.status = "removed";
     await teamMember.save();
 
-    // Send notification to the removed team member
     try {
       const NotificationService = (
         await import("../services/notificationService.js")
@@ -670,8 +669,8 @@ export const removeTeamMember = async (req, res) => {
       await notificationService.createNotification({
         recipient: teamMember.user._id,
         type: "TEAM_MEMBER_REMOVED",
-        title: "Project Assignment Removed",
-        message: `You have been removed from project "${teamMember.project.name}".`,
+        title: "Project Assignment Update",
+        message: `Your assignment to project "${teamMember.project.name}" (${teamMember.project.code}) has been updated. This change allows you to focus on other important tasks and projects. Thank you for your valuable contribution to this project!`,
         priority: "medium",
         data: {
           projectId: teamMember.project._id,

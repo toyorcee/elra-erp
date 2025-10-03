@@ -21,7 +21,6 @@ export const getRecentActivity = asyncHandler(async (req, res) => {
     department,
   } = req.query;
 
-  // Always filter by current user unless explicitly requesting all users (admin only)
   const currentUserId = req.user.id;
   const isAdmin =
     req.user.role?.name === "PLATFORM_ADMIN" ||

@@ -223,6 +223,20 @@ const inventoryService = {
       throw error;
     }
   },
+
+  // Export inventory reports
+  exportInventoryReport: async (params = {}) => {
+    try {
+      const response = await api.get("/inventory/reports/export", {
+        params,
+        responseType: "blob",
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error exporting inventory report:", error);
+      throw error;
+    }
+  },
 };
 
 export default inventoryService;

@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Invitation from "../models/Invitation.js";
 import User from "../models/User.js";
 import Role from "../models/Role.js";
@@ -918,40 +919,54 @@ export const createSingleInvitation = asyncHandler(async (req, res) => {
   const firstName = "";
   const lastName = "";
 
-  try {
-    // Create invitation
-    const invitation = await Invitation.create({
-      email: email,
-      firstName: firstName,
-      lastName: lastName,
-      department: departmentId,
-      role: roleId,
-      createdBy: currentUser._id,
-    });
+  const session = await mongoose.startSession();
 
-    // Send email
+  try {
+    await session.startTransaction();
+
+    // Create invitation within transaction
+    const invitation = await Invitation.create(
+      [
+        {
+          email: email,
+          firstName: firstName,
+          lastName: lastName,
+          department: departmentId,
+          role: roleId,
+          createdBy: currentUser._id,
+        },
+      ],
+      { session }
+    );
+
+    const createdInvitation = invitation[0];
+
+    // Send email BEFORE committing transaction
     console.log(`📧 [SINGLE_INVITATION] Sending email to ${email}...`);
     const userName =
-      invitation.firstName && invitation.lastName
-        ? `${invitation.firstName} ${invitation.lastName}`
+      createdInvitation.firstName && createdInvitation.lastName
+        ? `${createdInvitation.firstName} ${createdInvitation.lastName}`
         : "New User";
     const emailResult = await sendInvitationEmail(
-      invitation.email,
+      createdInvitation.email,
       userName,
-      invitation.code,
+      createdInvitation.code,
       role.name,
       department.name
     );
 
     if (emailResult.success) {
-      await invitation.markEmailSent();
+      // Mark email as sent and commit transaction
+      await createdInvitation.markEmailSent();
+      await session.commitTransaction();
+
       console.log(`✅ [SINGLE_INVITATION] Email sent successfully to ${email}`);
 
-      // Log audit
+      // Log audit (outside transaction)
       await AuditService.logUserAction(
         currentUser._id,
         "SINGLE_INVITATION_CREATED",
-        invitation._id,
+        createdInvitation._id,
         {
           email: email,
           department: department.name,
@@ -961,7 +976,7 @@ export const createSingleInvitation = asyncHandler(async (req, res) => {
         }
       );
 
-      // Send in-app notification to the creator
+      // Send in-app notification to the creator (outside transaction)
       try {
         const notificationService = new NotificationService();
         await notificationService.createNotification({
@@ -971,7 +986,7 @@ export const createSingleInvitation = asyncHandler(async (req, res) => {
           message: `Invitation sent to ${email} for ${role.name} role in ${department.name}`,
           priority: "medium",
           data: {
-            invitationId: invitation._id,
+            invitationId: createdInvitation._id,
             recipientEmail: email,
             role: role.name,
             department: department.name,
@@ -992,13 +1007,13 @@ export const createSingleInvitation = asyncHandler(async (req, res) => {
         message: "Invitation created and sent successfully",
         data: {
           invitation: {
-            id: invitation._id,
-            email: invitation.email,
-            firstName: invitation.firstName,
-            lastName: invitation.lastName,
-            code: invitation.code,
-            status: invitation.status,
-            emailSent: invitation.emailSent,
+            id: createdInvitation._id,
+            email: createdInvitation.email,
+            firstName: createdInvitation.firstName,
+            lastName: createdInvitation.lastName,
+            code: createdInvitation.code,
+            status: createdInvitation.status,
+            emailSent: createdInvitation.emailSent,
           },
           statistics: {
             totalInvitations: 1,
@@ -1009,7 +1024,9 @@ export const createSingleInvitation = asyncHandler(async (req, res) => {
         },
       });
     } else {
-      await invitation.markEmailFailed(emailResult.error);
+      // Email failed - abort transaction to remove invitation record
+      await session.abortTransaction();
+
       console.log(
         `❌ [SINGLE_INVITATION] Email failed for ${email}:`,
         emailResult.error
@@ -1021,26 +1038,20 @@ export const createSingleInvitation = asyncHandler(async (req, res) => {
       });
     }
   } catch (error) {
+    await session.abortTransaction();
     console.error(`❌ [SINGLE_INVITATION] Error:`, error);
     return res.status(500).json({
       success: false,
       message: "Failed to create invitation",
       error: error.message,
     });
+  } finally {
+    await session.endSession();
   }
 });
 
 export const createBulkInvitations = asyncHandler(async (req, res) => {
-  console.log("🚀 [BULK_INVITATION] Starting bulk invitation creation...");
-  console.log("📋 [BULK_INVITATION] Request body:", req.body);
-
   const currentUser = req.user;
-  console.log("👤 [BULK_INVITATION] Current user:", {
-    id: currentUser._id,
-    email: currentUser.email,
-    roleLevel: currentUser.role?.level,
-    roleName: currentUser.role?.name,
-  });
 
   const { emails, departmentId, roleId, batchName } = req.body;
 

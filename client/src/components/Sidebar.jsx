@@ -135,7 +135,6 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
   }, [user]);
 
   const getAccessibleModules = () => {
-    // Always include the main Dashboard link
     const mainNavigation = [
       {
         label: "Dashboard",
@@ -217,7 +216,16 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
 
   const accessibleModules = getAccessibleModules();
 
-  const navigation = [...accessibleModules];
+  const navigation = React.useMemo(() => {
+    const list = [...accessibleModules];
+    const customerCarePath = "/dashboard/modules/customer-care";
+    const idx = list.findIndex((i) => i.path === customerCarePath);
+    if (idx !== -1) {
+      const [cc] = list.splice(idx, 1);
+      list.push(cc);
+    }
+    return list;
+  }, [accessibleModules]);
 
   const userRoleLevel = user?.role?.level || user?.roleLevel || 300;
   const roleInfo = getRoleInfo(userRoleLevel);
@@ -539,14 +547,13 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     );
   };
 
-  // Special renderer for ERP modules when sidebar is collapsed
   const renderCollapsedERPModules = () => {
     if (shouldShowExpanded || sections.erp.length === 0) return null;
 
     return (
       <div className="mb-8 mt-8">
-        <div className="grid grid-cols-2 gap-2 px-2">
-          {sections.erp.slice(0, 8).map((item) => {
+        <div className="flex flex-col items-center gap-4 px-2">
+          {sections.erp.map((item) => {
             const IconComponent = getIconComponent(item.icon);
             const isItemActive = isActive(item.path);
 
@@ -554,30 +561,26 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center justify-center p-3 rounded-xl transition-all duration-300 cursor-pointer ${
+                className={`relative flex items-center justify-center h-11 w-11 rounded-full transition-all duration-300 cursor-pointer focus:outline-none ${
                   isItemActive
-                    ? "bg-[var(--elra-primary)] text-white shadow-lg shadow-emerald-500/20"
-                    : "text-gray-800 hover:bg-emerald-50 hover:text-emerald-700"
+                    ? "bg-[var(--elra-primary)] text-white ring-2 ring-emerald-300 shadow-lg shadow-emerald-500/20"
+                    : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                 }`}
                 title={item.label}
               >
-                <IconComponent className="h-5 w-5" />
+                <IconComponent
+                  className={`h-5 w-5 ${
+                    isItemActive ? "text-white" : "text-emerald-700"
+                  }`}
+                />
               </Link>
             );
           })}
         </div>
-        {sections.erp.length > 8 && (
-          <div className="mt-2 text-center">
-            <button className="text-gray-500 text-xs hover:text-[var(--elra-primary)]">
-              +{sections.erp.length - 8} more
-            </button>
-          </div>
-        )}
       </div>
     );
   };
 
-  // Group navigation items by section
   const sections = {
     main: navigation.filter((item) => item.section === "main"),
     erp: navigation.filter((item) => item.section === "erp"),

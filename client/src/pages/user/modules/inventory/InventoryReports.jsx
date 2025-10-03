@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  ChartBarIcon,
-  CubeIcon,
+  DocumentTextIcon,
+  CalendarIcon,
   CurrencyDollarIcon,
-  ExclamationTriangleIcon,
+  ArrowDownTrayIcon,
+  CubeIcon,
   CheckCircleIcon,
-  ClockIcon,
-  ArrowPathIcon,
-  DocumentArrowDownIcon,
 } from "@heroicons/react/24/outline";
+import { BarChart, PieChart, LineChart } from "../../../../components/graphs";
+import DataTable from "../../../../components/common/DataTable";
 import { useAuth } from "../../../../context/AuthContext";
 import inventoryService from "../../../../services/inventoryService";
 import { toast } from "react-toastify";
@@ -17,370 +17,797 @@ import { formatCurrency, formatDate } from "../../../../utils/formatters";
 
 const InventoryReports = () => {
   const { user } = useAuth();
-  const [stats, setStats] = useState({});
+  const [inventoryData, setInventoryData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [reportType, setReportType] = useState("overview");
-  const [dateRange, setDateRange] = useState({
-    start: new Date(new Date().getFullYear(), 0, 1).toISOString().split("T")[0],
-    end: new Date().toISOString().split("T")[0],
-  });
-
-  const userRole = user?.role?.name || user?.role;
-  const userDepartment = user?.department?.name;
-  const isSuperAdmin = user?.role?.level === 1000;
-  const isOperationsHOD =
-    user?.role?.level === 700 && userDepartment === "Operations";
-  const hasAccess = user && (isSuperAdmin || isOperationsHOD);
-
-  if (!hasAccess) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-red-600 mb-4">
-            Access Denied
-          </h2>
-          <p className="text-gray-600">
-            You don't have permission to access Inventory Reports. This module
-            is restricted to Super Admin and Operations HOD only.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const [exportLoading, setExportLoading] = useState(false);
+  const [reportType, setReportType] = useState("all");
+  const [selectedMonth, setSelectedMonth] = useState("all");
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
-    loadStats();
-  }, []);
+    loadData();
+  }, [reportType, selectedMonth, selectedYear]);
 
-  const loadStats = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const response = await inventoryService.getInventoryStats();
+      const response = await inventoryService.getAllInventory();
       if (response.success) {
-        setStats(response.data);
+        setInventoryData(response.data);
       } else {
-        toast.error("Failed to load inventory statistics");
+        toast.error("Failed to load inventory data");
       }
     } catch (error) {
-      console.error("Error loading inventory stats:", error);
-      toast.error("Error loading inventory statistics");
+      console.error("Error loading inventory data:", error);
+      toast.error("Error loading inventory data");
     } finally {
       setLoading(false);
     }
   };
 
-  const generateReport = async () => {
-    try {
-      // Show loading state
-      toast.info("Generating PDF report...");
+  const getFilteredData = () => {
+    let filtered = [...inventoryData];
 
-      // Simulate report generation (replace with actual PDF generation)
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Create a simple CSV download for now (replace with actual PDF generation)
-      const csvData = [
-        ["Inventory Report", ""],
-        ["Generated:", new Date().toLocaleDateString()],
-        [
-          "Date Range:",
-          `${formatDate(dateRange.start)} - ${formatDate(dateRange.end)}`,
-        ],
-        [""],
-        ["Summary", ""],
-        ["Total Items", statusStats.totalItems],
-        ["Total Value", formatCurrency(statusStats.totalValue)],
-        ["Purchase Value", formatCurrency(statusStats.totalPurchasePrice)],
-        ["Depreciation", formatCurrency(statusStats.depreciation)],
-        [""],
-        ["Status Breakdown", ""],
-        ...Object.entries(stats).map(([status, data]) => [
-          status.replace("_", " ").toUpperCase(),
-          `${data.count || 0} items (${(
-            ((data.count || 0) / statusStats.totalItems) *
-            100
-          ).toFixed(1)}%)`,
-          formatCurrency(data.totalValue || 0),
-        ]),
-      ];
-
-      const csvContent = csvData.map((row) => row.join(",")).join("\n");
-      const blob = new Blob([csvContent], { type: "text/csv" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `inventory-report-${
-        new Date().toISOString().split("T")[0]
-      }.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-
-      toast.success("Report generated and downloaded successfully!");
-    } catch (error) {
-      console.error("Error generating report:", error);
-      toast.error("Error generating report");
+    if (reportType === "monthly" && selectedMonth !== "all") {
+      filtered = filtered.filter((item) => {
+        const itemDate = new Date(item.createdAt);
+        return (
+          itemDate.getMonth() + 1 === selectedMonth &&
+          itemDate.getFullYear() === selectedYear
+        );
+      });
+    } else if (reportType === "yearly") {
+      filtered = filtered.filter((item) => {
+        const itemDate = new Date(item.createdAt);
+        return itemDate.getFullYear() === selectedYear;
+      });
     }
+
+    return filtered;
   };
 
-  const getStatusStats = () => {
-    const totalItems = Object.values(stats).reduce(
-      (sum, status) => sum + (status.count || 0),
+  const filteredData = getFilteredData();
+
+  const getInventoryAnalytics = () => {
+    const totalItems = filteredData.length;
+    const totalValue = filteredData.reduce(
+      (sum, item) => sum + (parseFloat(item.currentValue) || 0),
       0
     );
-    const totalValue = Object.values(stats).reduce(
-      (sum, status) => sum + (status.totalValue || 0),
-      0
-    );
-    const totalPurchasePrice = Object.values(stats).reduce(
-      (sum, status) => sum + (status.totalPurchasePrice || 0),
-      0
-    );
+    const projectTiedItems = filteredData.filter((item) => item.project).length;
+    const standaloneItems = filteredData.filter((item) => !item.project).length;
+
+    const statusBreakdown = getStatusBreakdown();
+    const categoryBreakdown = getCategoryBreakdown();
+    const typeBreakdown = getTypeBreakdown();
+
+    const monthlyData = {};
+    filteredData.forEach((item) => {
+      const month = new Date(item.createdAt).toLocaleDateString("en-US", {
+        month: "short",
+        year: "numeric",
+      });
+      if (!monthlyData[month]) {
+        monthlyData[month] = { count: 0, value: 0 };
+      }
+      monthlyData[month].count += 1;
+      monthlyData[month].value += parseFloat(item.currentValue) || 0;
+    });
 
     return {
       totalItems,
       totalValue,
-      totalPurchasePrice,
-      depreciation: totalPurchasePrice - totalValue,
+      projectTiedItems,
+      standaloneItems,
+      statusBreakdown,
+      categoryBreakdown,
+      typeBreakdown,
+      monthlyData,
     };
   };
 
-  const statusStats = getStatusStats();
+  const getStatusBreakdown = () => {
+    const breakdown = {};
+    filteredData.forEach((item) => {
+      breakdown[item.status] = (breakdown[item.status] || 0) + 1;
+    });
+    return breakdown;
+  };
 
-  if (loading) {
+  const getCategoryBreakdown = () => {
+    const breakdown = {};
+    filteredData.forEach((item) => {
+      breakdown[item.category] = (breakdown[item.category] || 0) + 1;
+    });
+    return breakdown;
+  };
+
+  const getTypeBreakdown = () => {
+    const breakdown = {};
+    filteredData.forEach((item) => {
+      breakdown[item.type] = (breakdown[item.type] || 0) + 1;
+    });
+    return breakdown;
+  };
+
+  const getChartData = () => {
+    const analytics = getInventoryAnalytics();
+
+    const statusChartData = {
+      labels: Object.keys(analytics.statusBreakdown),
+      datasets: [
+        {
+          data: Object.values(analytics.statusBreakdown),
+          backgroundColor: Object.keys(analytics.statusBreakdown).map(
+            (status) => getStatusColor(status)
+          ),
+        },
+      ],
+    };
+
+    const categoryEntries = Object.entries(analytics.categoryBreakdown)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 10);
+
+    const categoryChartData = {
+      labels: categoryEntries.map(([category]) => category),
+      datasets: [
+        {
+          label: "Items",
+          data: categoryEntries.map(([, count]) => parseInt(count) || 0),
+        },
+      ],
+    };
+
+    const monthlyEntries = Object.entries(analytics.monthlyData)
+      .sort(([a], [b]) => new Date(a) - new Date(b))
+      .slice(-24);
+
+    const monthlyChartData = {
+      labels: monthlyEntries.map(([month]) => month),
+      datasets: [
+        {
+          label: "Number of Items",
+          data: monthlyEntries.map(([, data]) => parseInt(data.count) || 0),
+          borderColor: "#10B981",
+          backgroundColor: "rgba(16, 185, 129, 0.12)",
+        },
+        {
+          label: "Total Value (NGN)",
+          data: monthlyEntries.map(([, data]) => parseFloat(data.value) || 0),
+          borderColor: "#3B82F6",
+          backgroundColor: "rgba(59, 130, 246, 0.12)",
+        },
+      ],
+    };
+
+    return {
+      statusChartData,
+      categoryChartData,
+      monthlyChartData,
+    };
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      available: "#10B981",
+      in_use: "#3B82F6",
+      maintenance: "#F59E0B",
+      retired: "#6B7280",
+      lost: "#EF4444",
+      damaged: "#F97316",
+    };
+    return colors[status] || "#6B7280";
+  };
+
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      available: { bg: "bg-green-100", text: "text-green-800", icon: "✅" },
+      in_use: { bg: "bg-blue-100", text: "text-blue-800", icon: "🔵" },
+      maintenance: { bg: "bg-yellow-100", text: "text-yellow-800", icon: "🔧" },
+      retired: { bg: "bg-gray-100", text: "text-gray-800", icon: "📦" },
+      lost: { bg: "bg-red-100", text: "text-red-800", icon: "❌" },
+      damaged: { bg: "bg-orange-100", text: "text-orange-800", icon: "⚠️" },
+    };
+
+    const config = statusConfig[status] || statusConfig.available;
+
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--elra-primary)]"></div>
-      </div>
+      <span
+        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}
+      >
+        <span className="mr-1">{config.icon}</span>
+        {status.toUpperCase()}
+      </span>
     );
-  }
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      setExportLoading(true);
+
+      const params = {
+        reportType,
+        period:
+          reportType === "monthly"
+            ? `${selectedMonth}/${selectedYear}`
+            : selectedYear,
+      };
+
+      const blob = await inventoryService.exportInventoryReport(params);
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `inventory-report-${reportType}-${
+        params.period || "all"
+      }.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("PDF report generated successfully!");
+    } catch (error) {
+      console.error("Error generating PDF report:", error);
+      toast.error("Failed to generate PDF report");
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const generateReport = () => {
+    const analytics = getInventoryAnalytics();
+    const reportText = `
+INVENTORY REPORT
+================
+Generated: ${new Date().toLocaleString()}
+Period: ${
+      reportType === "all"
+        ? "All Time"
+        : reportType === "monthly"
+        ? `${selectedMonth}/${selectedYear}`
+        : selectedYear
+    }
+
+SUMMARY
+-------
+Total Items: ${analytics.totalItems}
+Total Value: NGN ${analytics.totalValue.toLocaleString()}
+Project-tied Items: ${analytics.projectTiedItems}
+Standalone Items: ${analytics.standaloneItems}
+
+STATUS BREAKDOWN
+----------------
+${Object.entries(analytics.statusBreakdown)
+  .map(([status, count]) => `${status.toUpperCase()}: ${count} items`)
+  .join("\n")}
+
+CATEGORY BREAKDOWN
+------------------
+${Object.entries(analytics.categoryBreakdown)
+  .map(([category, count]) => `${category}: ${count} items`)
+  .join("\n")}
+    `;
+
+    const blob = new Blob([reportText], { type: "text/plain" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `inventory-report-${reportType}-${selectedYear}${
+      reportType === "monthly" ? `-${selectedMonth}` : ""
+    }.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    toast.success("Text report generated successfully!");
+  };
+
+  const analytics = getInventoryAnalytics();
+  const statusBreakdown = getStatusBreakdown();
+  const categoryBreakdown = getCategoryBreakdown();
 
   return (
-    <div className="space-y-6 p-4">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl p-6 text-white">
-        <h1 className="text-3xl font-bold mb-2">Inventory Reports</h1>
-        <p className="text-white/80">
-          Comprehensive reports and analytics for inventory management
-        </p>
-      </div>
-
-      {/* Simple Report Controls */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
-      >
-        <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium text-gray-700">From:</label>
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) =>
-                  setDateRange({ ...dateRange, start: e.target.value })
-                }
-                className="rounded-md border-gray-300 shadow-sm focus:border-[var(--elra-primary)] focus:ring focus:ring-[var(--elra-primary)] focus:ring-opacity-50"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium text-gray-700">To:</label>
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) =>
-                  setDateRange({ ...dateRange, end: e.target.value })
-                }
-                className="rounded-md border-gray-300 shadow-sm focus:border-[var(--elra-primary)] focus:ring focus:ring-[var(--elra-primary)] focus:ring-opacity-50"
-              />
-            </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl p-6 text-white">
+            <h1 className="text-3xl font-bold mb-2">Inventory Reports</h1>
+            <p className="text-white/80">
+              Generate and download comprehensive inventory reports and
+              analytics
+            </p>
           </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={loadStats}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--elra-primary)]"
-            >
-              <ArrowPathIcon className="h-4 w-4 mr-2" />
-              Refresh
-            </button>
-            <button
-              onClick={generateReport}
-              className="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--elra-primary)] shadow-lg hover:shadow-xl transition-all duration-200"
-            >
-              <DocumentArrowDownIcon className="h-5 w-5 mr-2" />
-              Generate PDF Report
-            </button>
-          </div>
-        </div>
-      </motion.div>
 
-      {/* Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total Items */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg border border-blue-200 p-6 hover:shadow-xl transition-all duration-300"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">
-                Total Items
-              </p>
-              <p className="text-2xl sm:text-3xl font-bold text-blue-900 mt-2 break-all leading-tight">
-                {statusStats.totalItems}
-              </p>
-            </div>
-            <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
-              <CubeIcon className="h-8 w-8 text-white" />
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Total Value */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-lg border border-green-200 p-6 hover:shadow-xl transition-all duration-300"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-green-700 uppercase tracking-wide">
-                Total Value
-              </p>
-              <p className="text-2xl sm:text-3xl font-bold text-green-900 mt-2 break-all leading-tight">
-                {formatCurrency(statusStats.totalValue)}
-              </p>
-            </div>
-            <div className="p-4 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
-              <CurrencyDollarIcon className="h-8 w-8 text-white" />
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Purchase Value */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl shadow-lg border border-purple-200 p-6 hover:shadow-xl transition-all duration-300"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-purple-700 uppercase tracking-wide">
-                Purchase Value
-              </p>
-              <p className="text-2xl sm:text-3xl font-bold text-purple-900 mt-2 break-all leading-tight">
-                {formatCurrency(statusStats.totalPurchasePrice)}
-              </p>
-            </div>
-            <div className="p-4 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
-              <ChartBarIcon className="h-8 w-8 text-white" />
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Depreciation */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl shadow-lg border border-orange-200 p-6 hover:shadow-xl transition-all duration-300"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-orange-700 uppercase tracking-wide">
-                Depreciation
-              </p>
-              <p className="text-2xl sm:text-3xl font-bold text-orange-900 mt-2 break-all leading-tight">
-                {formatCurrency(statusStats.depreciation)}
-              </p>
-            </div>
-            <div className="p-4 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
-              <ExclamationTriangleIcon className="h-8 w-8 text-white" />
-            </div>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Simple Status Overview */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6 }}
-        className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
-      >
-        <h3 className="text-lg font-medium text-gray-900 mb-4">
-          Inventory Status Overview
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Object.entries(stats).map(([status, data]) => {
-            const percentage =
-              statusStats.totalItems > 0
-                ? ((data.count || 0) / statusStats.totalItems) * 100
-                : 0;
-
-            return (
-              <div key={status} className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700 capitalize">
-                    {status.replace("_", " ")}
-                  </span>
-                  <span className="text-lg font-bold text-gray-900">
-                    {data.count || 0}
-                  </span>
+          {/* Report Controls */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-xl shadow-sm p-6"
+          >
+            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center space-y-4 xl:space-y-0">
+              <div className="flex flex-col lg:flex-row items-start lg:items-center space-y-3 lg:space-y-0 lg:space-x-4 w-full xl:w-auto">
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Report Type:
+                  </label>
+                  <select
+                    value={reportType}
+                    onChange={(e) => setReportType(e.target.value)}
+                    className="rounded-md border-gray-300 shadow-sm focus:border-[var(--elra-primary)] focus:ring focus:ring-[var(--elra-primary)] focus:ring-opacity-50"
+                  >
+                    <option value="all">All Data</option>
+                    <option value="monthly">Monthly Report</option>
+                    <option value="yearly">Yearly Report</option>
+                  </select>
                 </div>
-                <div className="text-xs text-gray-500">
-                  {percentage.toFixed(1)}% •{" "}
-                  {formatCurrency(data.totalValue || 0)}
+
+                {reportType === "monthly" && (
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Month:
+                    </label>
+                    <select
+                      value={selectedMonth}
+                      onChange={(e) =>
+                        setSelectedMonth(parseInt(e.target.value))
+                      }
+                      className="rounded-md border-gray-300 shadow-sm focus:border-[var(--elra-primary)] focus:ring focus:ring-[var(--elra-primary)] focus:ring-opacity-50"
+                    >
+                      <option value="all">All Months</option>
+                      {Array.from({ length: 12 }, (_, i) => (
+                        <option key={i + 1} value={i + 1}>
+                          {new Date(0, i).toLocaleString("default", {
+                            month: "long",
+                          })}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm font-medium text-gray-700">
+                    Year:
+                  </label>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                    className="rounded-md border-gray-300 shadow-sm focus:border-[var(--elra-primary)] focus:ring focus:ring-[var(--elra-primary)] focus:ring-opacity-50"
+                  >
+                    {Array.from({ length: 5 }, (_, i) => {
+                      const year = new Date().getFullYear() - i;
+                      return (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      </motion.div>
 
-      {/* Simple Report Summary */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7 }}
-        className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
-      >
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-medium text-gray-900">
-            Inventory Report Summary
-          </h3>
-          <div className="text-sm text-gray-500">
-            {formatDate(dateRange.start)} - {formatDate(dateRange.end)}
-          </div>
-        </div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full xl:w-auto">
+                <button
+                  onClick={handleExportPDF}
+                  disabled={exportLoading}
+                  className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                >
+                  {exportLoading ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  ) : (
+                    <DocumentTextIcon className="h-4 w-4 mr-2" />
+                  )}
+                  {exportLoading ? "Generating PDF..." : "Export PDF"}
+                </button>
+                <button
+                  onClick={generateReport}
+                  className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--elra-primary)] w-full sm:w-auto"
+                >
+                  <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
+                  Download Text Report
+                </button>
+              </div>
+            </div>
+          </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="text-center p-4 bg-blue-50 rounded-lg">
-            <div className="text-2xl font-bold text-blue-900 mb-1">
-              {statusStats.totalItems}
-            </div>
-            <div className="text-sm text-blue-700">Total Items</div>
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl p-6 shadow-lg border border-blue-200 hover:shadow-xl transition-all duration-300"
+            >
+              <div className="flex items-center">
+                <div className="p-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl shadow-lg">
+                  <CubeIcon className="h-6 w-6 text-white" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-semibold text-blue-700">
+                    Total Items
+                  </p>
+                  <p className="text-3xl font-bold text-blue-900">
+                    {analytics.totalItems}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl p-6 shadow-lg border border-green-200 hover:shadow-xl transition-all duration-300"
+            >
+              <div className="flex items-center">
+                <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl shadow-lg">
+                  <CurrencyDollarIcon className="h-6 w-6 text-white" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-semibold text-green-700">
+                    Total Value
+                  </p>
+                  <p className="text-3xl font-bold text-green-900">
+                    {formatCurrency(analytics.totalValue)}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-gradient-to-br from-purple-50 to-violet-100 rounded-xl p-6 shadow-lg border border-purple-200 hover:shadow-xl transition-all duration-300"
+            >
+              <div className="flex items-center">
+                <div className="p-3 bg-gradient-to-r from-purple-500 to-violet-600 rounded-xl shadow-lg">
+                  <CheckCircleIcon className="h-6 w-6 text-white" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-semibold text-purple-700">
+                    Available Items
+                  </p>
+                  <p className="text-3xl font-bold text-purple-900">
+                    {statusBreakdown.available || 0}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="bg-gradient-to-br from-orange-50 to-amber-100 rounded-xl p-6 shadow-lg border border-orange-200 hover:shadow-xl transition-all duration-300"
+            >
+              <div className="flex items-center">
+                <div className="p-3 bg-gradient-to-r from-orange-500 to-amber-600 rounded-xl shadow-lg">
+                  <CalendarIcon className="h-6 w-6 text-white" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-semibold text-orange-700">
+                    Period
+                  </p>
+                  <p className="text-3xl font-bold text-orange-900">
+                    {reportType === "all"
+                      ? "All Time"
+                      : reportType === "monthly"
+                      ? `${selectedMonth}/${selectedYear}`
+                      : selectedYear}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
           </div>
-          <div className="text-center p-4 bg-green-50 rounded-lg">
-            <div className="text-2xl font-bold text-green-900 mb-1">
-              {formatCurrency(statusStats.totalValue)}
-            </div>
-            <div className="text-sm text-green-700">Total Value</div>
+
+          {/* Analytics Charts - Responsive Grid */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            {/* Status Distribution */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+            >
+              <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                <div className="w-3 h-3 bg-purple-500 rounded-full mr-3"></div>
+                Status Distribution
+              </h3>
+              <div className="h-80">
+                <PieChart
+                  data={getChartData().statusChartData}
+                  title="Inventory Items by Status"
+                  showLegend={true}
+                />
+              </div>
+            </motion.div>
+
+            {/* Category Breakdown */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+            >
+              <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
+                Top Categories
+              </h3>
+              <div className="h-80">
+                <BarChart
+                  data={getChartData().categoryChartData}
+                  title="Items by Category"
+                  showLegend={false}
+                />
+              </div>
+            </motion.div>
           </div>
-          <div className="text-center p-4 bg-orange-50 rounded-lg">
-            <div className="text-2xl font-bold text-orange-900 mb-1">
-              {formatCurrency(statusStats.depreciation)}
+
+          {/* Monthly Trends */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+          >
+            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+              <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+              Monthly Inventory Trends
+            </h3>
+            <div className="h-96">
+              <LineChart
+                data={getChartData().monthlyChartData}
+                title="Inventory Activity Over Time"
+                showLegend={true}
+              />
             </div>
-            <div className="text-sm text-orange-700">Depreciation</div>
-          </div>
+          </motion.div>
+
+          {/* Status Breakdown */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-white rounded-xl shadow-sm p-6"
+          >
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Status Breakdown
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {Object.entries(statusBreakdown).map(([status, count]) => {
+                const getStatusStyles = (status) => {
+                  switch (status.toLowerCase()) {
+                    case "available":
+                      return {
+                        bg: "bg-gradient-to-br from-green-50 to-emerald-100",
+                        border: "border-green-200",
+                        text: "text-green-800",
+                        count: "text-green-900",
+                        icon: "✅",
+                      };
+                    case "in_use":
+                      return {
+                        bg: "bg-gradient-to-br from-blue-50 to-indigo-100",
+                        border: "border-blue-200",
+                        text: "text-blue-800",
+                        count: "text-blue-900",
+                        icon: "🔵",
+                      };
+                    case "maintenance":
+                      return {
+                        bg: "bg-gradient-to-br from-yellow-50 to-amber-100",
+                        border: "border-yellow-200",
+                        text: "text-yellow-800",
+                        count: "text-yellow-900",
+                        icon: "🔧",
+                      };
+                    case "retired":
+                      return {
+                        bg: "bg-gradient-to-br from-gray-50 to-slate-100",
+                        border: "border-gray-200",
+                        text: "text-gray-800",
+                        count: "text-gray-900",
+                        icon: "📦",
+                      };
+                    case "lost":
+                      return {
+                        bg: "bg-gradient-to-br from-red-50 to-rose-100",
+                        border: "border-red-200",
+                        text: "text-red-800",
+                        count: "text-red-900",
+                        icon: "❌",
+                      };
+                    case "damaged":
+                      return {
+                        bg: "bg-gradient-to-br from-orange-50 to-amber-100",
+                        border: "border-orange-200",
+                        text: "text-orange-800",
+                        count: "text-orange-900",
+                        icon: "⚠️",
+                      };
+                    default:
+                      return {
+                        bg: "bg-gradient-to-br from-gray-50 to-slate-100",
+                        border: "border-gray-200",
+                        text: "text-gray-800",
+                        count: "text-gray-900",
+                        icon: "📋",
+                      };
+                  }
+                };
+
+                const styles = getStatusStyles(status);
+
+                return (
+                  <div
+                    key={status}
+                    className={`text-center p-6 rounded-xl border-2 shadow-sm hover:shadow-md transition-all duration-300 ${styles.bg} ${styles.border}`}
+                  >
+                    <div className="text-3xl mb-2">{styles.icon}</div>
+                    <div className={`text-3xl font-bold ${styles.count} mb-2`}>
+                      {count}
+                    </div>
+                    <div
+                      className={`text-sm font-semibold ${styles.text} tracking-wide`}
+                    >
+                      {status.toUpperCase()}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+
+          {/* Category Breakdown */}
+          {Object.keys(categoryBreakdown).length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="bg-white rounded-xl shadow-sm p-6"
+            >
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Top Categories
+              </h3>
+              <div className="space-y-3">
+                {Object.entries(categoryBreakdown)
+                  .sort(([, a], [, b]) => b - a)
+                  .slice(0, 5)
+                  .map(([category, count], index) => (
+                    <div
+                      key={category}
+                      className={`flex justify-between items-center p-4 rounded-xl border-2 transition-all duration-300 hover:shadow-md ${
+                        index === 0
+                          ? "bg-gradient-to-r from-yellow-50 to-amber-100 border-yellow-200 shadow-sm"
+                          : index === 1
+                          ? "bg-gradient-to-r from-gray-50 to-slate-100 border-gray-200 shadow-sm"
+                          : index === 2
+                          ? "bg-gradient-to-r from-orange-50 to-amber-100 border-orange-200 shadow-sm"
+                          : "bg-gradient-to-r from-blue-50 to-indigo-100 border-blue-200"
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${
+                            index === 0
+                              ? "bg-gradient-to-r from-yellow-500 to-amber-600"
+                              : index === 1
+                              ? "bg-gradient-to-r from-gray-500 to-slate-600"
+                              : index === 2
+                              ? "bg-gradient-to-r from-orange-500 to-amber-600"
+                              : "bg-gradient-to-r from-blue-500 to-indigo-600"
+                          }`}
+                        >
+                          {index + 1}
+                        </div>
+                        <span className="font-semibold text-gray-900">
+                          {category}
+                        </span>
+                      </div>
+                      <span className="text-lg font-bold text-[var(--elra-primary)]">
+                        {count} items
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Recent Items */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="bg-white rounded-xl shadow-sm p-6"
+          >
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Recent Inventory Items
+            </h3>
+            <DataTable
+              columns={[
+                {
+                  header: "Item Details",
+                  key: "name",
+                  renderer: (item) => (
+                    <div>
+                      <div className="font-medium text-gray-900">
+                        {item.name}
+                      </div>
+                      <div className="text-sm text-gray-500">{item.code}</div>
+                      <div className="text-xs text-gray-400">{item.type}</div>
+                    </div>
+                  ),
+                },
+                {
+                  header: "Category & Description",
+                  key: "category",
+                  renderer: (item) => (
+                    <div>
+                      <div className="font-medium text-gray-900">
+                        {item.category}
+                      </div>
+                      <div className="text-sm text-gray-500 truncate max-w-xs">
+                        {item.description}
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  header: "Value",
+                  key: "currentValue",
+                  renderer: (item) => (
+                    <div className="flex items-center">
+                      <CurrencyDollarIcon className="h-4 w-4 text-gray-500 mr-1" />
+                      <span className="text-sm font-medium text-gray-900">
+                        {formatCurrency(item.currentValue)}
+                      </span>
+                    </div>
+                  ),
+                },
+                {
+                  header: "Status",
+                  key: "status",
+                  renderer: (item) => getStatusBadge(item.status),
+                },
+                {
+                  header: "Location",
+                  key: "location",
+                  renderer: (item) => (
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {typeof item.location === "string"
+                          ? item.location
+                          : item.location?.warehouse || "N/A"}
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  header: "Created",
+                  key: "createdAt",
+                  renderer: (item) => (
+                    <span className="text-gray-900">
+                      {formatDate(item.createdAt)}
+                    </span>
+                  ),
+                },
+              ]}
+              data={filteredData.slice(0, 20)}
+              loading={loading}
+              actions={{
+                showEdit: false,
+                showDelete: false,
+                showToggle: false,
+              }}
+            />
+          </motion.div>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 };

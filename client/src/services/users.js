@@ -1,9 +1,9 @@
-import api from './api';
+import api from "./api";
 
 // Get all users
 export const getUsers = async () => {
   try {
-    const response = await api.get('/users');
+    const response = await api.get("/users");
     return response.data;
   } catch (error) {
     throw error;
@@ -13,7 +13,7 @@ export const getUsers = async () => {
 // Get pending registration users (debug endpoint)
 export const getPendingUsers = async () => {
   try {
-    const response = await api.get('/users/pending');
+    const response = await api.get("/users/pending");
     return response.data;
   } catch (error) {
     throw error;
@@ -23,7 +23,17 @@ export const getPendingUsers = async () => {
 // Get manageable users (filtered)
 export const getManageableUsers = async () => {
   try {
-    const response = await api.get('/users/manageable');
+    const response = await api.get("/users/manageable");
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Get department users
+export const getDepartmentUsers = async () => {
+  try {
+    const response = await api.get("/users/department");
     return response.data;
   } catch (error) {
     throw error;
@@ -33,7 +43,7 @@ export const getManageableUsers = async () => {
 // Create new user
 export const createUser = async (userData) => {
   try {
-    const response = await api.post('/users', userData);
+    const response = await api.post("/users", userData);
     return response.data;
   } catch (error) {
     throw error;
@@ -93,7 +103,7 @@ export const updateUserStatus = async (userId, status) => {
 // Get user metrics
 export const getUserMetrics = async () => {
   try {
-    const response = await api.get('/users/metrics');
+    const response = await api.get("/users/metrics");
     return response.data;
   } catch (error) {
     throw error;
@@ -104,6 +114,7 @@ export default {
   getUsers,
   getPendingUsers,
   getManageableUsers,
+  getDepartmentUsers,
   createUser,
   updateUser,
   deleteUser,

@@ -22,15 +22,6 @@ export const sidebarConfig = [
     departments: ["all"], // Universal access
   },
   {
-    label: "Customer Care",
-    icon: "HiOutlineChatBubbleLeftRight",
-    path: "/dashboard/modules/customer-care",
-    required: { minLevel: 0 },
-    section: "erp",
-    badge: "Support",
-    departments: ["all"], // Universal access
-  },
-  {
     label: "HR Management",
     icon: "HiOutlineUsers",
     path: "/dashboard/modules/hr",
@@ -153,6 +144,15 @@ export const sidebarConfig = [
     section: "erp",
     badge: "Inv",
     departments: ["Operations"],
+  },
+  {
+    label: "Customer Care",
+    icon: "HiOutlineChatBubbleLeftRight",
+    path: "/dashboard/modules/customer-care",
+    required: { minLevel: 0 },
+    section: "erp",
+    badge: "Support",
+    departments: ["all"], // Universal access
   },
 
   // ===== SYSTEM MANAGEMENT =====
@@ -311,7 +311,6 @@ export const getNavigationForRole = (
   const userRoleConfig = roleConfig[roleLevel] || roleConfig[300];
   const allowedSections = userRoleConfig.sections;
 
-  // Define pathToModuleMap outside the filter function
   const pathToModuleMap = {
     "self-service": "SELF_SERVICE",
     hr: "HR",

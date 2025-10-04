@@ -5114,20 +5114,26 @@ export const getProjectApprovalReports = async (req, res) => {
       });
     }
 
-    // Calculate date range based on period (allow up to 20 years)
-    const endDate = new Date();
-    const startDate = new Date();
-    const periodDays = Math.min(parseInt(period), 7300); // Max 20 years (20 * 365)
-    startDate.setDate(endDate.getDate() - periodDays);
+    // Apply date filters based on period (EXACTLY like procurement)
+    let startDate, endDate;
+    if (period) {
+      if (period.includes("/")) {
+        // Monthly format: "3/2024"
+        const [month, year] = period.split("/");
+        startDate = new Date(year, month - 1, 1);
+        endDate = new Date(year, month, 0, 23, 59, 59);
+      } else {
+        // Yearly format: "2024"
+        startDate = new Date(period, 0, 1);
+        endDate = new Date(period, 11, 31, 23, 59, 59);
+      }
+    } else {
+      // All data - no date filter
+      endDate = new Date();
+      startDate = new Date(0); // Start from epoch for "all time"
+    }
 
-    console.log(
-      `📊 [PROJECT REPORTS] Generating reports for ${currentUser.firstName} ${currentUser.lastName}`
-    );
-    console.log(
-      `📊 [PROJECT REPORTS] Period: ${period} days (${startDate.toISOString()} to ${endDate.toISOString()})`
-    );
-
-    // STEP 1: Get PENDING projects using EXACT same logic as getPendingApprovalProjects
+    // STEP 1: Get PENDING projects that the current user can approve
     let pendingQuery = {
       status: {
         $in: [
@@ -5142,10 +5148,8 @@ export const getProjectApprovalReports = async (req, res) => {
       isActive: true,
     };
 
-    // For HODs, exclude projects from their own department
-    if (currentUser.role.level < 1000) {
-      pendingQuery.department = { $ne: currentUser.department._id };
-    }
+    // Don't add date filter to pending query - let the approval logic handle it
+    // The pending query will be filtered later based on actual approval chain logic
 
     const allPendingProjects = await Project.find(pendingQuery)
       .populate("createdBy", "firstName lastName email department")
@@ -5154,6 +5158,7 @@ export const getProjectApprovalReports = async (req, res) => {
       .sort({ createdAt: -1 });
 
     // Filter projects where current user is the next approver (EXACT same logic as getPendingApprovalProjects)
+
     const pendingProjects = allPendingProjects.filter((project) => {
       if (!project.approvalChain || project.approvalChain.length === 0) {
         return false;
@@ -5219,8 +5224,7 @@ export const getProjectApprovalReports = async (req, res) => {
       return false;
     });
 
-    // STEP 2: Get APPROVED/REJECTED projects using EXACT same logic as getCrossDepartmentalApprovalHistory
-    const allHistoryProjects = await Project.find({
+    const historyQuery = {
       $or: [
         {
           "approvalChain.status": "approved",
@@ -5239,14 +5243,46 @@ export const getProjectApprovalReports = async (req, res) => {
           isActive: true,
         },
       ],
-    })
+    };
+
+    if (period) {
+      historyQuery.createdAt = { $gte: startDate, $lte: endDate };
+    }
+
+    const allHistoryProjects = await Project.find(historyQuery)
       .populate("createdBy", "firstName lastName email department")
       .populate("department", "name")
       .populate("approvalChain.approver", "firstName lastName email department")
       .sort({ updatedAt: -1 });
 
-    // Process history projects the same way as getCrossDepartmentalApprovalHistory
+    let externalProjects = [];
+    if (currentUser.department?.name === "Project Management") {
+      const externalQuery = {
+        projectScope: "external",
+        isActive: true,
+        $or: [
+          { createdBy: currentUser._id },
+          { projectManager: currentUser._id },
+          { "approvalChain.approver": currentUser._id },
+        ],
+      };
+
+      if (period) {
+        externalQuery.createdAt = { $gte: startDate, $lte: endDate };
+      }
+
+      externalProjects = await Project.find(externalQuery)
+        .populate("createdBy", "firstName lastName email department")
+        .populate("department", "name")
+        .populate(
+          "approvalChain.approver",
+          "firstName lastName email department"
+        )
+        .sort({ updatedAt: -1 });
+    }
+
     const historyProjects = [];
+
     for (const project of allHistoryProjects) {
       const userApprovalStep = project.approvalChain.find(
         (step) =>
@@ -5256,7 +5292,6 @@ export const getProjectApprovalReports = async (req, res) => {
       );
 
       if (userApprovalStep) {
-        // Get document counts from requiredDocuments array
         const totalDocuments = project.requiredDocuments?.length || 0;
         const submittedDocuments =
           project.requiredDocuments?.filter((doc) => doc.isSubmitted).length ||
@@ -5280,7 +5315,7 @@ export const getProjectApprovalReports = async (req, res) => {
           approvalLevel: userApprovalStep.level,
           approvalComments: userApprovalStep.comments,
           approvedAt: userApprovalStep.approvedAt,
-          approver: userApprovalStep.approver, // This is the key field!
+          approver: userApprovalStep.approver,
           requiredDocuments: project.requiredDocuments,
           projectItems: project.projectItems,
           approvalChain: project.approvalChain,
@@ -5298,46 +5333,48 @@ export const getProjectApprovalReports = async (req, res) => {
       }
     }
 
-    // STEP 3: Calculate summary statistics (perfect mix of both APIs)
     const filteredHistoryProjects = historyProjects.filter(
       (p) => p.approvedAt >= startDate && p.approvedAt <= endDate
     );
+
     const totalProjects =
-      pendingProjects.length + filteredHistoryProjects.length;
+      currentUser.department?.name === "Project Management"
+        ? pendingProjects.length +
+          filteredHistoryProjects.length +
+          externalProjects.length
+        : pendingProjects.length + filteredHistoryProjects.length;
+
     const pendingCount = pendingProjects.length;
 
-    // Count approved and rejected using EXACT same logic as ApprovalDashboard
-    // Check the top-level approver field, not the approval chain
-
-    // Count approved and rejected - if user is the approver, they approved it regardless of project status
-    // Convert both to strings for proper comparison since they're MongoDB ObjectIds
-    // Also filter by date range for the selected period
-    const approvedCount = historyProjects.filter(
-      (p) =>
-        p.approver?._id?.toString() === currentUser._id.toString() &&
-        p.approvedAt >= startDate &&
-        p.approvedAt <= endDate
+    const approvedCount = filteredHistoryProjects.filter(
+      (p) => p.approver?._id?.toString() === currentUser._id.toString()
     ).length;
 
-    const rejectedCount = historyProjects.filter(
+    const rejectedCount = filteredHistoryProjects.filter(
       (p) =>
         p.approver?._id?.toString() === currentUser._id.toString() &&
-        p.status === "rejected" &&
-        p.approvedAt >= startDate &&
-        p.approvedAt <= endDate
+        p.status === "rejected"
     ).length;
 
-    // Calculate budget impact from projects within the date range
-    const totalBudgetImpact = [
-      ...pendingProjects,
-      ...filteredHistoryProjects,
-    ].reduce((sum, p) => sum + (p.budget || 0), 0);
+    const allProjectsForBudget =
+      currentUser.department?.name === "Project Management"
+        ? [...pendingProjects, ...filteredHistoryProjects, ...externalProjects]
+        : [...pendingProjects, ...filteredHistoryProjects];
+
+    const totalBudgetImpact = allProjectsForBudget.reduce(
+      (sum, p) => sum + (p.budget || 0),
+      0
+    );
 
     const summary = {
       totalProjects,
       approvedProjects: approvedCount,
       rejectedProjects: rejectedCount,
       pendingProjects: pendingCount,
+      externalProjects:
+        currentUser.department?.name === "Project Management"
+          ? externalProjects.length
+          : 0,
       totalBudgetImpact,
       averageApprovalTime: 0,
       approvalSuccessRate: 0,
@@ -5393,14 +5430,17 @@ export const getProjectApprovalReports = async (req, res) => {
 
     // Calculate how many months to show based on period
     let monthsToShow = 3; // default
-    if (periodDays <= 30) {
-      monthsToShow = 1; // Show 1 month for 30 days or less
-    } else if (periodDays <= 90) {
-      monthsToShow = 3; // Show 3 months for 90 days or less
-    } else if (periodDays <= 365) {
-      monthsToShow = 6; // Show 6 months for 1 year or less
+    if (period) {
+      if (period.includes("/")) {
+        // Monthly - show 1 month
+        monthsToShow = 1;
+      } else {
+        // Yearly - show 12 months
+        monthsToShow = 12;
+      }
     } else {
-      monthsToShow = 12; // Show 12 months for more than 1 year
+      // All data - show 12 months
+      monthsToShow = 12;
     }
 
     for (let i = monthsToShow - 1; i >= 0; i--) {
@@ -6158,6 +6198,23 @@ export const getProjectDashboard = async (req, res) => {
 
     let query = { isActive: true };
 
+    if (currentUser.department?.name === "Project Management") {
+      query = {
+        isActive: true,
+        $or: [
+          { projectScope: "departmental" },
+          {
+            projectScope: "external",
+            $or: [
+              { createdBy: currentUser._id },
+              { projectManager: currentUser._id },
+              { "approvalChain.approver": currentUser._id },
+            ],
+          },
+        ],
+      };
+    }
+
     // Get comprehensive project data
     const projects = await Project.find(query)
       .populate("department", "name")
@@ -6813,6 +6870,63 @@ export const getProjectsNeedingInventory = async (req, res) => {
   }
 };
 
+// @desc    Get external projects for Project Management HOD
+// @route   GET /api/projects/external-projects
+// @access  Private (Project Management HOD only)
+export const getExternalProjects = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    // Check if user is Project Management HOD
+    if (
+      currentUser.role.level < 700 ||
+      currentUser.department?.name !== "Project Management"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Access denied. Only Project Management HOD can access external projects.",
+      });
+    }
+
+    // Get external projects that the PM HOD manages
+    const externalProjects = await Project.find({
+      projectScope: "external",
+      isActive: true,
+      $or: [
+        { createdBy: currentUser._id }, // Projects they created
+        { projectManager: currentUser._id }, // Projects they manage
+        { "approvalChain.approver": currentUser._id }, // Projects they've approved
+      ],
+    })
+      .populate("createdBy", "firstName lastName email department")
+      .populate("department", "name")
+      .populate("projectManager", "firstName lastName email")
+      .populate("approvalChain.approver", "firstName lastName email department")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        projects: externalProjects,
+        total: externalProjects.length,
+        totalBudget: externalProjects.reduce(
+          (sum, project) => sum + (project.budget || 0),
+          0
+        ),
+      },
+      message: "External projects retrieved successfully",
+    });
+  } catch (error) {
+    console.error("❌ [EXTERNAL PROJECTS] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching external projects",
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Get project categories from model schema
 // @route   GET /api/projects/categories
 // @access  Private (All authenticated users)
@@ -7005,10 +7119,24 @@ export const exportProjectApprovalReport = async (req, res) => {
     }
 
     // Generate the report data (same logic as getProjectApprovalReports)
-    const endDate = new Date();
-    const startDate = new Date();
-    const periodDays = Math.min(parseInt(period), 7300);
-    startDate.setDate(endDate.getDate() - periodDays);
+    // Apply date filters based on period (EXACTLY like procurement)
+    let startDate, endDate;
+    if (period) {
+      if (period.includes("/")) {
+        // Monthly format: "3/2024"
+        const [month, year] = period.split("/");
+        startDate = new Date(year, month - 1, 1);
+        endDate = new Date(year, month, 0, 23, 59, 59);
+      } else {
+        // Yearly format: "2024"
+        startDate = new Date(period, 0, 1);
+        endDate = new Date(period, 11, 31, 23, 59, 59);
+      }
+    } else {
+      // All data - no date filter
+      endDate = new Date();
+      startDate = new Date(0); // Start from epoch for "all time"
+    }
 
     // Get pending projects
     let pendingQuery = {
@@ -7024,6 +7152,11 @@ export const exportProjectApprovalReport = async (req, res) => {
       },
       isActive: true,
     };
+
+    // Add date filter if period is specified
+    if (period) {
+      pendingQuery.createdAt = { $gte: startDate, $lte: endDate };
+    }
 
     if (currentUser.role.level < 1000) {
       pendingQuery.department = { $ne: currentUser.department._id };
@@ -7093,7 +7226,7 @@ export const exportProjectApprovalReport = async (req, res) => {
     });
 
     // Get history projects
-    const allHistoryProjects = await Project.find({
+    const historyQuery = {
       $or: [
         {
           "approvalChain.status": "approved",
@@ -7112,11 +7245,46 @@ export const exportProjectApprovalReport = async (req, res) => {
           isActive: true,
         },
       ],
-    })
+    };
+
+    // Add date filter if period is specified
+    if (period) {
+      historyQuery.createdAt = { $gte: startDate, $lte: endDate };
+    }
+
+    const allHistoryProjects = await Project.find(historyQuery)
       .populate("createdBy", "firstName lastName email department")
       .populate("department", "name")
       .populate("approvalChain.approver", "firstName lastName email department")
       .sort({ updatedAt: -1 });
+
+    // STEP 2.5: For Project Management HOD - also get external projects they manage
+    let externalProjects = [];
+    if (currentUser.department?.name === "Project Management") {
+      const externalQuery = {
+        projectScope: "external",
+        isActive: true,
+        $or: [
+          { createdBy: currentUser._id },
+          { projectManager: currentUser._id },
+          { "approvalChain.approver": currentUser._id },
+        ],
+      };
+
+      // Add date filter if period is specified
+      if (period) {
+        externalQuery.createdAt = { $gte: startDate, $lte: endDate };
+      }
+
+      externalProjects = await Project.find(externalQuery)
+        .populate("createdBy", "firstName lastName email department")
+        .populate("department", "name")
+        .populate(
+          "approvalChain.approver",
+          "firstName lastName email department"
+        )
+        .sort({ updatedAt: -1 });
+    }
 
     const historyProjects = [];
     for (const project of allHistoryProjects) {
@@ -7187,10 +7355,16 @@ export const exportProjectApprovalReport = async (req, res) => {
         p.status === "rejected"
     ).length;
 
-    const totalBudgetImpact = [
-      ...pendingProjects,
-      ...filteredHistoryProjects,
-    ].reduce((sum, p) => sum + (p.budget || 0), 0);
+    // For Project Management HOD, include external projects in budget calculation
+    const allProjectsForBudget =
+      currentUser.department?.name === "Project Management"
+        ? [...pendingProjects, ...filteredHistoryProjects, ...externalProjects]
+        : [...pendingProjects, ...filteredHistoryProjects];
+
+    const totalBudgetImpact = allProjectsForBudget.reduce(
+      (sum, p) => sum + (p.budget || 0),
+      0
+    );
 
     // Generate export content based on format
     let content, filename, contentType;
@@ -7233,79 +7407,244 @@ export const exportProjectApprovalReport = async (req, res) => {
       }.csv`;
       contentType = "text/csv";
     } else if (format.toUpperCase() === "PDF") {
-      // Generate branded PDF content
-      let pdfContent = `
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                              ELRA PROJECT REPORTS                           ║
-║                        Project Approval Analytics Report                     ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+      const { jsPDF } = await import("jspdf");
+      const autoTable = (await import("jspdf-autotable")).default;
 
-REPORT DETAILS
-═══════════════════════════════════════════════════════════════════════════════
-Generated for: ${currentUser.firstName} ${currentUser.lastName}
-Department: ${currentUser.department?.name}
-Position: ${currentUser.role?.name}
-Report Period: Last ${period} days
-Generated on: ${new Date().toLocaleString()}
-Report ID: ELRA-PR-${Date.now()}
-
-EXECUTIVE SUMMARY
-═══════════════════════════════════════════════════════════════════════════════
-Total Projects in Period: ${totalProjects}
-├─ Approved Projects: ${approvedCount}
-├─ Rejected Projects: ${rejectedCount}
-└─ Pending Projects: ${pendingCount}
-
-Financial Impact: ₦${totalBudgetImpact.toLocaleString()}
-
-PROJECT BREAKDOWN
-═══════════════════════════════════════════════════════════════════════════════
-`;
-
-      // Add recent projects
-      const recentProjects = [
-        ...filteredHistoryProjects.slice(0, 10),
-        ...pendingProjects.slice(0, 5),
-      ];
-      recentProjects.forEach((project, index) => {
-        const status = project.approver
-          ? project.status === "rejected"
-            ? "REJECTED"
-            : "APPROVED"
-          : "PENDING";
-        const statusIcon = project.approver
-          ? project.status === "rejected"
-            ? "❌"
-            : "✅"
-          : "⏳";
-
-        pdfContent += `
-${index + 1}. ${project.name}
-   Code: ${project.code}
-   Department: ${project.department?.name || "Unknown"}
-   Budget: ₦${(project.budget || 0).toLocaleString()}
-   Status: ${statusIcon} ${status}
-   ${
-     project.approvedAt
-       ? `Approved: ${new Date(project.approvedAt).toLocaleDateString()}`
-       : `Created: ${new Date(project.createdAt).toLocaleDateString()}`
-   }
-`;
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
       });
 
-      pdfContent += `
-═══════════════════════════════════════════════════════════════════════════════
-This report was generated by the ELRA Project Management System.
-For questions or clarifications, contact the Project Management Office.
+      const elraGreen = [13, 100, 73];
 
-© ${new Date().getFullYear()} ELRA - All rights reserved.
-`;
+      // Add ELRA logo
+      try {
+        const fs = await import("fs");
+        const path = await import("path");
+        const logoPath = path.join(
+          process.cwd(),
+          "server",
+          "assets",
+          "images",
+          "elra-logo.png"
+        );
 
-      content = pdfContent;
-      filename = `ELRA-Project-Reports-${
-        new Date().toISOString().split("T")[0]
-      }.pdf`;
-      contentType = "application/pdf";
+        if (fs.existsSync(logoPath)) {
+          const logoData = fs.readFileSync(logoPath);
+          const base64Logo = logoData.toString("base64");
+          doc.addImage(
+            `data:image/png;base64,${base64Logo}`,
+            "PNG",
+            85,
+            15,
+            20,
+            20
+          );
+        }
+      } catch (logoError) {
+        console.warn(
+          "Could not add ELRA logo to project report:",
+          logoError.message
+        );
+      }
+
+      // Header
+      doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+      doc.setFontSize(32);
+      doc.setFont("helvetica", "bold");
+      doc.text("ELRA", 105, 30, { align: "center" });
+
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "normal");
+      doc.text("Project Approval Reports", 105, 40, { align: "center" });
+
+      // Report details
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(
+        `Generated for: ${currentUser.firstName} ${currentUser.lastName}`,
+        20,
+        55
+      );
+      doc.text(`Department: ${currentUser.department?.name || "N/A"}`, 20, 62);
+      doc.text(`Position: ${currentUser.role?.name}`, 20, 69);
+      doc.text(`Report Period: Last ${period} days`, 20, 76);
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 83);
+
+      let yPosition = 105;
+
+      // Summary statistics
+      const summaryData = [
+        ["Total Projects", totalProjects.toString()],
+        ["Approved Projects", approvedCount.toString()],
+        ["Rejected Projects", rejectedCount.toString()],
+        ["Pending Projects", pendingCount.toString()],
+        ["Total Budget Impact", `NGN ${totalBudgetImpact.toLocaleString()}`],
+      ];
+
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.text("Summary Statistics", 20, yPosition);
+      yPosition += 10;
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [["Metric", "Value"]],
+        body: summaryData,
+        theme: "grid",
+        headStyles: { fillColor: elraGreen },
+        styles: { fontSize: 10 },
+      });
+
+      yPosition = doc.lastAutoTable.finalY + 15;
+
+      // Role-based content sections
+      const userDepartment = currentUser.department?.name;
+      const userRole = currentUser.role?.name;
+      const isSuperAdmin = currentUser.role.level >= 1000;
+      const isHOD = currentUser.role.level >= 700;
+
+      // Determine accessible modules based on role
+      const accessibleModules = [];
+
+      if (isSuperAdmin) {
+        accessibleModules.push(
+          "All Project Management",
+          "External Projects",
+          "Internal Projects",
+          "Project Analytics"
+        );
+      } else if (isHOD) {
+        if (userDepartment === "Project Management") {
+          accessibleModules.push(
+            "Project Management",
+            "External Projects",
+            "Internal Projects",
+            "Project Analytics"
+          );
+        } else if (userDepartment === "Finance & Accounting") {
+          accessibleModules.push(
+            "Project Budget Approvals",
+            "Financial Impact Analysis"
+          );
+        } else if (userDepartment === "Legal & Compliance") {
+          accessibleModules.push(
+            "Legal Compliance Reviews",
+            "Contract Approvals"
+          );
+        } else if (userDepartment === "Operations") {
+          accessibleModules.push(
+            "Procurement Approvals",
+            "Resource Allocation"
+          );
+        } else if (userDepartment === "Executive") {
+          accessibleModules.push(
+            "Executive Approvals",
+            "Strategic Project Reviews"
+          );
+        }
+      }
+
+      // Add accessible modules section
+      if (accessibleModules.length > 0) {
+        doc.text("Accessible Project Modules", 20, yPosition);
+        yPosition += 10;
+
+        const moduleData = accessibleModules.map((module) => [
+          module,
+          "Accessible",
+        ]);
+
+        autoTable(doc, {
+          startY: yPosition,
+          head: [["Module", "Status"]],
+          body: moduleData,
+          theme: "grid",
+          headStyles: { fillColor: elraGreen },
+          styles: { fontSize: 10 },
+        });
+
+        yPosition = doc.lastAutoTable.finalY + 15;
+      }
+
+      if (filteredHistoryProjects.length > 0 || pendingProjects.length > 0) {
+        doc.text("Recent Project Activity", 20, yPosition);
+        yPosition += 10;
+
+        const recentProjects =
+          currentUser.department?.name === "Project Management"
+            ? [
+                ...filteredHistoryProjects.slice(0, 10),
+                ...pendingProjects.slice(0, 5),
+                ...externalProjects.slice(0, 5),
+              ]
+            : [
+                ...filteredHistoryProjects.slice(0, 10),
+                ...pendingProjects.slice(0, 5),
+              ];
+
+        const projectData = recentProjects.map((project) => [
+          project.code,
+          project.name.length > 25
+            ? project.name.substring(0, 25) + "..."
+            : project.name,
+          project.department?.name || "Unknown",
+          `NGN ${(project.budget || 0).toLocaleString()}`,
+          project.approver
+            ? project.status === "rejected"
+              ? "REJECTED"
+              : "APPROVED"
+            : "PENDING",
+          project.approvedAt
+            ? new Date(project.approvedAt).toLocaleDateString()
+            : new Date(project.createdAt).toLocaleDateString(),
+        ]);
+
+        autoTable(doc, {
+          startY: yPosition,
+          head: [["Code", "Name", "Department", "Budget", "Status", "Date"]],
+          body: projectData,
+          theme: "grid",
+          headStyles: { fillColor: elraGreen },
+          styles: { fontSize: 8 },
+          columnStyles: {
+            0: { cellWidth: 18 }, // Code
+            1: { cellWidth: 40 }, // Name
+            2: { cellWidth: 30 }, // Department
+            3: { cellWidth: 25 }, // Budget
+            4: { cellWidth: 18 }, // Status
+            5: { cellWidth: 18 }, // Date
+          },
+          margin: { top: 20, right: 20, bottom: 20, left: 20 },
+          tableWidth: "wrap",
+          showHead: "everyPage",
+          didDrawPage: function (data) {
+            const pageCount = doc.internal.getNumberOfPages();
+            const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+            doc.setFontSize(8);
+            doc.setTextColor(100, 100, 100);
+            doc.text(
+              `Page ${currentPage} of ${pageCount} - Generated by ELRA Project Management System`,
+              105,
+              290,
+              { align: "center" }
+            );
+          },
+        });
+      }
+
+      const pdfBuffer = doc.output("arraybuffer");
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="project-reports-${
+          new Date().toISOString().split("T")[0]
+        }.pdf"`
+      );
+      res.send(Buffer.from(pdfBuffer));
+      return;
     } else {
       // Word/HTML format with ELRA branding
       let htmlContent = `

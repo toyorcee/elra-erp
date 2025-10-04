@@ -43,6 +43,7 @@ import {
   getWorkflowStatus,
   getProjectsNeedingInventory,
   getProjectCategories,
+  getExternalProjects,
   processProjectReimbursement,
   completeDepartmentalProjectImplementation,
   addVendorToProject,
@@ -268,6 +269,9 @@ router.get("/budget", checkRole(700), getProjectBudget);
 // Inventory workflow route - Operations HOD only
 router.get("/inventory-workflow", checkRole(700), getProjectsNeedingInventory);
 
+// External projects route - Project Management HOD only
+router.get("/external-projects", checkRole(700), getExternalProjects);
+
 // Regulatory Compliance routes - Legal/Compliance HOD+ only
 router.get(
   "/:id/regulatory-compliance",
@@ -356,11 +360,7 @@ router.get(
   checkLegalApprovalAccess,
   generateProjectCertificate
 );
-router.get(
-  "/:id/certificate",
-  protect,
-  generateProjectCertificate
-);
+router.get("/:id/certificate", protect, generateProjectCertificate);
 router.post("/:id/resubmit", protect, resubmitProject);
 
 // Workflow routes - HOD+

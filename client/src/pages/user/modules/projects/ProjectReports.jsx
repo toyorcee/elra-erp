@@ -4,13 +4,11 @@ import {
   ChartBarIcon,
   DocumentTextIcon,
   CalendarIcon,
-  FunnelIcon,
   ArrowDownTrayIcon,
   CheckCircleIcon,
   XCircleIcon,
   ClockIcon,
-  UserGroupIcon,
-  BuildingOfficeIcon,
+  GlobeAltIcon,
 } from "@heroicons/react/24/outline";
 import { BarChart, PieChart, LineChart } from "../../../../components/graphs";
 import { formatCurrency } from "../../../../utils/formatters";
@@ -25,24 +23,34 @@ const ProjectReports = () => {
   const { user } = useAuth();
   const [reportsData, setReportsData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedPeriod, setSelectedPeriod] = useState("365");
-  const [exportLoading, setExportLoading] = useState({
-    PDF: false,
-    Word: false,
-    CSV: false,
-  });
+  const [reportType, setReportType] = useState("yearly");
+  const [selectedMonth, setSelectedMonth] = useState("all");
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [exportLoading, setExportLoading] = useState(false);
 
   useEffect(() => {
     fetchReportsData();
-  }, [selectedPeriod]);
+  }, [reportType, selectedMonth, selectedYear]);
 
   const fetchReportsData = async () => {
     try {
       setLoading(true);
-      const response = await getProjectApprovalReports({
-        period: selectedPeriod,
+      const params = {
         approverId: user?.id,
-      });
+      };
+
+      if (reportType === "monthly") {
+        if (selectedMonth === "all") {
+          toast.error("Please select a specific month for monthly reports");
+          return;
+        }
+        params.period = `${selectedMonth}/${selectedYear}`;
+      } else if (reportType === "yearly") {
+        params.period = selectedYear;
+      }
+      // For "all", don't send period parameter
+
+      const response = await getProjectApprovalReports(params);
 
       if (response.success) {
         setReportsData(response.data);
@@ -59,110 +67,29 @@ const ProjectReports = () => {
 
   const handleExportPDF = async () => {
     try {
-      setExportLoading((prev) => ({ ...prev, PDF: true }));
-      await exportProjectApprovalReport("PDF", {
-        period: selectedPeriod,
+      setExportLoading(true);
+      const params = {
         approverId: user?.id,
-      });
+        format: "PDF",
+      };
+
+      if (reportType === "monthly") {
+        if (selectedMonth === "all") {
+          toast.error("Please select a specific month for monthly reports");
+          return;
+        }
+        params.period = `${selectedMonth}/${selectedYear}`;
+      } else if (reportType === "yearly") {
+        params.period = selectedYear;
+      }
+
+      await exportProjectApprovalReport("PDF", params);
       toast.success("PDF report exported successfully!");
     } catch (error) {
       console.error("Error exporting PDF:", error);
       toast.error("Failed to export PDF report");
     } finally {
-      setExportLoading((prev) => ({ ...prev, PDF: false }));
-    }
-  };
-
-  const handleExportWord = async () => {
-    try {
-      setExportLoading((prev) => ({ ...prev, Word: true }));
-      await exportProjectApprovalReport("Word", {
-        period: selectedPeriod,
-        approverId: user?.id,
-      });
-      toast.success("Word report exported successfully!");
-    } catch (error) {
-      console.error("Error exporting Word:", error);
-      toast.error("Failed to export Word report");
-    } finally {
-      setExportLoading((prev) => ({ ...prev, Word: false }));
-    }
-  };
-
-  const handleExportCSV = async () => {
-    if (!reportsData) return;
-
-    try {
-      setExportLoading((prev) => ({ ...prev, CSV: true }));
-      // Create CSV content
-      let csvContent = "Project Approval Reports\n\n";
-      csvContent += `Generated for: ${reportsData.approver.name}\n`;
-      csvContent += `Department: ${reportsData.approver.department}\n`;
-      csvContent += `Period: Last ${reportsData.period} days\n`;
-      csvContent += `Generated: ${new Date(
-        reportsData.generatedAt
-      ).toLocaleString()}\n\n`;
-
-      // Summary data
-      csvContent += "SUMMARY\n";
-      csvContent += "Metric,Value\n";
-      csvContent += `Total Projects,${reportsData.summary.totalProjects}\n`;
-      csvContent += `Approved Projects,${reportsData.summary.approvedProjects}\n`;
-      csvContent += `Rejected Projects,${reportsData.summary.rejectedProjects}\n`;
-      csvContent += `Pending Projects,${reportsData.summary.pendingProjects}\n`;
-      csvContent += `Total Budget Impact,${formatCurrency(
-        reportsData.summary.totalBudgetImpact
-      )}\n\n`;
-
-      // Monthly trends
-      csvContent += "MONTHLY TRENDS\n";
-      csvContent += "Month,Projects,Approved,Rejected,Budget\n";
-      reportsData.monthlyTrends.forEach((trend) => {
-        csvContent += `${trend.month},${trend.projects},${trend.approved},${
-          trend.rejected
-        },${formatCurrency(trend.budget)}\n`;
-      });
-      csvContent += "\n";
-
-      // Department breakdown
-      csvContent += "DEPARTMENT BREAKDOWN\n";
-      csvContent += "Department,Projects,Budget,Approved,Rejected,Pending\n";
-      reportsData.departmentBreakdown.forEach((dept) => {
-        csvContent += `${dept.department},${dept.projects},${formatCurrency(
-          dept.budget
-        )},${dept.approved},${dept.rejected},${dept.pending}\n`;
-      });
-      csvContent += "\n";
-
-      // Recent approvals
-      csvContent += "RECENT PROJECT ACTIVITY\n";
-      csvContent += "Project Name,Department,Budget,Status\n";
-      reportsData.recentApprovals.forEach((approval) => {
-        csvContent += `${approval.projectName},${
-          approval.department
-        },${formatCurrency(approval.budget)},${approval.status}\n`;
-      });
-
-      // Download CSV
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const link = document.createElement("a");
-      const url = URL.createObjectURL(blob);
-      link.setAttribute("href", url);
-      link.setAttribute(
-        "download",
-        `project-approval-reports-${new Date().toISOString().split("T")[0]}.csv`
-      );
-      link.style.visibility = "hidden";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      toast.success("CSV report exported successfully!");
-    } catch (error) {
-      console.error("Error exporting CSV:", error);
-      toast.error("Failed to export CSV report");
-    } finally {
-      setExportLoading((prev) => ({ ...prev, CSV: false }));
+      setExportLoading(false);
     }
   };
 
@@ -195,89 +122,87 @@ const ProjectReports = () => {
             management module
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={handleExportPDF}
-            disabled={exportLoading.PDF}
-            className={`${
-              exportLoading.PDF
-                ? "bg-red-300 cursor-not-allowed"
-                : "bg-red-500 hover:bg-red-600 cursor-pointer"
-            } text-white px-4 py-2 rounded-xl font-semibold flex items-center space-x-2 transition-colors`}
-            title="Export Project report as PDF"
-          >
-            {exportLoading.PDF ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-            ) : (
-              <ArrowDownTrayIcon className="h-5 w-5" />
-            )}
-            <span>{exportLoading.PDF ? "Exporting..." : "Export PDF"}</span>
-          </button>
-          <button
-            onClick={handleExportWord}
-            disabled={exportLoading.Word}
-            className={`${
-              exportLoading.Word
-                ? "bg-blue-300 cursor-not-allowed"
-                : "bg-blue-500 hover:bg-blue-600 cursor-pointer"
-            } text-white px-4 py-2 rounded-xl font-semibold flex items-center space-x-2 transition-colors`}
-            title="Export Project report as Word/HTML"
-          >
-            {exportLoading.Word ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-            ) : (
-              <ArrowDownTrayIcon className="h-5 w-5" />
-            )}
-            <span>{exportLoading.Word ? "Exporting..." : "Export Word"}</span>
-          </button>
-          <button
-            onClick={handleExportCSV}
-            disabled={exportLoading.CSV}
-            className={`${
-              exportLoading.CSV
-                ? "bg-green-300 cursor-not-allowed"
-                : "bg-green-500 hover:bg-green-600 cursor-pointer"
-            } text-white px-4 py-2 rounded-xl font-semibold flex items-center space-x-2 transition-colors`}
-            title="Export Project report as CSV"
-          >
-            {exportLoading.CSV ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-            ) : (
-              <ArrowDownTrayIcon className="h-5 w-5" />
-            )}
-            <span>{exportLoading.CSV ? "Exporting..." : "Export CSV"}</span>
-          </button>
-        </div>
       </div>
 
-      {/* Period Selector */}
-      <div className="flex items-center justify-between bg-white rounded-xl shadow-lg border border-gray-200 p-4">
-        <div className="flex items-center space-x-4">
-          <CalendarIcon className="h-5 w-5 text-gray-500" />
-          <span className="text-sm font-medium text-gray-700">
-            Report Period:
-          </span>
-          <select
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent bg-white"
-          >
-            <option value="7">Last 7 days</option>
-            <option value="30">Last 30 days</option>
-            <option value="90">Last 90 days</option>
-            <option value="180">Last 6 months</option>
-            <option value="365">Last year</option>
-            <option value="730">Last 2 years</option>
-            <option value="1095">Last 3 years</option>
-            <option value="1825">Last 5 years</option>
-            <option value="3650">Last 10 years</option>
-            <option value="7300">Last 20 years</option>
-          </select>
+      {/* Report Controls */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white rounded-xl shadow-sm p-6"
+      >
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center space-y-4 xl:space-y-0">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center space-y-3 lg:space-y-0 lg:space-x-4 w-full xl:w-auto">
+            <div className="flex items-center space-x-2">
+              <label className="text-sm font-medium text-gray-700">
+                Report Type:
+              </label>
+              <select
+                value={reportType}
+                onChange={(e) => setReportType(e.target.value)}
+                className="rounded-md border-gray-300 shadow-sm focus:border-[var(--elra-primary)] focus:ring focus:ring-[var(--elra-primary)] focus:ring-opacity-50"
+              >
+                <option value="monthly">Monthly Report</option>
+                <option value="yearly">Yearly Report</option>
+              </select>
+            </div>
+
+            {reportType === "monthly" && (
+              <div className="flex items-center space-x-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Month:
+                </label>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                  className="rounded-md border-gray-300 shadow-sm focus:border-[var(--elra-primary)] focus:ring focus:ring-[var(--elra-primary)] focus:ring-opacity-50"
+                >
+                  <option value="all">All Months</option>
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {new Date(0, i).toLocaleString("default", {
+                        month: "long",
+                      })}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="flex items-center space-x-2">
+              <label className="text-sm font-medium text-gray-700">Year:</label>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                className="rounded-md border-gray-300 shadow-sm focus:border-[var(--elra-primary)] focus:ring focus:ring-[var(--elra-primary)] focus:ring-opacity-50"
+              >
+                {Array.from({ length: 5 }, (_, i) => {
+                  const year = new Date().getFullYear() - i;
+                  return (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full xl:w-auto">
+            <button
+              onClick={handleExportPDF}
+              disabled={exportLoading}
+              className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+            >
+              {exportLoading ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              ) : (
+                <DocumentTextIcon className="h-4 w-4 mr-2" />
+              )}
+              {exportLoading ? "Generating PDF..." : "Export PDF"}
+            </button>
+          </div>
         </div>
-        <div className="text-sm text-gray-500">
-          Generated: {new Date(reportsData.generatedAt).toLocaleString()}
-        </div>
-      </div>
+      </motion.div>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
@@ -443,6 +368,93 @@ const ProjectReports = () => {
         </motion.div>
       </div>
 
+      {/* Project Classification Graph for PM HOD */}
+      {user?.department?.name === "Project Management" && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-6"
+        >
+          <h3 className="text-xl font-bold text-gray-900 mb-6">
+            Project Classification Overview
+          </h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <PieChart
+              data={{
+                labels: [
+                  "Pending Approvals",
+                  "Cross-Departmental Approved",
+                  "External Projects",
+                ],
+                datasets: [
+                  {
+                    data: [
+                      reportsData.summary.pendingProjects || 0,
+                      reportsData.summary.approvedProjects || 0,
+                      reportsData.summary.externalProjects || 0,
+                    ],
+                  },
+                ],
+              }}
+              title="Project Distribution"
+              height={300}
+              colors={["#F59E0B", "#10B981", "#8B5CF6"]}
+            />
+            <div className="space-y-4">
+              <div className="bg-gradient-to-r from-amber-50 to-amber-100 p-4 rounded-lg border border-amber-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold text-amber-800">
+                      Pending Approvals
+                    </h4>
+                    <p className="text-2xl font-bold text-amber-900">
+                      {reportsData.summary.pendingProjects || 0}
+                    </p>
+                    <p className="text-sm text-amber-700">
+                      Projects awaiting your approval
+                    </p>
+                  </div>
+                  <ClockIcon className="h-8 w-8 text-amber-600" />
+                </div>
+              </div>
+              <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold text-green-800">
+                      Cross-Departmental Approved
+                    </h4>
+                    <p className="text-2xl font-bold text-green-900">
+                      {reportsData.summary.approvedProjects || 0}
+                    </p>
+                    <p className="text-sm text-green-700">
+                      Projects you've approved across departments
+                    </p>
+                  </div>
+                  <CheckCircleIcon className="h-8 w-8 text-green-600" />
+                </div>
+              </div>
+              <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold text-purple-800">
+                      External Projects
+                    </h4>
+                    <p className="text-2xl font-bold text-purple-900">
+                      {reportsData.summary.externalProjects || 0}
+                    </p>
+                    <p className="text-sm text-purple-700">
+                      External projects you manage
+                    </p>
+                  </div>
+                  <GlobeAltIcon className="h-8 w-8 text-purple-600" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Department breakdown - two charts side-by-side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <motion.div
@@ -499,38 +511,6 @@ const ProjectReports = () => {
             title="Budget Distribution"
             height={300}
             colors={["#8B5CF6"]}
-          />
-        </motion.div>
-      </div>
-
-      {/* Approval Performance Metrics */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
-          className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
-        >
-          <h3 className="text-xl font-bold text-gray-900 mb-6">
-            Weekly Approval Volume
-          </h3>
-          <BarChart
-            data={{
-              labels: Object.keys(
-                reportsData.approvalMetrics?.approvalVolumeByDay || {}
-              ),
-              datasets: [
-                {
-                  label: "Projects Approved",
-                  data: Object.values(
-                    reportsData.approvalMetrics?.approvalVolumeByDay || {}
-                  ),
-                },
-              ],
-            }}
-            title="Daily Approval Patterns"
-            height={300}
-            colors={["#F59E0B"]}
           />
         </motion.div>
       </div>

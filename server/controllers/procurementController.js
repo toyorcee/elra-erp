@@ -224,11 +224,7 @@ const sendProcurementEmailToSupplier = async (procurement, currentUser) => {
 
         </div>
 
-        
-        
         <p>We look forward to a successful business relationship.</p>
-
-        
         
         <p>Best regards,<br>
 
@@ -239,8 +235,6 @@ const sendProcurementEmailToSupplier = async (procurement, currentUser) => {
         ELRA (Equipment Leasing Registration Authority)</p>
 
       </div>
-
-      
       
       <div class="footer">
 
@@ -2043,14 +2037,25 @@ export const markAsDelivered = async (req, res) => {
         const project = await Project.findById(procurement.relatedProject);
 
         if (project) {
+          console.log(
+            `🔍 [DEBUG] Project before inventory creation: ${project.code} - Status: ${project.status}`
+          );
+
           await project.createInventoryFromProcurement(
             procurement,
-
             currentUser
           );
 
           console.log(
             `✅ [INVENTORY] Inventory creation triggered successfully for project: ${project.name}`
+          );
+
+          // Reload project to check final status
+          const updatedProject = await Project.findById(
+            procurement.relatedProject
+          );
+          console.log(
+            `🔍 [DEBUG] Project after inventory creation: ${updatedProject.code} - Status: ${updatedProject.status}`
           );
         }
       } catch (inventoryError) {
@@ -2174,15 +2179,15 @@ export const exportProcurementReport = async (req, res) => {
         "server",
         "assets",
         "images",
-        "elra-logo.png"
+        "elra-logo.jpg"
       );
 
       if (fs.existsSync(logoPath)) {
         const logoData = fs.readFileSync(logoPath);
         const base64Logo = logoData.toString("base64");
         doc.addImage(
-          `data:image/png;base64,${base64Logo}`,
-          "PNG",
+          `data:image/jpeg;base64,${base64Logo}`,
+          "JPEG",
           85,
           15,
           20,
@@ -2240,22 +2245,26 @@ export const exportProcurementReport = async (req, res) => {
 
     doc.setFontSize(12);
     doc.setTextColor(0, 0, 0);
-             doc.text("Summary Statistics", 20, yPosition);
-             yPosition += 10;
+    doc.text("Summary Statistics", 20, yPosition);
+    yPosition += 10;
 
-             const formattedSummaryData = summaryData.map(([metric, value]) => [
-               metric,
-               metric.includes("Amount") ? `NGN ${parseInt(value.toString().replace(/[₦,]/g, '') || 0).toLocaleString()}` : value
-             ]);
+    const formattedSummaryData = summaryData.map(([metric, value]) => [
+      metric,
+      metric.includes("Amount")
+        ? `NGN ${parseInt(
+            value.toString().replace(/[₦,]/g, "") || 0
+          ).toLocaleString()}`
+        : value,
+    ]);
 
-             autoTable(doc, {
-               startY: yPosition,
-               head: [["Metric", "Value"]],
-               body: formattedSummaryData,
-               theme: "grid",
-               headStyles: { fillColor: elraGreen },
-               styles: { fontSize: 10 },
-             });
+    autoTable(doc, {
+      startY: yPosition,
+      head: [["Metric", "Value"]],
+      body: formattedSummaryData,
+      theme: "grid",
+      headStyles: { fillColor: elraGreen },
+      styles: { fontSize: 10 },
+    });
 
     yPosition = doc.lastAutoTable.finalY + 15;
 

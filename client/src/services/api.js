@@ -25,6 +25,16 @@ api.interceptors.request.use(
 let isRefreshing = false;
 let failedQueue = [];
 
+export const clearApiInterceptors = () => {
+  isRefreshing = false;
+  failedQueue = [];
+  console.log("🧹 [API] Cleared interceptors and failed queue");
+};
+
+if (typeof window !== "undefined") {
+  window.clearApiInterceptors = clearApiInterceptors;
+}
+
 const processQueue = (error, token = null) => {
   failedQueue.forEach((prom) => {
     if (error) {

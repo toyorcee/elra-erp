@@ -172,8 +172,25 @@ const parseTimeToMs = (timeString) => {
 const clearTokenCookies = (res) => {
   const cookieOptions = getCookieOptions();
 
-  res.clearCookie("token", { ...cookieOptions, maxAge: 0 });
-  res.clearCookie("refreshToken", { ...cookieOptions, maxAge: 0 });
+  // Clear cookies with explicit options
+  res.clearCookie("token", {
+    ...cookieOptions,
+    maxAge: 0,
+    httpOnly: true,
+    secure: cookieOptions.secure,
+    sameSite: cookieOptions.sameSite,
+    path: "/",
+  });
+  res.clearCookie("refreshToken", {
+    ...cookieOptions,
+    maxAge: 0,
+    httpOnly: true,
+    secure: cookieOptions.secure,
+    sameSite: cookieOptions.sameSite,
+    path: "/",
+  });
+
+  console.log("✅ [clearTokenCookies] Cookies cleared successfully");
 };
 
 // @desc    Register a new user with smart approval system
@@ -1519,7 +1536,35 @@ export const getUserModules = async (req, res) => {
 
     let availableModules = [];
 
-    const moduleAccessList = user.moduleAccess || [];
+    let moduleAccessList = [];
+
+    if (user.role?.name === "SUPER_ADMIN") {
+      moduleAccessList = user.moduleAccess || [];
+      console.log(
+        "🔍 [getUserModules] SUPER_ADMIN - using only user moduleAccess:",
+        moduleAccessList.length
+      );
+    } else {
+      const userModuleAccess = user.moduleAccess || [];
+      const roleModuleAccess = user.role?.moduleAccess || [];
+
+      moduleAccessList = [...userModuleAccess];
+
+      for (const roleModule of roleModuleAccess) {
+        const userHasModule = userModuleAccess.some(
+          (userModule) => userModule.module === roleModule.module
+        );
+        if (!userHasModule) {
+          moduleAccessList.push(roleModule);
+        }
+      }
+
+      console.log("🔍 [getUserModules] Non-Super Admin - combined access:", {
+        userModules: userModuleAccess.length,
+        roleModules: roleModuleAccess.length,
+        combinedModules: moduleAccessList.length,
+      });
+    }
 
     if (moduleAccessList.length > 0) {
       const Module = (await import("../models/Module.js")).default;

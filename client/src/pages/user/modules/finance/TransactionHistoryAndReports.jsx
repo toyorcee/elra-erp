@@ -13,8 +13,6 @@ import {
   DocumentTextIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
-  XCircleIcon,
-  ArrowDownTrayIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-toastify";
 import DataTable from "../../../../components/common/DataTable";
@@ -48,6 +46,13 @@ const TransactionHistoryAndReports = () => {
   const [reportsData, setReportsData] = useState(null);
   const [selectedPeriod, setSelectedPeriod] = useState("365");
   const [activeTab, setActiveTab] = useState("transactions"); // "transactions" or "reports"
+
+  // Separate loading states for export functions
+  const [exportLoading, setExportLoading] = useState({
+    pdf: false,
+    word: false,
+    csv: false,
+  });
 
   const transactionColumns = [
     {
@@ -89,8 +94,10 @@ const TransactionHistoryAndReports = () => {
     {
       header: "Amount",
       accessor: "amount",
+      headerClassName: "text-right",
+      cellClassName: "text-right",
       renderer: (transaction) => (
-        <div>
+        <div className="text-right">
           <div
             className={`text-sm font-medium ${
               transaction.type === "deposit"
@@ -266,40 +273,40 @@ const TransactionHistoryAndReports = () => {
 
   const handleExportPDF = async () => {
     try {
-      setLoading(true);
+      setExportLoading((prev) => ({ ...prev, pdf: true }));
       await exportTransactionHistoryPDF(filters);
       toast.success("PDF report exported successfully!");
     } catch (error) {
       console.error("Error exporting PDF:", error);
       toast.error("Failed to export PDF report");
     } finally {
-      setLoading(false);
+      setExportLoading((prev) => ({ ...prev, pdf: false }));
     }
   };
 
   const handleExportWord = async () => {
     try {
-      setLoading(true);
+      setExportLoading((prev) => ({ ...prev, word: true }));
       await exportTransactionHistoryWord(filters);
       toast.success("Word report exported successfully!");
     } catch (error) {
       console.error("Error exporting Word report:", error);
       toast.error("Failed to export Word report");
     } finally {
-      setLoading(false);
+      setExportLoading((prev) => ({ ...prev, word: false }));
     }
   };
 
   const handleExportCSV = async () => {
     try {
-      setLoading(true);
+      setExportLoading((prev) => ({ ...prev, csv: true }));
       await exportTransactionHistoryCSV(filters);
       toast.success("CSV report exported successfully!");
     } catch (error) {
       console.error("Error exporting CSV report:", error);
       toast.error("Failed to export CSV report");
     } finally {
-      setLoading(false);
+      setExportLoading((prev) => ({ ...prev, csv: false }));
     }
   };
 
@@ -556,60 +563,84 @@ const TransactionHistoryAndReports = () => {
                 <div className="flex items-center space-x-3">
                   <button
                     onClick={handleExportPDF}
-                    disabled={loading || filteredTransactions.length === 0}
+                    disabled={
+                      exportLoading.pdf || filteredTransactions.length === 0
+                    }
                     className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     title="Export as PDF"
                   >
-                    <svg
-                      className="w-4 h-4"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <span>Export PDF</span>
+                    {exportLoading.pdf ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <svg
+                        className="w-4 h-4"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    )}
+                    <span>
+                      {exportLoading.pdf ? "Exporting..." : "Export PDF"}
+                    </span>
                   </button>
                   <button
                     onClick={handleExportWord}
-                    disabled={loading || filteredTransactions.length === 0}
+                    disabled={
+                      exportLoading.word || filteredTransactions.length === 0
+                    }
                     className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     title="Export as Word/HTML"
                   >
-                    <svg
-                      className="w-4 h-4"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <span>Export Word</span>
+                    {exportLoading.word ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <svg
+                        className="w-4 h-4"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    )}
+                    <span>
+                      {exportLoading.word ? "Exporting..." : "Export Word"}
+                    </span>
                   </button>
                   <button
                     onClick={handleExportCSV}
-                    disabled={loading || filteredTransactions.length === 0}
+                    disabled={
+                      exportLoading.csv || filteredTransactions.length === 0
+                    }
                     className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     title="Export as CSV"
                   >
-                    <svg
-                      className="w-4 h-4"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <span>Export CSV</span>
+                    {exportLoading.csv ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <svg
+                        className="w-4 h-4"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    )}
+                    <span>
+                      {exportLoading.csv ? "Exporting..." : "Export CSV"}
+                    </span>
                   </button>
                 </div>
               </div>

@@ -2572,7 +2572,6 @@ export const startDepartmentalProjectImplementation = async (req, res) => {
       });
     }
 
-    // Check if project is departmental
     if (project.projectScope !== "departmental") {
       return res.status(400).json({
         success: false,
@@ -2580,7 +2579,6 @@ export const startDepartmentalProjectImplementation = async (req, res) => {
       });
     }
 
-    // Check if project is approved and in implementation
     if (project.status !== "approved" && project.status !== "implementation") {
       return res.status(400).json({
         success: false,
@@ -2589,19 +2587,18 @@ export const startDepartmentalProjectImplementation = async (req, res) => {
       });
     }
 
-    // Update project completion details
     project.status = "completed";
+    project.workflowPhase = "completion";
+    project.workflowStep = 4;
     project.actualEndDate = new Date();
     project.actualCost = actualCost || 0;
     project.completionNotes = completionNotes;
     project.completedBy = currentUser._id;
 
-    // Set finance status to pending reimbursement
     project.financeStatus = "pending";
 
     await project.save();
 
-    // Notify Finance HOD about reimbursement requirement
     try {
       const financeDept = await mongoose
         .model("Department")
@@ -3570,6 +3567,8 @@ export const approveProject = async (req, res) => {
           }
           approverMessage += ` The project has been forwarded to ${nextStage} for the next approval stage.`;
         }
+      } else if (project.status === "pending_budget_allocation") {
+        approverMessage += ` The project has been forwarded to Finance HOD for budget allocation.`;
       } else {
         approverMessage += ` The project has been fully approved and is ready for implementation.`;
       }
@@ -4828,7 +4827,10 @@ export const getPendingApprovalProjects = async (req, res) => {
           projectDoc.status
         );
 
-        if (projectDoc.complianceProgram) {
+        if (
+          projectDoc.projectScope === "external" &&
+          projectDoc.complianceProgram
+        ) {
           const Compliance = await import("../models/Compliance.js");
           const complianceItems = await Compliance.default.find({
             complianceProgram: projectDoc.complianceProgram._id,
@@ -5673,7 +5675,7 @@ export const getCrossDepartmentalApprovalHistory = async (req, res) => {
           0;
 
         let complianceItems = [];
-        if (project.complianceProgram) {
+        if (project.projectScope === "external" && project.complianceProgram) {
           const Compliance = await import("../models/Compliance.js");
           complianceItems = await Compliance.default.find({
             complianceProgram: project.complianceProgram._id,
@@ -7427,15 +7429,15 @@ export const exportProjectApprovalReport = async (req, res) => {
           "server",
           "assets",
           "images",
-          "elra-logo.png"
+          "elra-logo.jpg"
         );
 
         if (fs.existsSync(logoPath)) {
           const logoData = fs.readFileSync(logoPath);
           const base64Logo = logoData.toString("base64");
           doc.addImage(
-            `data:image/png;base64,${base64Logo}`,
-            "PNG",
+            `data:image/jpeg;base64,${base64Logo}`,
+            "JPEG",
             85,
             15,
             20,
@@ -7801,7 +7803,6 @@ export const generateProjectCertificate = async (req, res) => {
       `🏆 [PROJECT CERTIFICATE] Generating certificate for project: ${id}`
     );
 
-    // Find the project with all necessary data
     const project = await Project.findById(id)
       .populate("complianceProgram")
       .populate("createdBy", "firstName lastName email")
@@ -7929,17 +7930,10 @@ export const generateProjectCertificate = async (req, res) => {
       `✅ [PROJECT CERTIFICATE] Certificate data prepared for project: ${project.name} (${project.projectScope})`
     );
 
-    // Generate PDF certificate based on project scope
-    const pdfBuffer = await generateComplianceCertificatePDF(certificateData);
-
-    // Set response headers for PDF download based on certificate type
-    const certificateType =
-      project.projectScope === "external" ? "Compliance" : "Achievement";
-    const filename = `ELRA-${certificateType}-Certificate-${project.code}.pdf`;
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.send(pdfBuffer);
+    res.status(200).json({
+      success: true,
+      data: certificateData,
+    });
   } catch (error) {
     console.error(
       "❌ [PROJECT CERTIFICATE] Error generating certificate:",
@@ -7948,6 +7942,174 @@ export const generateProjectCertificate = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to generate project certificate",
+      error: error.message,
+    });
+  }
+};
+
+// Generate Project Certificate PDF (Download)
+export const generateProjectCertificatePDF = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+
+    console.log(
+      `🏆 [PROJECT CERTIFICATE PDF] Generating PDF for project: ${id}`
+    );
+
+    // Find the project with all necessary data
+    const project = await Project.findById(id)
+      .populate("complianceProgram")
+      .populate("createdBy", "firstName lastName email")
+      .populate("projectManager", "firstName lastName email")
+      .populate("department", "name code")
+      .populate("approvalChain.approver", "firstName lastName email");
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    // Check if project is eligible for certificate based on scope
+    if (project.projectScope === "external") {
+      // External projects: Check if both phases are 100% complete
+      if (
+        project.approvalProgress !== 100 ||
+        project.implementationProgress !== 100
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "External project certificate is available only after both approval and implementation phases are 100% complete.",
+        });
+      }
+    } else {
+      // Departmental/Personal projects: Check if project is completed
+      if (project.status !== "completed") {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Project certificate is available only after project completion.",
+        });
+      }
+    }
+
+    // Fetch compliance items (only for external projects with compliance programs)
+    let complianceItems = [];
+    if (project.projectScope === "external" && project.complianceProgram) {
+      const Compliance = await import("../models/Compliance.js");
+      complianceItems = await Compliance.default.find({
+        complianceProgram: project.complianceProgram._id,
+      });
+    }
+
+    // Generate certificate number and details based on project scope
+    const certificateNumber =
+      project.projectScope === "external"
+        ? `ELRA-COMP-${Date.now()}`
+        : `ELRA-ACH-${Date.now()}`;
+
+    const issueDate = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+    // Create certificate data based on project scope
+    const certificateData = {
+      project: {
+        name: project.name,
+        code: project.code,
+        description: project.description,
+        budget: project.budget,
+        startDate: project.startDate,
+        endDate: project.endDate,
+        createdBy: project.createdBy,
+        projectManager: project.projectManager,
+        department: project.department,
+        projectScope: project.projectScope,
+        approvalProgress: project.approvalProgress,
+        implementationProgress: project.implementationProgress,
+        overallProgress: project.progress,
+        clientName: null,
+      },
+      approvalChain: project.approvalChain.map((approval) => ({
+        level: approval.level,
+        approver: approval.approver,
+        approvedAt: approval.approvedAt,
+        comments: approval.comments,
+      })),
+      complianceProgram: project.complianceProgram
+        ? {
+            name: project.complianceProgram.name,
+            description: project.complianceProgram.description,
+            category: project.complianceProgram.category,
+            status: project.complianceProgram.status,
+            priority: project.complianceProgram.priority,
+            programOwner: project.complianceProgram.programOwner,
+            effectiveDate: project.complianceProgram.effectiveDate,
+            reviewDate: project.complianceProgram.reviewDate,
+          }
+        : null,
+      complianceItems: complianceItems.map((item) => ({
+        title: item.title,
+        category: item.category,
+        status: item.status,
+        priority: item.priority,
+        description: item.description,
+        dueDate: item.dueDate,
+        lastAudit: item.lastAudit,
+      })),
+      certificate: {
+        number: certificateNumber,
+        issueDate: issueDate,
+        issuedBy: user.firstName + " " + user.lastName,
+        issuedByTitle:
+          project.projectScope === "external"
+            ? "Legal & Compliance HOD"
+            : "Project Management HOD",
+        department:
+          project.projectScope === "external"
+            ? "Legal & Compliance"
+            : "Project Management",
+        type:
+          project.projectScope === "external"
+            ? "Compliance Certificate"
+            : "Achievement Certificate",
+      },
+    };
+
+    console.log(
+      `✅ [PROJECT CERTIFICATE PDF] Certificate data prepared for project: ${project.name} (${project.projectScope})`
+    );
+
+    // Generate PDF certificate based on project scope
+    console.log("🔄 [PDF GENERATION] Starting PDF generation...");
+    const pdfBuffer = await generateComplianceCertificatePDF(certificateData);
+    console.log(
+      "✅ [PDF GENERATION] PDF generated successfully, buffer size:",
+      pdfBuffer.byteLength
+    );
+
+    // Set response headers for PDF download based on certificate type
+    const certificateType =
+      project.projectScope === "external" ? "Compliance" : "Achievement";
+    const filename = `ELRA-${certificateType}-Certificate-${project.code}.pdf`;
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", pdfBuffer.byteLength);
+    res.send(Buffer.from(pdfBuffer));
+  } catch (error) {
+    console.error(
+      "❌ [PROJECT CERTIFICATE PDF] Error generating certificate PDF:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate project certificate PDF",
       error: error.message,
     });
   }

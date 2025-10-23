@@ -20,6 +20,7 @@ import {
   resubmitProject,
   legalApproveProject,
   generateProjectCertificate,
+  generateProjectCertificatePDF,
   triggerPostApprovalWorkflow,
   getProjectWorkflowStatus,
   getPendingApprovalProjects,
@@ -361,6 +362,7 @@ router.get(
   generateProjectCertificate
 );
 router.get("/:id/certificate", protect, generateProjectCertificate);
+router.get("/:id/certificate/pdf", protect, generateProjectCertificatePDF);
 router.post("/:id/resubmit", protect, resubmitProject);
 
 // Workflow routes - HOD+

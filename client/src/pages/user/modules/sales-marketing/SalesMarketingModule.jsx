@@ -115,7 +115,7 @@ const SalesMarketingModule = () => {
         return !(isSuperAdmin || isFinanceHOD || isSalesMarketingHOD);
       },
     },
-  ].filter(hasAccess); // Filter out items user doesn't have access to
+  ].filter(hasAccess);
 
   const quickActions = [
     {
@@ -128,7 +128,7 @@ const SalesMarketingModule = () => {
       title: "New Transaction",
       icon: FaPlus,
       color: "bg-green-500",
-      path: "/dashboard/modules/sales/add",
+      path: "/dashboard/modules/sales/transactions",
     },
     {
       title: "Generate Reports",

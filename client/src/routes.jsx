@@ -363,6 +363,10 @@ const AppRoutes = () => {
           element={<DepartmentProjects />}
         />
 
+        <Route
+          path="modules/customer-care"
+          element={<CustomerCareDashboard />}
+        />
         <Route path="modules/communication" element={<Communication />} />
         <Route
           path="modules/communication/messages"

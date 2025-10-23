@@ -331,11 +331,76 @@ export const createBudgetAllocation = async (req, res) => {
         "✅ [BUDGET ALLOCATION] Project saved with updated approval chain"
       );
 
+      // Reserve funds from ELRA wallet for personal/departmental projects
+      if (
+        project.requiresBudgetAllocation === true &&
+        (project.projectScope === "personal" ||
+          project.projectScope === "departmental")
+      ) {
+        console.log(
+          `💰 [BUDGET ALLOCATION] Reserving funds for ${project.projectScope} project: ${project.name} (${project.code})`
+        );
+
+        try {
+          // Import ELRA wallet model
+          const ELRAWallet = mongoose.model("ELRAWallet");
+          const wallet = await ELRAWallet.findOne();
+
+          if (!wallet) {
+            throw new Error("ELRA wallet not found");
+          }
+
+          // Calculate total project cost
+          const totalProjectCost = project.projectItems.reduce(
+            (sum, item) => sum + item.totalPrice,
+            0
+          );
+
+          console.log(
+            `💰 [BUDGET ALLOCATION] Project total cost: ₦${totalProjectCost.toLocaleString()}`
+          );
+          console.log(
+            `💰 [BUDGET ALLOCATION] BEFORE RESERVATION - Projects budget: Available ₦${wallet.budgetCategories.projects.available.toLocaleString()}, Reserved ₦${wallet.budgetCategories.projects.reserved.toLocaleString()}`
+          );
+
+          await wallet.reserveFromCategory(
+            "projects",
+            totalProjectCost,
+            `${
+              project.projectScope.charAt(0).toUpperCase() +
+              project.projectScope.slice(1)
+            } Project: ${project.name} (${project.code}) - Budget Allocation`,
+            project.code,
+            project._id,
+            "project",
+            allocatedBy._id,
+            null
+          );
+
+          console.log(
+            `✅ [BUDGET ALLOCATION] Successfully reserved ₦${totalProjectCost.toLocaleString()} for ${
+              project.projectScope
+            } project ${project.code}`
+          );
+        } catch (walletError) {
+          console.error(
+            `❌ [BUDGET ALLOCATION] Error reserving funds:`,
+            walletError
+          );
+          // Don't throw error - just log it and continue
+          console.log(
+            "⚠️ [BUDGET ALLOCATION] Continuing without fund reservation due to error"
+          );
+        }
+      }
+
       if (project.requiresBudgetAllocation === true) {
         console.log(
           "🛒 [BUDGET ALLOCATION] ${project.projectScope} project with budget allocation - triggering procurement workflow"
         );
         project.status = "pending_procurement";
+        project.workflowPhase = "procurement";
+        project.workflowStep = 2;
         await project.save();
         console.log(
           "📊 [STATS TRANSFORM] Project status set to pending_procurement"
@@ -798,6 +863,8 @@ export const approveBudgetAllocation = async (req, res) => {
           "🛒 [BUDGET ALLOCATION] ${project.projectScope} project with budget allocation - triggering procurement workflow"
         );
         project.status = "pending_procurement";
+        project.workflowPhase = "procurement";
+        project.workflowStep = 2;
         await project.save();
 
         // Procurement creation is handled in the main allocation creation logic

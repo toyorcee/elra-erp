@@ -494,14 +494,19 @@ export const getModulesForUser = (user) => {
       required: { minLevel: 0 },
       section: "main",
     },
-    {
-      label: "Self-Service",
-      icon: "HiOutlineUser",
-      path: "/dashboard/modules/self-service",
-      required: { minLevel: 0 },
-      section: "erp",
-      badge: "Personal",
-    },
+    // Self-Service: Available to all users EXCEPT Super Admin
+    ...(roleLevel !== 1000
+      ? [
+          {
+            label: "Self-Service",
+            icon: "HiOutlineUser",
+            path: "/dashboard/modules/self-service",
+            required: { minLevel: 0 },
+            section: "erp",
+            badge: "Personal",
+          },
+        ]
+      : []),
     {
       label: "Customer Care",
       icon: "HiOutlinePhone",

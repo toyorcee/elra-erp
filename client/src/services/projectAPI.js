@@ -88,6 +88,30 @@ export const getProjectById = async (id) => {
   }
 };
 
+// Get project certificate data (JSON)
+export const fetchProjectCertificateData = async (projectId) => {
+  try {
+    const response = await api.get(`/projects/${projectId}/certificate`);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching project certificate data:", error);
+    throw error;
+  }
+};
+
+// Download project certificate PDF
+export const downloadProjectCertificatePDF = async (projectId) => {
+  try {
+    const response = await api.get(`/projects/${projectId}/certificate/pdf`, {
+      responseType: "blob",
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error downloading project certificate PDF:", error);
+    throw error;
+  }
+};
+
 // Get projects needing inventory workflow (Operations HOD only)
 export const getProjectsNeedingInventory = async () => {
   try {

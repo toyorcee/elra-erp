@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import {
   CheckCircleIcon,
   DocumentTextIcon,
-  PrinterIcon,
   ArrowLeftIcon,
   ShieldCheckIcon,
   CalendarIcon,
@@ -12,6 +11,10 @@ import {
   BuildingOfficeIcon,
 } from "@heroicons/react/24/outline";
 import { FaCertificate, FaStamp, FaSignature } from "react-icons/fa";
+import {
+  fetchProjectCertificateData,
+  downloadProjectCertificatePDF,
+} from "../../../../services/projectAPI.js";
 
 const ComplianceCertificate = () => {
   const { projectId } = useParams();
@@ -19,6 +22,7 @@ const ComplianceCertificate = () => {
   const [certificateData, setCertificateData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     fetchCertificateData();
@@ -27,23 +31,12 @@ const ComplianceCertificate = () => {
   const fetchCertificateData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `/api/projects/${projectId}/compliance-certificate`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
+      const response = await fetchProjectCertificateData(projectId);
 
-      const data = await response.json();
-
-      if (data.success) {
-        setCertificateData(data.data);
+      if (response.success) {
+        setCertificateData(response.data);
       } else {
-        setError(data.message);
+        setError(response.message);
       }
     } catch (err) {
       console.error("Error fetching certificate data:", err);
@@ -53,38 +46,24 @@ const ComplianceCertificate = () => {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   const handleDownloadPDF = async () => {
     try {
-      const response = await fetch(
-        `/api/projects/${projectId}/compliance-certificate`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `ELRA-Compliance-Certificate-${projectId}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } else {
-        console.error("Failed to download PDF");
-      }
+      setDownloading(true);
+      const blob = await downloadProjectCertificatePDF(projectId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ELRA-${
+        certificateData?.certificate?.type || "Certificate"
+      }-${projectId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch (error) {
       console.error("Error downloading PDF:", error);
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -149,22 +128,23 @@ const ComplianceCertificate = () => {
             <ArrowLeftIcon className="h-5 w-5 mr-2" />
             Back to Project
           </button>
-          <div className="flex space-x-3">
-            <button
-              onClick={handlePrint}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <PrinterIcon className="h-4 w-4 mr-2" />
-              Print
-            </button>
-            <button
-              onClick={handleDownloadPDF}
-              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              <DocumentTextIcon className="h-4 w-4 mr-2" />
-              Download PDF
-            </button>
-          </div>
+          <button
+            onClick={handleDownloadPDF}
+            disabled={downloading}
+            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {downloading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Downloading...
+              </>
+            ) : (
+              <>
+                <DocumentTextIcon className="h-4 w-4 mr-2" />
+                Download PDF
+              </>
+            )}
+          </button>
         </div>
       </div>
 

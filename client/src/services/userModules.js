@@ -1564,20 +1564,25 @@ export const userModulesAPI = {
       "#06B6D4": "border-cyan-200",
     };
 
-    const transformedModules = backendModules.map((module) => ({
-      id: module._id,
-      title: module.name,
-      description: module.description,
-      icon: iconMap[module.icon] || "FaCog",
-      path: `/dashboard/modules/${module.code.toLowerCase()}`,
-      isReady: true,
-      color: colorMap[module.color] || "from-gray-500 to-gray-600",
-      bgColor: bgColorMap[module.color] || "bg-gray-50",
-      borderColor: borderColorMap[module.color] || "border-gray-200",
-      permissions: module.permissions || [],
-      code: module.code,
-      order: module.order,
-    }));
+    const transformedModules = backendModules.map((module) => {
+      // Convert module code to kebab-case for path matching
+      const pathCode = module.code.toLowerCase().replace(/_/g, "-");
+
+      return {
+        id: module._id,
+        title: module.name,
+        description: module.description,
+        icon: iconMap[module.icon] || "FaCog",
+        path: `/dashboard/modules/${pathCode}`,
+        isReady: true,
+        color: colorMap[module.color] || "from-gray-500 to-gray-600",
+        bgColor: bgColorMap[module.color] || "bg-gray-50",
+        borderColor: borderColorMap[module.color] || "border-gray-200",
+        permissions: module.permissions || [],
+        code: module.code,
+        order: module.order,
+      };
+    });
 
     console.log("✅ [userModulesAPI] Transformed modules:", transformedModules);
     return transformedModules;

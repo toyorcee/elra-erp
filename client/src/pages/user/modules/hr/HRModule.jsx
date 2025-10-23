@@ -62,6 +62,27 @@ const HRModule = () => {
     },
   ];
 
+  const quickActions = [
+    {
+      title: "Employee Invitation",
+      icon: FaUserPlus,
+      color: "bg-pink-500",
+      path: "/dashboard/modules/hr/invitation",
+    },
+    {
+      title: "Leave Management",
+      icon: FaCalendarAlt,
+      color: "bg-purple-500",
+      path: "/dashboard/modules/hr/leave/management",
+    },
+    {
+      title: "Onboarding Management",
+      icon: FaUsers,
+      color: "bg-orange-500",
+      path: "/dashboard/modules/hr/onboarding",
+    },
+  ];
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -79,15 +100,15 @@ const HRModule = () => {
           <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-purple-400/15 to-violet-400/15 rounded-full blur-3xl animate-pulse delay-1000"></div>
           <div className="absolute bottom-0 left-1/4 w-80 h-80 bg-gradient-to-tr from-orange-400/15 to-amber-400/15 rounded-full blur-3xl animate-pulse delay-2000"></div>
         </div>
-        <div className="relative z-10 px-6 py-14">
+        <div className="relative z-10 px-4 sm:px-6 py-8 sm:py-14">
           <div className="max-w-7xl mx-auto text-center">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-pink-500 to-rose-600 shadow-xl mb-6">
-              <FaUsers className="h-7 w-7 text-white" />
+            <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-br from-pink-500 to-rose-600 shadow-xl mb-4 sm:mb-6">
+              <FaUsers className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
             </div>
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 bg-clip-text text-transparent">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 bg-clip-text text-transparent">
               Human Resources
             </h1>
-            <p className="text-gray-600 mt-3">
+            <p className="text-gray-600 mt-2 sm:mt-3 text-sm sm:text-base">
               Manage employees, recruitment, performance, and HR operations.
             </p>
           </div>
@@ -95,8 +116,8 @@ const HRModule = () => {
       </div>
 
       {/* HR Features - glass cards with dynamic palettes */}
-      <div className="px-6 pb-16">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="px-4 sm:px-6 pb-12 sm:pb-16">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {hrFeatures.map((feature, index) => {
             const IconComponent = feature.icon;
             const palettes = [
@@ -130,7 +151,7 @@ const HRModule = () => {
                 onClick={() => navigate(feature.path)}
               >
                 <div
-                  className={`relative bg-gradient-to-br ${palette.bg} rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 border border-white/20 backdrop-blur-sm`}
+                  className={`relative bg-gradient-to-br ${palette.bg} rounded-3xl p-6 sm:p-8 shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 border border-white/20 backdrop-blur-sm`}
                 >
                   <div
                     className={`absolute inset-0 bg-gradient-to-br ${palette.overlay} opacity-0 group-hover:opacity-10 rounded-3xl transition-opacity duration-500`}
@@ -154,11 +175,11 @@ const HRModule = () => {
                       </div>
                     </div>
                     <h3
-                      className={`text-2xl font-bold text-gray-900 mb-4 group-hover:${palette.text} transition-colors`}
+                      className={`text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4 group-hover:${palette.text} transition-colors`}
                     >
                       {feature.title}
                     </h3>
-                    <p className="text-gray-600 mb-6 leading-relaxed">
+                    <p className="text-gray-600 mb-4 sm:mb-6 leading-relaxed text-sm sm:text-base">
                       {feature.description}
                     </p>
                     <div
@@ -184,6 +205,63 @@ const HRModule = () => {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Quick Actions Section */}
+      <div className="px-4 sm:px-6 pb-12 sm:pb-16">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-xl border border-white/20">
+            <div className="text-center mb-6 sm:mb-8">
+              <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">
+                Quick Actions
+              </h3>
+              <p className="text-gray-600 text-sm sm:text-base">
+                Jump into the most common HR tasks
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {quickActions.map((action, index) => {
+                const IconComponent = action.icon;
+                return (
+                  <div
+                    key={action.title}
+                    className="group flex items-center p-6 rounded-2xl bg-gradient-to-r from-white to-gray-50 hover:from-pink-50 hover:to-rose-50 border border-gray-200 hover:border-pink-300 transition-all duration-300 transform hover:scale-105 cursor-pointer"
+                    onClick={() => navigate(action.path)}
+                  >
+                    <div
+                      className={`p-3 rounded-xl ${action.color} mr-4 shadow-lg`}
+                    >
+                      <IconComponent className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <span className="text-gray-800 font-semibold group-hover:text-pink-600 transition-colors">
+                        {action.title}
+                      </span>
+                      <div className="flex items-center mt-1">
+                        <span className="text-sm text-gray-500">
+                          Access now
+                        </span>
+                        <svg
+                          className="ml-2 h-3 w-3 text-pink-500 transform group-hover:translate-x-1 transition-transform"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
     </div>

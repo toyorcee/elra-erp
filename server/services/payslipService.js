@@ -14,7 +14,7 @@ const loadPayslipImage = (imageName) => {
     const imagePath = path.resolve(__dirname, "../assets/images", imageName);
     if (fs.existsSync(imagePath)) {
       const imageBuffer = fs.readFileSync(imagePath);
-      return `data:image/png;base64,${imageBuffer.toString("base64")}`;
+      return `data:image/jpeg;base64,${imageBuffer.toString("base64")}`;
     }
   } catch (error) {
     console.warn(`⚠️ Could not load image ${imageName}:`, error.message);
@@ -430,52 +430,64 @@ class PayslipService {
   }
 
   /**
-   * Generate payslip header
+   * Generate payslip header with improved layout
    */
   generateHeader(doc, employeeData, period) {
     const elraGreen = [13, 100, 73];
 
-    // Try to add ELRA logo image
-    const elraLogo = loadPayslipImage("elra-logo.png");
+    // Try to add ELRA logo image centered at top
+    const elraLogo = loadPayslipImage("elra-logo.jpg");
     if (elraLogo) {
       try {
-        doc.addImage(elraLogo, "PNG", 85, 15, 20, 20);
+        // Position logo centered at top
+        doc.addImage(elraLogo, "JPEG", 95, 10, 20, 20);
         doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
-        doc.setFontSize(32);
+        doc.setFontSize(28);
         doc.setFont("helvetica", "bold");
-        doc.text("ELRA", 110, 30, { align: "center" });
+        doc.text("ELRA", 105, 35, { align: "center" });
       } catch (error) {
         console.warn(
           "⚠️ Could not add ELRA logo to payslip, falling back to text:",
           error.message
         );
         doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
-        doc.setFontSize(32);
+        doc.setFontSize(28);
         doc.setFont("helvetica", "bold");
         doc.text("ELRA", 105, 25, { align: "center" });
       }
     } else {
       // Fallback to text-only
       doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
-      doc.setFontSize(32);
+      doc.setFontSize(28);
       doc.setFont("helvetica", "bold");
       doc.text("ELRA", 105, 25, { align: "center" });
     }
 
-    // Reset to black for other text
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(16);
+    // Add tagline with proper spacing
+    doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
+    doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(`Payslip for ${period.monthName} ${period.year}`, 105, 35, {
+    doc.text("You Lease, We Regulate...", 105, 42, { align: "center" });
+
+    // Payslip title with better spacing
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Payslip for ${period.monthName} ${period.year}`, 105, 52, {
       align: "center",
     });
+
+    // Add a subtle line separator
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(20, 58, 190, 58);
   }
 
   /**
-   * Generate employee information section
+   * Generate employee information section with improved spacing
    */
   generateEmployeeInfo(doc, employeeData, payroll) {
-    const startY = 45;
+    const startY = 65; // Increased spacing from header
 
     // Employee Details
     doc.setFontSize(10);
@@ -539,7 +551,7 @@ class PayslipService {
    * Generate earnings section
    */
   generateEarningsSection(doc, payroll) {
-    const startY = 100;
+    const startY = 140;
 
     // Use ELRA green color
     const elraGreen = [13, 100, 73];

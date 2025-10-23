@@ -593,9 +593,6 @@ const ApprovalDashboard = () => {
               <div className="font-medium text-gray-900 truncate">
                 {formatCurrency(project.budget)}
               </div>
-              <div className="text-xs text-gray-500 truncate">
-                {project.budgetThreshold?.replace(/_/g, " ")}
-              </div>
             </div>
           </div>
         ),

@@ -659,9 +659,8 @@ export const updateInventory = async (req, res) => {
         isEdit
       );
 
-      const shouldTriggerImplementation =
-        updatedInventory.project?.requiresBudgetAllocation === true ||
-        updatedInventory.project?.projectScope === "external";
+      // Trigger implementation for ALL project scopes after inventory completion
+      const shouldTriggerImplementation = !!updatedInventory.project;
 
       if (shouldTriggerImplementation) {
         console.log(
@@ -1789,23 +1788,10 @@ export const resendInventoryNotifications = async (req, res) => {
       });
     }
 
-    // Find the completion PDF document
-    const completionPDF = inventory.documents?.find(
-      (doc) => doc.type === "completion_certificate"
-    );
+    // No PDF generation (same as original completion)
+    const pdfBuffer = null;
 
-    if (!completionPDF) {
-      return res.status(404).json({
-        success: false,
-        message: "Completion PDF not found. Cannot resend notifications.",
-      });
-    }
-
-    console.log(`📧 [RESEND] Found completion PDF: ${completionPDF.name}`);
-
-    // Get the PDF buffer (simulate reading the file)
-    // In a real implementation, you'd read the actual file from storage
-    const pdfBuffer = Buffer.from("PDF_CONTENT_PLACEHOLDER"); // This would be the actual PDF content
+    console.log(`📧 [RESEND] Resending notifications without PDF`);
 
     // Send notifications using the existing function
     await sendInventoryCompletionNotifications(
@@ -1813,6 +1799,46 @@ export const resendInventoryNotifications = async (req, res) => {
       currentUser,
       pdfBuffer
     );
+
+    // Also resend project implementation notification if project is in implementation status
+    if (inventory.project && inventory.project.status === "implementation") {
+      try {
+        const NotificationService = await import(
+          "../services/notificationService.js"
+        );
+        const notification = new NotificationService.default();
+
+        await notification.createNotification({
+          recipient: inventory.project.createdBy,
+          type: "PROJECT_IMPLEMENTATION_STARTED",
+          title: "Project Implementation Started",
+          message: `Your ${inventory.project.projectScope} project "${inventory.project.name}" (${inventory.project.code}) has moved to implementation phase. Inventory setup is complete and the project is ready for work to begin.`,
+          priority: "high",
+          data: {
+            projectId: inventory.project._id,
+            projectName: inventory.project.name,
+            projectCode: inventory.project.code,
+            projectScope: inventory.project.projectScope,
+            budget: inventory.project.budget,
+            category: inventory.project.category,
+            implementationStartedAt: new Date().toISOString(),
+            actionUrl: `/dashboard/modules/projects/${inventory.project._id}`,
+            workflowPhase: "implementation",
+            triggeredBy: currentUser._id,
+            resent: true, 
+          },
+        });
+
+        console.log(
+          `📧 [RESEND] Project implementation notification resent to project owner`
+        );
+      } catch (implNotifError) {
+        console.error(
+          "❌ [RESEND] Error resending project implementation notification:",
+          implNotifError
+        );
+      }
+    }
 
     console.log(
       `✅ [RESEND] Notifications resent successfully for: ${inventory.code}`
@@ -1826,10 +1852,17 @@ export const resendInventoryNotifications = async (req, res) => {
         inventoryName: inventory.name,
         projectName: inventory.project?.name,
         projectCode: inventory.project?.code,
-        pdfFound: !!completionPDF,
-        pdfName: completionPDF?.name,
+        projectStatus: inventory.project?.status,
+        pdfGenerated: false,
+        pdfName: "No PDF attached",
         resentBy: `${currentUser.firstName} ${currentUser.lastName}`,
         resentAt: new Date().toISOString(),
+        notificationsResent: [
+          "Inventory completion notifications",
+          inventory.project?.status === "implementation"
+            ? "Project implementation notification"
+            : null,
+        ].filter(Boolean),
       },
     });
   } catch (error) {
@@ -1952,15 +1985,15 @@ export const exportInventoryReport = async (req, res) => {
         "server",
         "assets",
         "images",
-        "elra-logo.png"
+        "elra-logo.jpg"
       );
 
       if (fs.existsSync(logoPath)) {
         const logoData = fs.readFileSync(logoPath);
         const base64Logo = logoData.toString("base64");
         doc.addImage(
-          `data:image/png;base64,${base64Logo}`,
-          "PNG",
+          `data:image/jpeg;base64,${base64Logo}`,
+          "JPEG",
           85,
           15,
           20,

@@ -20,6 +20,12 @@ const InventoryModule = () => {
   const hasAccess = (item) => {
     const userLevel = user?.role?.level || 0;
     const userDepartment = user?.department?.name;
+    const isSuperAdmin = userLevel === 1000;
+
+    // Super Admin can access everything
+    if (isSuperAdmin) {
+      return true;
+    }
 
     if (item.required?.minLevel && userLevel < item.required.minLevel) {
       return false;
@@ -104,15 +110,31 @@ const InventoryModule = () => {
         return !(isSuperAdmin || isOperationsHOD);
       },
     },
-  ].filter(hasAccess); // Filter out items user doesn't have access to
+  ].filter(hasAccess);
 
-  // Quick Actions should match the available feature cards
-  const quickActions = inventoryFeatures.slice(0, 3).map((feature) => ({
-    title: feature.title,
-    icon: feature.icon,
-    color: "bg-blue-500",
-    path: feature.path,
-  }));
+  const quickActions = [
+    {
+      title: "Inventory List",
+      icon: FaList,
+      color: "bg-green-500",
+      path: "/dashboard/modules/inventory/list",
+      required: { minLevel: 700, department: "Operations" },
+    },
+    {
+      title: "Inventory Tracking",
+      icon: FaSearch,
+      color: "bg-purple-500",
+      path: "/dashboard/modules/inventory/tracking",
+      required: { minLevel: 700, department: "Operations" },
+    },
+    {
+      title: "Inventory Reports",
+      icon: FaChartLine,
+      color: "bg-orange-500",
+      path: "/dashboard/modules/inventory/reports",
+      required: { minLevel: 700, department: "Operations" },
+    },
+  ].filter(hasAccess);
 
   if (loading) {
     return (
@@ -140,7 +162,7 @@ const InventoryModule = () => {
           >
             <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-3xl mb-8 shadow-2xl">
               <FaBoxes className="h-12 w-12 text-white" />
-          </div>
+            </div>
             <h1 className="text-6xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-emerald-600 bg-clip-text text-transparent mb-6">
               Inventory Hub
             </h1>
@@ -162,24 +184,24 @@ const InventoryModule = () => {
         >
           <h2 className="text-4xl font-bold text-gray-900 mb-4">
             Powerful Features
-        </h2>
+          </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Everything you need to manage inventory efficiently and effectively
-        </p>
+          </p>
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {inventoryFeatures.map((feature, index) => {
-          const IconComponent = feature.icon;
-          return (
+            const IconComponent = feature.icon;
+            return (
               <motion.div
-              key={feature.title}
+                key={feature.title}
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 + index * 0.2 }}
                 className="group cursor-pointer"
-              onClick={() => navigate(feature.path)}
-            >
+                onClick={() => navigate(feature.path)}
+              >
                 <div
                   className={`relative bg-gradient-to-br from-white to-gray-50 rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 border border-white/20 backdrop-blur-sm`}
                 >
@@ -189,48 +211,48 @@ const InventoryModule = () => {
                         className={`p-4 rounded-2xl ${feature.color} shadow-lg`}
                       >
                         <IconComponent className="h-8 w-8 text-white" />
-                  </div>
+                      </div>
                       <div className="flex flex-col items-end space-y-2">
                         <span className="px-3 py-1 bg-white/80 backdrop-blur-sm rounded-full text-xs font-semibold text-gray-700">
-                      {feature.status}
-                    </span>
+                          {feature.status}
+                        </span>
                         <span className="px-3 py-1 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full text-xs font-semibold">
-                      {feature.badge}
-                    </span>
-                  </div>
-                </div>
+                          {feature.badge}
+                        </span>
+                      </div>
+                    </div>
                     <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-blue-600 transition-colors">
-                  {feature.title}
-                </h3>
+                      {feature.title}
+                    </h3>
                     <p className="text-gray-600 mb-6 leading-relaxed">
-                  {feature.description}
-                </p>
-                <div className="flex items-center justify-between">
+                      {feature.description}
+                    </p>
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center text-blue-600 font-medium">
                         <span>Explore</span>
-                    <svg
-                      className="ml-2 h-4 w-4 transform group-hover:translate-x-1 transition-transform"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
+                        <svg
+                          className="ml-2 h-4 w-4 transform group-hover:translate-x-1 transition-transform"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
+                        </svg>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
               </motion.div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
 
-      {/* Quick Actions Section */}
+        {/* Quick Actions Section */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -240,18 +262,18 @@ const InventoryModule = () => {
           <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20">
             <div className="text-center mb-8">
               <h3 className="text-3xl font-bold text-gray-900 mb-4">
-          Quick Actions
-        </h3>
+                Quick Actions
+              </h3>
               <p className="text-gray-600">
                 Jump into the most common inventory tasks
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {quickActions.map((action, index) => {
-            const IconComponent = action.icon;
-            return (
+                const IconComponent = action.icon;
+                return (
                   <motion.button
-                key={action.title}
+                    key={action.title}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.9 + index * 0.1 }}
@@ -262,11 +284,11 @@ const InventoryModule = () => {
                       className={`p-3 rounded-xl ${action.color} mr-4 shadow-lg`}
                     >
                       <IconComponent className="h-6 w-6 text-white" />
-                </div>
+                    </div>
                     <div className="flex-1 text-left">
                       <span className="text-gray-800 font-semibold group-hover:text-blue-600 transition-colors">
-                  {action.title}
-                </span>
+                        {action.title}
+                      </span>
                       <div className="flex items-center mt-1">
                         <span className="text-sm text-gray-500">
                           Access now
@@ -287,9 +309,9 @@ const InventoryModule = () => {
                       </div>
                     </div>
                   </motion.button>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
           </div>
         </motion.div>
       </div>

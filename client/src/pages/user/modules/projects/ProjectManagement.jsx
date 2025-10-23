@@ -121,7 +121,7 @@ const ProjectManagement = () => {
       title: "Create Project",
       icon: FaRocket,
       color: "bg-green-500",
-      path: "/dashboard/modules/projects/create",
+      path: "/dashboard/modules/projects/list",
     },
     {
       title: "View Analytics",

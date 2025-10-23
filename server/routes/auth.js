@@ -103,7 +103,6 @@ const resendVerificationValidation = [
     .withMessage("Please provide a valid email address"),
 ];
 
-// Routes
 router.post("/register", registerValidation, register);
 router.post("/login", loginValidation, login);
 router.post("/join-company", joinCompany);

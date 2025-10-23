@@ -18,7 +18,7 @@ const loadCustomerCareImage = (imageName) => {
     const imagePath = path.resolve(__dirname, "../assets/images", imageName);
     if (fs.existsSync(imagePath)) {
       const imageBuffer = fs.readFileSync(imagePath);
-      return `data:image/png;base64,${imageBuffer.toString("base64")}`;
+      return `data:image/jpeg;base64,${imageBuffer.toString("base64")}`;
     }
   } catch (error) {
     console.warn(`⚠️ Could not load image ${imageName}:`, error.message);
@@ -1410,44 +1410,63 @@ export const exportCustomerCareReport = async (req, res) => {
         format: "a4",
       });
 
-      // ELRA Branding - Green color scheme
-      // ELRA Branding - Official ELRA color scheme
+      const pageWidth = doc.internal.pageSize.getWidth();
       const elraGreen = [13, 100, 73];
-      
-      // Try to add ELRA logo image
-      const elraLogo = loadCustomerCareImage("elra-logo.png");
+
+      const elraLogo = loadCustomerCareImage("elra-logo.jpg");
       if (elraLogo) {
         try {
-          doc.addImage(elraLogo, "PNG", 20, 15, 20, 20);
-          doc.setFontSize(24);
+          doc.addImage(elraLogo, "JPEG", pageWidth / 2 - 10, 15, 20, 20);
           doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
-          doc.text("ELRA Customer Care Report", 50, 30);
+          doc.setFontSize(24);
+          doc.setFont("helvetica", "bold");
+          doc.text("ELRA", pageWidth / 2, 50, { align: "center" });
         } catch (error) {
-          console.warn("⚠️ Could not add ELRA logo to customer care report, falling back to text:", error.message);
-          doc.setFontSize(24);
+          console.warn(
+            "⚠️ Could not add ELRA logo to customer care report, falling back to text:",
+            error.message
+          );
+          ``;
           doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
-          doc.text("ELRA Customer Care Report", 20, 20);
+          doc.setFontSize(24);
+          doc.setFont("helvetica", "bold");
+          doc.text("ELRA", pageWidth / 2, 25, { align: "center" });
         }
       } else {
         // Fallback to text-only
-        doc.setFontSize(24);
         doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
-        doc.text("ELRA Customer Care Report", 20, 20);
+        doc.setFontSize(24);
+        doc.setFont("helvetica", "bold");
+        doc.text("ELRA", pageWidth / 2, 25, { align: "center" });
       }
 
-      doc.setFontSize(12);
+      // Customer Care Report title right under ELRA text
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("Customer Care Report", pageWidth / 2, 60, {
+        align: "center",
+      });
+
+      // Content starts after title with proper spacing
+      let yPosition = 80;
+
+      doc.setFontSize(10);
       doc.setTextColor(0, 0, 0);
       doc.text(
         `Generated for: ${req.user.firstName} ${req.user.lastName}`,
         20,
-        35
+        yPosition
       );
-      doc.text(`Department: ${req.user.department?.name}`, 20, 42);
-      doc.text(`Position: ${req.user.role?.name}`, 20, 49);
-      doc.text(`Report Period: Last ${dateRange} days`, 20, 56);
-      doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 63);
-
-      let yPosition = 75;
+      yPosition += 7;
+      doc.text(`Department: ${req.user.department?.name}`, 20, yPosition);
+      yPosition += 7;
+      doc.text(`Position: ${req.user.role?.name}`, 20, yPosition);
+      yPosition += 7;
+      doc.text(`Report Period: Last ${dateRange} days`, 20, yPosition);
+      yPosition += 7;
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, yPosition);
+      yPosition += 15;
 
       doc.setFontSize(16);
       doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);

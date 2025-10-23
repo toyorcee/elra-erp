@@ -60,6 +60,7 @@ const projectSchema = new mongoose.Schema(
         "pending_budget_allocation",
         "pending_vendor_assignment",
         "pending_procurement",
+        "pending_inventory",
         "approved",
         "in_progress",
         "implementation",
@@ -104,6 +105,11 @@ const projectSchema = new mongoose.Schema(
       min: 0,
     },
     actualCost: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    elraFundingAmount: {
       type: Number,
       default: 0,
       min: 0,
@@ -519,6 +525,9 @@ const projectSchema = new mongoose.Schema(
       enum: [
         "planning",
         "approval",
+        "budget_allocation",
+        "procurement",
+        "inventory",
         "implementation",
         "execution",
         "completion",
@@ -1146,6 +1155,8 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
 
     // Set status to implementation (will be overridden for personal projects with budget allocation)
     this.status = "implementation";
+    this.workflowPhase = "implementation";
+    this.workflowStep = 3;
     await this.save();
 
     // Handle workflow based on project scope
@@ -1229,6 +1240,8 @@ projectSchema.methods.triggerPostApprovalWorkflow = async function (
           "💰 [WORKFLOW] Personal project requires budget allocation - setting status to pending_budget_allocation"
         );
         this.status = "pending_budget_allocation";
+        this.workflowPhase = "budget_allocation";
+        this.workflowStep = 1;
         console.log(
           "📋 [WORKFLOW] Finance HOD will be notified to create budget allocation"
         );
@@ -2252,7 +2265,7 @@ projectSchema.methods.createStandardProcurementOrder = async function (
 // Static method to generate unique inventory codes
 projectSchema.statics.generateUniqueInventoryCode = async function () {
   let attempts = 0;
-  const maxAttempts = 100; 
+  const maxAttempts = 100;
 
   while (attempts < maxAttempts) {
     const Inventory = mongoose.model("Inventory");
@@ -2374,28 +2387,32 @@ projectSchema.methods.createInventoryFromProcurement = async function (
       `✅ [INVENTORY] Created ${createdItems.length} inventory items from procurement order ${procurementOrder.poNumber}`
     );
 
+    console.log(
+      `🔍 [DEBUG] Project status before inventory processing: ${this.status}`
+    );
+    console.log(
+      `🔍 [DEBUG] Project requiresBudgetAllocation: ${this.requiresBudgetAllocation}`
+    );
+    console.log(`🔍 [DEBUG] Project scope: ${this.projectScope}`);
+
     if (this.requiresBudgetAllocation === true) {
       console.log(
-        `🚀 [INVENTORY] ${this.projectScope} project with budget allocation - setting to implementation status`
+        `📦 [INVENTORY] ${this.projectScope} project with budget allocation - setting to pending_inventory status`
       );
-      this.status = "implementation";
-
-      try {
-        await this.createImplementationTasks(triggeredByUser);
-        console.log(
-          `✅ [INVENTORY] Implementation tasks created for ${this.projectScope} project`
-        );
-      } catch (taskError) {
-        console.error(
-          `❌ [INVENTORY] Error creating implementation tasks:`,
-          taskError
-        );
-      }
+      this.status = "pending_inventory";
+      this.workflowPhase = "inventory";
+      this.workflowStep = 2;
+      console.log(`🔍 [DEBUG] Project status set to: ${this.status}`);
 
       // Save the project with updated status
       await this.save();
       console.log(
-        `✅ [INVENTORY] Project status updated to 'implementation' for project: ${this.code}`
+        `✅ [INVENTORY] Project status updated to 'pending_inventory' for project: ${this.code}`
+      );
+      console.log(`🔍 [DEBUG] Project status after save: ${this.status}`);
+    } else {
+      console.log(
+        `⚠️ [INVENTORY] Project does not require budget allocation - status not updated`
       );
     }
 
@@ -3494,11 +3511,15 @@ projectSchema.methods.approveProject = async function (
     // Set status based on whether budget allocation is required
     if (this.requiresBudgetAllocation === true) {
       this.status = "pending_budget_allocation";
+      this.workflowPhase = "budget_allocation";
+      this.workflowStep = 1;
       console.log(
         `📋 [APPROVAL] Budget allocation required - setting status to pending_budget_allocation`
       );
     } else {
       this.status = "approved";
+      this.workflowPhase = "approval";
+      this.workflowStep = 1;
       console.log(
         `✅ [APPROVAL] No budget allocation required - setting status to approved`
       );
@@ -3524,6 +3545,8 @@ projectSchema.methods.approveProject = async function (
         break;
       case "budget_allocation":
         this.status = "pending_budget_allocation";
+        this.workflowPhase = "budget_allocation";
+        this.workflowStep = 1;
         break;
     }
   }
@@ -4368,6 +4391,8 @@ projectSchema.methods.completeInventory = async function (triggeredByUser) {
         `🚀 [INVENTORY] ${this.projectScope} project with budget allocation - setting to implementation status`
       );
       this.status = "implementation";
+      this.workflowPhase = "implementation";
+      this.workflowStep = 3;
 
       // Funds will be moved from reserved to used when procurement orders are marked as paid
       console.log(
@@ -4375,6 +4400,8 @@ projectSchema.methods.completeInventory = async function (triggeredByUser) {
       );
 
       try {
+        // Create implementation tasks for ALL project scopes
+        // Use createImplementationTasks for all scopes to ensure consistent task creation
         await this.createImplementationTasks(triggeredByUser);
         console.log(
           `✅ [INVENTORY] Implementation tasks created for ${this.projectScope} project`
@@ -4389,6 +4416,43 @@ projectSchema.methods.completeInventory = async function (triggeredByUser) {
 
     // Check if both inventory and procurement are completed to trigger compliance review
     await this.checkComplianceReadiness();
+
+    // Notify project creator about implementation status
+    try {
+      const NotificationService = await import(
+        "../services/notificationService.js"
+      );
+      const notification = new NotificationService.default();
+
+      await notification.createNotification({
+        recipient: this.createdBy,
+        type: "PROJECT_IMPLEMENTATION_STARTED",
+        title: "Project Implementation Started",
+        message: `Your ${this.projectScope} project "${this.name}" (${this.code}) has moved to implementation phase. Inventory setup is complete and the project is ready for work to begin.`,
+        priority: "high",
+        data: {
+          projectId: this._id,
+          projectName: this.name,
+          projectCode: this.code,
+          projectScope: this.projectScope,
+          budget: this.budget,
+          category: this.category,
+          implementationStartedAt: new Date().toISOString(),
+          actionUrl: `/dashboard/modules/projects/${this._id}`,
+          workflowPhase: "implementation",
+          triggeredBy: triggeredByUser,
+        },
+      });
+
+      console.log(
+        `📧 [IMPLEMENTATION] Notification sent to project creator about implementation start`
+      );
+    } catch (notifError) {
+      console.error(
+        "❌ [IMPLEMENTATION] Error sending implementation notification:",
+        notifError
+      );
+    }
 
     await this.save();
     console.log(
@@ -4589,11 +4653,11 @@ projectSchema.methods.createImplementationTasks = async function (
         assignedBy: createdByUser || this.createdBy,
         createdBy: createdByUser || this.createdBy,
         estimatedHours: Math.ceil((setupDuration / (24 * 60 * 60 * 1000)) * 8),
-        projectType: "personal",
+        projectType: this.projectScope,
         implementationPhase: "setup",
         milestoneOrder: 1,
         isBaseTask: true,
-        tags: ["setup", "planning", "personal"],
+        tags: ["setup", "planning", this.projectScope],
         notes: `Timeline: ${setupEndDate.toLocaleDateString()} - Based on project duration: ${Math.ceil(
           totalDuration / (24 * 60 * 60 * 1000)
         )} days`,
@@ -4613,11 +4677,11 @@ projectSchema.methods.createImplementationTasks = async function (
         estimatedHours: Math.ceil(
           (implementationDuration / (24 * 60 * 60 * 1000)) * 8
         ),
-        projectType: "personal",
+        projectType: this.projectScope,
         implementationPhase: "execution",
         milestoneOrder: 2,
         isBaseTask: true,
-        tags: ["implementation", "core", "personal"],
+        tags: ["implementation", "core", this.projectScope],
         notes: `Timeline: ${implementationEndDate.toLocaleDateString()} - Main work phase`,
       },
       {
@@ -4634,11 +4698,11 @@ projectSchema.methods.createImplementationTasks = async function (
         assignedBy: createdByUser || this.createdBy,
         createdBy: createdByUser || this.createdBy,
         estimatedHours: Math.ceil((reviewDuration / (24 * 60 * 60 * 1000)) * 8),
-        projectType: "personal",
+        projectType: this.projectScope,
         implementationPhase: "review",
         milestoneOrder: 3,
         isBaseTask: true,
-        tags: ["review", "quality", "closure", "personal"],
+        tags: ["review", "quality", "closure", this.projectScope],
         notes: `Timeline: ${reviewEndDate.toLocaleDateString()} - Final review and closure phase`,
       },
     ];

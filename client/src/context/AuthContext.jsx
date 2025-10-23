@@ -11,7 +11,7 @@ const getInitialState = () => {
   return {
     user: null,
     isAuthenticated: false,
-    loading: false, // Start with false to prevent loading screens
+    loading: false,
     error: null,
     initialized: false,
     subscriptionPlans: [],
@@ -174,23 +174,15 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // Initialize auth on mount
   useEffect(() => {
     initializeAuth();
   }, [initializeAuth]);
 
   const login = useCallback(async (credentials) => {
-    console.log(
-      "🔍 [AuthContext] Login started with credentials:",
-      credentials
-    );
     dispatch({ type: AUTH_ACTIONS.LOGIN_START });
 
     try {
       const response = await authAPI.login(credentials);
-      console.log("✅ [AuthContext] Login API response:", response.data);
-      setHasLoggedIn(true); 
-
       const userData = response.data.data?.user || response.data.user;
 
       dispatch({
@@ -237,8 +229,15 @@ export const AuthProvider = ({ children }) => {
           .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
       });
 
+      localStorage.clear();
+      sessionStorage.clear();
+
       if (window.queryClient) {
         window.queryClient.clear();
+      }
+
+      if (window.clearApiInterceptors) {
+        window.clearApiInterceptors();
       }
 
       setHasLoggedIn(false);

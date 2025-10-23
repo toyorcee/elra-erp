@@ -13,7 +13,7 @@ const loadEmailImage = (imageName) => {
     const imagePath = path.resolve(__dirname, "../assets/images", imageName);
     if (fs.existsSync(imagePath)) {
       const imageBuffer = fs.readFileSync(imagePath);
-      return `data:image/png;base64,${imageBuffer.toString("base64")}`;
+      return `data:image/jpeg;base64,${imageBuffer.toString("base64")}`;
     }
   } catch (error) {
     console.warn(`⚠️ Could not load image ${imageName}:`, error.message);
@@ -154,11 +154,11 @@ const createEmailTemplate = (
     </head>
     <body>
             <div class="header">
-        <div style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px;">
+        <div style="text-align: center; margin-bottom: 8px;">
           ${(() => {
-            const elraLogo = loadEmailImage("elra-logo.png");
+            const elraLogo = loadEmailImage("elra-logo.jpg");
             if (elraLogo) {
-              return `<img src="${elraLogo}" alt="ELRA Logo" style="height: 24px; width: auto; max-width: 24px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));" />`;
+              return `<img src="${elraLogo}" alt="ELRA Logo" style="height: 40px; width: auto; max-width: 40px; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)); margin-bottom: 8px;" />`;
             }
             return "";
           })()}
@@ -1347,7 +1347,7 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
             <div class="logo-container">
               <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 10px;">
                 ${(() => {
-                  const elraLogo = loadEmailImage("elra-logo.png");
+                  const elraLogo = loadEmailImage("elra-logo.jpg");
                   if (elraLogo) {
                     return `<img src="${elraLogo}" alt="ELRA Logo" style="height: 60px; width: auto; max-width: 60px; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));" />`;
                   }
@@ -1648,7 +1648,7 @@ const sendPayslipEmail = async ({
              <div class="logo-container">
                <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 10px;">
                  ${(() => {
-                   const elraLogo = loadEmailImage("elra-logo.png");
+                   const elraLogo = loadEmailImage("elra-logo.jpg");
                    if (elraLogo) {
                      return `<img src="${elraLogo}" alt="ELRA Logo" style="height: 60px; width: auto; max-width: 60px; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));" />`;
                    }

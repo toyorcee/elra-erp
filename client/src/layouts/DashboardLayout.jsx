@@ -11,7 +11,7 @@ import { useAuth } from "../context/AuthContext";
 import { useMessages } from "../hooks/useMessages";
 import { useMessageContext } from "../context/MessageContext";
 import { DynamicSidebarProvider } from "../context/DynamicSidebarContext";
-import ELRALogo from "../components/ELRALogo";
+import CachedELRALogo from "../components/CachedELRALogo";
 import messageService from "../services/messageService";
 import { toast } from "react-toastify";
 import defaultAvatar from "../assets/defaulticon.jpg";
@@ -185,7 +185,6 @@ const DashboardLayout = () => {
         isMobile,
       }}
     >
-      
       <div className="min-h-screen bg-[var(--elra-bg-light)]">
         {/* Fixed Navbar */}
         <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-[var(--elra-border-primary)] shadow-lg shadow-[var(--elra-primary)]/10">
@@ -222,7 +221,7 @@ const DashboardLayout = () => {
                   onClick={handleLogoClick}
                   title={user && !loading ? "Go to Modules" : "Go to Home"}
                 >
-                  <ELRALogo variant="dark" size="sm" />
+                  <CachedELRALogo variant="dark" size="sm" />
                 </div>
               </div>
 
@@ -356,8 +355,6 @@ const DashboardLayout = () => {
 
         {/* Customer Care Floating Chat Button */}
         <CustomerCareChat />
-
-        
 
         {/* Main Content Area */}
         <div className="flex flex-1 pt-16 min-h-screen">

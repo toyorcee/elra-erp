@@ -13,7 +13,7 @@ const loadSalesMarketingImage = (imageName) => {
     const imagePath = path.resolve(__dirname, "../assets/images", imageName);
     if (fs.existsSync(imagePath)) {
       const imageBuffer = fs.readFileSync(imagePath);
-      return `data:image/png;base64,${imageBuffer.toString("base64")}`;
+      return `data:image/jpeg;base64,${imageBuffer.toString("base64")}`;
     }
   } catch (error) {
     console.warn(`⚠️ Could not load image ${imageName}:`, error.message);
@@ -367,7 +367,7 @@ export const exportSalesMarketingReport = async (req, res) => {
       const elraGreen = [13, 100, 73];
 
       // Try to add ELRA logo image
-      const elraLogo = loadSalesMarketingImage("elra-logo.png");
+      const elraLogo = loadSalesMarketingImage("elra-logo.jpg");
       if (elraLogo) {
         try {
           doc.addImage(elraLogo, "PNG", 85, 15, 20, 20);

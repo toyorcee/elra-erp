@@ -859,11 +859,77 @@ export const updateTaskStatus = async (req, res) => {
       );
     }
 
-    // Update project progress if task is completed
     if (status === "completed") {
       const project = await Project.findById(task.project);
       if (project) {
         await project.updateTwoPhaseProgress();
+
+        const Task = await import("../models/Task.js");
+        const allTasks = await Task.default.find({
+          project: project._id,
+          isActive: true,
+          isBaseTask: true,
+        });
+
+        const completedTasks = allTasks.filter(
+          (task) => task.status === "completed"
+        );
+
+        console.log(
+          `🔍 [TASK COMPLETION] Project: ${project.name}, Tasks: ${completedTasks.length}/${allTasks.length} completed`
+        );
+
+        if (allTasks.length > 0 && completedTasks.length === allTasks.length) {
+          console.log(
+            `🎉 [PROJECT COMPLETION] All tasks completed for ${project.projectScope} project: ${project.name}`
+          );
+
+          project.status = "completed";
+          project.workflowPhase = "completion";
+          project.workflowStep = 4;
+          project.actualEndDate = new Date();
+          project.completedBy = currentUser._id;
+
+          await project.save();
+
+          console.log(
+            `✅ [PROJECT COMPLETION] Project ${project.code} moved to completed status`
+          );
+
+          try {
+            const NotificationService = await import(
+              "../services/notificationService.js"
+            );
+            const notification = new NotificationService.default();
+
+            await notification.createNotification({
+              recipient: project.createdBy,
+              type: "PROJECT_COMPLETED",
+              title: "Project Completed",
+              message: `Your ${project.projectScope} project "${project.name}" (${project.code}) has been completed successfully! All implementation tasks are finished.`,
+              priority: "high",
+              data: {
+                projectId: project._id,
+                projectName: project.name,
+                projectCode: project.code,
+                projectScope: project.projectScope,
+                completedAt: new Date().toISOString(),
+                actionUrl: `/dashboard/modules/projects/${project._id}`,
+                workflowPhase: "completion",
+                triggeredBy: currentUser._id,
+              },
+            });
+
+            console.log(
+              `📧 [PROJECT COMPLETION] Notification sent to project creator`
+            );
+          } catch (notifError) {
+            console.error(
+              "❌ [PROJECT COMPLETION] Error sending completion notification:",
+              notifError
+            );
+          }
+        }
 
         // Check if this is an external project and both phases are 100% complete
         if (project.projectScope === "external") {
@@ -872,7 +938,10 @@ export const updateTaskStatus = async (req, res) => {
           );
 
           // If both approval and implementation phases are 100% complete, notify Super Admin and Executive HODs
-          if (project.approvalProgress === 100 && project.implementationProgress === 100) {
+          if (
+            project.approvalProgress === 100 &&
+            project.implementationProgress === 100
+          ) {
             console.log(
               "🎉 [EXTERNAL PROJECT] Both phases completed (100% approval + 100% implementation)! Notifying Super Admin and Executive HODs..."
             );

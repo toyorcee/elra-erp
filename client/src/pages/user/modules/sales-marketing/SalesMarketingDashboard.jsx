@@ -5,15 +5,12 @@ import {
   CurrencyDollarIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
-  UserGroupIcon,
   ShoppingCartIcon,
   MegaphoneIcon,
-  ClockIcon,
 } from "@heroicons/react/24/outline";
 import {
   BarChart,
   PieChart,
-  LineChart,
   RadialProgress,
 } from "../../../../components/graphs";
 import { formatCurrency } from "../../../../utils/formatters";

@@ -23,11 +23,24 @@ import {
   getSessionsByResponder,
   getActiveSessions,
   sendReminderNotification,
+  forwardComplaintToHOD,
+  getDepartments,
+  getForwardedComplaints,
+  getForwardedComplaintsCount,
 } from "../controllers/customerCareController.js";
 
 const router = express.Router();
 
 router.use(protect);
+
+// Get departments for forwarding
+router.get("/departments", checkCustomerCareAccess, getDepartments);
+
+// Get forwarded complaints for HODs
+router.get("/forwarded-complaints", getForwardedComplaints);
+
+// Get forwarded complaints count for HOD dashboard
+router.get("/forwarded-complaints/count", getForwardedComplaintsCount);
 
 router.get("/complaints", checkCustomerCareAccess, getComplaints);
 
@@ -94,6 +107,13 @@ router.post(
 );
 
 router.post("/complaints/:id/assign", checkCustomerCareAccess, assignComplaint);
+
+// Forward complaint to department HOD
+router.post(
+  "/complaints/:complaintId/forward-to-hod",
+  checkCustomerCareAccess,
+  forwardComplaintToHOD
+);
 
 router.post("/sessions", checkCustomerCareAccess, saveSession);
 

@@ -122,12 +122,6 @@ const CustomerCareReports = () => {
     try {
       setExportLoading((prev) => ({ ...prev, pdf: true }));
 
-      console.log("statisticsAPI:", statisticsAPI);
-      console.log(
-        "exportCustomerCareReport:",
-        statisticsAPI.exportCustomerCareReport
-      );
-
       if (!statisticsAPI.exportCustomerCareReport) {
         throw new Error(
           "exportCustomerCareReport function not found in statisticsAPI"

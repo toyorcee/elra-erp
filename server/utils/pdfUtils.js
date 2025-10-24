@@ -2917,8 +2917,8 @@ export const generateComplianceCertificatePDF = async (certificateData) => {
           error.message
         );
         // Fallback to star
-        doc.setTextColor(255, 255, 255);
-        doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
         doc.setFontSize(18);
         doc.text("★", 105, 61, { align: "center" });
       }
@@ -3006,9 +3006,9 @@ export const generateComplianceCertificatePDF = async (certificateData) => {
       doc.setDrawColor(...blue200);
       doc.roundedRect(x, y, 70, cardH, 4, 4, "FD");
       doc.setTextColor(...blue700);
-      doc.setFontSize(8);
+    doc.setFontSize(8);
       doc.text(label, x + 35, y + 8, { align: "center" });
-      doc.setTextColor(30, 30, 30);
+    doc.setTextColor(30, 30, 30);
       doc.setFontSize(11);
       doc.text(value, x + 35, y + 18, { align: "center" });
     };

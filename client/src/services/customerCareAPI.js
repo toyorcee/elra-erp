@@ -130,6 +130,53 @@ export const complaintAPI = {
       throw error;
     }
   },
+
+  forwardComplaintToHOD: async (complaintId, data) => {
+    try {
+      const response = await api.post(
+        `/customer-care/complaints/${complaintId}/forward-to-hod`,
+        data
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error forwarding complaint to HOD:", error);
+      throw error;
+    }
+  },
+
+  getDepartments: async () => {
+    try {
+      const response = await api.get("/customer-care/departments");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching departments:", error);
+      throw error;
+    }
+  },
+
+  getForwardedComplaints: async (params = {}) => {
+    try {
+      const response = await api.get("/customer-care/forwarded-complaints", {
+        params,
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching forwarded complaints:", error);
+      throw error;
+    }
+  },
+
+  getForwardedComplaintsCount: async () => {
+    try {
+      const response = await api.get(
+        "/customer-care/forwarded-complaints/count"
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching forwarded complaints count:", error);
+      throw error;
+    }
+  },
 };
 
 export const statisticsAPI = {
@@ -199,7 +246,7 @@ export const statisticsAPI = {
         `/customer-care/reports/export/${format}`,
         {
           params,
-          responseType: "blob", 
+          responseType: "blob",
         }
       );
       return response.data;

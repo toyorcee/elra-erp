@@ -179,6 +179,361 @@ export const getComplaintById = async (req, res) => {
 };
 
 // Create new complaint
+// Forward complaint to department HOD
+export const forwardComplaintToHOD = async (req, res) => {
+  try {
+    const { complaintId } = req.params;
+    const { departmentId, note } = req.body;
+
+    console.log(
+      "🚀 [COMPLAINT FORWARD] Starting complaint forwarding process..."
+    );
+    console.log("📝 [COMPLAINT FORWARD] Request data:", {
+      complaintId,
+      departmentId,
+      note: note ? note.substring(0, 50) + "..." : "No note",
+      forwardedBy: req.user._id,
+    });
+
+    if (!departmentId) {
+      console.log("❌ [COMPLAINT FORWARD] Missing department ID");
+      return res.status(400).json({
+        success: false,
+        message: "Department ID is required",
+      });
+    }
+
+    // Find the complaint
+    const complaint = await Complaint.findById(complaintId)
+      .populate("submittedBy", "firstName lastName email")
+      .populate("department", "name");
+
+    if (!complaint) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found",
+      });
+    }
+
+    // Find the target department and its HOD
+    const Department = (await import("../models/Department.js")).default;
+    const User = (await import("../models/User.js")).default;
+    const Notification = (await import("../models/Notification.js")).default;
+
+    const targetDepartment = await Department.findById(departmentId);
+    if (!targetDepartment) {
+      return res.status(404).json({
+        success: false,
+        message: "Target department not found",
+      });
+    }
+
+    // Find the HOD of the target department
+    const allUsersInDepartment = await User.find({
+      department: departmentId,
+      isActive: true,
+    }).populate("role");
+
+    // Find HOD by checking role level or role name
+    let targetHOD = null;
+
+    for (const user of allUsersInDepartment) {
+      // Check if user is HOD by level (>= 700) or by role name
+      if (
+        user.role &&
+        (user.role.level >= 700 || /hod/i.test(user.role.name))
+      ) {
+        targetHOD = user;
+        break;
+      }
+    }
+
+    if (!targetHOD) {
+      return res.status(404).json({
+        success: false,
+        message: "No HOD found for the target department",
+      });
+    }
+
+    // Create notification for the target HOD
+    let notificationMessage = `Complaint "${complaint.title}" from ${complaint.submittedBy.firstName} ${complaint.submittedBy.lastName} (${complaint.department?.name}) has been forwarded to you for awareness and follow-up.`;
+
+    if (note && note.trim()) {
+      notificationMessage += `\n\nAdditional Note: ${note.trim()}`;
+    }
+
+    const notificationData = {
+      recipient: targetHOD._id,
+      type: "complaint_forwarded",
+      title: "Complaint Forwarded for Awareness",
+      message: notificationMessage,
+      data: {
+        complaintId: complaint._id,
+        forwardedBy: req.user._id,
+        originalDepartment: complaint.department?._id,
+        targetDepartment: departmentId,
+        complaintTitle: complaint.title,
+        submittedBy: complaint.submittedBy._id,
+        status: "forwarded_for_awareness",
+        note: note?.trim() || null,
+      },
+      isRead: false,
+    };
+
+    // Import and use notification service
+    const NotificationService = (
+      await import("../services/notificationService.js")
+    ).default;
+    const notificationService = new NotificationService();
+
+    await notificationService.createNotification(notificationData);
+
+    // Update complaint with forwarding information
+    console.log(
+      "🔍 [FORWARD COMPLAINT] Before saving - complaint ID:",
+      complaint._id
+    );
+    console.log("🔍 [FORWARD COMPLAINT] Target HOD ID:", targetHOD._id);
+    console.log("🔍 [FORWARD COMPLAINT] Forwarded by:", req.user._id);
+
+    complaint.forwardedTo = {
+      department: departmentId,
+      hod: targetHOD._id,
+      forwardedAt: new Date(),
+      forwardedBy: req.user._id,
+      note: note?.trim() || null,
+    };
+
+    console.log(
+      "🔍 [FORWARD COMPLAINT] ForwardedTo data:",
+      complaint.forwardedTo
+    );
+
+    await complaint.save();
+
+    console.log("✅ [FORWARD COMPLAINT] Complaint saved successfully");
+
+    // Verify the save worked
+    const savedComplaint = await Complaint.findById(complaint._id).select(
+      "_id title forwardedTo"
+    );
+    console.log("🔍 [FORWARD COMPLAINT] Verification - saved complaint:", {
+      id: savedComplaint._id,
+      title: savedComplaint.title,
+      forwardedTo: savedComplaint.forwardedTo,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Complaint forwarded to ${targetDepartment.name} HOD successfully`,
+      data: {
+        complaintId: complaint._id,
+        forwardedTo: {
+          department: targetDepartment.name,
+          hod: {
+            name: `${targetHOD.firstName} ${targetHOD.lastName}`,
+            email: targetHOD.email,
+          },
+        },
+      },
+    });
+  } catch (error) {
+    console.error("❌ [CUSTOMER CARE] Error forwarding complaint:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error forwarding complaint",
+      error: error.message,
+    });
+  }
+};
+
+// Get departments for forwarding
+export const getDepartments = async (req, res) => {
+  try {
+    const Department = (await import("../models/Department.js")).default;
+
+    const departments = await Department.find({ isActive: true })
+      .select("_id name")
+      .sort({ name: 1 });
+
+    res.status(200).json({
+      success: true,
+      data: { departments },
+    });
+  } catch (error) {
+    console.error("❌ [CUSTOMER CARE] Error fetching departments:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching departments",
+      error: error.message,
+    });
+  }
+};
+
+// Get forwarded complaints for HODs
+export const getForwardedComplaints = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status, priority } = req.query;
+    const currentUser = req.user;
+
+    // Build query for forwarded complaints
+    const query = {
+      "forwardedTo.hod": currentUser._id,
+    };
+
+    // Add status filter if provided
+    if (status && status !== "all") {
+      query.status = status;
+    }
+
+    // Add priority filter if provided
+    if (priority && priority !== "all") {
+      query.priority = priority;
+    }
+
+    const complaints = await Complaint.find(query)
+      .populate("submittedBy", "firstName lastName email")
+      .populate("department", "name")
+      .populate("forwardedTo.department", "name")
+      .populate("forwardedTo.forwardedBy", "firstName lastName")
+      .sort({ "forwardedTo.forwardedAt": -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    // Transform the data to ensure consistent structure
+    const transformedComplaints = complaints.map((complaint) => {
+      const complaintObj = complaint.toObject();
+
+      // Ensure submittedBy is properly structured
+      if (
+        complaintObj.submittedBy &&
+        typeof complaintObj.submittedBy === "object"
+      ) {
+        complaintObj.submittedBy = {
+          _id: complaintObj.submittedBy._id,
+          firstName: complaintObj.submittedBy.firstName || "",
+          lastName: complaintObj.submittedBy.lastName || "",
+          email: complaintObj.submittedBy.email || "",
+        };
+      }
+
+      // Ensure department is properly structured
+      if (
+        complaintObj.department &&
+        typeof complaintObj.department === "object"
+      ) {
+        complaintObj.department = {
+          _id: complaintObj.department._id,
+          name: complaintObj.department.name || "",
+        };
+      }
+
+      // Ensure forwardedTo is properly structured
+      if (complaintObj.forwardedTo) {
+        if (
+          complaintObj.forwardedTo.department &&
+          typeof complaintObj.forwardedTo.department === "object"
+        ) {
+          complaintObj.forwardedTo.department = {
+            _id: complaintObj.forwardedTo.department._id,
+            name: complaintObj.forwardedTo.department.name || "",
+          };
+        }
+
+        if (
+          complaintObj.forwardedTo.forwardedBy &&
+          typeof complaintObj.forwardedTo.forwardedBy === "object"
+        ) {
+          complaintObj.forwardedTo.forwardedBy = {
+            _id: complaintObj.forwardedTo.forwardedBy._id,
+            firstName: complaintObj.forwardedTo.forwardedBy.firstName || "",
+            lastName: complaintObj.forwardedTo.forwardedBy.lastName || "",
+          };
+        }
+      }
+
+      return complaintObj;
+    });
+
+    const total = await Complaint.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        complaints: transformedComplaints,
+        pagination: {
+          current: page,
+          pages: Math.ceil(total / limit),
+          total,
+        },
+      },
+    });
+  } catch (error) {
+    console.error(
+      "❌ [CUSTOMER CARE] Error fetching forwarded complaints:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Error fetching forwarded complaints",
+      error: error.message,
+    });
+  }
+};
+
+// Get forwarded complaints count for HOD dashboard
+export const getForwardedComplaintsCount = async (req, res) => {
+  try {
+    const currentUser = req.user;
+
+    console.log("🔍 [FORWARDED COUNT] Fetching count for user:", {
+      userId: currentUser._id,
+      userName: `${currentUser.firstName} ${currentUser.lastName}`,
+      role: currentUser.role?.name,
+      level: currentUser.role?.level,
+    });
+
+    const totalForwarded = await Complaint.countDocuments({
+      "forwardedTo.hod": currentUser._id,
+    });
+
+    const pendingForwarded = await Complaint.countDocuments({
+      "forwardedTo.hod": currentUser._id,
+      status: { $in: ["pending", "in_progress"] },
+    });
+
+    const resolvedForwarded = await Complaint.countDocuments({
+      "forwardedTo.hod": currentUser._id,
+      status: "resolved",
+    });
+
+    console.log("🔍 [FORWARDED COUNT] Results:", {
+      totalForwarded,
+      pendingForwarded,
+      resolvedForwarded,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalForwarded,
+        pendingForwarded,
+        resolvedForwarded,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "❌ [CUSTOMER CARE] Error fetching forwarded complaints count:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Error fetching forwarded complaints count",
+      error: error.message,
+    });
+  }
+};
+
 export const createComplaint = async (req, res) => {
   try {
     const { title, description, category, priority, department, tags } =
@@ -191,7 +546,7 @@ export const createComplaint = async (req, res) => {
       });
     }
 
-    const complaint = new Complaint({
+    const complaintData = {
       title,
       description,
       category,
@@ -199,8 +554,9 @@ export const createComplaint = async (req, res) => {
       submittedBy: req.user._id,
       department: department || req.user.department._id,
       tags: tags || [],
-    });
+    };
 
+    const complaint = new Complaint(complaintData);
     await complaint.save();
 
     await complaint.populate([
@@ -240,8 +596,6 @@ export const createComplaint = async (req, res) => {
 
       const allHODs = [...customerCareHODs, ...superadmins];
 
-      const notifications = [];
-
       const hodNotifications = allHODs.map((user) => ({
         recipient: user._id,
         type: "complaint_submitted",
@@ -273,36 +627,8 @@ export const createComplaint = async (req, res) => {
         isRead: false,
       };
 
-      // Send notifications using proper service
-      console.log(
-        `📧 [CUSTOMER CARE] Sending ${hodNotifications.length} HOD notifications and 1 submitter notification`
-      );
-
-      for (const notification of hodNotifications) {
-        try {
-          await notificationService.createNotification(notification);
-          console.log(
-            `✅ [CUSTOMER CARE] HOD notification sent to: ${notification.recipient}`
-          );
-        } catch (error) {
-          console.error(
-            `❌ [CUSTOMER CARE] Failed to send HOD notification:`,
-            error
-          );
-        }
-      }
-
-      try {
-        await notificationService.createNotification(submitterNotification);
-        console.log(
-          `✅ [CUSTOMER CARE] Submitter notification sent to: ${submitterNotification.recipient}`
-        );
-      } catch (error) {
-        console.error(
-          `❌ [CUSTOMER CARE] Failed to send submitter notification:`,
-          error
-        );
-      }
+      const allNotifications = [...hodNotifications, submitterNotification];
+      await Notification.insertMany(allNotifications);
     } catch (notificationError) {
       console.error(
         "❌ [CUSTOMER CARE] Error creating notifications:",

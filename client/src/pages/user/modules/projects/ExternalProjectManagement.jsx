@@ -25,7 +25,7 @@ import DataTable from "../../../../components/common/DataTable";
 import { toast } from "react-toastify";
 import { updateTaskStatus } from "../../../../services/taskAPI";
 import { getMyProjectTasks } from "../../../../services/projectTaskService";
-import { downloadProjectCertificate } from "../../../../services/projectAPI";
+import { useNavigate } from "react-router-dom";
 import {
   formatNumberWithCommas,
   parseFormattedNumber,
@@ -49,6 +49,7 @@ import {
 
 const ExternalProjectManagement = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -93,10 +94,6 @@ const ExternalProjectManagement = () => {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [updatingTask, setUpdatingTask] = useState(null);
   const [projectTaskCounts, setProjectTaskCounts] = useState({});
-  const [showCertificateModal, setShowCertificateModal] = useState(false);
-  const [selectedProjectForCertificate, setSelectedProjectForCertificate] =
-    useState(null);
-  const [isGeneratingCertificate, setIsGeneratingCertificate] = useState(false);
 
   const formatStatus = (status) => {
     if (!status) return "N/A";
@@ -1225,39 +1222,6 @@ const ExternalProjectManagement = () => {
     return true;
   };
 
-  const handleDownloadCertificate = (project) => {
-    console.log(
-      "📜 [CERTIFICATE] Opening certificate modal for project:",
-      project.name
-    );
-    setSelectedProjectForCertificate(project);
-    setShowCertificateModal(true);
-  };
-
-  const handleConfirmCertificateDownload = async () => {
-    try {
-      setIsGeneratingCertificate(true);
-      console.log("🔄 [CERTIFICATE] Starting certificate generation...");
-
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      await downloadProjectCertificate(
-        selectedProjectForCertificate._id,
-        selectedProjectForCertificate.code
-      );
-
-      toast.success("Certificate downloaded successfully");
-
-      setShowCertificateModal(false);
-      setSelectedProjectForCertificate(null);
-    } catch (error) {
-      console.error("❌ [CERTIFICATE] Error downloading certificate:", error);
-      toast.error("Error downloading certificate");
-    } finally {
-      setIsGeneratingCertificate(false);
-    }
-  };
-
   const handleUpdateTaskStatus = async (taskId, newStatus) => {
     try {
       setUpdatingTask(taskId);
@@ -1794,15 +1758,20 @@ const ExternalProjectManagement = () => {
                         </span>
                       )}
                   </button>
-                  {/* Certificate Button - Show for completed external projects */}
+                  {/* View Certificate Button - Show for completed external projects */}
                   {row.status === "implementation" &&
                     row.projectScope === "external" &&
                     row.approvalProgress === 100 &&
                     row.implementationProgress === 100 && (
                       <button
-                        onClick={() => handleDownloadCertificate(row)}
-                        className="p-2 bg-yellow-100 text-yellow-600 hover:bg-yellow-200 hover:text-yellow-700 rounded-lg transition-colors cursor-pointer"
-                        title="Download Completion Certificate"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(
+                            `/dashboard/modules/projects/certificate/${row._id}`
+                          );
+                        }}
+                        className="p-2 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
+                        title="View Project Certificate"
                       >
                         <svg
                           className="h-4 w-4"
@@ -1814,7 +1783,7 @@ const ExternalProjectManagement = () => {
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             strokeWidth={2}
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                           />
                         </svg>
                       </button>
@@ -4437,210 +4406,6 @@ const ExternalProjectManagement = () => {
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Certificate Download Confirmation Modal */}
-        {showCertificateModal && selectedProjectForCertificate && (
-          <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4">
-              <div className="p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-yellow-100 rounded-lg mr-3">
-                      <svg
-                        className="h-6 w-6 text-yellow-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Download Completion Certificate
-                    </h3>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setShowCertificateModal(false);
-                      setSelectedProjectForCertificate(null);
-                    }}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
-                  >
-                    <svg
-                      className="h-6 w-6"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
-                </div>
-
-                {/* Project Info */}
-                <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                  <h4 className="font-medium text-gray-900 mb-2">
-                    {selectedProjectForCertificate.name}
-                  </h4>
-                  <p className="text-sm text-gray-600 mb-2">
-                    Project Code: {selectedProjectForCertificate.code}
-                  </p>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Approval Progress:</span>
-                    <span className="font-medium text-green-600">
-                      {selectedProjectForCertificate.approvalProgress}%
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">
-                      Implementation Progress:
-                    </span>
-                    <span className="font-medium text-green-600">
-                      {selectedProjectForCertificate.implementationProgress}%
-                    </span>
-                  </div>
-                </div>
-
-                {/* What the certificate includes */}
-                <div className="mb-6">
-                  <h4 className="font-medium text-gray-900 mb-3">
-                    Certificate will include:
-                  </h4>
-                  <ul className="space-y-2 text-sm text-gray-600">
-                    <li className="flex items-center">
-                      <svg
-                        className="h-4 w-4 text-green-500 mr-2"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      Project completion details and timeline
-                    </li>
-                    <li className="flex items-center">
-                      <svg
-                        className="h-4 w-4 text-green-500 mr-2"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      All approval signatures and dates
-                    </li>
-                    <li className="flex items-center">
-                      <svg
-                        className="h-4 w-4 text-green-500 mr-2"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      Implementation task completion summary
-                    </li>
-                    <li className="flex items-center">
-                      <svg
-                        className="h-4 w-4 text-green-500 mr-2"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      Official ELRA completion stamp
-                    </li>
-                  </ul>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => {
-                      setShowCertificateModal(false);
-                      setSelectedProjectForCertificate(null);
-                    }}
-                    disabled={isGeneratingCertificate}
-                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleConfirmCertificateDownload}
-                    disabled={isGeneratingCertificate}
-                    className="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isGeneratingCertificate ? (
-                      <>
-                        <svg
-                          className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          ></circle>
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          ></path>
-                        </svg>
-                        Generating Certificate...
-                      </>
-                    ) : (
-                      <>
-                        <svg
-                          className="h-4 w-4 mr-2"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                          />
-                        </svg>
-                        Download
-                      </>
-                    )}
-                  </button>
                 </div>
               </div>
             </div>

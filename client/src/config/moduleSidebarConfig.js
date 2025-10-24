@@ -321,6 +321,17 @@ export const moduleSidebarConfig = {
               return !(isCustomerCareUser && isHOD);
             },
           },
+          {
+            label: "Forwarded Complaints",
+            icon: "PaperAirplaneIcon",
+            path: "/dashboard/modules/customer-care/forwarded-complaints",
+            required: { minLevel: 700 },
+            description: "View complaints forwarded to you for awareness",
+            hidden: (user) => {
+              const isHOD = user?.role?.level >= 700;
+              return !isHOD;
+            },
+          },
         ],
       },
       {

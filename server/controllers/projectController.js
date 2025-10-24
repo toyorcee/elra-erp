@@ -7862,6 +7862,50 @@ export const generateProjectCertificate = async (req, res) => {
       day: "numeric",
     });
 
+    // Get the appropriate HOD for certificate signing
+    let certificateSigner = {
+      name: user.firstName + " " + user.lastName,
+      title: "Project Management HOD",
+      department: "Project Management",
+    };
+
+    // For external projects, try to get the actual Legal & Compliance HOD
+    if (project.projectScope === "external") {
+      try {
+        const legalDept = await Department.findOne({
+          name: "Legal & Compliance",
+        });
+        const hodRole = await mongoose.model("Role").findOne({ name: "HOD" });
+
+        if (legalDept && hodRole) {
+          const legalHOD = await User.findOne({
+            department: legalDept._id,
+            role: hodRole._id,
+            isActive: true,
+          }).populate("role");
+
+          if (legalHOD) {
+            certificateSigner = {
+              name: legalHOD.firstName + " " + legalHOD.lastName,
+              title: "Legal & Compliance HOD",
+              department: "Legal & Compliance",
+            };
+            console.log(
+              `✅ [CERTIFICATE] Using Legal & Compliance HOD: ${certificateSigner.name}`
+            );
+          } else {
+            console.log(
+              `⚠️ [CERTIFICATE] Legal & Compliance HOD not found, using Project Management HOD`
+            );
+          }
+        }
+      } catch (error) {
+        console.log(
+          `⚠️ [CERTIFICATE] Error finding Legal & Compliance HOD: ${error.message}`
+        );
+      }
+    }
+
     // Create certificate data based on project scope
     const certificateData = {
       project: {
@@ -7910,15 +7954,9 @@ export const generateProjectCertificate = async (req, res) => {
       certificate: {
         number: certificateNumber,
         issueDate: issueDate,
-        issuedBy: user.firstName + " " + user.lastName,
-        issuedByTitle:
-          project.projectScope === "external"
-            ? "Legal & Compliance HOD"
-            : "Project Management HOD",
-        department:
-          project.projectScope === "external"
-            ? "Legal & Compliance"
-            : "Project Management",
+        issuedBy: certificateSigner.name,
+        issuedByTitle: certificateSigner.title,
+        department: certificateSigner.department,
         type:
           project.projectScope === "external"
             ? "Compliance Certificate"
@@ -8017,6 +8055,50 @@ export const generateProjectCertificatePDF = async (req, res) => {
       day: "numeric",
     });
 
+    // Get the appropriate HOD for certificate signing
+    let certificateSigner = {
+      name: user.firstName + " " + user.lastName,
+      title: "Project Management HOD",
+      department: "Project Management",
+    };
+
+    // For external projects, try to get the actual Legal & Compliance HOD
+    if (project.projectScope === "external") {
+      try {
+        const legalDept = await Department.findOne({
+          name: "Legal & Compliance",
+        });
+        const hodRole = await mongoose.model("Role").findOne({ name: "HOD" });
+
+        if (legalDept && hodRole) {
+          const legalHOD = await User.findOne({
+            department: legalDept._id,
+            role: hodRole._id,
+            isActive: true,
+          }).populate("role");
+
+          if (legalHOD) {
+            certificateSigner = {
+              name: legalHOD.firstName + " " + legalHOD.lastName,
+              title: "Legal & Compliance HOD",
+              department: "Legal & Compliance",
+            };
+            console.log(
+              `✅ [CERTIFICATE PDF] Using Legal & Compliance HOD: ${certificateSigner.name}`
+            );
+          } else {
+            console.log(
+              `⚠️ [CERTIFICATE PDF] Legal & Compliance HOD not found, using Project Management HOD`
+            );
+          }
+        }
+      } catch (error) {
+        console.log(
+          `⚠️ [CERTIFICATE PDF] Error finding Legal & Compliance HOD: ${error.message}`
+        );
+      }
+    }
+
     // Create certificate data based on project scope
     const certificateData = {
       project: {
@@ -8065,15 +8147,9 @@ export const generateProjectCertificatePDF = async (req, res) => {
       certificate: {
         number: certificateNumber,
         issueDate: issueDate,
-        issuedBy: user.firstName + " " + user.lastName,
-        issuedByTitle:
-          project.projectScope === "external"
-            ? "Legal & Compliance HOD"
-            : "Project Management HOD",
-        department:
-          project.projectScope === "external"
-            ? "Legal & Compliance"
-            : "Project Management",
+        issuedBy: certificateSigner.name,
+        issuedByTitle: certificateSigner.title,
+        department: certificateSigner.department,
         type:
           project.projectScope === "external"
             ? "Compliance Certificate"

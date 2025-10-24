@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../../context/AuthContext";
 import { toast } from "react-toastify";
 import {
@@ -44,6 +45,7 @@ import AnimatedBubbles from "../../../../components/ui/AnimatedBubbles.jsx";
 
 const MyProjects = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const style = document.createElement("style");
@@ -1705,6 +1707,34 @@ const MyProjects = () => {
                           title="Implement Project"
                         >
                           <CheckCircleIcon className="h-4 w-4" />
+                        </button>
+                      )}
+
+                      {/* View Certificate Button - Show for completed projects */}
+                      {project.status === "completed" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(
+                              `/dashboard/modules/projects/certificate/${project.id}`
+                            );
+                          }}
+                          className="p-2 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors cursor-pointer"
+                          title="View Project Certificate"
+                        >
+                          <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
                         </button>
                       )}
                     </div>

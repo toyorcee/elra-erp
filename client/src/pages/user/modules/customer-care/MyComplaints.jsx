@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 import {
   HiTicket,
   HiChatBubbleOvalLeftEllipsis,
@@ -68,9 +69,7 @@ const MyComplaints = () => {
     const chatButton = document.querySelector("[data-chat-button]");
     if (chatButton) {
       sessionStorage.setItem("prefetchedComplaintId", complaint._id);
-      console.log("💾 Stored complaint ID in sessionStorage:", complaint._id);
       chatButton.click();
-      console.log("🖱️ Clicked chat button");
     } else {
       console.error("❌ Chat button not found");
     }

@@ -9,6 +9,8 @@ import {
   HiEye,
   HiArrowPath,
   HiXMark,
+  HiPaperAirplane,
+  HiUserGroup,
 } from "react-icons/hi2";
 import {
   complaintAPI,
@@ -25,6 +27,13 @@ const ComplaintManagement = () => {
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [pendingStatusChange, setPendingStatusChange] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [showForwardModal, setShowForwardModal] = useState(false);
+  const [selectedComplaintForForward, setSelectedComplaintForForward] =
+    useState(null);
+  const [departments, setDepartments] = useState([]);
+  const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [forwarding, setForwarding] = useState(false);
+  const [forwardNote, setForwardNote] = useState("");
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
@@ -146,6 +155,47 @@ const ComplaintManagement = () => {
     setPendingStatusChange(null);
   };
 
+  const handleForwardToHOD = (complaint) => {
+    setSelectedComplaintForForward(complaint);
+    setShowForwardModal(true);
+  };
+
+  const confirmForward = async () => {
+    if (!selectedComplaintForForward || !selectedDepartment) return;
+
+    try {
+      setForwarding(true);
+      const response = await complaintAPI.forwardComplaintToHOD(
+        selectedComplaintForForward._id,
+        {
+          departmentId: selectedDepartment,
+          note: forwardNote.trim() || undefined,
+        }
+      );
+
+      if (response.success) {
+        toast.success("Complaint forwarded to department HOD successfully!");
+        setShowForwardModal(false);
+        setSelectedComplaintForForward(null);
+        setSelectedDepartment("");
+      } else {
+        toast.error("Failed to forward complaint to HOD");
+      }
+    } catch (error) {
+      console.error("Error forwarding complaint:", error);
+      toast.error("Failed to forward complaint to HOD");
+    } finally {
+      setForwarding(false);
+    }
+  };
+
+  const cancelForward = () => {
+    setShowForwardModal(false);
+    setSelectedComplaintForForward(null);
+    setSelectedDepartment("");
+    setForwardNote("");
+  };
+
   useEffect(() => {
     const fetchComplaints = async () => {
       try {
@@ -170,7 +220,19 @@ const ComplaintManagement = () => {
       }
     };
 
+    const fetchDepartments = async () => {
+      try {
+        const response = await complaintAPI.getDepartments();
+        if (response.success) {
+          setDepartments(response.data.departments);
+        }
+      } catch (error) {
+        console.error("Error fetching departments:", error);
+      }
+    };
+
     fetchComplaints();
+    fetchDepartments();
   }, []);
 
   const getStatusColor = (status) => {
@@ -193,7 +255,6 @@ const ComplaintManagement = () => {
 
   return (
     <div className="space-y-6 p-4">
-
       {/* Header */}
       <div className="bg-gradient-to-r from-[var(--elra-primary)] to-[var(--elra-primary-dark)] rounded-xl p-6 text-white">
         <div>
@@ -299,12 +360,35 @@ const ComplaintManagement = () => {
         className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
       >
         <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900">
-            Complaints Management
-          </h2>
-          <p className="text-gray-600 mt-1">
-            Manage and update complaint status
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                Complaints Management
+              </h2>
+              <p className="text-gray-600 mt-1">
+                Manage and update complaint status
+              </p>
+            </div>
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 max-w-md">
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <HiArrowPath className="w-4 h-4 text-blue-600" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-blue-900 mb-1">
+                    💡 Quick Status Update
+                  </h3>
+                  <p className="text-xs text-blue-700 leading-relaxed">
+                    Use the dropdown in the <strong>Status</strong> column to
+                    quickly update complaint status. Changes are saved
+                    automatically with confirmation.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -409,6 +493,13 @@ const ComplaintManagement = () => {
                         title="View Details"
                       >
                         <HiEye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleForwardToHOD(complaint)}
+                        className="p-2 bg-green-100 hover:bg-green-200 text-green-600 rounded-lg transition-colors"
+                        title="Forward to Department HOD"
+                      >
+                        <HiPaperAirplane className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
@@ -684,6 +775,132 @@ const ComplaintManagement = () => {
                       </>
                     ) : (
                       <span>Confirm Change</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Forward to HOD Modal */}
+      {showForwardModal && selectedComplaintForForward && (
+        <div className="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-xl shadow-2xl max-w-md w-full"
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Forward to Department HOD
+                </h2>
+                <button
+                  onClick={cancelForward}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <HiXMark className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="text-center">
+                  <p className="text-gray-600 mb-2">
+                    Forward this complaint to a department HOD for awareness and
+                    follow-up:
+                  </p>
+                  <p className="font-semibold text-gray-900 text-lg">
+                    "{selectedComplaintForForward.title}"
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    From:{" "}
+                    {selectedComplaintForForward.department?.name || "N/A"}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Department HOD
+                  </label>
+                  <select
+                    value={selectedDepartment}
+                    onChange={(e) => setSelectedDepartment(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
+                  >
+                    <option value="">Select department HOD...</option>
+                    {departments
+                      .filter(
+                        (dept) =>
+                          dept._id !==
+                          selectedComplaintForForward.department?._id
+                      )
+                      .map((dept) => (
+                        <option key={dept._id} value={dept._id}>
+                          {dept.name} HOD
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Additional Note (Optional)
+                  </label>
+                  <textarea
+                    value={forwardNote}
+                    onChange={(e) => setForwardNote(e.target.value)}
+                    placeholder="Add any additional context or instructions for the department HOD..."
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent resize-none"
+                    rows={3}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    This note will be included in the notification sent to the
+                    department HOD.
+                  </p>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <HiUserGroup className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">
+                        HOD Notification
+                      </p>
+                      <p className="text-sm text-blue-700 mt-1">
+                        The selected department HOD will be notified and can
+                        follow up with Customer Care or assigned staff.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    onClick={cancelForward}
+                    className="flex-1 px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                    disabled={forwarding}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmForward}
+                    disabled={forwarding || !selectedDepartment}
+                    className="flex-1 px-4 py-2 bg-[var(--elra-primary)] text-white hover:bg-[var(--elra-primary-dark)] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    {forwarding ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Forwarding...</span>
+                      </>
+                    ) : (
+                      <>
+                        <HiPaperAirplane className="w-4 h-4" />
+                        <span>Forward to HOD</span>
+                      </>
                     )}
                   </button>
                 </div>

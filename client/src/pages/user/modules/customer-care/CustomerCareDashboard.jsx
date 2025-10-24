@@ -36,6 +36,12 @@ const CustomerCareDashboard = () => {
   });
 
   const [recentComplaints, setRecentComplaints] = useState([]);
+  const [personalComplaints, setPersonalComplaints] = useState([]);
+  const [forwardedComplaintsCount, setForwardedComplaintsCount] = useState({
+    totalForwarded: 0,
+    pendingForwarded: 0,
+    resolvedForwarded: 0,
+  });
   const [loading, setLoading] = useState(true);
 
   const isCustomerCareUser =
@@ -58,14 +64,47 @@ const CustomerCareDashboard = () => {
           setStats(statsResponse.data);
         }
 
-        const complaintsResponse = await complaintAPI.getComplaints({
-          limit: 5,
-          sortBy: "submittedAt",
-          sortOrder: "desc",
-          submittedByMe: !isCustomerCareUser && !isHOD,
-        });
-        if (complaintsResponse.success) {
-          setRecentComplaints(complaintsResponse.data.complaints);
+        // For HODs, get both department and personal complaints
+        if (isHOD && !isCustomerCareUser) {
+          // Get forwarded complaints count for HODs
+          const forwardedCountResponse =
+            await complaintAPI.getForwardedComplaintsCount();
+          if (forwardedCountResponse.success) {
+            setForwardedComplaintsCount(forwardedCountResponse.data);
+          }
+
+          // Get department complaints
+          const departmentResponse = await complaintAPI.getComplaints({
+            limit: 5,
+            sortBy: "submittedAt",
+            sortOrder: "desc",
+            departmentId: user.department._id,
+          });
+          if (departmentResponse.success) {
+            setRecentComplaints(departmentResponse.data.complaints);
+          }
+
+          // Get personal complaints
+          const personalResponse = await complaintAPI.getComplaints({
+            limit: 5,
+            sortBy: "submittedAt",
+            sortOrder: "desc",
+            submittedByMe: true,
+          });
+          if (personalResponse.success) {
+            setPersonalComplaints(personalResponse.data.complaints);
+          }
+        } else {
+          // For regular users, get their complaints
+          const complaintsResponse = await complaintAPI.getComplaints({
+            limit: 5,
+            sortBy: "submittedAt",
+            sortOrder: "desc",
+            submittedByMe: !isCustomerCareUser,
+          });
+          if (complaintsResponse.success) {
+            setRecentComplaints(complaintsResponse.data.complaints);
+          }
         }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -104,6 +143,80 @@ const CustomerCareDashboard = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6 p-4">
+        {/* Header Skeleton */}
+        <div className="bg-gradient-to-r from-gray-200 to-gray-300 rounded-xl p-6 animate-pulse">
+          <div className="h-8 bg-gray-300 rounded w-64 mb-2"></div>
+          <div className="h-4 bg-gray-300 rounded w-96"></div>
+        </div>
+
+        {/* Stats Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[...Array(4)].map((_, index) => (
+            <div
+              key={index}
+              className="bg-gray-100 rounded-xl p-6 animate-pulse"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="h-4 bg-gray-300 rounded w-24 mb-2"></div>
+                  <div className="h-8 bg-gray-300 rounded w-16 mb-2"></div>
+                  <div className="h-3 bg-gray-300 rounded w-20"></div>
+                </div>
+                <div className="w-12 h-12 bg-gray-300 rounded-xl"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Quick Actions Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[...Array(2)].map((_, index) => (
+            <div
+              key={index}
+              className="bg-gray-100 rounded-xl p-6 animate-pulse"
+            >
+              <div className="flex items-center space-x-4 mb-4">
+                <div className="w-12 h-12 bg-gray-300 rounded-xl"></div>
+                <div>
+                  <div className="h-6 bg-gray-300 rounded w-32 mb-2"></div>
+                  <div className="h-4 bg-gray-300 rounded w-24"></div>
+                </div>
+              </div>
+              <div className="h-4 bg-gray-300 rounded w-full mb-4"></div>
+              <div className="h-4 bg-gray-300 rounded w-3/4 mb-4"></div>
+              <div className="h-10 bg-gray-300 rounded w-32"></div>
+            </div>
+          ))}
+        </div>
+
+        {/* Recent Complaints Skeleton */}
+        <div className="bg-gray-100 rounded-xl p-6 animate-pulse">
+          <div className="flex items-center justify-between mb-4">
+            <div className="h-6 bg-gray-300 rounded w-48"></div>
+            <div className="h-4 bg-gray-300 rounded w-16"></div>
+          </div>
+          <div className="space-y-3">
+            {[...Array(3)].map((_, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between p-3 bg-gray-200 rounded-lg"
+              >
+                <div>
+                  <div className="h-4 bg-gray-300 rounded w-48 mb-2"></div>
+                  <div className="h-3 bg-gray-300 rounded w-32"></div>
+                </div>
+                <div className="h-6 bg-gray-300 rounded-full w-16"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!isCustomerCareUser) {
     return (
       <div className="space-y-6 p-4">
@@ -119,23 +232,77 @@ const CustomerCareDashboard = () => {
 
         {/* Stats Cards for Regular Users */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* My Complaints Count */}
+          {/* Department Complaints Count for HODs */}
+          {isHOD && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl shadow-lg border border-indigo-200 p-6 hover:shadow-xl transition-all duration-300"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-indigo-700 uppercase tracking-wide">
+                    Department Complaints
+                  </p>
+                  <p className="text-2xl sm:text-3xl font-bold text-indigo-900 mt-2">
+                    {recentComplaints.length}
+                  </p>
+                  <p className="text-sm text-indigo-600 mt-1">
+                    Total in {user.department?.name || "department"}
+                  </p>
+                </div>
+                <div className="p-4 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-lg">
+                  <HiUserGroup className="h-8 w-8 text-white" />
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Forwarded Complaints Count for HODs */}
+          {isHOD && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl shadow-lg border border-orange-200 p-6 hover:shadow-xl transition-all duration-300"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-orange-700 uppercase tracking-wide">
+                    Forwarded to Me
+                  </p>
+                  <p className="text-2xl sm:text-3xl font-bold text-orange-900 mt-2">
+                    {forwardedComplaintsCount.totalForwarded}
+                  </p>
+                  <p className="text-sm text-orange-600 mt-1">
+                    {forwardedComplaintsCount.pendingForwarded} pending
+                  </p>
+                </div>
+                <div className="p-4 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
+                  <HiPaperAirplane className="h-8 w-8 text-white" />
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* My Personal Complaints Count */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
+            transition={{ delay: 0.2 }}
             className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-lg border border-blue-200 p-6 hover:shadow-xl transition-all duration-300"
           >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">
-                  {isHOD ? "Department Complaints" : "My Complaints"}
+                  My Personal Complaints
                 </p>
                 <p className="text-2xl sm:text-3xl font-bold text-blue-900 mt-2">
-                  {recentComplaints.length}
+                  {isHOD ? personalComplaints.length : recentComplaints.length}
                 </p>
                 <p className="text-sm text-blue-600 mt-1">
-                  {isHOD ? "Total in department" : "Total submitted"}
+                  {isHOD ? "Personal complaints" : "Total submitted"}
                 </p>
               </div>
               <div className="p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
@@ -544,6 +711,28 @@ const CustomerCareDashboard = () => {
                   </h3>
                   <p className="text-sm text-gray-600">
                     Assign complaints to team members
+                  </p>
+                </div>
+              </Link>
+            </motion.div>
+          )}
+
+          {/* Forwarded Complaints - Only for HODs */}
+          {isHOD && (
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Link
+                to="/dashboard/modules/customer-care/forwarded-complaints"
+                className="flex items-center p-6 bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-xl hover:shadow-lg transition-all duration-300 group"
+              >
+                <div className="p-3 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <HiPaperAirplane className="w-6 h-6 text-white" />
+                </div>
+                <div className="ml-4">
+                  <h3 className="font-semibold text-gray-900">
+                    Forwarded Complaints
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    View complaints forwarded to you
                   </p>
                 </div>
               </Link>

@@ -8,8 +8,6 @@ import {
 } from "react-icons/hi2";
 import { toast } from "react-toastify";
 import { complaintAPI } from "../../../../services/customerCareAPI";
-import { getActiveDepartments } from "../../../../services/departments";
-import AnimatedBubbles from "../../../../components/ui/AnimatedBubbles";
 
 const SubmitComplaint = () => {
   const [formData, setFormData] = useState({
@@ -17,12 +15,9 @@ const SubmitComplaint = () => {
     category: "",
     priority: "medium",
     description: "",
-    department: "",
   });
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [departments, setDepartments] = useState([]);
-  const [departmentsLoading, setDepartmentsLoading] = useState(true);
 
   const categories = [
     { value: "technical", label: "Technical Issues" },
@@ -51,42 +46,6 @@ const SubmitComplaint = () => {
     { value: "high", label: "High", color: "text-red-600 bg-red-100" },
   ];
 
-  useEffect(() => {
-    const fetchDepartments = async () => {
-      try {
-        setDepartmentsLoading(true);
-        console.log("🔄 [SubmitComplaint] Fetching departments...");
-        const response = await getActiveDepartments();
-        console.log("📡 [SubmitComplaint] Departments API response:", response);
-
-        if (response.success && response.data && response.data.departments) {
-          console.log(
-            "✅ [SubmitComplaint] Departments data:",
-            response.data.departments
-          );
-          setDepartments(response.data.departments);
-        } else {
-          console.warn(
-            "⚠️ [SubmitComplaint] Departments API response structure:",
-            response
-          );
-          setDepartments([]);
-        }
-      } catch (error) {
-        console.error(
-          "❌ [SubmitComplaint] Error fetching departments:",
-          error
-        );
-        toast.error("Failed to load departments");
-        setDepartments([]);
-      } finally {
-        setDepartmentsLoading(false);
-      }
-    };
-
-    fetchDepartments();
-  }, []);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -104,7 +63,6 @@ const SubmitComplaint = () => {
           category: "",
           priority: "medium",
           description: "",
-          department: "",
         });
       } else {
         toast.error(
@@ -126,7 +84,6 @@ const SubmitComplaint = () => {
       category: "",
       priority: "medium",
       description: "",
-      department: "",
     });
   };
 
@@ -274,38 +231,6 @@ const SubmitComplaint = () => {
                   </label>
                 ))}
               </div>
-            </div>
-          </div>
-
-          {/* Department */}
-          <div className="relative">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Related Department
-            </label>
-            <div className="relative">
-              <select
-                value={formData.department}
-                onChange={(e) =>
-                  setFormData({ ...formData, department: e.target.value })
-                }
-                className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-transparent"
-                disabled={departmentsLoading}
-              >
-                <option value="">Select department (optional)</option>
-                {Array.isArray(departments) &&
-                  departments.map((dept) => (
-                    <option key={dept._id} value={dept._id}>
-                      {dept.name}
-                    </option>
-                  ))}
-              </select>
-
-              {/* Animated Bubbles Loading Indicator */}
-              <AnimatedBubbles
-                isVisible={departmentsLoading}
-                variant="bubbles"
-                className="bg-white/80 rounded-xl"
-              />
             </div>
           </div>
 

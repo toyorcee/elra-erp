@@ -37,6 +37,7 @@ import SubmitComplaint from "./pages/user/modules/customer-care/SubmitComplaint"
 import MyAssignments from "./pages/user/modules/customer-care/MyAssignments";
 import AssignComplaints from "./pages/user/modules/customer-care/AssignComplaints";
 import MyComplaints from "./pages/user/modules/customer-care/MyComplaints";
+import ForwardedComplaints from "./pages/user/modules/customer-care/ForwardedComplaints";
 import MyTickets from "./pages/user/modules/self-service/MyTickets";
 import MyLeaveRequests from "./pages/user/modules/self-service/MyLeaveRequests";
 import MyDocuments from "./pages/user/modules/self-service/MyDocuments";
@@ -314,6 +315,10 @@ const AppRoutes = () => {
         <Route
           path="modules/customer-care/my-complaints"
           element={<MyComplaints />}
+        />
+        <Route
+          path="modules/customer-care/forwarded-complaints"
+          element={<ForwardedComplaints />}
         />
 
         {/* Department Management Module Routes */}

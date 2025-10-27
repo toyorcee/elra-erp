@@ -1,5 +1,5 @@
 import React from "react";
-import elraLogo from "../assets/ELRAlogo.png";
+import elraLogo from "../assets/elra-logo.png";
 
 const ELRALogo = ({ variant = "dark", className = "", size = "md" }) => {
   const sizeClasses = {

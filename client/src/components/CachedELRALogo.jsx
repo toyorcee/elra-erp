@@ -14,9 +14,8 @@ const CachedELRALogo = ({ variant = "dark", className = "", size = "md" }) => {
     xl: "h-20 w-24",
   };
 
-  // Cache key for the logo
-  const LOGO_CACHE_KEY = "elra-logo-v1";
-  const LOGO_SOURCE_URL = "/src/assets/ELRAlogo.png";
+  const LOGO_CACHE_KEY = "elra-logo-v2";
+  const LOGO_SOURCE_URL = "/src/assets/elra-logo.png";
 
   useEffect(() => {
     let isMounted = true;
@@ -26,12 +25,10 @@ const CachedELRALogo = ({ variant = "dark", className = "", size = "md" }) => {
         setIsLoading(true);
         setHasError(false);
 
-        // First, try to get from cache
         console.log("🔍 [CachedELRALogo] Checking cache for logo...");
         const cachedLogo = await indexedDBService.getAsset(LOGO_CACHE_KEY);
 
         if (cachedLogo && isMounted) {
-          // Create object URL from cached blob
           const cachedUrl = URL.createObjectURL(cachedLogo);
           setLogoUrl(cachedUrl);
           setIsLoading(false);

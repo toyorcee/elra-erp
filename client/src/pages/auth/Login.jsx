@@ -6,7 +6,7 @@ import { MdVisibility, MdVisibilityOff } from "react-icons/md";
 import { useAuth } from "../../context/AuthContext";
 import { authAPI } from "../../services/api";
 import ELRALogo from "../../components/ELRALogo";
-import elraImage from "../../assets/elrabg.jpeg";
+import elraImage from "../../assets/elrabgg.jpeg";
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });

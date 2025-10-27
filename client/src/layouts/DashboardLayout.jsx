@@ -11,7 +11,7 @@ import { useAuth } from "../context/AuthContext";
 import { useMessages } from "../hooks/useMessages";
 import { useMessageContext } from "../context/MessageContext";
 import { DynamicSidebarProvider } from "../context/DynamicSidebarContext";
-import CachedELRALogo from "../components/CachedELRALogo";
+import elraLogo from "../assets/elra-logo.png";
 import messageService from "../services/messageService";
 import { toast } from "react-toastify";
 import defaultAvatar from "../assets/defaulticon.jpg";
@@ -221,7 +221,11 @@ const DashboardLayout = () => {
                   onClick={handleLogoClick}
                   title={user && !loading ? "Go to Modules" : "Go to Home"}
                 >
-                  <CachedELRALogo variant="dark" size="sm" />
+                  <img
+                    src={elraLogo}
+                    alt="ELRA Logo"
+                    className="h-8 w-12 object-contain"
+                  />
                 </div>
               </div>
 

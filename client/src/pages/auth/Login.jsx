@@ -5,7 +5,7 @@ import { HiMail, HiLockClosed, HiKey } from "react-icons/hi";
 import { MdVisibility, MdVisibilityOff } from "react-icons/md";
 import { useAuth } from "../../context/AuthContext";
 import { authAPI } from "../../services/api";
-import CachedELRALogo from "../../components/CachedELRALogo";
+import ELRALogo from "../../components/ELRALogo";
 import elraImage from "../../assets/elrabg.jpeg";
 
 const Login = () => {
@@ -116,7 +116,7 @@ const Login = () => {
         {/* Logo */}
         <div className="flex justify-center mb-6 md:mb-8">
           <div className="bg-white p-4 md:p-6 rounded-xl md:rounded-2xl shadow-lg">
-            <CachedELRALogo className="h-10 md:h-14 w-auto" />
+            <ELRALogo className="h-10 md:h-14 w-auto" />
           </div>
         </div>
 
@@ -292,7 +292,7 @@ const Login = () => {
 
             <div className="text-center mb-6">
               <div className="bg-white p-3 rounded-lg inline-block mb-4">
-                <CachedELRALogo className="h-8 w-auto mx-auto" />
+                <ELRALogo className="h-8 w-auto mx-auto" />
               </div>
               <h2 className="text-xl font-bold text-[var(--elra-primary)]">
                 Enter Invitation Code

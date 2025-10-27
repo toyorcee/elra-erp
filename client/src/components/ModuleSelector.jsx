@@ -25,7 +25,7 @@ import {
   FaHeadset,
 } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
-import CachedELRALogo from "./CachedELRALogo";
+import ELRALogo from "./ELRALogo";
 import { userModulesAPI } from "../services/userModules.js";
 import GradientSpinner from "./common/GradientSpinner";
 
@@ -609,7 +609,7 @@ function ModuleSelector() {
       <footer className="absolute bottom-8 text-center w-full">
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mx-8 shadow-lg border border-[var(--elra-border-primary)]">
           <div className="flex items-center justify-center mb-2">
-            <CachedELRALogo variant="dark" size="sm" />
+            <ELRALogo variant="dark" size="sm" />
           </div>
           <div className="text-sm text-[var(--elra-text-secondary)] font-medium">
             ELRA ERP System • Version 2.0

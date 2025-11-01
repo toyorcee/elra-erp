@@ -219,11 +219,10 @@ export const createInvitation = asyncHandler(async (req, res) => {
     console.log("✅ [INVITATION] No existing user found");
   }
 
-  // Check if invitation already exists for this email
   console.log("🔍 [INVITATION] Checking for existing invitations...");
   const existingInvitation = await Invitation.findOne({
     email: email.toLowerCase(),
-    status: "active",
+    status: { $in: ["active", "sent", "pending_approval"] },
   });
 
   if (existingInvitation) {
@@ -235,7 +234,12 @@ export const createInvitation = asyncHandler(async (req, res) => {
     });
     return res.status(400).json({
       success: false,
-      message: "Active invitation already exists for this email",
+      message: `Active invitation already exists for this email (status: ${existingInvitation.status}). Please cancel or wait for it to expire before creating a new one.`,
+      existingInvitation: {
+        id: existingInvitation._id,
+        status: existingInvitation.status,
+        createdAt: existingInvitation.createdAt,
+      },
     });
   }
   console.log("✅ [INVITATION] No existing active invitations found");

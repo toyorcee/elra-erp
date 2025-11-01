@@ -237,20 +237,22 @@ const generateNextExternalProjectCode = async () => {
 
 // @desc    Get next external project code
 // @route   GET /api/projects/next-external-code
-// @access  Private (Project Management HOD only)
+// @access  Private (Project Management HOD or Superadmin)
 export const getNextExternalProjectCode = async (req, res) => {
   try {
     const currentUser = req.user;
 
-    // Check if user is Project Management HOD
-    if (
-      currentUser.role.level < 700 ||
-      currentUser.department?.name !== "Project Management"
-    ) {
+    // Check if user is Project Management HOD or Superadmin
+    const isSuperAdmin = currentUser.role.level >= 1000;
+    const isProjectManagementHOD =
+      currentUser.department?.name === "Project Management" &&
+      currentUser.role.level >= 700;
+
+    if (!isSuperAdmin && !isProjectManagementHOD) {
       return res.status(403).json({
         success: false,
         message:
-          "Access denied. Only Project Management HOD can create external projects.",
+          "Access denied. Only Project Management HOD or Superadmin can create external projects.",
       });
     }
 
@@ -3166,14 +3168,16 @@ export const addTeamMember = async (req, res) => {
 
     // Additional validation for external projects
     if (project.projectScope === "external") {
-      const isProjectManagementDepartment =
-        currentUser.department?.name === "Project Management";
+      const isSuperAdmin = currentUser.role.level >= 1000;
+      const isProjectManagementHOD =
+        currentUser.department?.name === "Project Management" &&
+        currentUser.role.level >= 700;
 
-      if (!isProjectManagementDepartment || currentUser.role.level < 700) {
+      if (!isSuperAdmin && !isProjectManagementHOD) {
         return res.status(403).json({
           success: false,
           message:
-            "Access denied. Only Project Management HOD can manage external project teams.",
+            "Access denied. Only Project Management HOD or Superadmin can manage external project teams.",
         });
       }
     }
@@ -3488,34 +3492,41 @@ export const approveProject = async (req, res) => {
       });
     }
 
+    const isSuperAdmin = currentUser.role.level >= 1000;
+
     if (
       level === "finance" &&
+      !isSuperAdmin &&
       currentUser.department?.name !== "Finance & Accounting"
     ) {
       return res.status(403).json({
         success: false,
-        message: "Only Finance department can approve at finance level",
+        message:
+          "Only Finance department or Superadmin can approve at finance level",
       });
     }
 
     if (
       level === "executive" &&
+      !isSuperAdmin &&
       currentUser.department?.name !== "Executive Office"
     ) {
       return res.status(403).json({
         success: false,
-        message: "Only Executive Office can approve at executive level",
+        message:
+          "Only Executive Office or Superadmin can approve at executive level",
       });
     }
 
     if (
       level === "legal_compliance" &&
+      !isSuperAdmin &&
       currentUser.department?.name !== "Legal & Compliance"
     ) {
       return res.status(403).json({
         success: false,
         message:
-          "Only Legal & Compliance department can approve at legal_compliance level",
+          "Only Legal & Compliance department or Superadmin can approve at legal_compliance level",
       });
     }
 
@@ -4037,21 +4048,22 @@ export const approveProject = async (req, res) => {
 
 // @desc    Legal approval with compliance program attachment
 // @route   POST /api/projects/:id/legal-approve
-// @access  Private (Legal HOD)
+// @access  Private (Legal HOD or Superadmin)
 export const legalApproveProject = async (req, res) => {
   try {
     const { id } = req.params;
     const { complianceProgramId, comments } = req.body;
     const currentUser = req.user;
 
-    // Check if user is Legal HOD
-    if (
-      currentUser.role.level < 700 ||
-      currentUser.department.name !== "Legal & Compliance"
-    ) {
+    const isSuperAdmin = currentUser.role.level >= 1000;
+    const isLegalHOD =
+      currentUser.role.level >= 700 &&
+      currentUser.department?.name === "Legal & Compliance";
+
+    if (!isSuperAdmin && !isLegalHOD) {
       return res.status(403).json({
         success: false,
-        message: "Only Legal HOD can perform legal approval",
+        message: "Only Legal HOD or Superadmin can perform legal approval",
       });
     }
 
@@ -4254,7 +4266,6 @@ export const rejectProject = async (req, res) => {
       });
     }
 
-    // Check if user has permission to reject this level
     if (level === "hod" && currentUser.role.level < 700) {
       return res.status(403).json({
         success: false,
@@ -4262,34 +4273,41 @@ export const rejectProject = async (req, res) => {
       });
     }
 
+    const isSuperAdmin = currentUser.role.level >= 1000;
+
     if (
       level === "finance" &&
+      !isSuperAdmin &&
       currentUser.department?.name !== "Finance & Accounting"
     ) {
       return res.status(403).json({
         success: false,
-        message: "Only Finance department can reject at finance level",
+        message:
+          "Only Finance department or Superadmin can reject at finance level",
       });
     }
 
     if (
       level === "executive" &&
+      !isSuperAdmin &&
       currentUser.department?.name !== "Executive Office"
     ) {
       return res.status(403).json({
         success: false,
-        message: "Only Executive Office can reject at executive level",
+        message:
+          "Only Executive Office or Superadmin can reject at executive level",
       });
     }
 
     if (
       level === "legal_compliance" &&
+      !isSuperAdmin &&
       currentUser.department?.name !== "Legal & Compliance"
     ) {
       return res.status(403).json({
         success: false,
         message:
-          "Only Legal & Compliance department can reject at legal_compliance level",
+          "Only Legal & Compliance department or Superadmin can reject at legal_compliance level",
       });
     }
 
@@ -4991,25 +5009,22 @@ export const getDepartmentPendingApprovalProjects = async (req, res) => {
 
 // @desc    Get projects pending Project Management HOD approval
 // @route   GET /api/projects/project-management-pending-approval
-// @access  Private (Project Management HOD only)
+// @access  Private (Project Management HOD or Superadmin)
 export const getProjectManagementPendingApprovalProjects = async (req, res) => {
   try {
     const currentUser = req.user;
 
-    // Check if user is HOD level
-    if (currentUser.role.level < 700) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied. HOD level (700) or higher required.",
-      });
-    }
+    // Check if user is HOD level or Superadmin
+    const isSuperAdmin = currentUser.role.level >= 1000;
+    const isProjectManagementHOD =
+      currentUser.department?.name === "Project Management" &&
+      currentUser.role.level >= 700;
 
-    // Check if user is Project Management HOD
-    if (currentUser.department?.name !== "Project Management") {
+    if (!isSuperAdmin && !isProjectManagementHOD) {
       return res.status(403).json({
         success: false,
         message:
-          "Access denied. Only Project Management HOD can access this endpoint.",
+          "Access denied. Only Project Management HOD or Superadmin can access this endpoint.",
       });
     }
 
@@ -5763,26 +5778,31 @@ export const getCrossDepartmentalApprovalHistory = async (req, res) => {
 
 // @desc    Get HOD approval history
 // @route   GET /api/projects/approval-history
-// @access  Private (HODs only)
+// @access  Private (HODs or Superadmin)
 export const getHODApprovalHistory = async (req, res) => {
   try {
     const currentUser = req.user;
 
-    // Check if user is HOD level
-    if (currentUser.role.level < 700) {
+    // Check if user is HOD level or Superadmin
+    const isSuperAdmin = currentUser.role.level >= 1000;
+    if (!isSuperAdmin && currentUser.role.level < 700) {
       return res.status(403).json({
         success: false,
         message: "Access denied. HOD level (700) or higher required.",
       });
     }
 
-    // Find projects from the HOD's own department where they have approved
-    const projects = await Project.find({
-      department: currentUser.department._id, // Only projects from HOD's own department
+    let query = {
       "approvalChain.status": "approved",
       "approvalChain.approver": currentUser._id,
       isActive: true,
-    })
+    };
+
+    if (!isSuperAdmin && currentUser.department) {
+      query.department = currentUser.department._id;
+    }
+
+    const projects = await Project.find(query)
       .populate("createdBy", "firstName lastName email employeeId")
       .populate("projectManager", "firstName lastName email")
       .populate("department", "name code")
@@ -5800,7 +5820,6 @@ export const getHODApprovalHistory = async (req, res) => {
       );
 
       if (userApprovalStep) {
-        // Get document counts from requiredDocuments array
         const totalDocuments = project.requiredDocuments?.length || 0;
         const submittedDocuments =
           project.requiredDocuments?.filter((doc) => doc.isSubmitted).length ||
@@ -6872,35 +6891,45 @@ export const getProjectsNeedingInventory = async (req, res) => {
   }
 };
 
-// @desc    Get external projects for Project Management HOD
+// @desc    Get external projects for Project Management HOD or Superadmin
 // @route   GET /api/projects/external-projects
-// @access  Private (Project Management HOD only)
+// @access  Private (Project Management HOD or Superadmin)
 export const getExternalProjects = async (req, res) => {
   try {
     const currentUser = req.user;
 
-    // Check if user is Project Management HOD
-    if (
-      currentUser.role.level < 700 ||
-      currentUser.department?.name !== "Project Management"
-    ) {
+    const isSuperAdmin =
+      currentUser.role.level >= 1000 || currentUser.isSuperadmin;
+    const isProjectManagementHOD =
+      currentUser.role.level >= 700 &&
+      currentUser.department?.name === "Project Management";
+
+    if (!isSuperAdmin && !isProjectManagementHOD) {
       return res.status(403).json({
         success: false,
         message:
-          "Access denied. Only Project Management HOD can access external projects.",
+          "Access denied. Only Project Management HOD or Superadmin can access external projects.",
       });
     }
 
-    // Get external projects that the PM HOD manages
-    const externalProjects = await Project.find({
+    // Build query based on user role
+    let query = {
       projectScope: "external",
       isActive: true,
-      $or: [
+    };
+
+    // For Project Management HOD: filter by projects they created/manage/approved
+    // For Superadmin: get ALL external projects
+    if (!isSuperAdmin && isProjectManagementHOD) {
+      query.$or = [
         { createdBy: currentUser._id }, // Projects they created
         { projectManager: currentUser._id }, // Projects they manage
         { "approvalChain.approver": currentUser._id }, // Projects they've approved
-      ],
-    })
+      ];
+    }
+
+    // Get external projects
+    const externalProjects = await Project.find(query)
       .populate("createdBy", "firstName lastName email department")
       .populate("department", "name")
       .populate("projectManager", "firstName lastName email")

@@ -2,19 +2,13 @@ import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../../context/AuthContext";
 import { GradientSpinner } from "../../../../components/common";
+import { motion } from "framer-motion";
 import {
   FaChartBar,
   FaDollarSign,
-  FaHandshake,
-  FaFileInvoice,
   FaCheckCircle,
   FaPlus,
-  FaEdit,
-  FaEye,
   FaDownload,
-  FaUsers,
-  FaBullhorn,
-  FaCalendarAlt,
 } from "react-icons/fa";
 
 const SalesMarketingModule = () => {
@@ -155,25 +149,43 @@ const SalesMarketingModule = () => {
           <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-indigo-400/15 to-sky-400/15 rounded-full blur-3xl animate-pulse delay-1000"></div>
           <div className="absolute bottom-0 left-1/4 w-80 h-80 bg-gradient-to-tr from-rose-400/15 to-amber-400/15 rounded-full blur-3xl animate-pulse delay-2000"></div>
         </div>
-        <div className="relative z-10 px-6 py-14">
-          <div className="w-full text-center">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-xl mb-6">
-              <FaChartBar className="h-7 w-7 text-white" />
+        <div className="relative z-10 px-4 sm:px-6 py-12 sm:py-14">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="mx-auto text-center"
+          >
+            <div className="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-gradient-to-br from-blue-500 to-cyan-600 shadow-xl mb-6">
+              <FaChartBar className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
             </div>
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-indigo-600 bg-clip-text text-transparent mb-4 sm:mb-6">
               Sales & Marketing
             </h1>
-            <p className="text-gray-600 mt-3">
+            <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto">
               Manage sales transactions, track marketing campaigns, and build
               strong customer relationships.
             </p>
-          </div>
+          </motion.div>
         </div>
       </div>
 
       {/* Features - glass cards with dynamic palettes */}
-      <div className="px-6 pb-16">
-        <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="px-4 sm:px-6 pb-16">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="text-center mb-12"
+        >
+          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            Sales & Marketing Tools
+          </h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Access comprehensive sales and marketing management tools
+          </p>
+        </motion.div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           {salesMarketingFeatures.map((feature, index) => {
             const IconComponent = feature.icon;
             const palettes = [
@@ -201,13 +213,18 @@ const SalesMarketingModule = () => {
             ];
             const palette = palettes[index % palettes.length];
             return (
-              <div
+              <motion.div
                 key={feature.title}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 + index * 0.1 }}
+                whileHover={{ scale: 1.02, y: -4 }}
+                whileTap={{ scale: 0.98 }}
                 className="group cursor-pointer"
                 onClick={() => navigate(feature.path)}
               >
                 <div
-                  className={`relative bg-gradient-to-br ${palette.bg} rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 border border-white/20 backdrop-blur-sm`}
+                  className={`relative bg-gradient-to-br ${palette.bg} rounded-3xl p-6 sm:p-8 shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 border border-white/20 backdrop-blur-sm`}
                 >
                   <div
                     className={`absolute inset-0 bg-gradient-to-br ${palette.overlay} opacity-0 group-hover:opacity-10 rounded-3xl transition-opacity duration-500`}
@@ -215,7 +232,7 @@ const SalesMarketingModule = () => {
                   <div className="relative z-10">
                     <div className="flex items-start justify-between mb-6">
                       <div
-                        className={`p-4 rounded-2xl ${palette.iconBg} shadow-lg`}
+                        className={`p-4 rounded-2xl ${palette.iconBg} shadow-lg group-hover:scale-110 transition-transform duration-300`}
                       >
                         <IconComponent className="h-8 w-8 text-white" />
                       </div>
@@ -231,11 +248,11 @@ const SalesMarketingModule = () => {
                       </div>
                     </div>
                     <h3
-                      className={`text-2xl font-bold text-gray-900 mb-4 group-hover:${palette.text} transition-colors`}
+                      className={`text-xl sm:text-2xl font-bold text-gray-900 mb-4 group-hover:${palette.text} transition-colors`}
                     >
                       {feature.title}
                     </h3>
-                    <p className="text-gray-600 mb-6 leading-relaxed">
+                    <p className="text-gray-600 mb-6 leading-relaxed text-sm sm:text-base">
                       {feature.description}
                     </p>
                     <div
@@ -258,40 +275,68 @@ const SalesMarketingModule = () => {
                     </div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>
       </div>
 
       {/* Quick Actions - glass */}
-      <div className="px-6 pb-16">
-        <div className="w-full bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-8">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Quick Actions
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {quickActions.map((action) => {
-              const IconComponent = action.icon;
-              return (
-                <button
-                  key={action.title}
-                  className="group flex items-center p-6 rounded-2xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 transform hover:scale-105"
-                  onClick={() => navigate(action.path)}
-                >
-                  <div
-                    className={`p-3 rounded-xl ${action.color} mr-4 shadow-lg`}
+      <div className="px-4 sm:px-6 pb-16">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+        >
+          <div className="bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-6 sm:p-8">
+            <div className="text-center mb-8">
+              <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
+                Quick Actions
+              </h3>
+              <p className="text-gray-600">
+                Jump to the most-used sales and marketing tools
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+              {quickActions.map((action, index) => {
+                const IconComponent = action.icon;
+                return (
+                  <motion.div
+                    key={action.title}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.4,
+                      delay: 1.0 + index * 0.1,
+                      type: "spring",
+                      stiffness: 100,
+                    }}
+                    whileHover={{
+                      scale: 1.02,
+                      y: -2,
+                      transition: { duration: 0.2 },
+                    }}
+                    whileTap={{ scale: 0.98 }}
                   >
-                    <IconComponent className="h-6 w-6 text-white" />
-                  </div>
-                  <span className="text-gray-800 font-semibold group-hover:text-blue-700 transition-colors">
-                    {action.title}
-                  </span>
-                </button>
-              );
-            })}
+                    <button
+                      className="group flex items-center p-4 sm:p-6 rounded-2xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all duration-300 transform hover:scale-105 w-full"
+                      onClick={() => navigate(action.path)}
+                    >
+                      <div
+                        className={`p-3 rounded-xl ${action.color} mr-4 shadow-lg`}
+                      >
+                        <IconComponent className="h-6 w-6 text-white" />
+                      </div>
+                      <span className="text-gray-800 font-semibold group-hover:text-blue-700 transition-colors text-sm sm:text-base">
+                        {action.title}
+                      </span>
+                    </button>
+                  </motion.div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

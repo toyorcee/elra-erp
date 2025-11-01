@@ -204,10 +204,11 @@ const AppRoutes = () => {
         {/* HR Module Routes */}
         <Route path="modules/hr" element={<HRModule />} />
         <Route path="modules/hr/users" element={<HRUsers />} />
-        <Route
+        {/* Commented out Department Management route */}
+        {/* <Route
           path="modules/hr/departments"
           element={<DepartmentManagement />}
-        />
+        /> */}
         <Route path="modules/hr/roles" element={<HRRoles />} />
         <Route path="modules/hr/invitation" element={<HRInvitations />} />
         <Route
@@ -256,10 +257,10 @@ const AppRoutes = () => {
         {/* Self-Service Module routes */}
         <Route path="modules/self-service" element={<SelfService />} />
         <Route path="modules/self-service/payslips" element={<MyPayslips />} />
-        <Route
+        {/* <Route
           path="modules/self-service/my-projects"
           element={<MyProjects />}
-        />
+        /> */}
         <Route
           path="modules/self-service/leave-requests"
           element={<MyLeaveRequests />}

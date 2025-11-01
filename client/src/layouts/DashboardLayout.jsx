@@ -188,17 +188,18 @@ const DashboardLayout = () => {
       <div className="min-h-screen bg-[var(--elra-bg-light)]">
         {/* Fixed Navbar */}
         <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-[var(--elra-border-primary)] shadow-lg shadow-[var(--elra-primary)]/10">
-          <div className="px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
+          <div className="px-2 sm:px-4 md:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-14 sm:h-16">
               {/* Left side */}
-              <div className="flex items-center">
+              <div className="flex items-center min-w-0 flex-1">
                 {/* Mobile hamburger menu */}
                 <button
                   onClick={toggleSidebar}
-                  className="lg:hidden p-2 rounded-xl text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] transition-all duration-200 hover:scale-105 mr-4"
+                  className="lg:hidden p-2 sm:p-2.5 rounded-xl text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] transition-all duration-200 hover:scale-105 mr-2 sm:mr-4 touch-target"
+                  aria-label="Toggle sidebar"
                 >
                   <svg
-                    className="w-6 h-6"
+                    className="w-5 h-5 sm:w-6 sm:h-6"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -217,41 +218,40 @@ const DashboardLayout = () => {
 
                 {/* ELRA Logo - Now clickable */}
                 <div
-                  className="cursor-pointer hover:scale-105 transition-transform duration-200"
+                  className="cursor-pointer hover:scale-105 transition-transform duration-200 flex-shrink-0"
                   onClick={handleLogoClick}
                   title={user && !loading ? "Go to Modules" : "Go to Home"}
                 >
                   <img
                     src={elraLogo}
                     alt="ELRA Logo"
-                    className="h-8 w-12 object-contain"
+                    className="h-6 sm:h-7 md:h-8 w-auto object-contain"
                   />
                 </div>
               </div>
 
               {/* Right side */}
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4 flex-shrink-0">
                 {/* Message Icon - Always visible like other icons */}
                 <div className="relative">
                   <button
                     onClick={toggleUnreadMessagesDropdown}
-                    className="message-icon-button p-2 rounded-xl text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] transition-all duration-200 hover:scale-105 relative cursor-pointer"
+                    className="message-icon-button p-2 sm:p-2.5 rounded-xl text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] transition-all duration-200 hover:scale-105 relative cursor-pointer touch-target"
+                    aria-label="Unread messages"
                   >
-                    <ChatBubbleLeftRightIcon className="h-6 w-6" />
-                    <span
-                      className={`absolute -top-1 -right-1 w-5 h-5 text-white text-xs rounded-full flex items-center justify-center font-bold transition-all duration-200 ${
-                        totalUnreadMessages === 0
-                          ? "bg-[var(--elra-primary)] scale-90"
-                          : "bg-red-500 scale-100 animate-pulse"
-                      }`}
-                    >
-                      {totalUnreadMessages > 99 ? "99+" : totalUnreadMessages}
-                    </span>
+                    <ChatBubbleLeftRightIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+                    {totalUnreadMessages > 0 && (
+                      <span
+                        className={`absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 text-white text-[10px] sm:text-xs rounded-full flex items-center justify-center font-bold transition-all duration-200 bg-red-500 scale-100 animate-pulse`}
+                      >
+                        {totalUnreadMessages > 99 ? "99+" : totalUnreadMessages}
+                      </span>
+                    )}
                   </button>
 
                   {/* Unread Messages Dropdown */}
                   {showUnreadMessagesDropdown && (
-                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-[var(--elra-border-primary)] z-50 message-dropdown-container">
+                    <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-sm bg-white rounded-lg shadow-xl border border-[var(--elra-border-primary)] z-50 message-dropdown-container">
                       <div className="p-4 border-b border-[var(--elra-border-primary)]">
                         <div className="flex items-center justify-between">
                           <h3 className="text-sm font-semibold text-[var(--elra-text-primary)]">
@@ -281,13 +281,13 @@ const DashboardLayout = () => {
                         </div>
                       </div>
 
-                      <div className="max-h-96 overflow-y-auto">
+                      <div className="max-h-[60vh] sm:max-h-96 overflow-y-auto">
                         {isLoadingUnread ? (
-                          <div className="p-4 text-center text-[var(--elra-text-muted)]">
+                          <div className="p-3 sm:p-4 text-center text-[var(--elra-text-muted)] text-sm">
                             Loading...
                           </div>
                         ) : unreadMessages.length === 0 ? (
-                          <div className="p-4 text-center text-[var(--elra-text-muted)]">
+                          <div className="p-3 sm:p-4 text-center text-[var(--elra-text-muted)] text-sm">
                             No unread messages
                           </div>
                         ) : (
@@ -295,19 +295,19 @@ const DashboardLayout = () => {
                             <div
                               key={message._id}
                               onClick={() => handleUnreadMessageClick(message)}
-                              className="p-4 border-b border-[var(--elra-border-primary)] hover:bg-[var(--elra-secondary-3)] cursor-pointer transition-colors"
+                              className="p-3 sm:p-4 border-b border-[var(--elra-border-primary)] hover:bg-[var(--elra-secondary-3)] cursor-pointer transition-colors touch-target"
                             >
-                              <div className="flex items-start space-x-3">
-                                <div className="w-8 h-8 rounded-full overflow-hidden">
+                              <div className="flex items-start space-x-2 sm:space-x-3">
+                                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden flex-shrink-0">
                                   {getAvatarDisplay(message.sender)}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between">
-                                    <p className="text-sm font-medium text-[var(--elra-text-primary)] truncate">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-xs sm:text-sm font-medium text-[var(--elra-text-primary)] truncate">
                                       {message.sender.firstName}{" "}
                                       {message.sender.lastName}
                                     </p>
-                                    <span className="text-xs text-[var(--elra-text-muted)]">
+                                    <span className="text-[10px] sm:text-xs text-[var(--elra-text-muted)] flex-shrink-0">
                                       {new Date(
                                         message.createdAt
                                       ).toLocaleTimeString([], {
@@ -316,7 +316,7 @@ const DashboardLayout = () => {
                                       })}
                                     </span>
                                   </div>
-                                  <p className="text-sm text-[var(--elra-text-muted)] truncate mt-1">
+                                  <p className="text-xs sm:text-sm text-[var(--elra-text-muted)] truncate mt-1">
                                     {message.content}
                                   </p>
                                 </div>
@@ -384,8 +384,10 @@ const DashboardLayout = () => {
               )}
 
               {/* Main content area */}
-              <div className="min-h-screen bg-gray-50">
-                <Outlet />
+              <div className="min-h-screen bg-gray-50 w-full overflow-x-hidden">
+                <div className="w-full max-w-full px-2 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6">
+                  <Outlet />
+                </div>
               </div>
             </div>
           </DynamicSidebarProvider>

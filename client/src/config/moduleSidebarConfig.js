@@ -1,6 +1,3 @@
-// Module-specific sidebar navigation configurations
-// This file defines the sidebar items that appear when a specific module is selected
-
 export const moduleSidebarConfig = {
   // ===== DEPARTMENT MANAGEMENT MODULE =====
   departmentManagement: {
@@ -25,34 +22,34 @@ export const moduleSidebarConfig = {
           },
         ],
       },
-      {
-        title: "Departmental Projects Management",
-        collapsible: true,
-        defaultExpanded: true,
-        items: [
-          {
-            label: "Department Projects",
-            icon: "FolderIcon",
-            path: "/dashboard/modules/department-management/projects",
-            required: { minLevel: 700 },
-            description: "Create and manage internal departmental projects",
-          },
-          {
-            label: "Pending Approvals",
-            icon: "ClockIcon",
-            path: "/dashboard/modules/department-management/project-approvals",
-            required: { minLevel: 700 },
-            description: "Review and approve department project requests",
-          },
-          {
-            label: "Approval History",
-            icon: "DocumentCheckIcon",
-            path: "/dashboard/modules/department-management/approval-history",
-            required: { minLevel: 700 },
-            description: "View all project approval decisions and history",
-          },
-        ],
-      },
+      // {
+      //   title: "Departmental Projects Management",
+      //   collapsible: true,
+      //   defaultExpanded: true,
+      //   items: [
+      //     {
+      //       label: "Department Projects",
+      //       icon: "FolderIcon",
+      //       path: "/dashboard/modules/department-management/projects",
+      //       required: { minLevel: 700 },
+      //       description: "Create and manage internal departmental projects",
+      //     },
+      //     {
+      //       label: "Pending Approvals",
+      //       icon: "ClockIcon",
+      //       path: "/dashboard/modules/department-management/project-approvals",
+      //       required: { minLevel: 700 },
+      //       description: "Review and approve department project requests",
+      //     },
+      //     {
+      //       label: "Approval History",
+      //       icon: "DocumentCheckIcon",
+      //       path: "/dashboard/modules/department-management/approval-history",
+      //       required: { minLevel: 700 },
+      //       description: "View all project approval decisions and history",
+      //     },
+      //   ],
+      // },
       {
         title: "User Management",
         collapsible: true,
@@ -135,13 +132,13 @@ export const moduleSidebarConfig = {
             required: { minLevel: 300 },
             description: "View, upload, and scan documents with OCR processing",
           },
-          {
-            label: "My Projects",
-            icon: "FolderIcon",
-            path: "/dashboard/modules/self-service/my-projects",
-            required: { minLevel: 300 },
-            description: "Create and manage your personal projects",
-          },
+          // {
+          //   label: "My Projects",
+          //   icon: "FolderIcon",
+          //   path: "/dashboard/modules/self-service/my-projects",
+          //   required: { minLevel: 300 },
+          //   description: "Create and manage your personal projects",
+          // },
           {
             label: "My Leave Requests",
             icon: "ClipboardDocumentListIcon",

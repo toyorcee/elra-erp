@@ -233,24 +233,20 @@ const NotificationBell = ({ className = "" }) => {
             refetchNotifications();
           }
         }}
-        className="p-2 rounded-xl text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] transition-all duration-200 hover:scale-105 relative cursor-pointer"
+        className="p-2 sm:p-2.5 rounded-xl text-[var(--elra-primary)] hover:bg-[var(--elra-secondary-3)] transition-all duration-200 hover:scale-105 relative cursor-pointer touch-target"
         title="Notifications"
+        aria-label="Notifications"
       >
-        {unreadCount > 0 ? (
-          <BellIcon className="w-6 h-6" />
-        ) : (
-          <BellIcon className="w-6 h-6" />
-        )}
-
+        <BellIcon className="w-5 h-5 sm:w-6 sm:h-6" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 text-white text-xs rounded-full flex items-center justify-center font-bold transition-all duration-200 bg-orange-500 scale-100 animate-pulse">
+          <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 text-white text-[10px] sm:text-xs rounded-full flex items-center justify-center font-bold transition-all duration-200 bg-orange-500 scale-100 animate-pulse">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white rounded-lg shadow-xl border border-[var(--elra-border-primary)] z-50">
+        <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-72 md:w-80 max-w-sm bg-white rounded-lg shadow-xl border border-[var(--elra-border-primary)] z-50">
           <div className="p-3 sm:p-4 border-b border-[var(--elra-border-primary)]">
             <div className="flex items-center justify-between">
               <h3 className="text-xs sm:text-sm font-semibold text-[var(--elra-text-primary)]">

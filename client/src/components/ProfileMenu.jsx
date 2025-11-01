@@ -124,8 +124,9 @@ const ProfileMenu = () => {
         {/* Sign Out Button */}
         <button
           onClick={handleLogoutClick}
-          className="p-2 rounded-lg bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white transition-all duration-200 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
+          className="p-2 sm:p-2.5 rounded-lg bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white transition-all duration-200 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20 touch-target"
           title="Sign out"
+          aria-label="Sign out"
         >
           <MdLogout
             size={20}
@@ -136,7 +137,9 @@ const ProfileMenu = () => {
         {/* Dropdown Toggle for Additional Options */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="p-2 rounded-lg bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white transition-all duration-300 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
+          className="p-2 sm:p-2.5 rounded-lg bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white transition-all duration-300 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20 touch-target"
+          aria-label="Profile menu"
+          aria-expanded={isOpen}
         >
           <div
             className={`w-4 h-4 transition-transform duration-300 ${
@@ -163,7 +166,9 @@ const ProfileMenu = () => {
       {/* Mobile Profile Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="lg:hidden flex items-center space-x-2 p-2 rounded-lg bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white transition-all duration-300 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20"
+        className="lg:hidden flex items-center space-x-2 p-2 rounded-lg bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white transition-all duration-300 group shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20 touch-target"
+        aria-label="Profile menu"
+        aria-expanded={isOpen}
       >
         <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg lg:hidden overflow-hidden border border-white/30">
           {user?.avatar ? (
@@ -211,7 +216,7 @@ const ProfileMenu = () => {
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-2xl border border-gray-200 py-3 z-[9999]">
+        <div className="absolute right-0 mt-3 w-[calc(100vw-2rem)] sm:w-72 max-w-sm bg-white rounded-2xl shadow-2xl border border-gray-200 py-3 z-[9999]">
           {/* User Info Header */}
           <div
             onClick={navigateToProfile}

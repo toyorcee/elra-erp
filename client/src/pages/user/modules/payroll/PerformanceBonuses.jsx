@@ -439,31 +439,33 @@ const PerformanceBonuses = () => {
   }
 
   return (
-    <div className="space-y-8 p-4">
+    <div className="space-y-4 sm:space-y-6 lg:space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
             Performance Bonuses
           </h1>
-          <p className="text-gray-600 mt-2">
+          <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">
             Manage performance-based bonuses for employees
           </p>
         </div>
         <button
           onClick={handleAddBonus}
           disabled={isSubmitting}
-          className="inline-flex items-center px-6 py-3 bg-[var(--elra-primary)] text-white font-medium rounded-xl shadow-lg hover:bg-[var(--elra-primary-dark)] transition-all duration-200 transform hover:scale-105 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+          className="inline-flex items-center justify-center px-4 sm:px-6 py-2 sm:py-3 bg-[var(--elra-primary)] text-white text-sm sm:text-base font-medium rounded-xl shadow-lg hover:bg-[var(--elra-primary-dark)] transition-all duration-200 transform hover:scale-105 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none touch-target w-full sm:w-auto"
         >
           {isSubmitting ? (
             <>
-              <HiRefresh className="w-5 h-5 mr-2 animate-spin" />
-              Processing...
+              <HiRefresh className="w-4 h-4 sm:w-5 sm:h-5 mr-2 animate-spin" />
+              <span className="hidden sm:inline">Processing...</span>
+              <span className="sm:hidden">Processing</span>
             </>
           ) : (
             <>
-              <HiPlus className="w-5 h-5 mr-2" />
-              Add Bonus
+              <HiPlus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+              <span className="hidden sm:inline">Add Bonus</span>
+              <span className="sm:hidden">Add</span>
             </>
           )}
         </button>
@@ -473,56 +475,71 @@ const PerformanceBonuses = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (
           <>
-            {[...Array(4)].map((_, index) => (
+            {[...Array(3)].map((_, index) => (
               <div
                 key={index}
-                className="bg-white p-6 rounded-2xl shadow-lg animate-pulse"
+                className="bg-white p-6 rounded-xl shadow-lg animate-pulse"
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
-                    <div className="h-8 bg-gray-200 rounded w-12"></div>
+                    <div className="h-4 bg-gray-200 rounded w-32 mb-2"></div>
+                    <div className="h-8 bg-gray-200 rounded w-16"></div>
                   </div>
-                  <div className="w-8 h-8 bg-gray-200 rounded"></div>
+                  <div className="w-12 h-12 bg-gray-200 rounded"></div>
                 </div>
               </div>
             ))}
           </>
         ) : (
           <>
-            <div className="bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-2xl shadow-lg">
+            {/* Total Bonuses Card */}
+            <div className="bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white rounded-xl shadow-lg border border-white/20 p-6 hover:shadow-xl transition-all duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-white/80 text-sm font-medium">
+                  <p className="text-sm font-semibold text-white/80 uppercase tracking-wide">
                     Total Bonuses
                   </p>
-                  <p className="text-3xl font-bold">{stats.total}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-white mt-2 break-all leading-tight">
+                    {stats.total}
+                  </p>
                 </div>
-                <HiGift className="w-8 h-8 text-white/80" />
+                <div className="p-4 bg-white/20 rounded-xl shadow-lg">
+                  <HiGift className="h-8 w-8 text-white" />
+                </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-2xl shadow-lg">
+            {/* Active Bonuses Card */}
+            <div className="bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white rounded-xl shadow-lg border border-white/20 p-6 hover:shadow-xl transition-all duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-white/80 text-sm font-medium">
+                  <p className="text-sm font-semibold text-white/80 uppercase tracking-wide">
                     Active Bonuses
                   </p>
-                  <p className="text-3xl font-bold">{stats.active}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-white mt-2 break-all leading-tight">
+                    {stats.active}
+                  </p>
                 </div>
-                <HiCheckCircle className="w-8 h-8 text-white/80" />
+                <div className="p-4 bg-white/20 rounded-xl shadow-lg">
+                  <HiCheckCircle className="h-8 w-8 text-white" />
+                </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white p-6 rounded-2xl shadow-lg">
+            {/* Performance Bonuses Card */}
+            <div className="bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] text-white rounded-xl shadow-lg border border-white/20 p-6 hover:shadow-xl transition-all duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-white/80 text-sm font-medium">
-                    Performance
+                  <p className="text-sm font-semibold text-white/80 uppercase tracking-wide">
+                    Performance Bonuses
                   </p>
-                  <p className="text-3xl font-bold">{stats.performance}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-white mt-2 break-all leading-tight">
+                    {stats.performance}
+                  </p>
                 </div>
-                <HiUserGroup className="w-8 h-8 text-white/80" />
+                <div className="p-4 bg-white/20 rounded-xl shadow-lg">
+                  <HiUserGroup className="h-8 w-8 text-white" />
+                </div>
               </div>
             </div>
           </>
@@ -530,12 +547,12 @@ const PerformanceBonuses = () => {
       </div>
 
       {/* Filters Section */}
-      <div className="bg-white p-6 rounded-2xl shadow-lg">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+      <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900">Filters</h3>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            className="inline-flex items-center justify-center px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors touch-target w-full sm:w-auto"
           >
             <HiFilter className="w-4 h-4 mr-2" />
             {showFilters ? "Hide Filters" : "Show Filters"}
@@ -544,7 +561,7 @@ const PerformanceBonuses = () => {
 
         {showFilters && (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Bonus Type

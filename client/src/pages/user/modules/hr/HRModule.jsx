@@ -2,6 +2,7 @@ import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../../context/AuthContext";
 import { GradientSpinner } from "../../../../components/common";
+import { motion } from "framer-motion";
 import { FaUsers, FaUserPlus, FaCalendarAlt, FaChartBar } from "react-icons/fa";
 
 const HRModule = () => {
@@ -100,24 +101,42 @@ const HRModule = () => {
           <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-purple-400/15 to-violet-400/15 rounded-full blur-3xl animate-pulse delay-1000"></div>
           <div className="absolute bottom-0 left-1/4 w-80 h-80 bg-gradient-to-tr from-orange-400/15 to-amber-400/15 rounded-full blur-3xl animate-pulse delay-2000"></div>
         </div>
-        <div className="relative z-10 px-4 sm:px-6 py-8 sm:py-14">
-          <div className="max-w-7xl mx-auto text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-br from-pink-500 to-rose-600 shadow-xl mb-4 sm:mb-6">
-              <FaUsers className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+        <div className="relative z-10 px-4 sm:px-6 py-12 sm:py-14">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="mx-auto text-center"
+          >
+            <div className="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-gradient-to-br from-pink-500 to-rose-600 shadow-xl mb-6">
+              <FaUsers className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
             </div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 bg-clip-text text-transparent">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 bg-clip-text text-transparent mb-4 sm:mb-6">
               Human Resources
             </h1>
-            <p className="text-gray-600 mt-2 sm:mt-3 text-sm sm:text-base">
+            <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto">
               Manage employees, recruitment, performance, and HR operations.
             </p>
-          </div>
+          </motion.div>
         </div>
       </div>
 
       {/* HR Features - glass cards with dynamic palettes */}
       <div className="px-4 sm:px-6 pb-12 sm:pb-16">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="text-center mb-12"
+        >
+          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            HR Tools
+          </h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Access comprehensive human resources management tools
+          </p>
+        </motion.div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           {hrFeatures.map((feature, index) => {
             const IconComponent = feature.icon;
             const palettes = [
@@ -145,8 +164,13 @@ const HRModule = () => {
             ];
             const palette = palettes[index % palettes.length];
             return (
-              <div
+              <motion.div
                 key={feature.title}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 + index * 0.1 }}
+                whileHover={{ scale: 1.02, y: -4 }}
+                whileTap={{ scale: 0.98 }}
                 className="group cursor-pointer"
                 onClick={() => navigate(feature.path)}
               >
@@ -159,7 +183,7 @@ const HRModule = () => {
                   <div className="relative z-10">
                     <div className="flex items-start justify-between mb-6">
                       <div
-                        className={`p-4 rounded-2xl ${palette.iconBg} shadow-lg`}
+                        className={`p-4 rounded-2xl ${palette.iconBg} shadow-lg group-hover:scale-110 transition-transform duration-300`}
                       >
                         <IconComponent className="h-8 w-8 text-white" />
                       </div>
@@ -202,7 +226,7 @@ const HRModule = () => {
                     </div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>
@@ -210,7 +234,11 @@ const HRModule = () => {
 
       {/* Quick Actions Section */}
       <div className="px-4 sm:px-6 pb-12 sm:pb-16">
-        <div className="max-w-7xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+        >
           <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-xl border border-white/20">
             <div className="text-center mb-6 sm:mb-8">
               <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">
@@ -220,13 +248,27 @@ const HRModule = () => {
                 Jump into the most common HR tasks
               </p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {quickActions.map((action, index) => {
                 const IconComponent = action.icon;
                 return (
-                  <div
+                  <motion.div
                     key={action.title}
-                    className="group flex items-center p-6 rounded-2xl bg-gradient-to-r from-white to-gray-50 hover:from-pink-50 hover:to-rose-50 border border-gray-200 hover:border-pink-300 transition-all duration-300 transform hover:scale-105 cursor-pointer"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.4,
+                      delay: 1.0 + index * 0.1,
+                      type: "spring",
+                      stiffness: 100,
+                    }}
+                    whileHover={{
+                      scale: 1.02,
+                      y: -2,
+                      transition: { duration: 0.2 },
+                    }}
+                    whileTap={{ scale: 0.98 }}
+                    className="group flex items-center p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-white to-gray-50 hover:from-pink-50 hover:to-rose-50 border border-gray-200 hover:border-pink-300 transition-all duration-300 transform hover:scale-105 cursor-pointer w-full"
                     onClick={() => navigate(action.path)}
                   >
                     <div
@@ -235,7 +277,7 @@ const HRModule = () => {
                       <IconComponent className="h-6 w-6 text-white" />
                     </div>
                     <div className="flex-1 text-left">
-                      <span className="text-gray-800 font-semibold group-hover:text-pink-600 transition-colors">
+                      <span className="text-gray-800 font-semibold group-hover:text-pink-600 transition-colors text-sm sm:text-base">
                         {action.title}
                       </span>
                       <div className="flex items-center mt-1">
@@ -257,12 +299,12 @@ const HRModule = () => {
                         </svg>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })}
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

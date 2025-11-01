@@ -112,20 +112,20 @@ const SelfService = () => {
           <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-emerald-400/20 to-cyan-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
           <div className="absolute bottom-0 left-1/4 w-80 h-80 bg-gradient-to-tr from-orange-400/20 to-amber-400/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
         </div>
-        <div className="relative z-10 px-6 py-16">
+        <div className="relative z-10 px-4 sm:px-6 py-12 sm:py-16">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="text-center mb-16"
+            className="text-center mb-12"
           >
-            <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl mb-8 shadow-2xl">
-              <FaUser className="h-12 w-12 text-white" />
+            <div className="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl mb-6 sm:mb-8 shadow-2xl">
+              <FaUser className="h-10 w-10 sm:h-12 sm:w-12 text-white" />
             </div>
-            <h1 className="text-6xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent mb-6">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent mb-4 sm:mb-6">
               Self-Service
             </h1>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
               Personal services and self-management tools for all employees.
             </p>
           </motion.div>
@@ -133,21 +133,23 @@ const SelfService = () => {
       </div>
 
       {/* Features Section */}
-      <div className="px-6 pb-20">
+      <div className="px-4 sm:px-6 pb-20">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="text-center mb-16"
+          className="text-center mb-12 mx-auto"
         >
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">Your Tools</h2>
+          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            Your Tools
+          </h2>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Access your personal information, manage requests, and handle your
             own administrative tasks.
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           {selfServiceFeatures.map((feature, index) => {
             const IconComponent = feature.icon;
             return (
@@ -155,14 +157,16 @@ const SelfService = () => {
                 key={feature.title}
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 + index * 0.2 }}
+                transition={{ delay: 0.4 + index * 0.1 }}
+                whileHover={{ scale: 1.02, y: -4 }}
+                whileTap={{ scale: 0.98 }}
                 className="group cursor-pointer"
               >
                 <Link to={feature.path} className="block">
                   <div
                     className={`relative bg-gradient-to-br ${
                       feature.bgGradient || "from-white to-gray-50"
-                    } rounded-3xl p-8 shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 border border-white/20 backdrop-blur-sm`}
+                    } rounded-3xl p-6 sm:p-8 shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 border border-white/20 backdrop-blur-sm`}
                   >
                     <div
                       className={`absolute inset-0 bg-gradient-to-br ${
@@ -174,7 +178,7 @@ const SelfService = () => {
                         <div
                           className={`p-4 rounded-2xl ${
                             feature.iconBg || "bg-blue-500"
-                          } shadow-lg`}
+                          } shadow-lg group-hover:scale-110 transition-transform duration-300`}
                         >
                           <IconComponent className="h-8 w-8 text-white" />
                         </div>
@@ -187,10 +191,10 @@ const SelfService = () => {
                           </span>
                         </div>
                       </div>
-                      <h3 className="text-2xl font-bold text-gray-900 mb-4 group-hover:text-blue-600 transition-colors">
+                      <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 group-hover:text-blue-600 transition-colors">
                         {feature.title}
                       </h3>
-                      <p className="text-gray-600 mb-6 leading-relaxed">
+                      <p className="text-gray-600 mb-6 leading-relaxed text-sm sm:text-base">
                         {feature.description}
                       </p>
                       <div className="flex items-center text-blue-600 font-medium">
@@ -222,18 +226,18 @@ const SelfService = () => {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
-          className="mt-20"
+          className="mt-16 sm:mt-20"
         >
-          <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-8 shadow-xl border border-white/20">
+          <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 sm:p-8 shadow-xl border border-white/20">
             <div className="text-center mb-8">
-              <h3 className="text-3xl font-bold text-gray-900 mb-4">
+              <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4">
                 Quick Actions
               </h3>
               <p className="text-gray-600">
                 Jump to the most-used self-service tools
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
               {quickActions.map((action, index) => {
                 const IconComponent = action.icon;
                 return (
@@ -256,14 +260,14 @@ const SelfService = () => {
                   >
                     <Link
                       to={action.path}
-                      className="group flex items-center p-6 rounded-2xl bg-gradient-to-r from-white to-gray-50 hover:from-blue-50 hover:to-indigo-50 border border-gray-200 hover:border-blue-300 transition-all duration-300 transform hover:scale-105"
+                      className="group flex items-center p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-white to-gray-50 hover:from-blue-50 hover:to-indigo-50 border border-gray-200 hover:border-blue-300 transition-all duration-300 transform hover:scale-105 w-full"
                     >
                       <div
                         className={`p-3 rounded-xl ${action.color} mr-4 shadow-lg`}
                       >
                         <IconComponent className="h-6 w-6 text-white" />
                       </div>
-                      <span className="text-gray-800 font-semibold group-hover:text-blue-600 transition-colors">
+                      <span className="text-gray-800 font-semibold group-hover:text-blue-600 transition-colors text-sm sm:text-base">
                         {action.title}
                       </span>
                     </Link>

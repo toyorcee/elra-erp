@@ -429,7 +429,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
         <Link
           to={item.path}
           onClick={handleClick}
-          className={`group flex items-center px-3 py-2 text-sm font-medium rounded-xl transition-all duration-300 relative cursor-pointer ${
+          className={`group flex items-center px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all duration-300 relative cursor-pointer touch-target ${
             isItemActive
               ? "bg-[var(--elra-primary)] text-white font-semibold shadow-lg shadow-emerald-500/20"
               : "text-gray-800 hover:bg-emerald-50 hover:text-emerald-700"
@@ -623,12 +623,14 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
           height: "100vh",
           overflowY: "auto",
         }}
+        role="navigation"
+        aria-label="Main navigation"
       >
         {/* Header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 bg-white sticky top-0 z-10">
+        <div className="flex items-center justify-between h-14 sm:h-16 px-3 sm:px-4 border-b border-gray-200 bg-white sticky top-0 z-10">
           {shouldShowExpanded && (
-            <div className="flex items-center">
-              <span className="font-bold text-[var(--elra-primary)] text-lg">
+            <div className="flex items-center min-w-0">
+              <span className="font-bold text-[var(--elra-primary)] text-base sm:text-lg truncate">
                 {isModuleView && currentModule
                   ? getCurrentModuleInfo()?.label || currentModule
                   : "Dashboard"}
@@ -636,20 +638,22 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             </div>
           )}
 
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center space-x-1 flex-shrink-0">
             {shouldShowExpanded ? (
               <button
                 onClick={handleToggle}
-                className="p-2 text-gray-500 hover:text-[var(--elra-primary)] hover:bg-gray-100 transition-all duration-200 cursor-pointer"
+                className="p-2 text-gray-500 hover:text-[var(--elra-primary)] hover:bg-gray-100 transition-all duration-200 cursor-pointer touch-target hidden lg:block"
                 title="Collapse sidebar"
+                aria-label="Collapse sidebar"
               >
                 <ChevronDownIcon className="h-5 w-5 transform rotate-90" />
               </button>
             ) : (
               <button
                 onClick={handleToggle}
-                className="p-2 text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 cursor-pointer"
+                className="p-2 text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 cursor-pointer touch-target hidden lg:block"
                 title="Expand sidebar"
+                aria-label="Expand sidebar"
               >
                 <Bars3Icon className="h-5 w-5" />
               </button>
@@ -658,26 +662,27 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             {/* Mobile toggle button */}
             <button
               onClick={handleToggle}
-              className="p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer lg:hidden"
+              className="p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer touch-target lg:hidden"
+              aria-label={isOpen ? "Close sidebar" : "Open sidebar"}
             >
               {isOpen ? (
-                <XMarkIcon className="h-5 w-5" />
+                <XMarkIcon className="h-5 w-5 sm:h-6 sm:w-6" />
               ) : (
-                <Bars3Icon className="h-5 w-5" />
+                <Bars3Icon className="h-5 w-5 sm:h-6 sm:w-6" />
               )}
             </button>
           </div>
         </div>
 
         {/* User Profile */}
-        <div className="px-4 py-4 border-b border-gray-200 bg-white">
+        <div className="px-3 sm:px-4 py-3 sm:py-4 border-b border-gray-200 bg-white">
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
+            <div className="flex items-center min-w-0 flex-1">
               <div
                 className={`${
-                  shouldShowExpanded ? "w-12 h-12" : "w-10 h-10"
-                } rounded-full flex items-center justify-center shadow-lg overflow-hidden border-2 border-[var(--elra-primary)] ${
-                  !shouldShowExpanded ? "mx-auto" : ""
+                  shouldShowExpanded ? "w-10 h-10 sm:w-12 sm:h-12" : "w-10 h-10"
+                } rounded-full flex items-center justify-center shadow-lg overflow-hidden border-2 border-[var(--elra-primary)] flex-shrink-0 ${
+                  !shouldShowExpanded ? "mx-auto" : "mr-3 sm:mr-4"
                 }`}
               >
                 {user?.avatar ? (
@@ -706,14 +711,14 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                 </div>
               </div>
               {shouldShowExpanded && (
-                <div className="ml-4 flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-800 truncate">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-semibold text-gray-800 truncate">
                     {user?.firstName} {user?.lastName}
                   </p>
-                  <p className="text-sm text-gray-600 font-semibold truncate">
+                  <p className="text-xs sm:text-sm text-gray-600 font-semibold truncate">
                     {user?.department?.name || "Department"}
                   </p>
-                  <p className="text-xs text-gray-500 font-medium">
+                  <p className="text-[10px] sm:text-xs text-gray-500 font-medium truncate">
                     {typeof roleInfo?.title === "string"
                       ? roleInfo.title
                       : "Staff"}
@@ -726,9 +731,9 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
 
         {/* Navigation */}
         <div
-          className="px-4 py-6 space-y-1 sidebar-scroll"
+          className="px-2 sm:px-4 py-4 sm:py-6 space-y-1 sidebar-scroll"
           style={{
-            maxHeight: "calc(100vh - 200px)",
+            maxHeight: "calc(100vh - 180px)",
             overflowY: "auto",
           }}
         >

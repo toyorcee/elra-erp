@@ -453,7 +453,7 @@ const MessageDropdown = ({ isOpen, onClose }) => {
             initial={{ x: 400 }}
             animate={{ x: 0 }}
             exit={{ x: 400 }}
-            className="relative w-full max-w-md h-[calc(100vh-4rem)] bg-white rounded-l-2xl shadow-2xl border border-[var(--elra-border-primary)] overflow-hidden message-dropdown"
+            className="relative w-full sm:max-w-md h-[calc(100vh-4rem)] sm:h-[calc(100vh-4rem)] bg-white rounded-l-2xl sm:rounded-l-2xl shadow-2xl border border-[var(--elra-border-primary)] overflow-hidden message-dropdown"
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-[var(--elra-border-primary)] bg-white">

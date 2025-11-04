@@ -283,6 +283,13 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { taskId, action, notes } = req.body; // action: "start" or "complete"
 
+  if (!taskId) {
+    return res.status(400).json({
+      success: false,
+      message: "Task ID is required",
+    });
+  }
+
   const lifecycle = await EmployeeLifecycle.findById(id);
   if (!lifecycle) {
     return res.status(404).json({
@@ -291,35 +298,54 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
     });
   }
 
-  const task = lifecycle.tasks.id(taskId);
-  if (!task) {
+  // Convert taskId to string for comparison (handles both ObjectId and string)
+  const taskIdString = taskId.toString();
+
+  // Find the specific task using find() with explicit _id matching
+  const taskIndex = lifecycle.tasks.findIndex(
+    (task) => task._id.toString() === taskIdString
+  );
+
+  if (taskIndex === -1) {
     return res.status(404).json({
       success: false,
       message: "Task not found",
     });
   }
 
+  const task = lifecycle.tasks[taskIndex];
+
+  // Validate task status before action
+  if (task.status === "Completed" && action === "start") {
+    return res.status(400).json({
+      success: false,
+      message: "Task is already completed",
+    });
+  }
+
+  if (task.status === "Completed" && action === "complete") {
+    return res.status(400).json({
+      success: false,
+      message: "Task is already completed",
+    });
+  }
+
   let status;
   let message;
 
+  // Update the specific task using array index
   if (action === "start") {
-    if (task.status === "Completed") {
-      return res.status(400).json({
-        success: false,
-        message: "Task is already completed",
-      });
-    }
-    await lifecycle.startTask(taskId, req.user._id);
+    lifecycle.tasks[taskIndex].status = "In Progress";
+    lifecycle.tasks[taskIndex].startedAt = new Date();
     status = "In Progress";
     message = "Task started successfully";
   } else if (action === "complete") {
-    if (task.status === "Completed") {
-      return res.status(400).json({
-        success: false,
-        message: "Task is already completed",
-      });
+    lifecycle.tasks[taskIndex].status = "Completed";
+    lifecycle.tasks[taskIndex].completedBy = req.user._id;
+    lifecycle.tasks[taskIndex].completedAt = new Date();
+    if (notes) {
+      lifecycle.tasks[taskIndex].notes = notes;
     }
-    await lifecycle.completeTask(taskId, req.user._id, notes);
     status = "Completed";
     message = "Task completed successfully";
   } else {
@@ -329,14 +355,16 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
     });
   }
 
-  // Add timeline entry
+  lifecycle.markModified("tasks");
+
+  await lifecycle.save();
+
   await lifecycle.addTimelineEntry(
     "Task Updated",
     `Task "${task.title}" ${action}ed by HR`,
     req.user._id
   );
 
-  // Get updated lifecycle with populated data
   const updatedLifecycle = await EmployeeLifecycle.findById(id).populate([
     { path: "employee", select: "firstName lastName email avatar fullName" },
     { path: "department", select: "name" },
@@ -474,14 +502,12 @@ const initiateOffboarding = asyncHandler(async (req, res) => {
       });
     }
 
-    // Reactivate existing offboarding
     existingOffboarding.status = "Initiated";
     existingOffboarding.startDate = new Date();
     existingOffboarding.notes = `Offboarding re-initiated by ${req.user.firstName} ${req.user.lastName}`;
 
     await existingOffboarding.save();
 
-    // Add timeline entry
     await existingOffboarding.addTimelineEntry(
       "Offboarding Re-initiated",
       `Offboarding process re-started by ${req.user.firstName} ${req.user.lastName}`,
@@ -507,11 +533,6 @@ const initiateOffboarding = asyncHandler(async (req, res) => {
     });
   }
 
-  // Create new offboarding lifecycle with 5 tasks
-  console.log(
-    `🚀 [OFFBOARDING] Creating offboarding lifecycle for: ${employee.email}`
-  );
-
   try {
     const offboardingLifecycle =
       await EmployeeLifecycle.createStandardLifecycle(
@@ -519,15 +540,10 @@ const initiateOffboarding = asyncHandler(async (req, res) => {
         "Offboarding",
         employee.department,
         employee.role,
-        req.user._id, // initiated by current user
-        req.user._id // assigned to current user (HR)
+        req.user._id,
+        req.user._id
       );
 
-    console.log(
-      `✅ [OFFBOARDING] Created offboarding lifecycle with ID: ${offboardingLifecycle._id}`
-    );
-
-    // Populate the lifecycle for response
     const populatedLifecycle = await EmployeeLifecycle.findById(
       offboardingLifecycle._id
     ).populate([
@@ -664,6 +680,325 @@ const getOffboardingLifecycles = asyncHandler(async (req, res) => {
   });
 });
 
+const revertOffboarding = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const lifecycle = await EmployeeLifecycle.findById(id);
+  if (!lifecycle) {
+    return res.status(404).json({
+      success: false,
+      message: "Lifecycle not found",
+    });
+  }
+
+  // Verify this is an offboarding lifecycle
+  if (lifecycle.type !== "Offboarding") {
+    return res.status(400).json({
+      success: false,
+      message: "This endpoint is only for offboarding lifecycles",
+    });
+  }
+
+  try {
+    // Reset all tasks to Pending
+    if (lifecycle.tasks && lifecycle.tasks.length > 0) {
+      lifecycle.tasks.forEach((task) => {
+        task.status = "Pending";
+        task.startedAt = undefined;
+        task.completedAt = undefined;
+        task.completedBy = undefined;
+        task.notes = "";
+      });
+    }
+
+    lifecycle.status = "On Hold";
+    lifecycle.actualCompletionDate = undefined;
+    lifecycle.notes = `Offboarding reverted by ${req.user.firstName} ${
+      req.user.lastName
+    } on ${new Date().toLocaleString()}. Employee reactivated and all tasks reset.`;
+
+    lifecycle.markModified("tasks");
+
+    await lifecycle.save();
+
+    const reactivatedEmployee = await User.findByIdAndUpdate(
+      lifecycle.employee,
+      {
+        status: "ACTIVE",
+        isActive: true,
+      },
+      { new: true }
+    ).populate("role department");
+
+    await lifecycle.addTimelineEntry(
+      "Offboarding Reverted",
+      `Offboarding process reverted by ${req.user.firstName} ${req.user.lastName}. All tasks reset to pending and user reactivated.`,
+      req.user._id
+    );
+
+    // Send notifications
+    try {
+      const NotificationService = (
+        await import("../services/notificationService.js")
+      ).default;
+      const notificationService = new NotificationService();
+
+      await notificationService.createNotification({
+        recipient: lifecycle.employee,
+        type: "OFFBOARDING_REVERTED",
+        title: "Offboarding Reverted - Account Reactivated",
+        message: `Your offboarding process has been reverted by HR. Your account has been reactivated and all offboarding tasks have been reset. You can now continue working with ELRA.`,
+        priority: "high",
+        category: "OFFBOARDING",
+        actionUrl: "/dashboard",
+        data: {
+          lifecycleId: lifecycle._id,
+          revertedBy: req.user._id,
+          revertedByName: `${req.user.firstName} ${req.user.lastName}`,
+          revertedAt: new Date(),
+        },
+      });
+
+      // Notify the assigned HR person (if different from the person who reverted)
+      if (
+        lifecycle.assignedHR &&
+        lifecycle.assignedHR.toString() !== req.user._id.toString()
+      ) {
+        await notificationService.createNotification({
+          recipient: lifecycle.assignedHR,
+          type: "OFFBOARDING_REVERTED",
+          title: "Offboarding Reverted",
+          message: `The offboarding process for ${reactivatedEmployee.firstName} ${reactivatedEmployee.lastName} (${reactivatedEmployee.employeeId}) has been reverted by ${req.user.firstName} ${req.user.lastName}. All tasks have been reset to pending and the employee has been reactivated.`,
+          priority: "medium",
+          category: "OFFBOARDING",
+          actionUrl: "/dashboard/modules/hr/offboarding",
+          data: {
+            lifecycleId: lifecycle._id,
+            employeeId: reactivatedEmployee._id,
+            employeeName: `${reactivatedEmployee.firstName} ${reactivatedEmployee.lastName}`,
+            revertedBy: req.user._id,
+            revertedByName: `${req.user.firstName} ${req.user.lastName}`,
+            revertedAt: new Date(),
+          },
+        });
+      }
+
+      // Notify the initiator if different from current user and assigned HR
+      if (
+        lifecycle.initiatedBy &&
+        lifecycle.initiatedBy.toString() !== req.user._id.toString() &&
+        lifecycle.initiatedBy.toString() !== lifecycle.assignedHR?.toString()
+      ) {
+        await notificationService.createNotification({
+          recipient: lifecycle.initiatedBy,
+          type: "OFFBOARDING_REVERTED",
+          title: "Offboarding Reverted",
+          message: `The offboarding process you initiated for ${reactivatedEmployee.firstName} ${reactivatedEmployee.lastName} (${reactivatedEmployee.employeeId}) has been reverted by ${req.user.firstName} ${req.user.lastName}.`,
+          priority: "medium",
+          category: "OFFBOARDING",
+          actionUrl: "/dashboard/modules/hr/offboarding",
+          data: {
+            lifecycleId: lifecycle._id,
+            employeeId: reactivatedEmployee._id,
+            employeeName: `${reactivatedEmployee.firstName} ${reactivatedEmployee.lastName}`,
+            revertedBy: req.user._id,
+            revertedByName: `${req.user.firstName} ${req.user.lastName}`,
+            revertedAt: new Date(),
+          },
+        });
+      }
+
+      // Notify all Super Admins
+      const superAdmins = await User.find({
+        $or: [{ "role.level": 1000 }, { isSuperadmin: true }],
+        isActive: true,
+      })
+        .populate("role")
+        .populate("department");
+
+      for (const superAdmin of superAdmins) {
+        if (
+          superAdmin._id.toString() !== req.user._id.toString() &&
+          superAdmin._id.toString() !== lifecycle.assignedHR?.toString() &&
+          superAdmin._id.toString() !== lifecycle.initiatedBy?.toString()
+        ) {
+          await notificationService.createNotification({
+            recipient: superAdmin._id,
+            type: "OFFBOARDING_REVERTED",
+            title: "Offboarding Reverted",
+            message: `The offboarding process for ${reactivatedEmployee.firstName} ${reactivatedEmployee.lastName} (${reactivatedEmployee.employeeId}) has been reverted by ${req.user.firstName} ${req.user.lastName}. All tasks have been reset and the employee has been reactivated.`,
+            priority: "high",
+            category: "OFFBOARDING",
+            actionUrl: "/dashboard/modules/hr/offboarding",
+            data: {
+              lifecycleId: lifecycle._id,
+              employeeId: reactivatedEmployee._id,
+              employeeName: `${reactivatedEmployee.firstName} ${reactivatedEmployee.lastName}`,
+              employeeEmail: reactivatedEmployee.email,
+              revertedBy: req.user._id,
+              revertedByName: `${req.user.firstName} ${req.user.lastName}`,
+              revertedAt: new Date(),
+            },
+          });
+        }
+      }
+
+      // Notify all HR HODs
+      const hrDepartment = await Department.findOne({
+        name: "Human Resources",
+      });
+      if (hrDepartment) {
+        const hrHODs = await User.find({
+          department: hrDepartment._id,
+          "role.level": 700,
+          isActive: true,
+        })
+          .populate("role")
+          .populate("department");
+
+        for (const hrHOD of hrHODs) {
+          // Skip if this HR HOD is the one who reverted or already notified
+          if (
+            hrHOD._id.toString() !== req.user._id.toString() &&
+            hrHOD._id.toString() !== lifecycle.assignedHR?.toString() &&
+            hrHOD._id.toString() !== lifecycle.initiatedBy?.toString()
+          ) {
+            await notificationService.createNotification({
+              recipient: hrHOD._id,
+              type: "OFFBOARDING_REVERTED",
+              title: "Offboarding Reverted",
+              message: `The offboarding process for ${reactivatedEmployee.firstName} ${reactivatedEmployee.lastName} (${reactivatedEmployee.employeeId}) has been reverted by ${req.user.firstName} ${req.user.lastName}. All tasks have been reset and the employee has been reactivated.`,
+              priority: "high",
+              category: "OFFBOARDING",
+              actionUrl: "/dashboard/modules/hr/offboarding",
+              data: {
+                lifecycleId: lifecycle._id,
+                employeeId: reactivatedEmployee._id,
+                employeeName: `${reactivatedEmployee.firstName} ${reactivatedEmployee.lastName}`,
+                employeeEmail: reactivatedEmployee.email,
+                revertedBy: req.user._id,
+                revertedByName: `${req.user.firstName} ${req.user.lastName}`,
+                revertedAt: new Date(),
+              },
+            });
+          }
+        }
+      }
+    } catch (notificationError) {
+      console.error(
+        "❌ [OFFBOARDING REVERT] Error sending notifications:",
+        notificationError
+      );
+      // Don't fail the revert if notifications fail
+    }
+
+    // Get updated lifecycle with populated data
+    const updatedLifecycle = await EmployeeLifecycle.findById(id).populate([
+      {
+        path: "employee",
+        select: "firstName lastName email avatar employeeId",
+      },
+      { path: "department", select: "name" },
+      { path: "assignedHR", select: "firstName lastName email" },
+      { path: "initiatedBy", select: "firstName lastName email" },
+      { path: "tasks.assignedTo", select: "firstName lastName email" },
+      { path: "tasks.completedBy", select: "firstName lastName email" },
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: updatedLifecycle,
+      message:
+        "Offboarding reverted successfully. All tasks reset and user reactivated.",
+    });
+  } catch (error) {
+    console.error("Error reverting offboarding:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to revert offboarding",
+      error: error.message,
+    });
+  }
+});
+
+const getCompletedOffboardings = asyncHandler(async (req, res) => {
+  const {
+    page = 1,
+    limit = 10,
+    department,
+    search,
+    sortBy = "actualCompletionDate",
+    sortOrder = "desc",
+  } = req.query;
+
+  const query = {
+    type: "Offboarding",
+    status: "Completed",
+  };
+
+  if (department) query.department = department;
+
+  const user = req.user;
+
+  if (user.role.level >= 1000) {
+  } else if (user.role.level >= 700) {
+    const userWithDept = await User.findById(user._id).populate("department");
+    if (
+      userWithDept.department &&
+      userWithDept.department.name !== "Human Resources"
+    ) {
+      query.department = user.department;
+    }
+  } else {
+    query.department = user.department;
+  }
+
+  const pageNum = parseInt(page);
+  const limitNum = parseInt(limit);
+  const skip = (pageNum - 1) * limitNum;
+
+  let lifecyclesQuery = EmployeeLifecycle.find(query)
+    .populate([
+      {
+        path: "employee",
+        select: "firstName lastName email avatar employeeId",
+      },
+      { path: "department", select: "name" },
+      { path: "assignedHR", select: "firstName lastName email" },
+      { path: "initiatedBy", select: "firstName lastName email" },
+    ])
+    .sort({ [sortBy]: sortOrder === "desc" ? -1 : 1 })
+    .skip(skip)
+    .limit(limitNum);
+
+  const [lifecycles, total] = await Promise.all([
+    lifecyclesQuery.exec(),
+    EmployeeLifecycle.countDocuments(query),
+  ]);
+
+  const totalPages = Math.ceil(total / limitNum);
+  const hasNextPage = pageNum < totalPages;
+  const hasPrevPage = pageNum > 1;
+
+  const paginatedData = {
+    docs: lifecycles,
+    totalDocs: total,
+    limit: limitNum,
+    page: pageNum,
+    totalPages,
+    hasNextPage,
+    hasPrevPage,
+    nextPage: hasNextPage ? pageNum + 1 : null,
+    prevPage: hasPrevPage ? pageNum - 1 : null,
+  };
+
+  return res.status(200).json({
+    success: true,
+    data: paginatedData,
+    message: "Completed offboarding lifecycles retrieved successfully",
+  });
+});
+
 export {
   getAllLifecycles,
   getLifecycleById,
@@ -676,4 +1011,6 @@ export {
   getLifecycleStats,
   initiateOffboarding,
   getOffboardingLifecycles,
+  revertOffboarding,
+  getCompletedOffboardings,
 };

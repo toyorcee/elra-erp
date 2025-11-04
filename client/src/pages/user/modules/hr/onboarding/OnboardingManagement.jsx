@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useAuth } from "../../../../../context/AuthContext";
 import { userModulesAPI } from "../../../../../services/userModules";
 import {
   UserIcon,
@@ -8,14 +7,11 @@ import {
   ExclamationTriangleIcon,
   PlayIcon,
   PauseIcon,
-  CalendarIcon,
   BuildingOfficeIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
   ArrowPathIcon,
-  InformationCircleIcon,
   XMarkIcon,
-  DocumentTextIcon,
   ClipboardDocumentCheckIcon,
 } from "@heroicons/react/24/outline";
 import { toast } from "react-toastify";
@@ -23,11 +19,8 @@ import defaultAvatar from "../../../../../assets/defaulticon.jpg";
 import ELRALogo from "../../../../../components/ELRALogo";
 
 const OnboardingManagement = () => {
-  const { user } = useAuth();
-  const [lifecycles, setLifecycles] = useState([]);
   const [groupedUsers, setGroupedUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({});
   const [selectedUser, setSelectedUser] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [filters, setFilters] = useState({
@@ -39,31 +32,32 @@ const OnboardingManagement = () => {
   const [allLifecycles, setAllLifecycles] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchTimeout, setSearchTimeout] = useState(null);
+  const [updatingTasks, setUpdatingTasks] = useState({});
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      console.log("🔍 Fetching lifecycle data");
 
-      // Fetch all onboarding lifecycles without filters
       const onboardingFilters = { type: "Onboarding" };
 
-      const [lifecyclesRes, statsRes] = await Promise.all([
-        userModulesAPI.employeeLifecycle.getAll(onboardingFilters),
-        userModulesAPI.employeeLifecycle.getStats(),
-      ]);
-
-      console.log("📊 Lifecycles response:", lifecyclesRes);
-      console.log("📈 Stats response:", statsRes);
+      const lifecyclesRes = await userModulesAPI.employeeLifecycle.getAll(
+        onboardingFilters
+      );
 
       const lifecyclesData = lifecyclesRes.data.docs || [];
       setAllLifecycles(lifecyclesData);
-      setLifecycles(lifecyclesData);
-      setStats(statsRes.data);
 
-      // Group lifecycles by user
       const grouped = groupLifecyclesByUser(lifecyclesData);
       setGroupedUsers(grouped);
+
+      if (selectedUser && showDetailsModal) {
+        const updatedSelectedUser = grouped.find(
+          (userData) => userData.user._id === selectedUser.user._id
+        );
+        if (updatedSelectedUser) {
+          setSelectedUser(updatedSelectedUser);
+        }
+      }
     } catch (error) {
       console.error("Error fetching lifecycle data:", error);
       toast.error("Failed to fetch lifecycle data");
@@ -212,11 +206,14 @@ const OnboardingManagement = () => {
   };
 
   const calculateProgress = (lifecycle) => {
-    if (!lifecycle.tasks || lifecycle.tasks.length === 0) return 0;
+    if (!lifecycle || !lifecycle.tasks || lifecycle.tasks.length === 0) {
+      return 0;
+    }
     const completed = lifecycle.tasks.filter(
-      (task) => task.status === "Completed"
+      (task) => task && task.status === "Completed"
     ).length;
-    return Math.round((completed / lifecycle.tasks.length) * 100);
+    const total = lifecycle.tasks.length;
+    return Math.round((completed / total) * 100);
   };
 
   const isOverdue = (lifecycle) => {
@@ -234,15 +231,10 @@ const OnboardingManagement = () => {
     lifecyclesData.forEach((lifecycle) => {
       // Skip if employee is null or undefined
       if (!lifecycle.employee) {
-        console.warn(
-          "⚠️ [ONBOARDING] Skipping lifecycle with null employee:",
-          lifecycle._id
-        );
         return;
       }
 
       const userId = lifecycle.employee._id;
-      const userName = `${lifecycle.employee.firstName} ${lifecycle.employee.lastName}`;
 
       if (!grouped[userId]) {
         grouped[userId] = {
@@ -300,12 +292,15 @@ const OnboardingManagement = () => {
   };
 
   const handleTaskAction = async (lifecycleId, taskId, action) => {
+    // Prevent multiple clicks on the same task
+    const taskKey = `${lifecycleId}-${taskId}`;
+    if (updatingTasks[taskKey]) {
+      return;
+    }
+
     try {
-      console.log(`🚀 [TASK] ${action}ing task:`, {
-        lifecycleId,
-        taskId,
-        action,
-      });
+      // Set loading state for this specific task
+      setUpdatingTasks((prev) => ({ ...prev, [taskKey]: true }));
 
       const response = await userModulesAPI.employeeLifecycle.updateTaskStatus(
         lifecycleId,
@@ -314,18 +309,59 @@ const OnboardingManagement = () => {
 
       if (response.success) {
         toast.success(`Task ${action}ed successfully`);
-        // Refresh data to show updated progress
-        fetchData();
+
+        if (response.data) {
+          const updatedLifecycle = response.data;
+
+          // Update grouped users immediately with the complete lifecycle data
+          const updatedGroupedUsers = groupedUsers.map((userData) => {
+            if (
+              userData.lifecycles.Onboarding?._id?.toString() ===
+              lifecycleId.toString()
+            ) {
+              return {
+                ...userData,
+                lifecycles: {
+                  ...userData.lifecycles,
+                  Onboarding: updatedLifecycle,
+                },
+              };
+            }
+            return userData;
+          });
+
+          setGroupedUsers(updatedGroupedUsers);
+
+          if (selectedUser) {
+            const updatedSelectedUser = {
+              ...selectedUser,
+              lifecycles: {
+                ...selectedUser.lifecycles,
+                Onboarding: updatedLifecycle,
+              },
+            };
+            setSelectedUser(updatedSelectedUser);
+          }
+        }
+
+        setTimeout(() => {
+          fetchData();
+        }, 500);
       } else {
         toast.error(`Failed to ${action} task`);
       }
     } catch (error) {
       console.error(`Error ${action}ing task:`, error);
       toast.error(`Failed to ${action} task`);
+    } finally {
+      setUpdatingTasks((prev) => {
+        const newState = { ...prev };
+        delete newState[taskKey];
+        return newState;
+      });
     }
   };
 
-  // Image utility functions
   const getDefaultAvatar = () => {
     return defaultAvatar;
   };
@@ -401,7 +437,7 @@ const OnboardingManagement = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
           <div className="bg-white rounded-xl shadow-lg p-6 border border-[var(--elra-border-primary)]">
             <div className="flex items-center space-x-4">
               <div className="p-2 bg-blue-100 rounded-lg">
@@ -463,6 +499,29 @@ const OnboardingManagement = () => {
                   {groupedUsers.filter((user) => {
                     const onboarding = getLifecycleStatus(user, "Onboarding");
                     return onboarding && onboarding.isOverdue;
+                  }).length || 0}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-[var(--elra-border-primary)]">
+            <div className="flex items-center space-x-4">
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <ClockIcon className="w-6 h-6 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600">
+                  Pending Onboarding
+                </p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {groupedUsers.filter((user) => {
+                    const onboarding = getLifecycleStatus(user, "Onboarding");
+                    return (
+                      onboarding &&
+                      onboarding.status !== "Completed" &&
+                      onboarding.status !== "Cancelled"
+                    );
                   }).length || 0}
                 </p>
               </div>
@@ -643,11 +702,6 @@ const OnboardingManagement = () => {
 
         {/* Users List */}
         <div className="space-y-4">
-          {console.log(
-            "🎯 Rendering grouped users:",
-            groupedUsers.length,
-            groupedUsers
-          )}
           {groupedUsers.map((userData) => {
             const onboardingStatus = getLifecycleStatus(userData, "Onboarding");
             const offboardingStatus = getLifecycleStatus(
@@ -866,7 +920,8 @@ const OnboardingManagement = () => {
                         {selectedUser.lifecycles.Onboarding.tasks?.filter(
                           (task) => task.status === "Completed"
                         ).length || 0}
-                        /5)
+                        /{selectedUser.lifecycles.Onboarding.tasks?.length || 0}
+                        )
                       </h4>
                     </div>
 
@@ -932,9 +987,23 @@ const OnboardingManagement = () => {
                                       "start"
                                     )
                                   }
-                                  className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                                  disabled={
+                                    updatingTasks[
+                                      `${selectedUser.lifecycles.Onboarding._id}-${task._id}`
+                                    ]
+                                  }
+                                  className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                  Start
+                                  {updatingTasks[
+                                    `${selectedUser.lifecycles.Onboarding._id}-${task._id}`
+                                  ] ? (
+                                    <span className="flex items-center">
+                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
+                                      Starting...
+                                    </span>
+                                  ) : (
+                                    "Start"
+                                  )}
                                 </button>
                               )}
                               {task.status === "In Progress" && (
@@ -946,9 +1015,23 @@ const OnboardingManagement = () => {
                                       "complete"
                                     )
                                   }
-                                  className="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                                  disabled={
+                                    updatingTasks[
+                                      `${selectedUser.lifecycles.Onboarding._id}-${task._id}`
+                                    ]
+                                  }
+                                  className="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                  Complete
+                                  {updatingTasks[
+                                    `${selectedUser.lifecycles.Onboarding._id}-${task._id}`
+                                  ] ? (
+                                    <span className="flex items-center">
+                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
+                                      Completing...
+                                    </span>
+                                  ) : (
+                                    "Complete"
+                                  )}
                                 </button>
                               )}
                               {task.status === "Completed" && (

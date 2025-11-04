@@ -144,6 +144,33 @@ export const setBudgetAllocation = async (req, res) => {
       `💰 [BUDGET ALLOCATION] Allocated ₦${amount.toLocaleString()} to ${category} budget`
     );
 
+    // Get user info for notifications
+    const user = await User.findById(userId)
+      .populate("role", "name level")
+      .populate("department", "name");
+
+    const addedByUserName = `${user?.firstName} ${user?.lastName}`;
+    const addedByDepartment = user?.department?.name || "Unknown Department";
+    const formattedAmount = new Intl.NumberFormat("en-NG", {
+      style: "currency",
+      currency: "NGN",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+
+    // Notify category HOD about budget allocation
+    console.log(
+      `📧 [BUDGET ALLOCATION] Notifying ${category} category HOD about budget allocation`
+    );
+    await notifyCategoryHOD(
+      category,
+      addedByUserName,
+      addedByDepartment,
+      formattedAmount,
+      `Budget allocation for ${category}`,
+      `BUDGET_${category.toUpperCase()}`
+    );
+
     // Check for low balance after allocation and notify if needed
     const lowBalanceThreshold = 10000000;
     const newBalance = wallet.availableFunds;
@@ -156,14 +183,6 @@ export const setBudgetAllocation = async (req, res) => {
       const user = await User.findById(userId)
         .populate("role", "name level")
         .populate("department", "name");
-
-      const addedByUserName = `${user?.firstName} ${user?.lastName}`;
-      const formattedAmount = new Intl.NumberFormat("en-NG", {
-        style: "currency",
-        currency: "NGN",
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }).format(amount);
 
       const formattedBalance = new Intl.NumberFormat("en-NG", {
         style: "currency",
@@ -418,6 +437,8 @@ export const addFunds = async (req, res) => {
       description,
       finalReference,
       wallet.availableFunds,
+      allocateToBudget,
+      budgetCategory,
       flexibleAllocation,
       allocations
     );
@@ -725,6 +746,8 @@ const sendFundAdditionNotifications = async (
   description,
   reference,
   newBalance,
+  allocateToBudget = false,
+  budgetCategory = null,
   flexibleAllocation = false,
   allocations = []
 ) => {
@@ -822,12 +845,87 @@ const sendFundAdditionNotifications = async (
       );
     }
 
+    // Notify category-specific HODs when funds are allocated to their categories
+    if (allocateToBudget && budgetCategory) {
+      console.log(
+        `📧 [FUND_ADDITION] Notifying ${budgetCategory} category HOD about direct allocation`
+      );
+      await notifyCategoryHOD(
+        budgetCategory,
+        addedByUserName,
+        addedByDepartment,
+        formattedAmount,
+        description,
+        reference
+      );
+    } else if (flexibleAllocation && allocations.length > 0) {
+      // Notify HODs for each category in flexible allocation
+      const categorySet = new Set(allocations.map((alloc) => alloc.category));
+      for (const category of categorySet) {
+        const categoryAllocations = allocations.filter(
+          (alloc) => alloc.category === category
+        );
+        const categoryTotal = categoryAllocations.reduce(
+          (sum, alloc) => sum + alloc.amount,
+          0
+        );
+        const formattedCategoryAmount = new Intl.NumberFormat("en-NG", {
+          style: "currency",
+          currency: "NGN",
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        }).format(categoryTotal);
+
+        await notifyCategoryHOD(
+          category,
+          addedByUserName,
+          addedByDepartment,
+          formattedCategoryAmount,
+          description,
+          reference
+        );
+      }
+    }
+
+    let allocationMessageForCreator = "";
+    if (allocateToBudget && budgetCategory) {
+      allocationMessageForCreator = ` Allocated: ${formattedAmount} to ${budgetCategory}.`;
+    } else if (flexibleAllocation && allocations.length > 0) {
+      const parts = allocations.map((alloc) => {
+        const fa = new Intl.NumberFormat("en-NG", {
+          style: "currency",
+          currency: "NGN",
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        }).format(alloc.amount);
+        return `${fa} to ${alloc.category}`;
+      });
+      allocationMessageForCreator = ` Allocated: ${parts.join(", ")}.`;
+    }
+
+    const creatorNotification = new Notification({
+      recipient: addedByUser._id,
+      type: "FUND_ADDITION",
+      title: "Funds Added to ELRA Wallet",
+      message: `${addedByUserName} (${addedByDepartment}) added ${formattedAmount} to the ELRA wallet.${allocationMessageForCreator} New balance: ${formattedBalance}`,
+      priority: "high",
+      category: "FINANCE",
+      data: {
+        addedBy: addedByUserName,
+        addedByDepartment,
+        amount: formattedAmount,
+        allocations: allocations,
+        description,
+        reference,
+        newBalance: formattedBalance,
+        actionUrl: "/dashboard/modules/finance/elra-wallet",
+      },
+    });
+    await creatorNotification.save();
+
     // Check for low balance and notify all three parties if needed
     const lowBalanceThreshold = 10000000; // 10M NGN
     if (newBalance < lowBalanceThreshold) {
-      console.log(
-        `⚠️ [LOW_BALANCE_ALERT] Main wallet balance (₦${formattedBalance}) is below threshold (₦${lowBalanceThreshold.toLocaleString()})`
-      );
       await notifyLowBalance(
         addedByUserName,
         formattedAmount,
@@ -835,13 +933,96 @@ const sendFundAdditionNotifications = async (
         lowBalanceThreshold
       );
     }
-
-    console.log("✅ [FUND_ADDITION] All notifications processed successfully");
-
-    console.log(`✅ [FUND_ADDITION] Notifications sent successfully`);
   } catch (error) {
     console.error("❌ [FUND_ADDITION] Error sending notifications:", error);
     // Don't throw error - notifications are not critical for the main operation
+  }
+};
+
+/**
+ * Notify category-specific HOD when funds are allocated to their budget category
+ */
+const notifyCategoryHOD = async (
+  category,
+  addedByUserName,
+  addedByDepartment,
+  formattedAmount,
+  description,
+  reference
+) => {
+  try {
+    const categoryDepartmentMap = {
+      payroll: "Human Resources",
+      projects: "Project Management",
+      operational: "Sales & Marketing",
+    };
+
+    const departmentName = categoryDepartmentMap[category];
+
+    if (!departmentName) {
+      console.error(`❌ [FUND_ADDITION] Unknown budget category: ${category}`);
+      return;
+    }
+
+    // Find the department
+    const department = await Department.findOne({ name: departmentName });
+
+    if (!department) {
+      console.error(
+        `❌ [FUND_ADDITION] Department not found: ${departmentName}`
+      );
+      return;
+    }
+
+    const departmentUsers = await User.find({
+      department: department._id,
+      isActive: true,
+    })
+      .populate("role", "name level description")
+      .populate("department", "name description");
+
+    const categoryHOD = departmentUsers.find(
+      (user) =>
+        user.role && (user.role.name === "HOD" || user.role.level >= 700)
+    );
+
+    if (!categoryHOD) {
+      console.error(
+        `❌ [FUND_ADDITION] HOD not found for ${departmentName} department`
+      );
+      return;
+    }
+
+    // Send notification to department HOD
+
+    const categoryDisplayName =
+      category.charAt(0).toUpperCase() + category.slice(1) + " Budget";
+
+    const notification = new Notification({
+      recipient: categoryHOD._id,
+      type: "FUND_ADDITION",
+      title: `Funds Allocated to ${categoryDisplayName}`,
+      message: `${addedByUserName} (${addedByDepartment}) allocated ${formattedAmount} to the ${categoryDisplayName}. Funds are now available for your department's use.`,
+      priority: "high",
+      category: "FINANCE",
+      data: {
+        addedBy: addedByUserName,
+        addedByDepartment,
+        budgetCategory: category,
+        categoryDisplayName,
+        amount: formattedAmount,
+        description,
+        reference,
+        actionUrl: "/dashboard/modules/finance/elra-wallet",
+      },
+    });
+
+    await notification.save();
+  } catch (error) {
+    console.error(
+      `❌ [FUND_ADDITION] Error notifying ${category} category HOD:`,
+      error
+    );
   }
 };
 
@@ -860,7 +1041,6 @@ const notifyFinanceHOD = async (
 ) => {
   try {
     console.log("🔍 [FUND_ADDITION] Finding Finance & Accounting department");
-    // Find Finance & Accounting department
     const financeDept = await Department.findOne({
       name: "Finance & Accounting",
     });
@@ -872,13 +1052,6 @@ const notifyFinanceHOD = async (
       return;
     }
 
-    console.log("✅ [FUND_ADDITION] Finance department found:", {
-      departmentId: financeDept._id,
-      departmentName: financeDept.name,
-    });
-
-    // Find Finance HOD
-    console.log("🔍 [FUND_ADDITION] Finding Finance HOD");
     const financeUsers = await User.find({
       department: financeDept._id,
       isActive: true,
@@ -886,7 +1059,6 @@ const notifyFinanceHOD = async (
       .populate("role", "name level description")
       .populate("department", "name description");
 
-    // Find HOD or user with level >= 700
     let financeHOD = financeUsers.find(
       (user) =>
         user.role && (user.role.name === "HOD" || user.role.level >= 700)

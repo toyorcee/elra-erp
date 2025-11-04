@@ -7,6 +7,64 @@ import nodemailer from "nodemailer";
 import mongoose from "mongoose";
 import NotificationService from "../services/notificationService.js";
 import AuditService from "../services/auditService.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Logo helper functions (matching emailService.js)
+const getLogoConfig = () => {
+  const filename = process.env.EMAIL_LOGO_FILENAME || "elra-logo.png";
+  const ext = path.extname(filename).toLowerCase();
+  const mime =
+    ext === ".png"
+      ? "image/png"
+      : ext === ".svg"
+      ? "image/svg+xml"
+      : "image/jpeg";
+  return { filename, mime };
+};
+
+const getEmailLogoSrc = () => {
+  const useCid = (process.env.EMAIL_USE_CID || "").toLowerCase() === "true";
+  const cid = process.env.EMAIL_LOGO_CID || "brandLogo";
+  if (useCid) return `cid:${cid}`;
+
+  if (process.env.EMAIL_LOGO_URL) return process.env.EMAIL_LOGO_URL;
+
+  const { filename, mime } = getLogoConfig();
+  try {
+    const imagePath = path.resolve(__dirname, "../assets/images", filename);
+    if (fs.existsSync(imagePath)) {
+      const imageBuffer = fs.readFileSync(imagePath);
+      return `data:${mime};base64,${imageBuffer.toString("base64")}`;
+    }
+  } catch (err) {
+    console.warn("⚠️ Could not resolve email logo src:", err.message);
+  }
+  return null;
+};
+
+const getEmailLogoAttachmentIfNeeded = () => {
+  const useCid = (process.env.EMAIL_USE_CID || "").toLowerCase() === "true";
+  if (!useCid) return null;
+  const { filename, mime } = getLogoConfig();
+  try {
+    const imagePath = path.resolve(__dirname, "../assets/images", filename);
+    if (!fs.existsSync(imagePath)) return null;
+    return {
+      filename,
+      path: imagePath,
+      cid: process.env.EMAIL_LOGO_CID || "brandLogo",
+      contentType: mime,
+    };
+  } catch (err) {
+    console.warn("⚠️ Could not prepare CID logo attachment:", err.message);
+    return null;
+  }
+};
 
 // ============================================================================
 
@@ -64,19 +122,21 @@ const sendProcurementEmailToSupplier = async (procurement, currentUser) => {
 
       <style>
 
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f5f5f5; margin: 0; padding: 20px; }
 
-        .header { background: linear-gradient(135deg, #0D6449 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+        .email-wrapper { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
 
-        .header h1 { margin: 0 0 5px 0; font-size: 32px; font-weight: bold; }
+        .header { background: #ffffff; color: #1a1a1a; padding: 45px 30px 35px 30px; text-align: center; border-bottom: 3px solid #0D6449; }
 
-        .tagline { margin: 0 0 15px 0; }
+        .header h1 { margin: 12px 0 8px 0; font-size: 36px; font-weight: 700; color: #0D6449; letter-spacing: -0.5px; }
 
-        .tagline p { margin: 0; font-size: 16px; opacity: 0.9; font-weight: 300; letter-spacing: 1px; }
+        .tagline { margin: 0 0 20px 0; }
 
-        .header h2 { margin: 0; font-size: 20px; opacity: 0.9; }
+        .tagline p { margin: 0; font-size: 17px; color: #059669; font-weight: 400; letter-spacing: 0.5px; }
 
-        .content { padding: 20px; }
+        .header h2 { margin: 0; font-size: 22px; color: #333; font-weight: 600; }
+
+        .content { padding: 30px; background: #ffffff; }
 
         .order-details { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; }
 
@@ -100,19 +160,33 @@ const sendProcurementEmailToSupplier = async (procurement, currentUser) => {
 
     <body>
 
-      <div class="header">
+      <div class="email-wrapper">
 
-        <h1>ELRA</h1>
+        <div class="header">
 
-        <div class="tagline">
+          <div style="text-align: center; margin-bottom: 12px;">
 
-          <p>You Lease, We Regulate</p>
+            ${(() => {
+              const elraLogo = getEmailLogoSrc();
+              if (elraLogo) {
+                return `<img src="${elraLogo}" alt="ELRA Logo" style="height: 70px; width: auto; max-width: 200px; display: block; margin: 0 auto 12px auto;" />`;
+              }
+              return "";
+            })()}
+
+            <h1>ELRA</h1>
+
+          </div>
+
+          <div class="tagline">
+
+            <p>You Lease, We Regulate</p>
+
+          </div>
+
+          <h2>Purchase Order ${poNumber}</h2>
 
         </div>
-
-        <h2>Purchase Order ${poNumber}</h2>
-
-      </div>
 
       
       
@@ -242,6 +316,8 @@ const sendProcurementEmailToSupplier = async (procurement, currentUser) => {
 
         <p>For support, contact: support@elra.com</p>
 
+        </div>
+
       </div>
 
     </body>
@@ -291,6 +367,17 @@ const sendProcurementEmailToSupplier = async (procurement, currentUser) => {
 
     attachments: emailOptions.attachments || [],
   };
+
+  // Add logo attachment if CID mode is enabled
+  {
+    const logoAttachment = getEmailLogoAttachmentIfNeeded();
+    if (logoAttachment) {
+      mailOptions.attachments = [
+        ...(mailOptions.attachments || []),
+        logoAttachment,
+      ];
+    }
+  }
 
   console.log(`📧 [PROCUREMENT] Sending email to supplier...`);
 

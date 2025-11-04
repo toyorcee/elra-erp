@@ -615,11 +615,7 @@ employeeLifecycleSchema.pre("save", async function (next) {
     if (completedCount === totalCount && this.status !== "Completed") {
       this.status = "Completed";
       this.actualCompletionDate = new Date();
-      console.log(
-        `✅ [LIFECYCLE] ${this.type} lifecycle completed for employee: ${this.employee}`
-      );
 
-      // Update employee status based on lifecycle type
       if (this.type === "Offboarding") {
         try {
           const User = mongoose.model("User");
@@ -627,47 +623,126 @@ employeeLifecycleSchema.pre("save", async function (next) {
             status: "PENDING_OFFBOARDING",
             isActive: false,
           });
-          console.log(
-            `🔄 [LIFECYCLE] Employee status updated to PENDING_OFFBOARDING and deactivated`
-          );
-
-          // Trigger final payroll calculation
-          try {
-            const PayrollService = (
-              await import("../services/payrollService.js")
-            ).default;
-            const currentDate = new Date();
-            const month = currentDate.getMonth() + 1;
-            const year = currentDate.getFullYear();
-
-            console.log(
-              `💰 [FINAL PAYROLL] Triggering final payroll calculation for offboarded employee: ${this.employee}`
-            );
-
-            // Calculate final payroll (this will be stored for HR to review and process)
-            const finalPayrollData = await PayrollService.calculateFinalPayroll(
-              this.employee,
-              month,
-              year
-            );
-
-            // Store final payroll data in the lifecycle for HR review
-            this.finalPayrollData = finalPayrollData;
-            console.log(
-              `✅ [FINAL PAYROLL] Final payroll calculated and stored for employee: ${this.employee}`
-            );
-          } catch (payrollError) {
-            console.error(
-              "❌ [FINAL PAYROLL] Error calculating final payroll:",
-              payrollError
-            );
-            // Don't fail the offboarding process if payroll calculation fails
-          }
         } catch (error) {
           console.error(
             "❌ [LIFECYCLE] Error updating employee status:",
             error
           );
+        }
+      } else if (this.type === "Onboarding") {
+        try {
+          const NotificationService = (
+            await import("../services/notificationService.js")
+          ).default;
+          const notificationService = new NotificationService();
+
+          await this.populate([
+            {
+              path: "employee",
+              select: "firstName lastName email employeeId",
+            },
+            { path: "department", select: "name" },
+            {
+              path: "assignedHR",
+              select: "firstName lastName email",
+            },
+          ]);
+
+          const employee = this.employee;
+          const department = this.department;
+          const assignedHR = this.assignedHR;
+
+          await notificationService.createNotification({
+            recipient: employee._id,
+            type: "ONBOARDING_COMPLETED",
+            title: "🎉 Onboarding Completed Successfully!",
+            message: `Congratulations! Your onboarding process has been completed successfully. You are now fully onboarded to ELRA and eligible for payroll. Welcome to the team!`,
+            priority: "high",
+            category: "ONBOARDING",
+            actionUrl: "/dashboard",
+            data: {
+              lifecycleId: this._id,
+              completedAt: this.actualCompletionDate,
+              employeeId: employee.employeeId,
+              departmentName: department?.name || "Unknown",
+            },
+          });
+
+          if (assignedHR) {
+            await notificationService.createNotification({
+              recipient: assignedHR._id,
+              type: "ONBOARDING_COMPLETED",
+              title: "Onboarding Completed",
+              message: `The onboarding process for ${employee.firstName} ${employee.lastName} (${employee.employeeId}) has been completed successfully. All 5 onboarding tasks have been finished.`,
+              priority: "medium",
+              category: "ONBOARDING",
+              actionUrl: "/dashboard/modules/hr/onboarding",
+              data: {
+                lifecycleId: this._id,
+                employeeId: employee._id,
+                employeeName: `${employee.firstName} ${employee.lastName}`,
+                employeeEmail: employee.email,
+                completedAt: this.actualCompletionDate,
+              },
+            });
+          }
+
+          const Department = mongoose.model("Department");
+          const hrDepartment = await Department.findOne({
+            name: "Human Resources",
+          });
+
+          if (hrDepartment) {
+            const User = mongoose.model("User");
+            const hrHODs = await User.find({
+              department: hrDepartment._id,
+              "role.level": 700,
+              isActive: true,
+            })
+              .populate("role")
+              .populate("department");
+
+            for (const hrHOD of hrHODs) {
+              if (
+                assignedHR &&
+                hrHOD._id.toString() === assignedHR._id.toString()
+              ) {
+                continue;
+              }
+
+              await notificationService.createNotification({
+                recipient: hrHOD._id,
+                type: "ONBOARDING_COMPLETED",
+                title: "Onboarding Completed",
+                message: `The onboarding process for ${employee.firstName} ${
+                  employee.lastName
+                } (${employee.employeeId}) from ${
+                  department?.name || "Unknown"
+                } department has been completed successfully.`,
+                priority: "medium",
+                category: "ONBOARDING",
+                actionUrl: "/dashboard/modules/hr/onboarding",
+                data: {
+                  lifecycleId: this._id,
+                  employeeId: employee._id,
+                  employeeName: `${employee.firstName} ${employee.lastName}`,
+                  employeeEmail: employee.email,
+                  departmentName: department?.name || "Unknown",
+                  completedAt: this.actualCompletionDate,
+                },
+              });
+            }
+          }
+
+          console.log(
+            `📧 [ONBOARDING] Sent completion notifications for: ${employee.email}`
+          );
+        } catch (notificationError) {
+          console.error(
+            "❌ [ONBOARDING] Error sending completion notifications:",
+            notificationError
+          );
+          // Don't fail the save if notifications fail
         }
       }
     } else if (completedCount > 0 && this.status === "Initiated") {

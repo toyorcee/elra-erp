@@ -48,6 +48,7 @@ const SalesMarketingApprovals = () => {
     allocated: 0,
     used: 0,
     reserved: 0,
+    lastAllocated: 0,
   });
 
   useEffect(() => {
@@ -62,12 +63,20 @@ const SalesMarketingApprovals = () => {
       if (response.success) {
         const budgetCategories =
           response.data?.financialSummary?.budgetCategories;
+        const recent = response.data?.recentTransactions || [];
+        const lastOperationalAllocation = recent.find(
+          (t) =>
+            t?.type === "allocation" &&
+            (t?.budgetCategory === "operational" ||
+              /operational|sales|marketing/i.test(t?.description || ""))
+        );
         if (budgetCategories?.operational) {
           setWalletBalance({
             available: budgetCategories.operational.available || 0,
             allocated: budgetCategories.operational.allocated || 0,
             used: budgetCategories.operational.used || 0,
             reserved: budgetCategories.operational.reserved || 0,
+            lastAllocated: lastOperationalAllocation?.amount || 0,
           });
         }
       }
@@ -418,7 +427,7 @@ const SalesMarketingApprovals = () => {
 
       <div className="w-full">
         {/* Sales & Marketing Approval Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           {/* Available Operations Budget Card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -542,6 +551,96 @@ const SalesMarketingApprovals = () => {
                 <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
               </div>
             </div>
+          </motion.div>
+
+          {/* Reserved Budget Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl shadow-lg border border-purple-200 p-6 hover:shadow-xl transition-all duration-300"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="p-4 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl shadow-lg">
+                  <ClockIcon className="w-7 h-7 text-white" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-semibold text-purple-700 uppercase tracking-wide">
+                    Reserved Operations Budget
+                  </p>
+                  <p className="text-2xl font-bold text-purple-900">
+                    {formatCurrency(walletBalance.reserved)}
+                  </p>
+                  <p className="text-xs text-purple-600 mt-1">
+                    Awaiting Processing
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Secondary Stat Row */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Used Budget */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                Used Budget
+              </p>
+              <ArrowTrendingDownIcon className="w-5 h-5 text-gray-500" />
+            </div>
+            <p className="text-2xl font-bold text-gray-900">
+              {formatCurrency(walletBalance.used)}
+            </p>
+            <p className="text-xs text-gray-500">Processed Transactions</p>
+          </motion.div>
+
+          {/* Reserved Budget */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                Reserved Budget
+              </p>
+              <ClockIcon className="w-5 h-5 text-gray-500" />
+            </div>
+            <p className="text-2xl font-bold text-gray-900">
+              {formatCurrency(walletBalance.reserved)}
+            </p>
+            <p className="text-xs text-gray-500">Awaiting Processing</p>
+          </motion.div>
+
+          {/* Last Allocated */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                Last Allocated Amount
+              </p>
+              <BanknotesIcon className="w-5 h-5 text-gray-500" />
+            </div>
+            <p className="text-2xl font-bold text-gray-900">
+              {formatCurrency(walletBalance.lastAllocated || 0)}
+            </p>
+            <p className="text-xs text-gray-500">Most recent allocation</p>
           </motion.div>
         </div>
 

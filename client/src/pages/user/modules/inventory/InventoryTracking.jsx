@@ -1,19 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  CubeIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
   ClockIcon,
   WrenchScrewdriverIcon,
-  EyeIcon,
   ArrowPathIcon,
-  CalendarIcon,
   CurrencyDollarIcon,
   XMarkIcon,
-  ChartBarIcon,
-  ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../../../context/AuthContext";
 import inventoryService from "../../../../services/inventoryService";
@@ -28,20 +22,22 @@ const InventoryTracking = () => {
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({
     type: "all",
-    priority: "all",
   });
   const [selectedItem, setSelectedItem] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [activeTab, setActiveTab] = useState("maintenance");
 
-  // Access control - only Super Admin and Operations HOD can access
-  const userRole = user?.role?.name || user?.role;
   const userDepartment = user?.department?.name;
   const isSuperAdmin = user?.role?.level === 1000;
   const isOperationsHOD =
     user?.role?.level === 700 && userDepartment === "Operations";
-  const hasAccess = user && (isSuperAdmin || isOperationsHOD);
+  const isOperationsManager =
+    user?.role?.level >= 600 &&
+    user?.role?.level < 700 &&
+    userDepartment === "Operations";
+  const hasAccess =
+    user && (isSuperAdmin || isOperationsHOD || isOperationsManager);
 
   if (!hasAccess) {
     return (
@@ -52,7 +48,8 @@ const InventoryTracking = () => {
           </h2>
           <p className="text-gray-600">
             You don't have permission to access Inventory Tracking. This module
-            is restricted to Super Admin and Operations HOD only.
+            is restricted to Super Admin, Operations HOD, and Operations Manager
+            only.
           </p>
         </div>
       </div>
@@ -139,18 +136,6 @@ const InventoryTracking = () => {
         {priority.toUpperCase()}
       </span>
     );
-  };
-
-  const getTypeIcon = (type) => {
-    const typeIcons = {
-      equipment: "🔧",
-      vehicle: "🚗",
-      property: "🏢",
-      furniture: "🪑",
-      electronics: "💻",
-      other: "📦",
-    };
-    return typeIcons[type] || "📦";
   };
 
   const maintenanceColumns = [

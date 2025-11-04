@@ -128,6 +128,15 @@ const ELRAWalletManagement = () => {
     return allCategories.filter((cat) => !usedCategories.includes(cat.value));
   };
 
+  const getDepartmentForCategory = (category) => {
+    const categoryDepartmentMap = {
+      payroll: "Human Resources Department",
+      projects: "Project Management Department",
+      operational: "Sales & Marketing Department",
+    };
+    return categoryDepartmentMap[category] || "Unknown Department";
+  };
+
   const isOverAllocated = () => {
     if (addFundsData.flexibleAllocation) {
       return getRemainingAmount() < 0;
@@ -272,9 +281,6 @@ const ELRAWalletManagement = () => {
         getWalletTransactions({ limit: 10 }),
       ]);
 
-      console.log("Wallet Response:", walletResponse);
-      console.log("Transactions Response:", transactionsResponse);
-
       setWalletData(walletResponse.data);
       setTransactions(transactionsResponse.data?.transactions || []);
     } catch (error) {
@@ -285,11 +291,9 @@ const ELRAWalletManagement = () => {
     }
   };
 
-  // Add funds to wallet
   const handleAddFunds = async (e) => {
     e.preventDefault();
 
-    // Validate allocations
     if (addFundsData.flexibleAllocation) {
       const totalAmount = parseFormattedNumber(addFundsData.amount) || 0;
       const totalAllocated = getTotalAllocated();
@@ -1116,6 +1120,11 @@ const ELRAWalletManagement = () => {
                                 Operational Budget
                               </option>
                             </select>
+                            <p className="mt-2 text-xs text-gray-600 font-medium">
+                              {getDepartmentForCategory(
+                                addFundsData.budgetCategory
+                              )}
+                            </p>
                           </div>
 
                           {/* Category Balance Information */}
@@ -1252,52 +1261,63 @@ const ELRAWalletManagement = () => {
                               (allocation, index) => (
                                 <div
                                   key={index}
-                                  className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg"
+                                  className="flex flex-col space-y-2 p-3 bg-gray-50 rounded-lg"
                                 >
-                                  <select
-                                    value={allocation.category}
-                                    onChange={(e) =>
-                                      updateAllocation(
-                                        index,
-                                        "category",
-                                        e.target.value
-                                      )
-                                    }
-                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                                  >
-                                    {getAvailableCategories(index).map(
-                                      (category) => (
-                                        <option
-                                          key={category.value}
-                                          value={category.value}
-                                        >
-                                          {category.label}
-                                        </option>
-                                      )
-                                    )}
-                                  </select>
-                                  <input
-                                    type="text"
-                                    value={formatNumberWithCommas(
-                                      allocation.amount
-                                    )}
-                                    onChange={(e) =>
-                                      updateAllocation(
-                                        index,
-                                        "amount",
-                                        e.target.value
-                                      )
-                                    }
-                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
-                                    placeholder="Amount"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => removeAllocation(index)}
-                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                  >
-                                    <XMarkIcon className="w-4 h-4" />
-                                  </button>
+                                  <div className="flex items-center space-x-3">
+                                    <div className="flex-1">
+                                      <select
+                                        value={allocation.category}
+                                        onChange={(e) =>
+                                          updateAllocation(
+                                            index,
+                                            "category",
+                                            e.target.value
+                                          )
+                                        }
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                                      >
+                                        {getAvailableCategories(index).map(
+                                          (category) => (
+                                            <option
+                                              key={category.value}
+                                              value={category.value}
+                                            >
+                                              {category.label}
+                                            </option>
+                                          )
+                                        )}
+                                      </select>
+                                      <p className="mt-1 text-xs text-gray-600 font-medium">
+                                        {getDepartmentForCategory(
+                                          allocation.category
+                                        )}
+                                      </p>
+                                    </div>
+                                    <div className="flex-1">
+                                      <input
+                                        type="text"
+                                        value={formatNumberWithCommas(
+                                          allocation.amount
+                                        )}
+                                        onChange={(e) =>
+                                          updateAllocation(
+                                            index,
+                                            "amount",
+                                            e.target.value
+                                          )
+                                        }
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--elra-primary)] focus:border-[var(--elra-primary)]"
+                                        placeholder="Amount"
+                                      />
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeAllocation(index)}
+                                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors self-start"
+                                    >
+                                      <XMarkIcon className="w-4 h-4" />
+                                    </button>
+                                  </div>
                                 </div>
                               )
                             )}
@@ -1474,6 +1494,9 @@ const ELRAWalletManagement = () => {
                       <option value="projects">Projects Budget</option>
                       <option value="operational">Operational Budget</option>
                     </select>
+                    <p className="mt-2 text-xs text-gray-600 font-medium">
+                      {getDepartmentForCategory(budgetData.category)}
+                    </p>
                   </motion.div>
 
                   <motion.div

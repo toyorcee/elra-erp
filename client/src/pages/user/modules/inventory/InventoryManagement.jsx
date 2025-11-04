@@ -6,8 +6,6 @@ const InventoryManagement = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Access control - only Super Admin and Operations HOD can access
-  const userRole = user?.role?.name || user?.role;
   const userDepartment = user?.department?.name;
   const isSuperAdmin = user?.role?.level === 1000;
   const isOperationsHOD =
@@ -30,12 +28,10 @@ const InventoryManagement = () => {
     );
   }
 
-  // Redirect to Inventory List (main functionality)
   useEffect(() => {
     navigate("/dashboard/modules/inventory/list", { replace: true });
   }, [navigate]);
 
-  // Loading state while redirecting
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--elra-primary)]"></div>

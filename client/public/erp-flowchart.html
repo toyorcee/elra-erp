@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ELRA ERP System - Business Cycle Flowchart</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 40px;
+      }
+
+      .header h1 {
+        color: #2d3748;
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .header p {
+        color: #4a5568;
+        font-size: 1.1rem;
+      }
+
+      /* Flowchart Container */
+      .flowchart-container {
+        position: relative;
+        padding: 40px;
+        background: #f8f9fa;
+        border-radius: 15px;
+        margin-bottom: 30px;
+      }
+
+      /* Main Process Flow */
+      .main-flow {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 30px;
+        margin-bottom: 40px;
+      }
+
+      .process-step {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        padding: 20px;
+        border-radius: 15px;
+        text-align: center;
+        min-width: 200px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        position: relative;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+      }
+
+      .process-step:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+      }
+
+      .process-step h3 {
+        font-size: 1.2rem;
+        margin-bottom: 10px;
+      }
+
+      .process-step p {
+        font-size: 0.9rem;
+        opacity: 0.9;
+      }
+
+      /* Arrow Connectors */
+      .arrow {
+        font-size: 2rem;
+        color: #667eea;
+        font-weight: bold;
+      }
+
+      /* Module Grid */
+      .modules-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 25px;
+        margin-bottom: 40px;
+      }
+
+      .module-card {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        border-left: 5px solid;
+        transition: transform 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .module-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+      }
+
+      .module-card.hr {
+        border-left-color: #e53e3e;
+      }
+      .module-card.payroll {
+        border-left-color: #38a169;
+      }
+      .module-card.procurement {
+        border-left-color: #d69e2e;
+      }
+      .module-card.accounts {
+        border-left-color: #3182ce;
+      }
+      .module-card.communication {
+        border-left-color: #805ad5;
+      }
+
+      .module-card h3 {
+        color: #2d3748;
+        margin-bottom: 15px;
+        font-size: 1.3rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .module-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.2rem;
+      }
+
+      .hr .module-icon {
+        background: #e53e3e;
+      }
+      .payroll .module-icon {
+        background: #38a169;
+      }
+      .procurement .module-icon {
+        background: #d69e2e;
+      }
+      .accounts .module-icon {
+        background: #3182ce;
+      }
+      .communication .module-icon {
+        background: #805ad5;
+      }
+
+      .module-card ul {
+        list-style: none;
+        margin-top: 15px;
+      }
+
+      .module-card li {
+        padding: 8px 0;
+        color: #4a5568;
+        position: relative;
+        padding-left: 25px;
+      }
+
+      .module-card li::before {
+        content: "▸";
+        position: absolute;
+        left: 0;
+        color: #667eea;
+        font-weight: bold;
+      }
+
+      /* Data Flow Diagram */
+      .data-flow {
+        background: white;
+        border-radius: 15px;
+        padding: 30px;
+        margin-bottom: 30px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+      }
+
+      .data-flow h2 {
+        color: #2d3748;
+        margin-bottom: 25px;
+        text-align: center;
+        font-size: 1.8rem;
+      }
+
+      .flow-diagram {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        align-items: center;
+      }
+
+      .flow-item {
+        text-align: center;
+        padding: 20px;
+        background: linear-gradient(135deg, #f7fafc, #edf2f7);
+        border-radius: 12px;
+        border: 2px solid #e2e8f0;
+        transition: all 0.3s ease;
+      }
+
+      .flow-item:hover {
+        border-color: #667eea;
+        transform: scale(1.05);
+      }
+
+      .flow-item h4 {
+        color: #2d3748;
+        margin-bottom: 10px;
+        font-size: 1.1rem;
+      }
+
+      .flow-item p {
+        color: #4a5568;
+        font-size: 0.9rem;
+      }
+
+      .flow-arrow {
+        font-size: 1.5rem;
+        color: #667eea;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100%;
+      }
+
+      /* Business Cycle */
+      .business-cycle {
+        background: linear-gradient(135deg, #e3f2fd, #f3e5f5);
+        border-radius: 15px;
+        padding: 30px;
+        margin-bottom: 30px;
+        border: 2px solid #bbdefb;
+      }
+
+      .cycle-steps {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 20px;
+      }
+
+      .cycle-step {
+        background: white;
+        border-radius: 50%;
+        width: 120px;
+        height: 120px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease;
+        position: relative;
+      }
+
+      .cycle-step:hover {
+        transform: scale(1.1);
+      }
+
+      .cycle-step::after {
+        content: "→";
+        position: absolute;
+        right: -30px;
+        font-size: 1.5rem;
+        color: #667eea;
+      }
+
+      .cycle-step:last-child::after {
+        display: none;
+      }
+
+      .cycle-step h4 {
+        font-size: 0.9rem;
+        color: #2d3748;
+        margin-bottom: 5px;
+      }
+
+      .cycle-step p {
+        font-size: 0.8rem;
+        color: #4a5568;
+      }
+
+      /* Responsive Design */
+      @media (max-width: 768px) {
+        .main-flow {
+          flex-direction: column;
+        }
+
+        .arrow {
+          transform: rotate(90deg);
+        }
+
+        .cycle-steps {
+          flex-direction: column;
+        }
+
+        .cycle-step::after {
+          transform: rotate(90deg);
+          right: 0;
+          top: -30px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>ELRA ERP System</h1>
+        <p>Complete Business Cycle Flowchart & Data Flow</p>
+      </div>
+
+      <!-- Main Process Flow -->
+      <div class="flowchart-container">
+        <h2
+          style="
+            text-align: center;
+            color: #2d3748;
+            margin-bottom: 30px;
+            font-size: 1.8rem;
+          "
+        >
+          🔄 Main Business Process Flow
+        </h2>
+        <div class="main-flow">
+          <div class="process-step">
+            <h3>📥 Data Entry</h3>
+            <p>Employee, Financial & Operational Data</p>
+          </div>
+          <div class="arrow">→</div>
+          <div class="process-step">
+            <h3>⚙️ Processing</h3>
+            <p>Automated Calculations & Workflows</p>
+          </div>
+          <div class="arrow">→</div>
+          <div class="process-step">
+            <h3>✅ Approval</h3>
+            <p>Multi-level Authorization</p>
+          </div>
+          <div class="arrow">→</div>
+          <div class="process-step">
+            <h3>📤 Output</h3>
+            <p>Reports, Payments & Analytics</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ERP Modules -->
+      <div class="modules-grid">
+        <div class="module-card hr">
+          <h3>
+            <div class="module-icon">👥</div>
+            Human Resources
+          </h3>
+          <p>Employee lifecycle management and HR operations</p>
+          <ul>
+            <li>Employee Registration & Profiles</li>
+            <li>Recruitment & Onboarding</li>
+            <li>Performance Management</li>
+            <li>Leave & Attendance</li>
+            <li>HR Reports & Analytics</li>
+            <li>Employee Self-Service</li>
+            <li>CPD Training & e-Learning</li>
+            <li>Regulatory Compliance Tracking</li>
+            <li>Multi-Tenant Zonal Office Support</li>
+            <li>Audit & Compliance Logs</li>
+          </ul>
+        </div>
+
+        <div class="module-card payroll">
+          <h3>
+            <div class="module-icon">💰</div>
+            Payroll Management
+          </h3>
+          <p>Complete payroll processing and compensation</p>
+          <ul>
+            <li>Salary Structure Management</li>
+            <li>Payroll Calculations</li>
+            <li>Deductions & Benefits</li>
+            <li>Tax Management</li>
+            <li>Payment Processing</li>
+            <li>Payroll Reports</li>
+            <li>FIRS TIN Integration</li>
+            <li>Regulatory Compliance</li>
+            <li>Multi-Tenant Support</li>
+            <li>Audit Trail Management</li>
+          </ul>
+        </div>
+
+        <div class="module-card procurement">
+          <h3>
+            <div class="module-icon">🛒</div>
+            Procurement & Leasing
+          </h3>
+          <p>End-to-end procurement and equipment leasing management</p>
+          <ul>
+            <li>Purchase Requisitions</li>
+            <li>Vendor Management</li>
+            <li>Purchase Orders</li>
+            <li>Equipment Lease Registry</li>
+            <li>Lease Contract Management</li>
+            <li>Customs TIP Portal Integration</li>
+            <li>Import Verification System</li>
+            <li>Lease Accreditation Tracking</li>
+            <li>Procurement Analytics</li>
+            <li>Regulatory Compliance</li>
+          </ul>
+        </div>
+
+        <div class="module-card accounts">
+          <h3>
+            <div class="module-icon">📈</div>
+            Accounts & Finance
+          </h3>
+          <p>Financial management and regulatory compliance</p>
+          <ul>
+            <li>Expense Management</li>
+            <li>Revenue Tracking</li>
+            <li>Budget Planning</li>
+            <li>Financial Reports</li>
+            <li>Audit Management</li>
+            <li>Cost Analysis</li>
+            <li>National Lease Trust Fund (NLTF)</li>
+            <li>PSAELMS Integration</li>
+            <li>Regulatory Reporting</li>
+            <li>Compliance Monitoring</li>
+          </ul>
+        </div>
+
+        <div class="module-card communication">
+          <h3>
+            <div class="module-icon">💬</div>
+            Communication & Support
+          </h3>
+          <p>Internal communication and stakeholder support</p>
+          <ul>
+            <li>Internal Messaging</li>
+            <li>Announcements</li>
+            <li>File Sharing</li>
+            <li>Meeting Management</li>
+            <li>Team Collaboration</li>
+            <li>Communication History</li>
+            <li>Helpdesk & Support Platform</li>
+            <li>Public Interface Support</li>
+            <li>Mobile App Integration</li>
+            <li>Real-Time Notifications</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Data Flow Diagram -->
+      <div class="data-flow">
+        <h2>🔄 Data Flow Between Modules</h2>
+        <div class="flow-diagram">
+          <div class="flow-item">
+            <h4>👥 HR Module</h4>
+            <p>Employee data, leave records, performance data</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-item">
+            <h4>💰 Payroll Module</h4>
+            <p>Salary calculations, deductions, tax processing</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-item">
+            <h4>📈 Accounts Module</h4>
+            <p>Financial posting, expense tracking, reporting</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-item">
+            <h4>🛒 Procurement Module</h4>
+            <p>Purchase orders, vendor payments, inventory</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-item">
+            <h4>💬 Communication Module</h4>
+            <p>Notifications, approvals, collaboration</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Business Cycle -->
+      <div class="business-cycle">
+        <h2
+          style="
+            text-align: center;
+            color: #1976d2;
+            margin-bottom: 30px;
+            font-size: 1.8rem;
+          "
+        >
+          🔄 Complete Business Cycle
+        </h2>
+        <div class="cycle-steps">
+          <div class="cycle-step">
+            <h4>1. Planning</h4>
+            <p>Budget & Strategy</p>
+          </div>
+          <div class="cycle-step">
+            <h4>2. Recruitment</h4>
+            <p>Hiring Process</p>
+          </div>
+          <div class="cycle-step">
+            <h4>3. Operations</h4>
+            <p>Daily Activities</p>
+          </div>
+          <div class="cycle-step">
+            <h4>4. Procurement</h4>
+            <p>Purchasing</p>
+          </div>
+          <div class="cycle-step">
+            <h4>5. Processing</h4>
+            <p>Data & Payroll</p>
+          </div>
+          <div class="cycle-step">
+            <h4>6. Reporting</h4>
+            <p>Analytics & Insights</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Advanced Capabilities -->
+      <div
+        style="
+          background: linear-gradient(135deg, #e8f5e8, #f0f8ff);
+          border-radius: 15px;
+          padding: 30px;
+          margin-bottom: 30px;
+          border: 2px solid #90ee90;
+        "
+      >
+        <h2
+          style="
+            text-align: center;
+            color: #2d3748;
+            margin-bottom: 25px;
+            font-size: 1.8rem;
+          "
+        >
+          🚀 Advanced Capabilities
+        </h2>
+        <div
+          style="
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+          "
+        >
+          <div
+            style="
+              background: white;
+              padding: 20px;
+              border-radius: 10px;
+              border-left: 4px solid #4caf50;
+            "
+          >
+            <h3 style="color: #4caf50; margin-bottom: 10px">
+              🔐 Role-Based Access Control
+            </h3>
+            <ul style="list-style: none; padding: 0">
+              <li>• Secure module-level access by rank</li>
+              <li>• Role, department, or location-based</li>
+              <li>• Multi-tenant ready architecture</li>
+              <li>• Zonal offices & liaison units support</li>
+            </ul>
+          </div>
+          <div
+            style="
+              background: white;
+              padding: 20px;
+              border-radius: 10px;
+              border-left: 4px solid #2196f3;
+            "
+          >
+            <h3 style="color: #2196f3; margin-bottom: 10px">
+              📋 Audit & Compliance Logs
+            </h3>
+            <ul style="list-style: none; padding: 0">
+              <li>• Immutable history of all actions</li>
+              <li>• User and department tracking</li>
+              <li>• Regulatory compliance enforcement</li>
+              <li>• Digital traceability</li>
+            </ul>
+          </div>
+          <div
+            style="
+              background: white;
+              padding: 20px;
+              border-radius: 10px;
+              border-left: 4px solid #ff9800;
+            "
+          >
+            <h3 style="color: #ff9800; margin-bottom: 10px">
+              ⚙️ Workflow Designer
+            </h3>
+            <ul style="list-style: none; padding: 0">
+              <li>• Customizable automation builder</li>
+              <li>• Regulatory task automation</li>
+              <li>• Internal process workflows</li>
+              <li>• Approval chain management</li>
+            </ul>
+          </div>
+          <div
+            style="
+              background: white;
+              padding: 20px;
+              border-radius: 10px;
+              border-left: 4px solid #9c27b0;
+            "
+          >
+            <h3 style="color: #9c27b0; margin-bottom: 10px">
+              📱 Real-Time Mobile Sync
+            </h3>
+            <ul style="list-style: none; padding: 0">
+              <li>• HR & compliance mobile apps</li>
+              <li>• Field inspections & audits</li>
+              <li>• Real-time data synchronization</li>
+              <li>• Offline capability</li>
+            </ul>
+          </div>
+          <div
+            style="
+              background: white;
+              padding: 20px;
+              border-radius: 10px;
+              border-left: 4px solid #f44336;
+            "
+          >
+            <h3 style="color: #f44336; margin-bottom: 10px">
+              🏢 Multi-Tenant Ready
+            </h3>
+            <ul style="list-style: none; padding: 0">
+              <li>• Zonal offices support</li>
+              <li>• Liaison units management</li>
+              <li>• Embedded regulators</li>
+              <li>• Scalable architecture</li>
+            </ul>
+          </div>
+          <div
+            style="
+              background: white;
+              padding: 20px;
+              border-radius: 10px;
+              border-left: 4px solid #607d8b;
+            "
+          >
+            <h3 style="color: #607d8b; margin-bottom: 10px">
+              💾 Data Backup & Recovery
+            </h3>
+            <ul style="list-style: none; padding: 0">
+              <li>• Redundant cloud storage</li>
+              <li>• Physical storage backup</li>
+              <li>• Failover architecture</li>
+              <li>• Disaster recovery</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- System Integration Framework -->
+      <div
+        style="
+          background: linear-gradient(135deg, #fff3e0, #f3e5f5);
+          border-radius: 15px;
+          padding: 30px;
+          margin-bottom: 30px;
+          border: 2px solid #ffb74d;
+        "
+      >
+        <h2
+          style="
+            text-align: center;
+            color: #2d3748;
+            margin-bottom: 25px;
+            font-size: 1.8rem;
+          "
+        >
+          🔗 System Integration Framework
+        </h2>
+        <div
+          style="
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+          "
+        >
+          <div
+            style="
+              background: white;
+              padding: 25px;
+              border-radius: 12px;
+              border: 2px solid #4caf50;
+            "
+          >
+            <h3 style="color: #4caf50; margin-bottom: 15px; font-size: 1.2rem">
+              🏛️ Internal Systems
+            </h3>
+            <ul style="list-style: none; padding: 0">
+              <li style="padding: 8px 0; border-bottom: 1px solid #e0e0e0">
+                <strong>Digital Lease Registry & Accreditation System</strong
+                ><br />
+                <span style="color: #666; font-size: 0.9rem"
+                  >Already in operation</span
+                >
+              </li>
+              <li style="padding: 8px 0; border-bottom: 1px solid #e0e0e0">
+                <strong>e-Learning & CPD Training System</strong><br />
+                <span style="color: #666; font-size: 0.9rem"
+                  >Staff & external stakeholders</span
+                >
+              </li>
+              <li style="padding: 8px 0">
+                <strong>Helpdesk and Support Platform</strong><br />
+                <span style="color: #666; font-size: 0.9rem"
+                  >Internal use and public interface</span
+                >
+              </li>
+            </ul>
+          </div>
+          <div
+            style="
+              background: white;
+              padding: 25px;
+              border-radius: 12px;
+              border: 2px solid #2196f3;
+            "
+          >
+            <h3 style="color: #2196f3; margin-bottom: 15px; font-size: 1.2rem">
+              🌐 External Integrations
+            </h3>
+            <ul style="list-style: none; padding: 0">
+              <li style="padding: 8px 0; border-bottom: 1px solid #e0e0e0">
+                <strong
+                  >Unified Digital Leasing Marketplace & Exchange
+                  (UDLME)</strong
+                >
+              </li>
+              <li style="padding: 8px 0; border-bottom: 1px solid #e0e0e0">
+                <strong>National Lease Trust Fund (NLTF)</strong>
+              </li>
+              <li style="padding: 8px 0; border-bottom: 1px solid #e0e0e0">
+                <strong
+                  >Public Sector Asset Lease Management System (PSAELMS)</strong
+                >
+              </li>
+              <li style="padding: 8px 0; border-bottom: 1px solid #e0e0e0">
+                <strong>Federal Inland Revenue Service (FIRS)</strong><br />
+                <span style="color: #666; font-size: 0.9rem"
+                  >TIN validation</span
+                >
+              </li>
+              <li style="padding: 8px 0; border-bottom: 1px solid #e0e0e0">
+                <strong>CAC, NIN, and BVN APIs</strong><br />
+                <span style="color: #666; font-size: 0.9rem"
+                  >Entity and individual verification</span
+                >
+              </li>
+              <li style="padding: 8px 0">
+                <strong>Customs TIP Portal</strong><br />
+                <span style="color: #666; font-size: 0.9rem"
+                  >Equipment lease import verification</span
+                >
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Benefits to ELRA -->
+      <div
+        style="
+          background: linear-gradient(135deg, #e8f5e8, #f0f8ff);
+          border-radius: 15px;
+          padding: 30px;
+          margin-bottom: 30px;
+          border: 2px solid #4caf50;
+        "
+      >
+        <h2
+          style="
+            text-align: center;
+            color: #2d3748;
+            margin-bottom: 25px;
+            font-size: 1.8rem;
+          "
+        >
+          🎯 Benefits to ELRA
+        </h2>
+        <div
+          style="
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+          "
+        >
+          <div
+            style="
+              background: white;
+              padding: 20px;
+              border-radius: 10px;
+              border-left: 4px solid #4caf50;
+            "
+          >
+            <h3 style="color: #4caf50; margin-bottom: 10px">⚡ Efficiency</h3>
+            <p style="color: #666; line-height: 1.6">
+              End-to-end automation reduces manual effort, bottlenecks, and
+              duplication
+            </p>
+          </div>
+          <div
+            style="
+              background: white;
+              padding: 20px;
+              border-radius: 10px;
+              border-left: 4px solid #2196f3;
+            "
+          >
+            <h3 style="color: #2196f3; margin-bottom: 10px">📋 Compliance</h3>
+            <p style="color: #666; line-height: 1.6">
+              Enforces standard operating procedures and regulatory obligations
+            </p>
+          </div>
+          <div
+            style="
+              background: white;
+              padding: 20px;
+              border-radius: 10px;
+              border-left: 4px solid #ff9800;
+            "
+          >
+            <h3 style="color: #ff9800; margin-bottom: 10px">
+              🗄️ Data Governance
+            </h3>
+            <p style="color: #666; line-height: 1.6">
+              Every operation and asset action is digitally captured and
+              traceable
+            </p>
+          </div>
+          <div
+            style="
+              background: white;
+              padding: 20px;
+              border-radius: 10px;
+              border-left: 4px solid #9c27b0;
+            "
+          >
+            <h3 style="color: #9c27b0; margin-bottom: 10px">
+              👥 Staff Productivity
+            </h3>
+            <p style="color: #666; line-height: 1.6">
+              Transparent KPI tracking improves output and morale
+            </p>
+          </div>
+          <div
+            style="
+              background: white;
+              padding: 20px;
+              border-radius: 10px;
+              border-left: 4px solid #f44336;
+            "
+          >
+            <h3 style="color: #f44336; margin-bottom: 10px">
+              🤝 Stakeholder Confidence
+            </h3>
+            <p style="color: #666; line-height: 1.6">
+              Timely service delivery and transparency improves public trust
+            </p>
+          </div>
+          <div
+            style="
+              background: white;
+              padding: 20px;
+              border-radius: 10px;
+              border-left: 4px solid #607d8b;
+            "
+          >
+            <h3 style="color: #607d8b; margin-bottom: 10px">
+              🏛️ Institutional Memory
+            </h3>
+            <p style="color: #666; line-height: 1.6">
+              Archives policies, cases, and contracts across administrations
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Integration Points -->
+      <div
+        style="
+          background: white;
+          border-radius: 15px;
+          padding: 30px;
+          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        "
+      >
+        <h2
+          style="
+            text-align: center;
+            color: #2d3748;
+            margin-bottom: 25px;
+            font-size: 1.8rem;
+          "
+        >
+          🔗 Key Integration Points
+        </h2>
+        <div
+          style="
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+          "
+        >
+          <div
+            style="
+              background: #f7fafc;
+              padding: 20px;
+              border-radius: 10px;
+              border-left: 4px solid #e53e3e;
+            "
+          >
+            <h3 style="color: #e53e3e; margin-bottom: 10px">HR → Payroll</h3>
+            <ul style="list-style: none; padding: 0">
+              <li>• Employee data synchronization</li>
+              <li>• Leave data for salary deductions</li>
+              <li>• Performance data for bonuses</li>
+              <li>• Department structure for cost allocation</li>
+            </ul>
+          </div>
+          <div
+            style="
+              background: #f7fafc;
+              padding: 20px;
+              border-radius: 10px;
+              border-left: 4px solid #38a169;
+            "
+          >
+            <h3 style="color: #38a169; margin-bottom: 10px">
+              Payroll → Accounts
+            </h3>
+            <ul style="list-style: none; padding: 0">
+              <li>• Payroll expenses auto-posting</li>
+              <li>• Tax liabilities tracking</li>
+              <li>• Benefits cost allocation</li>
+              <li>• Financial reporting integration</li>
+            </ul>
+          </div>
+          <div
+            style="
+              background: #f7fafc;
+              padding: 20px;
+              border-radius: 10px;
+              border-left: 4px solid #d69e2e;
+            "
+          >
+            <h3 style="color: #d69e2e; margin-bottom: 10px">
+              Procurement → Accounts
+            </h3>
+            <ul style="list-style: none; padding: 0">
+              <li>• Purchase orders to accounts payable</li>
+              <li>• Vendor payment tracking</li>
+              <li>• Inventory valuation</li>
+              <li>• Cost center allocation</li>
+            </ul>
+          </div>
+          <div
+            style="
+              background: #f7fafc;
+              padding: 20px;
+              border-radius: 10px;
+              border-left: 4px solid #805ad5;
+            "
+          >
+            <h3 style="color: #805ad5; margin-bottom: 10px">
+              Cross-Module Communication
+            </h3>
+            <ul style="list-style: none; padding: 0">
+              <li>• Notifications across all modules</li>
+              <li>• Approval workflows spanning modules</li>
+              <li>• User activity tracking</li>
+              <li>• Unified reporting dashboard</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

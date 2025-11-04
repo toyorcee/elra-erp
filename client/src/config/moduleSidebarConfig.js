@@ -158,8 +158,18 @@ export const moduleSidebarConfig = {
             label: "My Project Tasks",
             icon: "ClipboardDocumentCheckIcon",
             path: "/dashboard/modules/self-service/project-tasks",
-            required: { minLevel: 300 },
+            required: { minLevel: 700 },
             description: "View and manage your assigned project tasks",
+            hidden: (user) => {
+              if (!user || !user.role || !user.department) return true;
+              
+              const userDepartment = user?.department?.name;
+              const isProjectManagementHOD =
+                user?.role?.level === 700 &&
+                userDepartment === "Project Management";
+              
+              return !isProjectManagementHOD;
+            },
           },
         ],
       },
@@ -1164,18 +1174,21 @@ export const moduleSidebarConfig = {
             icon: "CubeIcon",
             path: "/dashboard/modules/inventory/list",
             required: {
-              minLevel: 700,
+              minLevel: 600,
               department: "Operations",
             },
             description: "View and manage all inventory items",
             hidden: (user) => {
-              // Only Super Admin and Operations HOD can access
               const userDepartment = user?.department?.name;
               const isSuperAdmin = user?.role?.level === 1000;
               const isOperationsHOD =
                 user?.role?.level === 700 && userDepartment === "Operations";
+              const isOperationsManager =
+                user?.role?.level >= 600 &&
+                user?.role?.level < 700 &&
+                userDepartment === "Operations";
 
-              return !(isSuperAdmin || isOperationsHOD);
+              return !(isSuperAdmin || isOperationsHOD || isOperationsManager);
             },
           },
           {
@@ -1183,7 +1196,7 @@ export const moduleSidebarConfig = {
             icon: "WrenchScrewdriverIcon",
             path: "/dashboard/modules/inventory/tracking",
             required: {
-              minLevel: 700,
+              minLevel: 600,
               department: "Operations",
             },
             description: "Track maintenance schedules and available items",
@@ -1192,8 +1205,12 @@ export const moduleSidebarConfig = {
               const isSuperAdmin = user?.role?.level === 1000;
               const isOperationsHOD =
                 user?.role?.level === 700 && userDepartment === "Operations";
+              const isOperationsManager =
+                user?.role?.level >= 600 &&
+                user?.role?.level < 700 &&
+                userDepartment === "Operations";
 
-              return !(isSuperAdmin || isOperationsHOD);
+              return !(isSuperAdmin || isOperationsHOD || isOperationsManager);
             },
           },
           {
@@ -1201,18 +1218,21 @@ export const moduleSidebarConfig = {
             icon: "ChartBarIcon",
             path: "/dashboard/modules/inventory/reports",
             required: {
-              minLevel: 700,
+              minLevel: 600,
               department: "Operations",
             },
             description: "Generate inventory reports and analytics",
             hidden: (user) => {
-              // Only Super Admin and Operations HOD can access
               const userDepartment = user?.department?.name;
               const isSuperAdmin = user?.role?.level === 1000;
               const isOperationsHOD =
                 user?.role?.level === 700 && userDepartment === "Operations";
+              const isOperationsManager =
+                user?.role?.level >= 600 &&
+                user?.role?.level < 700 &&
+                userDepartment === "Operations";
 
-              return !(isSuperAdmin || isOperationsHOD);
+              return !(isSuperAdmin || isOperationsHOD || isOperationsManager);
             },
           },
         ],

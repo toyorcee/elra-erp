@@ -782,6 +782,35 @@ export const userModulesAPI = {
         throw error;
       }
     },
+    revertOffboarding: async (lifecycleId) => {
+      try {
+        const response = await api.patch(
+          `/employee-lifecycle/${lifecycleId}/revert-offboarding`
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [employeeLifecycleAPI] Error reverting offboarding:",
+          error
+        );
+        throw error;
+      }
+    },
+    getCompletedOffboardings: async (params) => {
+      try {
+        const response = await api.get(
+          "/employee-lifecycle/offboarding/completed",
+          { params }
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [employeeLifecycleAPI] Error fetching completed offboardings:",
+          error
+        );
+        throw error;
+      }
+    },
   },
 
   // Leave Management API

@@ -1,6 +1,7 @@
 import User from "../models/User.js";
 import Invitation from "../models/Invitation.js";
 import EmployeeLifecycle from "../models/EmployeeLifecycle.js";
+import Department from "../models/Department.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import AuditService from "../services/auditService.js";
 import { generateEmployeeId } from "../utils/employeeIdGenerator.js";
@@ -52,21 +53,11 @@ export const registerFromInvitation = asyncHandler(async (req, res) => {
     });
   }
 
-  // Find and validate invitation
   const invitation = await Invitation.findOne({
     code: invitationCode.toUpperCase(),
     status: "active",
     expiresAt: { $gt: new Date() },
   }).populate("department role");
-
-  console.log("🔍 Found invitation:", {
-    id: invitation?._id,
-    code: invitation?.code,
-    email: invitation?.email,
-    status: invitation?.status,
-    role: invitation?.role?._id,
-    department: invitation?.department?._id,
-  });
 
   if (!invitation) {
     return res.status(400).json({
@@ -75,7 +66,6 @@ export const registerFromInvitation = asyncHandler(async (req, res) => {
     });
   }
 
-  // Check if user already exists
   const existingUser = await User.findByEmailOrUsername(invitation.email);
   if (existingUser) {
     return res.status(400).json({
@@ -89,7 +79,6 @@ export const registerFromInvitation = asyncHandler(async (req, res) => {
   let employeeId;
   try {
     employeeId = await generateEmployeeId(invitation.department._id);
-    console.log("🆔 Generated employee ID:", employeeId);
   } catch (error) {
     console.error("❌ Error generating employee ID:", error);
     employeeId = null;
@@ -114,38 +103,8 @@ export const registerFromInvitation = asyncHandler(async (req, res) => {
     isEmailVerified: true,
   };
 
-  console.log("🔐 [PASSWORD] Password before user creation:", {
-    originalPassword: password,
-    passwordLength: password.length,
-    passwordType: typeof password,
-    willBeHashed: true,
-  });
-
-  console.log("👤 Creating user with data:", {
-    username: userData.username,
-    email: userData.email,
-    firstName: userData.firstName,
-    lastName: userData.lastName,
-    role: userData.role,
-    department: userData.department,
-  });
-
   try {
     user = await User.create(userData);
-
-    console.log("✅ User created successfully:", {
-      userId: user._id,
-      email: user.email,
-      username: user.username,
-    });
-
-    console.log("🔐 [PASSWORD] Password after user creation:", {
-      hashedPassword: user.password,
-      hashedPasswordLength: user.password?.length,
-      hashedPasswordType: typeof user.password,
-      isHashed:
-        user.password?.startsWith("$2b$") || user.password?.startsWith("$2a$"),
-    });
   } catch (error) {
     console.error("❌ Error creating user:", error);
     return res.status(500).json({
@@ -170,24 +129,11 @@ export const registerFromInvitation = asyncHandler(async (req, res) => {
     invitation.usedBy = user._id;
     invitation.usedAt = new Date();
     await invitation.save();
-
-    console.log("✅ Invitation marked as used:", {
-      invitationId: invitation._id,
-      usedBy: user._id,
-      usedAt: invitation.usedAt,
-    });
   } catch (error) {
     console.error("❌ Error marking invitation as used:", error);
   }
 
   try {
-    console.log(
-      "🚀 [ONBOARDING] Starting onboarding lifecycle creation for user:",
-      user.email
-    );
-    console.log("🚀 [ONBOARDING] Department ID:", invitation.department._id);
-    console.log("🚀 [ONBOARDING] Role ID:", invitation.role._id);
-
     // Create Onboarding lifecycle
     const onboardingLifecycle = await EmployeeLifecycle.createStandardLifecycle(
       user._id,
@@ -197,20 +143,6 @@ export const registerFromInvitation = asyncHandler(async (req, res) => {
       invitation.createdBy || user._id,
       invitation.createdBy || user._id
     );
-
-    console.log("✅ [ONBOARDING] Onboarding lifecycle created successfully:", {
-      lifecycleId: onboardingLifecycle._id,
-      employeeId: user._id,
-      type: "Onboarding",
-      status: onboardingLifecycle.status,
-      tasksCount: onboardingLifecycle.tasks?.length || 0,
-      tasks:
-        onboardingLifecycle.tasks?.map((task) => ({
-          title: task.title,
-          status: task.status,
-          assignedTo: task.assignedTo,
-        })) || [],
-    });
 
     // Create Offboarding lifecycle (for future use when employee leaves)
     const offboardingLifecycle =
@@ -228,13 +160,6 @@ export const registerFromInvitation = asyncHandler(async (req, res) => {
     offboardingLifecycle.notes =
       "Offboarding lifecycle created for future use when employee leaves the company";
     await offboardingLifecycle.save();
-
-    console.log("✅ Offboarding lifecycle created:", {
-      lifecycleId: offboardingLifecycle._id,
-      employeeId: user._id,
-      type: "Offboarding",
-      status: "On Hold",
-    });
   } catch (error) {
     console.error("❌ Error creating lifecycles:", error);
   }
@@ -271,11 +196,65 @@ export const registerFromInvitation = asyncHandler(async (req, res) => {
         onboardingRequired: true,
       },
     });
-
-    console.log("✅ Welcome notification created for new user:", user.email);
   } catch (notificationError) {
     console.error("❌ Error creating welcome notification:", notificationError);
-    // Don't fail the registration if notification fails
+  }
+
+  try {
+    const hrDepartment = await Department.findOne({
+      name: "Human Resources",
+    });
+
+    if (hrDepartment) {
+      const hrHODs = await User.find({
+        department: hrDepartment._id,
+        "role.level": 700,
+        isActive: true,
+      })
+        .populate("role")
+        .populate("department");
+
+      for (const hrHOD of hrHODs) {
+        try {
+          await notificationService.createNotification({
+            recipient: hrHOD._id,
+            type: "WELCOME_ONBOARDING",
+            title: "👤 New Employee Joined ELRA",
+            message: `${user.firstName} ${user.lastName} (${
+              user.email
+            }) has successfully joined ELRA as ${invitation.role.name} in ${
+              invitation.department.name
+            } department. Employee ID: ${
+              employeeId || "Pending"
+            }. Onboarding tasks have been created and assigned.`,
+            priority: "medium",
+            category: "ONBOARDING",
+            actionUrl: "/modules/hr/onboarding",
+            data: {
+              newEmployeeId: user._id,
+              employeeId: employeeId,
+              employeeName: `${user.firstName} ${user.lastName}`,
+              employeeEmail: user.email,
+              department: invitation.department.name,
+              role: invitation.role.name,
+              onboardingRequired: true,
+            },
+          });
+        } catch (hodNotificationError) {
+          console.error(
+            `❌ Error sending notification to HR HOD ${hrHOD.email}:`,
+            hodNotificationError
+          );
+          // Continue with other HODs even if one fails
+        }
+      }
+    }
+  } catch (hrNotificationError) {
+    console.error(
+      "❌ Error sending HR HOD notifications:",
+      hrNotificationError
+    );
+    // Don't fail the registration if HR notification fails
   }
 
   res.status(201).json({

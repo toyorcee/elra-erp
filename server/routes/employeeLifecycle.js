@@ -12,6 +12,8 @@ import {
   getLifecycleStats,
   initiateOffboarding,
   getOffboardingLifecycles,
+  revertOffboarding,
+  getCompletedOffboardings,
 } from "../controllers/employeeLifecycleController.js";
 
 const router = express.Router();
@@ -28,14 +30,13 @@ router.get("/stats", getLifecycleStats);
 router.get("/active", getActiveLifecycles);
 router.get("/overdue", getOverdueLifecycles);
 router.get("/offboarding", getOffboardingLifecycles);
-
+router.get("/offboarding/completed", getCompletedOffboardings);
 router.post("/", createLifecycle);
 router.post("/initiate-offboarding", initiateOffboarding);
-
-// Parameterized routes (must come LAST)
 router.get("/:id", getLifecycleById);
 router.patch("/:id/status", updateLifecycleStatus);
 router.patch("/:id/checklist", completeChecklistItem);
 router.patch("/:id/task", updateTaskStatus);
+router.patch("/:id/revert-offboarding", revertOffboarding);
 
 export default router;

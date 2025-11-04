@@ -176,62 +176,40 @@ export const createInvitation = asyncHandler(async (req, res) => {
   }
 
   if (isPendingUser && userId) {
-    console.log("🔄 [INVITATION] Processing pending user invitation...");
     const pendingUser = await User.findById(userId);
     if (!pendingUser) {
-      console.log("❌ [INVITATION] Pending user not found:", userId);
       return res.status(404).json({
         success: false,
         message: "Pending user not found",
       });
     }
 
-    console.log("📋 [INVITATION] Pending user found:", {
-      id: pendingUser._id,
-      email: pendingUser.email,
-      status: pendingUser.status,
-    });
-
     if (pendingUser.status !== "PENDING_REGISTRATION") {
-      console.log(
-        "❌ [INVITATION] User not in pending registration status:",
-        pendingUser.status
-      );
       return res.status(400).json({
         success: false,
         message: "User is not in pending registration status",
       });
     }
   } else {
-    console.log("🔍 [INVITATION] Checking for existing user...");
-    const existingUser = await User.findByEmailOrUsername(email);
+    // Check for ANY existing user (active or inactive) with this email
+    const existingUser = await User.findOne({
+      email: email.toLowerCase(),
+    });
     if (existingUser) {
-      console.log("❌ [INVITATION] User already exists:", {
-        id: existingUser._id,
-        email: existingUser.email,
-        status: existingUser.status,
-      });
       return res.status(400).json({
         success: false,
-        message: "User with this email already exists",
+        message: `User with email ${email} already exists in the system. Cannot create invitation for existing user.`,
       });
     }
-    console.log("✅ [INVITATION] No existing user found");
   }
 
-  console.log("🔍 [INVITATION] Checking for existing invitations...");
+  // Check for any active invitation
   const existingInvitation = await Invitation.findOne({
     email: email.toLowerCase(),
     status: { $in: ["active", "sent", "pending_approval"] },
   });
 
   if (existingInvitation) {
-    console.log("❌ [INVITATION] Active invitation already exists:", {
-      id: existingInvitation._id,
-      email: existingInvitation.email,
-      status: existingInvitation.status,
-      createdAt: existingInvitation.createdAt,
-    });
     return res.status(400).json({
       success: false,
       message: `Active invitation already exists for this email (status: ${existingInvitation.status}). Please cancel or wait for it to expire before creating a new one.`,
@@ -242,44 +220,40 @@ export const createInvitation = asyncHandler(async (req, res) => {
       },
     });
   }
-  console.log("✅ [INVITATION] No existing active invitations found");
+
+  // Check for used invitation (means user already registered)
+  const usedInvitation = await Invitation.findOne({
+    email: email.toLowerCase(),
+    status: "used",
+  });
+
+  if (usedInvitation) {
+    return res.status(400).json({
+      success: false,
+      message: `An invitation for this email was already used. User has already registered. Cannot create a new invitation.`,
+    });
+  }
 
   // Validate department exists
-  console.log("🏢 [INVITATION] Validating department...");
   const department = await Department.findById(departmentId);
 
   if (!department) {
-    console.log("❌ [INVITATION] Invalid department:", {
-      departmentId,
-    });
     return res.status(400).json({
       success: false,
       message: "Invalid department",
     });
   }
-  console.log("✅ [INVITATION] Department validated:", {
-    id: department._id,
-    name: department.name,
-  });
 
   // Validate role exists
-  console.log("👥 [INVITATION] Validating role...");
   const role = await Role.findById(roleId);
   if (!role) {
-    console.log("❌ [INVITATION] Invalid role:", roleId);
     return res.status(400).json({
       success: false,
       message: "Invalid role",
     });
   }
-  console.log("✅ [INVITATION] Role validated:", {
-    id: role._id,
-    name: role.name,
-    level: role.level,
-  });
 
   // Create invitation
-  console.log("📝 [INVITATION] Creating invitation...");
   const invitation = await Invitation.create({
     email: email.toLowerCase(),
     firstName,
@@ -293,26 +267,15 @@ export const createInvitation = asyncHandler(async (req, res) => {
     userId: isPendingUser ? userId : null,
   });
 
-  console.log("✅ [INVITATION] Invitation created successfully:", {
-    id: invitation._id,
-    code: invitation.code,
-    email: invitation.email,
-    status: invitation.status,
-    expiresAt: invitation.expiresAt,
-  });
-
   // If this is for a pending user, update their status
   if (isPendingUser && userId) {
-    console.log("🔄 [INVITATION] Updating pending user status...");
     await User.findByIdAndUpdate(userId, {
       status: "INVITED",
       invitedAt: new Date(),
     });
-    console.log("✅ [INVITATION] Pending user status updated to INVITED");
   }
 
   // Send invitation email
-  console.log("📧 [INVITATION] Sending invitation email...");
   const emailResult = await sendInvitationEmail(
     invitation.email,
     `${invitation.firstName} ${invitation.lastName}`,
@@ -320,12 +283,6 @@ export const createInvitation = asyncHandler(async (req, res) => {
     role.name,
     department.name
   );
-
-  console.log("📧 [INVITATION] Email send result:", {
-    success: emailResult.success,
-    messageId: emailResult.messageId,
-    error: emailResult.error,
-  });
 
   if (!emailResult.success) {
     console.error(
@@ -349,15 +306,12 @@ export const createInvitation = asyncHandler(async (req, res) => {
         department: department.name,
       },
     });
-    console.log("✅ [INVITATION] In-app notification sent to creator");
   } catch (notificationError) {
     console.error(
       "❌ [INVITATION] Failed to send in-app notification:",
       notificationError
     );
   }
-
-  console.log("🎉 [INVITATION] Invitation creation completed successfully");
 
   res.status(201).json({
     success: true,
@@ -386,17 +340,17 @@ export const createInvitation = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Get all invitations for company (Super Admin only)
+// @desc    Get all invitations for company (HOD and Super Admin)
 // @route   GET /api/invitations
-// @access  Private (Super Admin)
+// @access  Private (HOD and Super Admin)
 export const getInvitations = asyncHandler(async (req, res) => {
   const currentUser = req.user;
 
-  // Check if user is super admin
-  if (currentUser.role.level < 1000) {
+  // Check if user is HOD (700) or Super Admin (1000)
+  if (currentUser.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Super admin privileges required.",
+      message: "Access denied. HOD or Super Admin privileges required.",
     });
   }
 
@@ -463,13 +417,6 @@ export const getUserInvitations = asyncHandler(async (req, res) => {
   // Pagination
   const skip = (page - 1) * limit;
 
-  console.log("🔍 [USER_INVITATIONS] Fetching invitations for user:", {
-    userId: currentUser._id,
-    filter,
-    page,
-    limit,
-  });
-
   const invitations = await Invitation.find(filter)
     .populate("department", "name")
     .populate("role", "name")
@@ -492,12 +439,6 @@ export const getUserInvitations = asyncHandler(async (req, res) => {
     emailError: inv.emailError,
   }));
 
-  console.log("✅ [USER_INVITATIONS] Found invitations:", {
-    count: invitations.length,
-    total,
-    invitations: mappedInvitations,
-  });
-
   res.json({
     success: true,
     data: {
@@ -512,18 +453,18 @@ export const getUserInvitations = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Get invitation by ID (Super Admin only)
+// @desc    Get invitation by ID (HOD and Super Admin)
 // @route   GET /api/invitations/:id
-// @access  Private (Super Admin)
+// @access  Private (HOD and Super Admin)
 export const getInvitation = asyncHandler(async (req, res) => {
   const currentUser = req.user;
   const { id } = req.params;
 
-  // Check if user is super admin
-  if (currentUser.role.level < 100) {
+  // Check if user is HOD (700) or Super Admin (1000)
+  if (currentUser.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Super admin privileges required.",
+      message: "Access denied. HOD or Super Admin privileges required.",
     });
   }
 
@@ -547,18 +488,18 @@ export const getInvitation = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Resend invitation (Super Admin only)
+// @desc    Resend invitation (HOD and Super Admin)
 // @route   POST /api/invitations/:id/resend
-// @access  Private (Super Admin)
+// @access  Private (HOD and Super Admin)
 export const resendInvitation = asyncHandler(async (req, res) => {
   const currentUser = req.user;
   const { id } = req.params;
 
-  // Check if user is super admin
-  if (currentUser.role.level < 100) {
+  // Check if user is HOD (700) or Super Admin (1000)
+  if (currentUser.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Super admin privileges required.",
+      message: "Access denied. HOD or Super Admin privileges required.",
     });
   }
 
@@ -639,18 +580,18 @@ export const resendInvitation = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Cancel invitation (Super Admin only)
+// @desc    Cancel invitation (HOD and Super Admin)
 // @route   DELETE /api/invitations/:id
-// @access  Private (Super Admin)
+// @access  Private (HOD and Super Admin)
 export const cancelInvitation = asyncHandler(async (req, res) => {
   const currentUser = req.user;
   const { id } = req.params;
 
-  // Check if user is super admin
-  if (currentUser.role.level < 100) {
+  // Check if user is HOD (700) or Super Admin (1000)
+  if (currentUser.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Super admin privileges required.",
+      message: "Access denied. HOD or Super Admin privileges required.",
     });
   }
 
@@ -734,17 +675,17 @@ export const verifyInvitationCode = asyncHandler(async (req, res) => {
   res.json(responseData);
 });
 
-// @desc    Get invitation statistics (Super Admin only)
+// @desc    Get invitation statistics (HOD and Super Admin)
 // @route   GET /api/invitations/stats
-// @access  Private (Super Admin)
+// @access  Private (HOD and Super Admin)
 export const getInvitationStats = asyncHandler(async (req, res) => {
   const currentUser = req.user;
 
-  // Check if user is super admin
-  if (currentUser.role.level < 100) {
+  // Check if user is HOD (700) or Super Admin (1000)
+  if (currentUser.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Super admin privileges required.",
+      message: "Access denied. HOD or Super Admin privileges required.",
     });
   }
 
@@ -776,15 +717,15 @@ export const getInvitationStats = asyncHandler(async (req, res) => {
 
 // @desc    Get available salary grades
 // @route   GET /api/invitations/salary-grades
-// @access  Private (Super Admin)
+// @access  Private (HOD and Super Admin)
 export const getSalaryGrades = asyncHandler(async (req, res) => {
   const currentUser = req.user;
 
-  // Check if user is super admin
-  if (currentUser.role.level < 1000) {
+  // Check if user is HOD (700) or Super Admin (1000)
+  if (currentUser.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Super admin privileges required.",
+      message: "Access denied. HOD or Super Admin privileges required.",
     });
   }
 
@@ -803,41 +744,45 @@ export const getSalaryGrades = asyncHandler(async (req, res) => {
 export const createSingleInvitation = asyncHandler(async (req, res) => {
   const { email, departmentId, roleId } = req.body;
 
-  console.log("🚀 [SINGLE_INVITATION] Starting single invitation creation...");
-  console.log("📋 [SINGLE_INVITATION] Request data:", {
-    email,
-    departmentId,
-    roleId,
-  });
-
   const currentUser = req.user;
 
-  // Check existing user
-  const existingUser = await User.findByEmailOrUsername(email);
+  const existingUser = await User.findOne({
+    email: email.toLowerCase(),
+  });
   if (existingUser) {
-    console.log(`❌ [SINGLE_INVITATION] User already exists: ${email}`);
     return res.status(400).json({
       success: false,
-      message: `User with email ${email} already exists`,
+      message: `User with email ${email} already exists in the system. Cannot create invitation for existing user.`,
     });
   }
 
   const existingInvitation = await Invitation.findOne({
-    email: email,
-    status: { $in: ["active", "sent"] },
+    email: email.toLowerCase(),
+    status: { $in: ["active", "sent", "pending_approval"] },
   });
 
   if (existingInvitation) {
-    console.log(`❌ [SINGLE_INVITATION] Active invitation exists: ${email}`);
     return res.status(400).json({
       success: false,
       message: `Active invitation already exists for ${email}`,
     });
   }
 
+  // Check for used invitation (means user already registered)
+  const usedInvitation = await Invitation.findOne({
+    email: email.toLowerCase(),
+    status: "used",
+  });
+
+  if (usedInvitation) {
+    return res.status(400).json({
+      success: false,
+      message: `An invitation for ${email} was already used. User has already registered. Cannot create a new invitation.`,
+    });
+  }
+
   const department = await Department.findById(departmentId);
   if (!department) {
-    console.log("❌ [SINGLE_INVITATION] Invalid department:", departmentId);
     return res.status(400).json({
       success: false,
       message: "Invalid department",
@@ -845,25 +790,10 @@ export const createSingleInvitation = asyncHandler(async (req, res) => {
   }
 
   // Check if department already has a HOD and this is a HOD invitation
-  console.log(
-    `🔍 [SINGLE_INVITATION] Checking for existing HOD in department: ${department.name} (${departmentId}) for role: ${roleId}`
-  );
   const existingHOD = await checkExistingHOD(departmentId, roleId);
   const offboardingHOD = await checkOffboardingHOD(departmentId, roleId);
 
-  console.log(
-    `🔍 [SINGLE_INVITATION] Existing HOD found:`,
-    existingHOD ? `${existingHOD.fullName} (${existingHOD.email})` : "None"
-  );
-  console.log(
-    `🔍 [SINGLE_INVITATION] Replace existing HOD flag:`,
-    req.body.replaceExistingHOD
-  );
-
   if (existingHOD && !req.body.replaceExistingHOD) {
-    console.log(
-      `⚠️ [SINGLE_INVITATION] Department ${department.name} already has HOD: ${existingHOD.fullName} - Returning 409 error`
-    );
     return res.status(409).json({
       success: false,
       message: `Department ${department.name} already has a HOD: ${existingHOD.fullName}`,
@@ -883,36 +813,19 @@ export const createSingleInvitation = asyncHandler(async (req, res) => {
     });
   }
 
-  // If there's a HOD in offboarding process, allow replacement without conflict
-  if (offboardingHOD && !existingHOD) {
-    console.log(
-      `ℹ️ [SINGLE_INVITATION] Department ${department.name} has HOD in offboarding process: ${offboardingHOD.fullName} (${offboardingHOD.status}) - allowing replacement`
-    );
-  }
-
   // If replacing HOD, deactivate the existing one
   if (existingHOD && req.body.replaceExistingHOD) {
-    console.log(
-      `🔄 [SINGLE_INVITATION] Replacing existing HOD: ${existingHOD.fullName}`
-    );
-
-    // Deactivate the existing HOD
     existingHOD.isActive = false;
     existingHOD.status = "INACTIVE";
     existingHOD.deactivatedAt = new Date();
     existingHOD.deactivatedBy = currentUser._id;
     existingHOD.deactivationReason = "Replaced by new HOD invitation";
     await existingHOD.save();
-
-    console.log(
-      `✅ [SINGLE_INVITATION] Existing HOD deactivated: ${existingHOD.fullName}`
-    );
   }
 
   // Validate role
   const role = await Role.findById(roleId);
   if (!role) {
-    console.log("❌ [SINGLE_INVITATION] Invalid role:", roleId);
     return res.status(400).json({
       success: false,
       message: "Invalid role",
@@ -946,7 +859,6 @@ export const createSingleInvitation = asyncHandler(async (req, res) => {
     const createdInvitation = invitation[0];
 
     // Send email BEFORE committing transaction
-    console.log(`📧 [SINGLE_INVITATION] Sending email to ${email}...`);
     const userName =
       createdInvitation.firstName && createdInvitation.lastName
         ? `${createdInvitation.firstName} ${createdInvitation.lastName}`
@@ -963,8 +875,6 @@ export const createSingleInvitation = asyncHandler(async (req, res) => {
       // Mark email as sent and commit transaction
       await createdInvitation.markEmailSent();
       await session.commitTransaction();
-
-      console.log(`✅ [SINGLE_INVITATION] Email sent successfully to ${email}`);
 
       // Log audit (outside transaction)
       await AuditService.logUserAction(
@@ -996,9 +906,6 @@ export const createSingleInvitation = asyncHandler(async (req, res) => {
             department: department.name,
           },
         });
-        console.log(
-          "✅ [SINGLE_INVITATION] In-app notification sent to creator"
-        );
       } catch (notificationError) {
         console.error(
           "❌ [SINGLE_INVITATION] Failed to send in-app notification:",
@@ -1031,10 +938,6 @@ export const createSingleInvitation = asyncHandler(async (req, res) => {
       // Email failed - abort transaction to remove invitation record
       await session.abortTransaction();
 
-      console.log(
-        `❌ [SINGLE_INVITATION] Email failed for ${email}:`,
-        emailResult.error
-      );
       return res.status(500).json({
         success: false,
         message: "Failed to send invitation email",
@@ -1059,19 +962,7 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
 
   const { emails, departmentId, roleId, batchName } = req.body;
 
-  console.log("📝 [BULK_INVITATION] Parsed bulk invitation data:", {
-    emailCount: emails ? emails.length : 0,
-    departmentId,
-    roleId,
-    batchName,
-  });
-
   if (!emails || !departmentId || !roleId) {
-    console.log("❌ [BULK_INVITATION] Missing required fields:", {
-      hasEmails: !!emails,
-      hasDepartmentId: !!departmentId,
-      hasRoleId: !!roleId,
-    });
     return res.status(400).json({
       success: false,
       message: "Emails, department, and role are required",
@@ -1079,18 +970,9 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
   }
 
   // Validate and process emails
-  console.log("📧 [BULK_INVITATION] Processing emails...");
   const { validEmails, invalidEmails } = validateEmails(emails);
 
-  console.log("📊 [BULK_INVITATION] Email validation results:", {
-    totalEmails: emails.length,
-    validEmails: validEmails.length,
-    invalidEmails: invalidEmails.length,
-    invalidEmailList: invalidEmails,
-  });
-
   if (validEmails.length === 0) {
-    console.log("❌ [BULK_INVITATION] No valid email addresses provided");
     return res.status(400).json({
       success: false,
       message: "No valid email addresses provided",
@@ -1098,10 +980,6 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
   }
 
   if (invalidEmails.length > 0) {
-    console.log(
-      "⚠️ [BULK_INVITATION] Some email addresses are invalid:",
-      invalidEmails
-    );
     return res.status(400).json({
       success: false,
       message: "Some email addresses are invalid",
@@ -1110,46 +988,28 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
   }
 
   // Validate department
-  console.log("🏢 [BULK_INVITATION] Validating department...");
   const department = await Department.findById(departmentId);
 
   if (!department) {
-    console.log("❌ [BULK_INVITATION] Invalid department:", {
-      departmentId,
-    });
     return res.status(400).json({
       success: false,
       message: "Invalid department",
     });
   }
-  console.log("✅ [BULK_INVITATION] Department validated:", {
-    id: department._id,
-    name: department.name,
-  });
 
-  console.log("👥 [BULK_INVITATION] Validating role...");
   const role = await Role.findById(roleId);
   if (!role) {
-    console.log("❌ [BULK_INVITATION] Invalid role:", roleId);
     return res.status(400).json({
       success: false,
       message: "Invalid role",
     });
   }
-  console.log("✅ [BULK_INVITATION] Role validated:", {
-    id: role._id,
-    name: role.name,
-    level: role.level,
-  });
 
   // Check if department already has a HOD and this is a HOD invitation
   const existingHOD = await checkExistingHOD(departmentId, roleId);
   const offboardingHOD = await checkOffboardingHOD(departmentId, roleId);
 
   if (existingHOD && !req.body.replaceExistingHOD) {
-    console.log(
-      `⚠️ [BULK_INVITATION] Department ${department.name} already has HOD: ${existingHOD.fullName}`
-    );
     return res.status(409).json({
       success: false,
       message: `Department ${department.name} already has a HOD: ${existingHOD.fullName}`,
@@ -1169,80 +1029,58 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
     });
   }
 
-  // If there's a HOD in offboarding process, allow replacement without conflict
-  if (offboardingHOD && !existingHOD) {
-    console.log(
-      `ℹ️ [BULK_INVITATION] Department ${department.name} has HOD in offboarding process: ${offboardingHOD.fullName} (${offboardingHOD.status}) - allowing replacement`
-    );
-  }
-
   // If replacing HOD, deactivate the existing one
   if (existingHOD && req.body.replaceExistingHOD) {
-    console.log(
-      `🔄 [BULK_INVITATION] Replacing existing HOD: ${existingHOD.fullName}`
-    );
-
-    // Deactivate the existing HOD
     existingHOD.isActive = false;
     existingHOD.status = "INACTIVE";
     existingHOD.deactivatedAt = new Date();
     existingHOD.deactivatedBy = currentUser._id;
     existingHOD.deactivationReason = "Replaced by new HOD invitation";
     await existingHOD.save();
-
-    console.log(
-      `✅ [BULK_INVITATION] Existing HOD deactivated: ${existingHOD.fullName}`
-    );
   }
 
   // Generate sequential batch ID only for bulk invitations
-  console.log("🆔 [BULK_INVITATION] Generating batch ID...");
   const batchId = await Invitation.generateSequentialBatchNumber();
   const batchNameFinal =
     batchName || `Batch_${new Date().toISOString().split("T")[0]}`;
-
-  console.log("🆔 [BULK_INVITATION] Batch info:", {
-    batchId,
-    batchName: batchNameFinal,
-  });
-
-  // Create invitations
-  console.log(
-    "📝 [BULK_INVITATION] Starting invitation creation for",
-    validEmails.length,
-    "emails..."
-  );
   const invitations = [];
   const emailResults = [];
   const errors = [];
 
   for (let i = 0; i < validEmails.length; i++) {
     const email = validEmails[i];
-    console.log(
-      `📧 [BULK_INVITATION] Processing email ${i + 1}/${
-        validEmails.length
-      }: ${email}`
-    );
 
     try {
-      // Check if user already exists
-      const existingUser = await User.findByEmailOrUsername(email);
+      // Check for ANY existing user (active or inactive) with this email
+      const existingUser = await User.findOne({
+        email: email.toLowerCase(),
+      });
       if (existingUser) {
-        const errorMsg = `User with email ${email} already exists`;
-        console.log(`❌ [BULK_INVITATION] ${errorMsg}`);
+        const errorMsg = `User with email ${email} already exists in the system`;
         errors.push(errorMsg);
         continue;
       }
 
-      // Check if invitation already exists
+      // Check for any active invitation
       const existingInvitation = await Invitation.findOne({
-        email: email,
-        status: { $in: ["active", "sent"] },
+        email: email.toLowerCase(),
+        status: { $in: ["active", "sent", "pending_approval"] },
       });
 
       if (existingInvitation) {
         const errorMsg = `Active invitation already exists for ${email}`;
-        console.log(`❌ [BULK_INVITATION] ${errorMsg}`);
+        errors.push(errorMsg);
+        continue;
+      }
+
+      // Check for used invitation (means user already registered)
+      const usedInvitation = await Invitation.findOne({
+        email: email.toLowerCase(),
+        status: "used",
+      });
+
+      if (usedInvitation) {
+        const errorMsg = `An invitation for ${email} was already used. User has already registered.`;
         errors.push(errorMsg);
         continue;
       }
@@ -1250,10 +1088,6 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
       // For bulk invitations, we don't generate names - user will set them during registration
       const firstName = "";
       const lastName = "";
-
-      console.log(
-        `📝 [BULK_INVITATION] Creating invitation for ${email} (${firstName} ${lastName})`
-      );
 
       // Create invitation
       const invitation = await Invitation.create({
@@ -1267,14 +1101,7 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
         batchName: batchNameFinal,
       });
 
-      console.log(`✅ [BULK_INVITATION] Invitation created for ${email}:`, {
-        id: invitation._id,
-        code: invitation.code,
-        status: invitation.status,
-      });
-
       // Send invitation email
-      console.log(`📧 [BULK_INVITATION] Sending email to ${email}...`);
       const userName =
         invitation.firstName && invitation.lastName
           ? `${invitation.firstName} ${invitation.lastName}`
@@ -1294,7 +1121,6 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
           status: "sent",
           messageId: emailResult.messageId,
         });
-        console.log(`✅ [BULK_INVITATION] Email sent successfully to ${email}`);
       } else {
         await invitation.markEmailFailed(emailResult.error);
         emailResults.push({
@@ -1302,10 +1128,6 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
           status: "failed",
           error: emailResult.error,
         });
-        console.log(
-          `❌ [BULK_INVITATION] Email failed for ${email}:`,
-          emailResult.error
-        );
       }
 
       invitations.push(invitation);
@@ -1324,10 +1146,8 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
           userAgent: req.get("User-Agent"),
         }
       );
-      console.log(`📋 [BULK_INVITATION] Audit log created for ${email}`);
     } catch (error) {
       const errorMsg = `Error creating invitation for ${email}: ${error.message}`;
-      console.log(`❌ [BULK_INVITATION] ${errorMsg}`);
       errors.push(errorMsg);
     }
   }
@@ -1338,18 +1158,6 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
   const successfulEmails = emailResults.filter(
     (r) => r.status === "sent"
   ).length;
-
-  console.log("📊 [BULK_INVITATION] Final statistics:", {
-    totalEmails: validEmails.length,
-    successfulInvitations,
-    failedInvitations: errors.length,
-    emailsSent: successfulEmails,
-    emailsFailed: failedEmails,
-    batchId,
-    batchName: batchNameFinal,
-  });
-
-  console.log("🎉 [BULK_INVITATION] Bulk invitation creation completed");
 
   try {
     await notificationService.createNotification({
@@ -1370,7 +1178,6 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
         role: role.name,
       },
     });
-    console.log("✅ [BULK_INVITATION] In-app notification sent to creator");
   } catch (notificationError) {
     console.error(
       "❌ [BULK_INVITATION] Failed to send in-app notification:",
@@ -1409,16 +1216,16 @@ export const createBulkInvitations = asyncHandler(async (req, res) => {
 
 // @desc    Get batch invitation statistics
 // @route   GET /api/invitations/batch/:batchId
-// @access  Private (Super Admin)
+// @access  Private (HOD and Super Admin)
 export const getBatchInvitations = asyncHandler(async (req, res) => {
   const currentUser = req.user;
   const { batchId } = req.params;
 
-  // Check if user is super admin
-  if (currentUser.role.level < 100) {
+  // Check if user is HOD (700) or Super Admin (1000)
+  if (currentUser.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Super admin privileges required.",
+      message: "Access denied. HOD or Super Admin privileges required.",
     });
   }
 
@@ -1468,16 +1275,16 @@ export const getBatchInvitations = asyncHandler(async (req, res) => {
 
 // @desc    Search batches by batch ID or name
 // @route   GET /api/invitations/search-batches
-// @access  Private (Super Admin)
+// @access  Private (HOD and Super Admin)
 export const searchBatches = asyncHandler(async (req, res) => {
   const currentUser = req.user;
   const { query, type = "batch", page = 1, limit = 10 } = req.query;
 
-  // Check if user is super admin
-  if (currentUser.role.level < 100) {
+  // Check if user is HOD (700) or Super Admin (1000)
+  if (currentUser.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Super admin privileges required.",
+      message: "Access denied. HOD or Super Admin privileges required.",
     });
   }
 
@@ -1650,40 +1457,21 @@ export const searchBatches = asyncHandler(async (req, res) => {
 
 // @desc    Create bulk invitations from CSV with detailed employee data
 // @route   POST /api/invitations/bulk-csv
-// @access  Private (Super Admin)
+// @access  Private (HOD and Super Admin)
 export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
-  console.log(
-    "🚀 [CSV_BULK_INVITATION] Starting CSV-based bulk invitation creation..."
-  );
-  console.log("📋 [CSV_BULK_INVITATION] Request body:", req.body);
-
   const currentUser = req.user;
-  console.log("👤 [CSV_BULK_INVITATION] Current user:", {
-    id: currentUser._id,
-    email: currentUser.email,
-    roleLevel: currentUser.role?.level,
-    roleName: currentUser.role?.name,
-  });
 
-  // Check if user is super admin
-  if (currentUser.role.level < 1000) {
-    console.log("❌ [CSV_BULK_INVITATION] Permission denied - not super admin");
+  // Check if user is HOD (700) or Super Admin (1000)
+  if (currentUser.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Super admin privileges required.",
+      message: "Access denied. HOD or Super Admin privileges required.",
     });
   }
 
   const { csvData, requiresApproval = false, batchName } = req.body;
 
-  console.log("📝 [CSV_BULK_INVITATION] Parsed CSV invitation data:", {
-    csvRowCount: csvData ? csvData.length : 0,
-    requiresApproval,
-    batchName,
-  });
-
   if (!csvData || !Array.isArray(csvData) || csvData.length === 0) {
-    console.log("❌ [CSV_BULK_INVITATION] Invalid CSV data");
     return res.status(400).json({
       success: false,
       message: "Valid CSV data is required",
@@ -1703,10 +1491,6 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
   );
 
   if (missingFields.length > 0) {
-    console.log(
-      "❌ [CSV_BULK_INVITATION] Missing required CSV fields:",
-      missingFields
-    );
     return res.status(400).json({
       success: false,
       message: `Missing required CSV fields: ${missingFields.join(", ")}`,
@@ -1728,12 +1512,6 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
   const batchNameFinal =
     batchName || `CSV_Batch_${new Date().toISOString().split("T")[0]}`;
 
-  console.log("🆔 [CSV_BULK_INVITATION] Batch info:", {
-    batchId,
-    batchName: batchNameFinal,
-    requiresApproval,
-  });
-
   // Process CSV data
   const invitations = [];
   const errors = [];
@@ -1743,30 +1521,26 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
     const row = csvData[i];
     const rowNumber = i + 1;
 
-    console.log(
-      `📧 [CSV_BULK_INVITATION] Processing row ${rowNumber}/${csvData.length}: ${row.email}`
-    );
-
     try {
       // Validate email
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(row.email)) {
         const errorMsg = `Row ${rowNumber}: Invalid email format - ${row.email}`;
-        console.log(`❌ [CSV_BULK_INVITATION] ${errorMsg}`);
         errors.push(errorMsg);
         continue;
       }
 
-      // Check if user already exists
-      const existingUser = await User.findByEmailOrUsername(row.email);
+      // Check for ANY existing user (active or inactive) with this email
+      const existingUser = await User.findOne({
+        email: row.email.toLowerCase(),
+      });
       if (existingUser) {
-        const errorMsg = `Row ${rowNumber}: User with email ${row.email} already exists`;
-        console.log(`❌ [CSV_BULK_INVITATION] ${errorMsg}`);
+        const errorMsg = `Row ${rowNumber}: User with email ${row.email} already exists in the system`;
         errors.push(errorMsg);
         continue;
       }
 
-      // Check if invitation already exists
+      // Check for any active invitation
       const existingInvitation = await Invitation.findOne({
         email: row.email.toLowerCase(),
         status: { $in: ["active", "sent", "pending_approval"] },
@@ -1774,7 +1548,18 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
 
       if (existingInvitation) {
         const errorMsg = `Row ${rowNumber}: Active invitation already exists for ${row.email}`;
-        console.log(`❌ [CSV_BULK_INVITATION] ${errorMsg}`);
+        errors.push(errorMsg);
+        continue;
+      }
+
+      // Check for used invitation (means user already registered)
+      const usedInvitation = await Invitation.findOne({
+        email: row.email.toLowerCase(),
+        status: "used",
+      });
+
+      if (usedInvitation) {
+        const errorMsg = `Row ${rowNumber}: An invitation for ${row.email} was already used. User has already registered.`;
         errors.push(errorMsg);
         continue;
       }
@@ -1786,7 +1571,6 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
 
       if (!department) {
         const errorMsg = `Row ${rowNumber}: Department "${row.department}" not found`;
-        console.log(`❌ [CSV_BULK_INVITATION] ${errorMsg}`);
         errors.push(errorMsg);
         continue;
       }
@@ -1798,7 +1582,6 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
 
       if (!role) {
         const errorMsg = `Row ${rowNumber}: Role "${row.role}" not found`;
-        console.log(`❌ [CSV_BULK_INVITATION] ${errorMsg}`);
         errors.push(errorMsg);
         continue;
       }
@@ -1812,35 +1595,18 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
 
       if (existingHOD && !req.body.replaceExistingHOD) {
         const errorMsg = `Row ${rowNumber}: Department "${department.name}" already has HOD: ${existingHOD.fullName}`;
-        console.log(`⚠️ [CSV_BULK_INVITATION] ${errorMsg}`);
         errors.push(errorMsg);
         continue;
       }
 
-      // If there's a HOD in offboarding process, allow replacement without conflict
-      if (offboardingHOD && !existingHOD) {
-        console.log(
-          `ℹ️ [CSV_BULK_INVITATION] Row ${rowNumber}: Department ${department.name} has HOD in offboarding process: ${offboardingHOD.fullName} (${offboardingHOD.status}) - allowing replacement`
-        );
-      }
-
       // If replacing HOD, deactivate the existing one
       if (existingHOD && req.body.replaceExistingHOD) {
-        console.log(
-          `🔄 [CSV_BULK_INVITATION] Replacing existing HOD: ${existingHOD.fullName}`
-        );
-
-        // Deactivate the existing HOD
         existingHOD.isActive = false;
         existingHOD.status = "INACTIVE";
         existingHOD.deactivatedAt = new Date();
         existingHOD.deactivatedBy = currentUser._id;
         existingHOD.deactivationReason = "Replaced by new HOD invitation";
         await existingHOD.save();
-
-        console.log(
-          `✅ [CSV_BULK_INVITATION] Existing HOD deactivated: ${existingHOD.fullName}`
-        );
       }
 
       // Determine invitation status based on approval requirements and role level
@@ -1848,10 +1614,6 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
       if (requiresApproval || role.level >= 80) {
         invitationStatus = "pending_approval";
       }
-
-      console.log(
-        `📝 [CSV_BULK_INVITATION] Creating invitation for ${row.email} (${row.firstName} ${row.lastName}) - Status: ${invitationStatus}`
-      );
 
       // Create invitation
       const invitation = await Invitation.create({
@@ -1873,22 +1635,10 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
         approvalLevel: role.level,
       });
 
-      console.log(
-        `✅ [CSV_BULK_INVITATION] Invitation created for ${row.email}:`,
-        {
-          id: invitation._id,
-          code: invitation.code,
-          status: invitation.status,
-        }
-      );
-
       invitations.push(invitation);
 
       // Send invitation email only if auto-approved
       if (invitationStatus === "active") {
-        console.log(
-          `📧 [CSV_BULK_INVITATION] Sending email to ${row.email}...`
-        );
         const emailResult = await sendInvitationEmail(
           invitation.email,
           `${invitation.firstName} ${invitation.lastName}`,
@@ -1899,20 +1649,9 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
 
         if (emailResult.success) {
           await invitation.markEmailSent();
-          console.log(
-            `✅ [CSV_BULK_INVITATION] Email sent successfully to ${row.email}`
-          );
         } else {
           await invitation.markEmailFailed(emailResult.error);
-          console.log(
-            `❌ [CSV_BULK_INVITATION] Email failed for ${row.email}:`,
-            emailResult.error
-          );
         }
-      } else {
-        console.log(
-          `⏳ [CSV_BULK_INVITATION] Invitation pending approval for ${row.email}`
-        );
       }
 
       // Log audit
@@ -1941,7 +1680,6 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
       });
     } catch (error) {
       const errorMsg = `Row ${rowNumber}: Error creating invitation for ${row.email}: ${error.message}`;
-      console.log(`❌ [CSV_BULK_INVITATION] ${errorMsg}`);
       errors.push(errorMsg);
       validationResults.push({
         row: rowNumber,
@@ -1960,20 +1698,6 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
   const autoApproved = invitations.filter(
     (inv) => inv.status === "active"
   ).length;
-
-  console.log("📊 [CSV_BULK_INVITATION] Final statistics:", {
-    totalRows: csvData.length,
-    successfulInvitations,
-    pendingApproval,
-    autoApproved,
-    errors: errors.length,
-    batchId,
-    batchName: batchNameFinal,
-  });
-
-  console.log(
-    "🎉 [CSV_BULK_INVITATION] CSV bulk invitation creation completed"
-  );
 
   // Send in-app notification to the creator
   try {
@@ -1994,7 +1718,6 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
         requiresApproval: requiresApproval,
       },
     });
-    console.log("✅ [CSV_BULK_INVITATION] In-app notification sent to creator");
   } catch (notificationError) {
     console.error(
       "❌ [CSV_BULK_INVITATION] Failed to send in-app notification:",
@@ -2035,30 +1758,17 @@ export const createBulkInvitationsFromCSV = asyncHandler(async (req, res) => {
 
 // @desc    Approve pending CSV bulk invitations
 // @route   POST /api/invitations/batch/:batchId/approve
-// @access  Private (Super Admin)
+// @access  Private (HOD and Super Admin)
 export const approveBulkInvitations = asyncHandler(async (req, res) => {
-  console.log(
-    "🚀 [APPROVE_BULK_INVITATION] Starting bulk invitation approval..."
-  );
-
   const currentUser = req.user;
   const { batchId } = req.params;
   const { invitationIds, approveAll = false } = req.body;
 
-  console.log("👤 [APPROVE_BULK_INVITATION] Current user:", {
-    id: currentUser._id,
-    email: currentUser.email,
-    roleLevel: currentUser.role?.level,
-  });
-
-  // Check if user is super admin
-  if (currentUser.role.level < 1000) {
-    console.log(
-      "❌ [APPROVE_BULK_INVITATION] Permission denied - not super admin"
-    );
+  // Check if user is HOD (700) or Super Admin (1000)
+  if (currentUser.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Super admin privileges required.",
+      message: "Access denied. HOD or Super Admin privileges required.",
     });
   }
 
@@ -2078,16 +1788,11 @@ export const approveBulkInvitations = asyncHandler(async (req, res) => {
   }
 
   if (pendingInvitations.length === 0) {
-    console.log("❌ [APPROVE_BULK_INVITATION] No pending invitations found");
     return res.status(404).json({
       success: false,
       message: "No pending invitations found for approval",
     });
   }
-
-  console.log(
-    `📝 [APPROVE_BULK_INVITATION] Found ${pendingInvitations.length} pending invitations`
-  );
 
   const approvedInvitations = [];
   const emailResults = [];
@@ -2095,10 +1800,6 @@ export const approveBulkInvitations = asyncHandler(async (req, res) => {
 
   for (const invitation of pendingInvitations) {
     try {
-      console.log(
-        `✅ [APPROVE_BULK_INVITATION] Approving invitation for ${invitation.email}`
-      );
-
       // Update invitation status
       invitation.status = "active";
       invitation.approvedBy = currentUser._id;
@@ -2106,9 +1807,6 @@ export const approveBulkInvitations = asyncHandler(async (req, res) => {
       await invitation.save();
 
       // Send invitation email
-      console.log(
-        `📧 [APPROVE_BULK_INVITATION] Sending email to ${invitation.email}...`
-      );
       const emailResult = await sendInvitationEmail(
         invitation.email,
         `${invitation.firstName} ${invitation.lastName}`,
@@ -2125,9 +1823,6 @@ export const approveBulkInvitations = asyncHandler(async (req, res) => {
           status: "sent",
           messageId: emailResult.messageId,
         });
-        console.log(
-          `✅ [APPROVE_BULK_INVITATION] Email sent successfully to ${invitation.email}`
-        );
       } else {
         await invitation.markEmailFailed(emailResult.error);
         emailResults.push({
@@ -2135,10 +1830,6 @@ export const approveBulkInvitations = asyncHandler(async (req, res) => {
           status: "failed",
           error: emailResult.error,
         });
-        console.log(
-          `❌ [APPROVE_BULK_INVITATION] Email failed for ${invitation.email}:`,
-          emailResult.error
-        );
       }
 
       approvedInvitations.push(invitation);
@@ -2157,7 +1848,6 @@ export const approveBulkInvitations = asyncHandler(async (req, res) => {
       );
     } catch (error) {
       const errorMsg = `Error approving invitation for ${invitation.email}: ${error.message}`;
-      console.log(`❌ [APPROVE_BULK_INVITATION] ${errorMsg}`);
       errors.push(errorMsg);
     }
   }
@@ -2165,14 +1855,6 @@ export const approveBulkInvitations = asyncHandler(async (req, res) => {
   const successfulApprovals = approvedInvitations.length;
   const emailsSent = emailResults.filter((r) => r.status === "sent").length;
   const emailsFailed = emailResults.filter((r) => r.status === "failed").length;
-
-  console.log("📊 [APPROVE_BULK_INVITATION] Approval statistics:", {
-    totalPending: pendingInvitations.length,
-    successfulApprovals,
-    emailsSent,
-    emailsFailed,
-    errors: errors.length,
-  });
 
   res.json({
     success: true,
@@ -2235,23 +1917,16 @@ export const getNextBatchNumber = asyncHandler(async (req, res) => {
 
 // @desc    Get pending CSV bulk invitations for approval
 // @route   GET /api/invitations/pending-approval
-// @access  Private (Super Admin)
+// @access  Private (HOD and Super Admin)
 export const getPendingApprovalInvitations = asyncHandler(async (req, res) => {
   const currentUser = req.user;
   const { page = 1, limit = 10, batchId } = req.query;
 
-  console.log("👤 [PENDING_APPROVAL] Current user:", {
-    id: currentUser._id,
-    email: currentUser.email,
-    roleLevel: currentUser.role?.level,
-  });
-
-  // Check if user is super admin
-  if (currentUser.role.level < 1000) {
-    console.log("❌ [PENDING_APPROVAL] Permission denied - not super admin");
+  // Check if user is HOD (700) or Super Admin (1000)
+  if (currentUser.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Super admin privileges required.",
+      message: "Access denied. HOD or Super Admin privileges required.",
     });
   }
 
@@ -2293,11 +1968,6 @@ export const getPendingApprovalInvitations = asyncHandler(async (req, res) => {
     }
   });
 
-  console.log("📊 [PENDING_APPROVAL] Found pending invitations:", {
-    total,
-    batchGroups: Object.keys(batchGroups).length,
-  });
-
   res.json({
     success: true,
     data: {
@@ -2315,25 +1985,16 @@ export const getPendingApprovalInvitations = asyncHandler(async (req, res) => {
 
 // @desc    Retry failed emails for a batch
 // @route   POST /api/invitations/batch/:batchId/retry-emails
-// @access  Private (Super Admin)
+// @access  Private (HOD and Super Admin)
 export const retryFailedEmails = asyncHandler(async (req, res) => {
-  console.log("🔄 [RETRY_EMAILS] Starting email retry for batch...");
-
   const currentUser = req.user;
   const { batchId } = req.params;
 
-  console.log("👤 [RETRY_EMAILS] Current user:", {
-    id: currentUser._id,
-    email: currentUser.email,
-    roleLevel: currentUser.role?.level,
-  });
-
-  // Check if user is super admin
-  if (currentUser.role.level < 1000) {
-    console.log("❌ [RETRY_EMAILS] Permission denied - not super admin");
+  // Check if user is HOD (700) or Super Admin (1000)
+  if (currentUser.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Super admin privileges required.",
+      message: "Access denied. HOD or Super Admin privileges required.",
     });
   }
 
@@ -2345,7 +2006,6 @@ export const retryFailedEmails = asyncHandler(async (req, res) => {
   }).populate("department role");
 
   if (failedInvitations.length === 0) {
-    console.log("ℹ️ [RETRY_EMAILS] No failed emails found for batch:", batchId);
     return res.status(200).json({
       success: true,
       message: "No failed emails found to retry",
@@ -2360,20 +2020,11 @@ export const retryFailedEmails = asyncHandler(async (req, res) => {
     });
   }
 
-  console.log(
-    `📧 [RETRY_EMAILS] Found ${failedInvitations.length} failed emails to retry`
-  );
-
   const emailResults = [];
   const errors = [];
 
   for (let i = 0; i < failedInvitations.length; i++) {
     const invitation = failedInvitations[i];
-    console.log(
-      `📧 [RETRY_EMAILS] Retrying email ${i + 1}/${failedInvitations.length}: ${
-        invitation.email
-      }`
-    );
 
     try {
       // Send invitation email
@@ -2393,9 +2044,6 @@ export const retryFailedEmails = asyncHandler(async (req, res) => {
           status: "sent",
           messageId: emailResult.messageId,
         });
-        console.log(
-          `✅ [RETRY_EMAILS] Email sent successfully to ${invitation.email}`
-        );
       } else {
         await invitation.markEmailFailed(emailResult.error);
         emailResults.push({
@@ -2403,14 +2051,9 @@ export const retryFailedEmails = asyncHandler(async (req, res) => {
           status: "failed",
           error: emailResult.error,
         });
-        console.log(
-          `❌ [RETRY_EMAILS] Email failed for ${invitation.email}:`,
-          emailResult.error
-        );
       }
     } catch (error) {
       const errorMsg = `Error retrying email for ${invitation.email}: ${error.message}`;
-      console.log(`❌ [RETRY_EMAILS] ${errorMsg}`);
       errors.push(errorMsg);
       emailResults.push({
         email: invitation.email,
@@ -2423,15 +2066,6 @@ export const retryFailedEmails = asyncHandler(async (req, res) => {
   // Calculate statistics
   const emailsSent = emailResults.filter((r) => r.status === "sent").length;
   const emailsFailed = emailResults.filter((r) => r.status === "failed").length;
-
-  console.log("📊 [RETRY_EMAILS] Retry statistics:", {
-    totalFailed: failedInvitations.length,
-    emailsSent,
-    emailsFailed,
-    batchId,
-  });
-
-  console.log("🎉 [RETRY_EMAILS] Email retry completed");
 
   res.status(200).json({
     success: true,
@@ -2451,25 +2085,16 @@ export const retryFailedEmails = asyncHandler(async (req, res) => {
 
 // @desc    Retry failed email for a single invitation
 // @route   POST /api/invitations/:invitationId/retry-email
-// @access  Private (Super Admin)
+// @access  Private (HOD and Super Admin)
 export const retrySingleEmail = asyncHandler(async (req, res) => {
-  console.log("🔄 [RETRY_SINGLE_EMAIL] Starting single email retry...");
-
   const currentUser = req.user;
   const { invitationId } = req.params;
 
-  console.log("👤 [RETRY_SINGLE_EMAIL] Current user:", {
-    id: currentUser._id,
-    email: currentUser.email,
-    roleLevel: currentUser.role?.level,
-  });
-
-  // Check if user is super admin
-  if (currentUser.role.level < 1000) {
-    console.log("❌ [RETRY_SINGLE_EMAIL] Permission denied - not super admin");
+  // Check if user is HOD (700) or Super Admin (1000)
+  if (currentUser.role.level < 700) {
     return res.status(403).json({
       success: false,
-      message: "Access denied. Super admin privileges required.",
+      message: "Access denied. HOD or Super Admin privileges required.",
     });
   }
 
@@ -2479,16 +2104,11 @@ export const retrySingleEmail = asyncHandler(async (req, res) => {
   );
 
   if (!invitation) {
-    console.log("❌ [RETRY_SINGLE_EMAIL] Invitation not found:", invitationId);
     return res.status(404).json({
       success: false,
       message: "Invitation not found",
     });
   }
-
-  console.log(
-    `📧 [RETRY_SINGLE_EMAIL] Retrying email for invitation: ${invitation.email}`
-  );
 
   try {
     // Send invitation email
@@ -2503,9 +2123,6 @@ export const retrySingleEmail = asyncHandler(async (req, res) => {
 
     if (emailResult.success) {
       await invitation.markEmailSent();
-      console.log(
-        `✅ [RETRY_SINGLE_EMAIL] Email sent successfully to ${invitation.email}`
-      );
 
       res.status(200).json({
         success: true,
@@ -2528,10 +2145,6 @@ export const retrySingleEmail = asyncHandler(async (req, res) => {
       });
     } else {
       await invitation.markEmailFailed(emailResult.error);
-      console.log(
-        `❌ [RETRY_SINGLE_EMAIL] Email failed for ${invitation.email}:`,
-        emailResult.error
-      );
 
       res.status(400).json({
         success: false,
@@ -2553,7 +2166,6 @@ export const retrySingleEmail = asyncHandler(async (req, res) => {
     }
   } catch (error) {
     const errorMsg = `Error retrying email for ${invitation.email}: ${error.message}`;
-    console.log(`❌ [RETRY_SINGLE_EMAIL] ${errorMsg}`);
 
     res.status(500).json({
       success: false,

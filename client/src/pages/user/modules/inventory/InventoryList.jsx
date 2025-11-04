@@ -4,19 +4,13 @@ import {
   CubeIcon,
   EyeIcon,
   PencilIcon,
-  TrashIcon,
-  PlusIcon,
   ArrowPathIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
-  ClockIcon,
   CurrencyDollarIcon,
   XMarkIcon,
   WrenchScrewdriverIcon,
   DocumentIcon,
-  ChartBarIcon,
-  ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../../../../context/AuthContext";
 import inventoryService from "../../../../services/inventoryService";
@@ -63,7 +57,6 @@ const InventoryList = () => {
   const { user } = useAuth();
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState({});
   const [filters, setFilters] = useState({
     status: "all",
     category: "all",
@@ -121,12 +114,16 @@ const InventoryList = () => {
   const [loadingView, setLoadingView] = useState(null);
   const [loadingDocument, setLoadingDocument] = useState(null);
 
-  const userRole = user?.role?.name || user?.role;
   const userDepartment = user?.department?.name;
   const isSuperAdmin = user?.role?.level === 1000;
   const isOperationsHOD =
     user?.role?.level === 700 && userDepartment === "Operations";
-  const hasAccess = user && (isSuperAdmin || isOperationsHOD);
+  const isOperationsManager =
+    user?.role?.level >= 600 &&
+    user?.role?.level < 700 &&
+    userDepartment === "Operations";
+  const hasAccess =
+    user && (isSuperAdmin || isOperationsHOD || isOperationsManager);
 
   const needsCompletion = (item) => {
     if (item.completionStatus === "completed") {
@@ -156,7 +153,8 @@ const InventoryList = () => {
           </h2>
           <p className="text-gray-600">
             You don't have permission to access Inventory Management. This
-            module is restricted to Super Admin and Operations HOD only.
+            module is restricted to Super Admin, Operations HOD, and Operations
+            Manager only.
           </p>
         </div>
       </div>
@@ -170,19 +168,12 @@ const InventoryList = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [inventoryResponse, statsResponse] = await Promise.all([
-        inventoryService.getAllInventory(),
-        inventoryService.getInventoryStats(),
-      ]);
+      const inventoryResponse = await inventoryService.getAllInventory();
 
       if (inventoryResponse.success) {
         setInventory(inventoryResponse.data);
       } else {
         toast.error("Failed to load inventory data");
-      }
-
-      if (statsResponse.success) {
-        setStats(statsResponse.data);
       }
     } catch (error) {
       console.error("Error loading inventory data:", error);
@@ -229,21 +220,6 @@ const InventoryList = () => {
       toast.error("Error loading project inventory items");
     } finally {
       setLoadingProjectItems(false);
-    }
-  };
-
-  const handleStatusUpdate = async (itemId, newStatus) => {
-    try {
-      const response = await inventoryService.updateStatus(itemId, newStatus);
-      if (response.success) {
-        toast.success("Status updated successfully");
-        loadData();
-      } else {
-        toast.error("Failed to update status");
-      }
-    } catch (error) {
-      console.error("Error updating status:", error);
-      toast.error("Error updating status");
     }
   };
 
@@ -331,21 +307,9 @@ const InventoryList = () => {
   const handleSubmitCompletion = async () => {
     if (!completingItem) return;
 
-    // Debug logging
-    console.log("🔍 [COMPLETION] Form data:", completionForm);
-    console.log("🔍 [COMPLETION] Form validation errors:", validateForm());
-    console.log("🔍 [COMPLETION] Mode:", isEditMode ? "EDIT" : "CREATE");
-    console.log("🔍 [COMPLETION] Documents in form:", completionForm.documents);
-    console.log(
-      "🔍 [COMPLETION] Documents length:",
-      completionForm.documents.length
-    );
-
     const errors = validateForm();
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
-
-      console.log("❌ [COMPLETION] Validation errors found:", errors);
 
       const missingFields = [];
       if (!completionForm.brand || completionForm.brand === "TBD")
@@ -376,12 +340,6 @@ const InventoryList = () => {
       )
         missingFields.push("Maintenance Interval");
 
-      console.log("🔍 [COMPLETION] Missing fields detected:", missingFields);
-      console.log(
-        "🔍 [COMPLETION] Validation errors from validateForm():",
-        Object.keys(errors)
-      );
-
       let errorMessage;
       if (missingFields.length > 0) {
         errorMessage = `Missing required fields: ${missingFields.join(", ")}`;
@@ -403,16 +361,6 @@ const InventoryList = () => {
       // First, upload any new documents if they exist
       let uploadedDocumentIds = [];
 
-      console.log("🔍 [DOCUMENTS] Starting document processing:");
-      console.log(
-        "🔍 [DOCUMENTS] completionForm.documents:",
-        completionForm.documents
-      );
-      console.log(
-        "🔍 [DOCUMENTS] completionForm.documents.length:",
-        completionForm.documents.length
-      );
-
       if (completionForm.documents.length > 0) {
         // Separate existing documents from new files
         const existingDocuments = completionForm.documents.filter(
@@ -422,14 +370,7 @@ const InventoryList = () => {
           (doc) => !doc._id && doc.file
         );
 
-        console.log("🔍 [DOCUMENTS] Existing documents:", existingDocuments);
-        console.log("🔍 [DOCUMENTS] New files:", newFiles);
-
         uploadedDocumentIds.push(...existingDocuments.map((doc) => doc._id));
-        console.log(
-          "🔍 [DOCUMENTS] After adding existing docs, uploadedDocumentIds:",
-          uploadedDocumentIds
-        );
 
         if (newFiles.length > 0) {
           try {
@@ -446,21 +387,10 @@ const InventoryList = () => {
             formData.append("inventoryId", completingItem._id);
             formData.append("inventoryName", completingItem.name);
 
-            console.log(
-              "🔍 [DOCUMENTS] Uploading new files via uploadInventoryDocuments..."
-            );
             const uploadResponse = await uploadInventoryDocuments(formData);
-            console.log("🔍 [DOCUMENTS] Upload response:", uploadResponse);
 
             if (uploadResponse.success) {
               uploadedDocumentIds.push(...uploadResponse.data.documentIds);
-              console.log(
-                `✅ [INVENTORY] Uploaded ${newFiles.length} documents successfully`
-              );
-              console.log(
-                "🔍 [DOCUMENTS] Final uploadedDocumentIds after upload:",
-                uploadedDocumentIds
-              );
             }
           } catch (uploadError) {
             console.error(
@@ -517,14 +447,6 @@ const InventoryList = () => {
           maintenanceNotes: completionForm.maintenanceNotes,
         },
       };
-
-      console.log(
-        "🔍 [SUBMIT] Final uploadedDocumentIds before sending:",
-        uploadedDocumentIds
-      );
-      console.log("🔍 [SUBMIT] Sending updateData to backend:", updateData);
-      console.log("🔍 [SUBMIT] Mode:", isEditMode ? "EDIT" : "COMPLETION");
-      console.log("🔍 [SUBMIT] Completing item ID:", completingItem._id);
 
       await inventoryService.updateInventory(completingItem._id, updateData);
 
@@ -606,7 +528,6 @@ const InventoryList = () => {
       );
       if (response.success) {
         toast.success("Notifications resent successfully!");
-        console.log("Resend response:", response.data);
       } else {
         toast.error(response.message || "Failed to resend notifications");
       }
@@ -638,18 +559,6 @@ const InventoryList = () => {
         {status.toUpperCase()}
       </span>
     );
-  };
-
-  const getTypeIcon = (type) => {
-    const typeIcons = {
-      equipment: "⚙️",
-      vehicle: "🚗",
-      property: "🏢",
-      furniture: "🪑",
-      electronics: "💻",
-      other: "📦",
-    };
-    return typeIcons[type] || "📦";
   };
 
   const formatText = (text) => {
@@ -787,13 +696,6 @@ const InventoryList = () => {
       completionForm.nextMaintenanceDate &&
       new Date(completionForm.nextMaintenanceDate) < new Date()
     ) {
-      console.log("🔍 [DATE VALIDATION] Next maintenance date issue:", {
-        nextMaintenanceDate: completionForm.nextMaintenanceDate,
-        nextDate: new Date(completionForm.nextMaintenanceDate),
-        today: new Date(),
-        isPast: new Date(completionForm.nextMaintenanceDate) < new Date(),
-      });
-
       if (
         completionForm.lastMaintenanceDate &&
         completionForm.maintenanceInterval
@@ -1005,13 +907,15 @@ const InventoryList = () => {
                     <PencilIcon className="h-4 w-4" />
                   )}
                 </button>
-                <button
-                  onClick={() => handleResendNotifications(item)}
-                  className="inline-flex items-center justify-center w-8 h-8 rounded-full border border-emerald-200 text-emerald-700 bg-white hover:bg-emerald-50 cursor-pointer transition-colors"
-                  title="Resend Notifications"
-                >
-                  <ArrowPathIcon className="h-4 w-4" />
-                </button>
+                {(isSuperAdmin || isOperationsHOD) && (
+                  <button
+                    onClick={() => handleResendNotifications(item)}
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-full border border-emerald-200 text-emerald-700 bg-white hover:bg-emerald-50 cursor-pointer transition-colors"
+                    title="Resend Notifications"
+                  >
+                    <ArrowPathIcon className="h-4 w-4" />
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -2292,10 +2196,6 @@ const InventoryList = () => {
                   <SmartFileUpload
                     files={completionForm.documents}
                     onFilesChange={(newFiles) => {
-                      console.log(
-                        "🔍 [SmartFileUpload] onFilesChange called with:",
-                        newFiles
-                      );
                       setCompletionForm({
                         ...completionForm,
                         documents: newFiles,

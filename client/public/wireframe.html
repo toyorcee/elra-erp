@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ELRA ERP System - Module Access & Workflow</title>
+    <style>
+        :root {
+            --primary-green: #00A651;
+            --light-green: #E8F5E9;
+            --dark-green: #00813F;
+            --hover-green: #007A3D;
+            --white: #FFFFFF;
+            --gray-100: #F8F9FA;
+            --gray-200: #E9ECEF;
+            --gray-300: #DEE2E6;
+            --text-dark: #212529;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            background-color: var(--gray-100);
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-green), var(--dark-green));
+            color: var(--white);
+            padding: 1.5rem 0;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .section {
+            background: var(--white);
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        h2 {
+            color: var(--primary-green);
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid var(--light-green);
+            padding-bottom: 0.5rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .card {
+            background: var(--white);
+            border-radius: 8px;
+            padding: 1.5rem;
+            border: 1px solid var(--gray-200);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .role-level {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding: 0.5rem;
+            border-radius: 4px;
+            background: var(--light-green);
+        }
+
+        .role-level-indicator {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+            background: var(--primary-green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--white);
+            font-weight: bold;
+        }
+
+        .module-list {
+            list-style: none;
+        }
+
+        .module-list li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .module-list li:last-child {
+            border-bottom: none;
+        }
+
+        .access-flow {
+            position: relative;
+            padding: 1rem;
+            margin: 1rem 0;
+            background: var(--light-green);
+            border-radius: 4px;
+        }
+
+        .access-flow::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--primary-green);
+            border-radius: 4px 0 0 4px;
+        }
+
+        .department-specific {
+            background: var(--gray-100);
+            padding: 1rem;
+            border-radius: 4px;
+            margin-top: 1rem;
+        }
+
+        .cross-dept-access {
+            border-left: 4px solid var(--primary-green);
+            padding-left: 1rem;
+            margin: 1rem 0;
+        }
+
+        .legend {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>ELRA ERP System</h1>
+            <p>Module Access & Role Hierarchy Overview</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Role Hierarchy Section -->
+        <section class="section">
+            <h2>Role Hierarchy</h2>
+            <div class="grid">
+                <div class="card">
+                    <div class="role-level">
+                        <div class="role-level-indicator">S</div>
+                        <strong>SUPER_ADMIN (1000)</strong>
+                    </div>
+                    <p>System-wide access and oversight</p>
+                    <div class="access-flow">Full access to all modules and departments</div>
+                </div>
+                <div class="card">
+                    <div class="role-level">
+                        <div class="role-level-indicator">H</div>
+                        <strong>HOD (700)</strong>
+                    </div>
+                    <p>Department head access</p>
+                    <div class="access-flow">Complete department control + cross-department features</div>
+                </div>
+                <div class="card">
+                    <div class="role-level">
+                        <div class="role-level-indicator">M</div>
+                        <strong>MANAGER (600)</strong>
+                    </div>
+                    <p>Operational management</p>
+                    <div class="access-flow">Department operations + team management</div>
+                </div>
+                <div class="card">
+                    <div class="role-level">
+                        <div class="role-level-indicator">T</div>
+                        <strong>STAFF (300)</strong>
+                    </div>
+                    <p>Task-specific access</p>
+                    <div class="access-flow">Basic operations + personal tasks</div>
+                </div>
+                <div class="card">
+                    <div class="role-level">
+                        <div class="role-level-indicator">V</div>
+                        <strong>VIEWER (100)</strong>
+                    </div>
+                    <p>View-only access</p>
+                    <div class="access-flow">Read-only access to permitted areas</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Common Modules Section -->
+        <section class="section">
+            <h2>Common Modules</h2>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--primary-green)"></div>
+                    <span>Full Access</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--light-green)"></div>
+                    <span>Limited Access</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--gray-200)"></div>
+                    <span>View Only</span>
+                </div>
+            </div>
+            <div class="grid">
+                <div class="card">
+                    <h3>SELF_SERVICE</h3>
+                    <ul class="module-list">
+                        <li>Personal Information</li>
+                        <li>Leave Requests</li>
+                        <li>Document Access</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>CUSTOMER_CARE</h3>
+                    <ul class="module-list">
+                        <li>Customer Inquiries</li>
+                        <li>Support Tickets</li>
+                        <li>Response Management</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>PROJECTS</h3>
+                    <ul class="module-list">
+                        <li>Personal Projects</li>
+                        <li>Department Projects</li>
+                        <li>Project Collaboration</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>COMMUNICATION</h3>
+                    <ul class="module-list">
+                        <li>Internal Messaging</li>
+                        <li>Announcements</li>
+                        <li>Team Collaboration</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>DOCUMENT</h3>
+                    <ul class="module-list">
+                        <li>Documents uploaded by users</li>
+                        <li>Documents reviewed by users</li>
+                        <li>Document archive</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- System Overview Section -->
+        <section class="section">
+            <h2>System Overview</h2>
+            <div class="grid">
+                <div class="card">
+                    <h3>Departments (10)</h3>
+                    <ul class="module-list">
+                        <li>Human Resources</li>
+                        <li>Finance & Accounting</li>
+                        <li>Procurement</li>
+                        <li>Operations</li>
+                        <li>Sales & Marketing</li>
+                        <li>Legal & Compliance</li>
+                        <li>IT & Systems</li>
+                        <li>Customer Service</li>
+                        <li>Executive</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>Common Modules</h3>
+                    <ul class="module-list">
+                        <li>SELF_SERVICE</li>
+                        <li>CUSTOMER_CARE</li>
+                        <li>PROJECTS</li>
+                        <li>COMMUNICATION</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>Department-Specific Modules</h3>
+                    <ul class="module-list">
+                        <li>HR Module</li>
+                        <li>FINANCE Module</li>
+                        <li>PROCUREMENT Module</li>
+                        <li>INVENTORY Module</li>
+                        <li>PAYROLL Module</li>
+                        <li>COMPLIANCE Module</li>
+                        <li>DOCUMENT_MANAGEMENT Module</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Project Management Section -->
+        <section class="section">
+            <h2>Project Management Workflow</h2>
+            
+            <div class="grid">
+                <div class="card">
+                    <h3>Project Types</h3>
+                    <ul class="module-list">
+                        <li>
+                            <strong>Personal Projects</strong>
+                            <ul>
+                                <li>Created by any department member</li>
+                                <li>Requires HOD approval</li>
+                                <li>Limited budget threshold</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <strong>Departmental Projects</strong>
+                            <ul>
+                                <li>Created by department HOD</li>
+                                <li>Requires Finance review for budget > ₦500,000</li>
+                                <li>Executive approval for high-value projects</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <strong>External Projects</strong>
+                            <ul>
+                                <li>Created exclusively by HR HOD</li>
+                                <li>Requires vendor details and project items</li>
+                                <li>Mandatory compliance and regulatory checks</li>
+                                <li>Executive approval required</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <h3>Approval Workflow</h3>
+                    <div class="access-flow">
+                        <div>1. Project Creation</div>
+                        <div>2. Initial Review</div>
+                        <div>3. Budget Allocation</div>
+                        <div>4. Procurement Process</div>
+                        <div>5. Implementation</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Budget Thresholds & Approval Flow</h3>
+                    <div class="department-specific">
+                        <h4 style="color: var(--primary-green); margin-bottom: 1rem;">Personal Projects</h4>
+                        <ul class="module-list">
+                            <li>≤ ₦1M:
+                                <ul>
+                                    <li>No Budget Required: Auto-approved</li>
+                                    <li>Budget Required: Finance → Executive</li>
+                                </ul>
+                            </li>
+                            <li>₦1M - ₦5M:
+                                <ul>
+                                    <li>No Budget Required: Auto-approved</li>
+                                    <li>Finance Dept: Direct to Executive</li>
+                                    <li>Other Depts: Finance → Executive</li>
+                                </ul>
+                            </li>
+                            <li>> ₦5M:
+                                <ul>
+                                    <li>No Budget Required: Auto-approved</li>
+                                    <li>Finance Dept: Direct to Executive</li>
+                                    <li>Other Depts: Finance → Executive (Higher Scrutiny)</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                        <h4 style="color: var(--primary-green); margin: 1rem 0;">Departmental Projects</h4>
+                        <ul class="module-list">
+                            <li>≤ ₦1M:
+                                <ul>
+                                    <li>No Budget Required: Auto-approved</li>
+                                    <li>Budget Required: Finance → Executive</li>
+                                </ul>
+                            </li>
+                            <li>₦1M - ₦5M:
+                                <ul>
+                                    <li>No Budget Required: Auto-approved</li>
+                                    <li>Finance Dept: Direct to Executive</li>
+                                    <li>Other Depts: Finance → Executive</li>
+                                </ul>
+                            </li>
+                            <li>> ₦5M:
+                                <ul>
+                                    <li>No Budget Required: Auto-approved</li>
+                                    <li>Finance Dept: Direct to Executive</li>
+                                    <li>Other Depts: Finance → Executive (Higher Scrutiny)</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                        <h4 style="color: var(--primary-green); margin: 1rem 0;">External Projects</h4>
+                        <ul class="module-list">
+                            <li>≤ ₦1M:
+                                <ul>
+                                    <li>No Budget Required: Legal → Executive</li>
+                                    <li>Budget Required: Legal → Finance → Executive → Budget</li>
+                                </ul>
+                            </li>
+                            <li>₦1M - ₦5M:
+                                <ul>
+                                    <li>No Budget Required: Legal → Executive</li>
+                                    <li>Budget Required: Legal → Finance → Executive → Budget</li>
+                                </ul>
+                            </li>
+                            <li>> ₦5M:
+                                <ul>
+                                    <li>No Budget Required: Legal → Executive</li>
+                                    <li>Budget Required: Legal → Finance → Executive → Budget (Higher Scrutiny)</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                        <div style="margin-top: 1rem; padding: 0.5rem; background: var(--light-green); border-radius: 4px;">
+                            <strong>Special Cases:</strong>
+                            <ul style="margin-top: 0.5rem;">
+                                <li>SUPER_ADMIN: All projects auto-approved</li>
+                                <li>Finance Department: Skip finance approval</li>
+                                <li>External Projects: Only HR HOD & SUPER_ADMIN can create</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Project Status Flow</h3>
+                    <div class="access-flow">
+                        <div>Planning</div>
+                        <div>Pending Approval</div>
+                        <div>Budget Allocation</div>
+                        <div>Implementation</div>
+                        <div>Completion</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Integration Features</h3>
+                    <ul class="module-list">
+                        <li>Automatic procurement creation</li>
+                        <li>Vendor management for external projects</li>
+                        <li>Equipment requirements tracking</li>
+                        <li>Inventory allocation and tracking</li>
+                        <li>Real-time budget monitoring</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+    </div>
+
+        <!-- Payroll Calculation Section -->
+        <section class="section">
+            <h2>Payroll Calculation Example</h2>
+            <div class="grid">
+                <div class="card">
+                    <h3>Staff Role (Grade 4) Breakdown</h3>
+                    <div class="role-level">
+                        <div class="role-level-indicator">4</div>
+                        <strong>Professional Staff (Level 300)</strong>
+                    </div>
+                    <div class="department-specific">
+                        <h4 style="color: var(--primary-green); margin-bottom: 1rem;">Base Components</h4>
+                        <ul class="module-list">
+                            <li>Base Salary Range: ₦150,000 - ₦250,000</li>
+                            <li>Standard Allowances:
+                                <ul>
+                                    <li>Housing: ₦60,000</li>
+                                    <li>Transport: ₦40,000</li>
+                                    <li>Meal: ₦20,000</li>
+                                </ul>
+                            </li>
+                        </ul>
+
+                        <h4 style="color: var(--primary-green); margin: 1rem 0;">Calculation Example</h4>
+                        <div class="access-flow">
+                            <div><strong>Step 1: Base Salary</strong></div>
+                            <div>Starting Base: ₦150,000</div>
+                            <div>+ Housing: ₦60,000</div>
+                            <div>+ Transport: ₦40,000</div>
+                            <div>+ Meal: ₦20,000</div>
+                            <div><strong>Total Gross: ₦270,000</strong></div>
+                        </div>
+
+                        <h4 style="color: var(--primary-green); margin: 1rem 0;">Deductions & Tax</h4>
+                        <ul class="module-list">
+                            <li>Pension (8%): ₦21,600</li>
+                            <li>Tax (PAYE):
+                                <ul>
+                                    <li>Annual Gross: ₦3,240,000</li>
+                                    <li>Estimated Monthly Tax: ₦27,000</li>
+                                </ul>
+                            </li>
+                            <li><strong>Total Deductions: ₦48,600</strong></li>
+                        </ul>
+
+                        <div style="margin-top: 1rem; padding: 1rem; background: var(--light-green); border-radius: 4px;">
+                            <strong>Net Salary: ₦221,400</strong>
+                            <p style="margin-top: 0.5rem; font-size: 0.9rem;">
+                                (Gross ₦270,000 - Deductions ₦48,600)
+                            </p>
+                        </div>
+
+                        <h4 style="color: var(--primary-green); margin: 1rem 0;">Taxable vs Non-Taxable Breakdown</h4>
+                        <div class="department-specific" style="background: var(--gray-100); padding: 1rem; border-radius: 4px;">
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                                <div>
+                                    <h5 style="font-weight: bold; margin-bottom: 0.5rem;">Taxable Components</h5>
+                                    <ul class="module-list">
+                                        <li>Base Salary: ₦150,000</li>
+                                        <li>Training Fund: ₦15,000</li>
+                                        <li>Cooperative Loan (10%): ₦15,000</li>
+                                        <li>Welfare Fund (Taxable): ₦15,000</li>
+                                        <li><strong>Total Taxable: ₦195,000</strong></li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h5 style="font-weight: bold; margin-bottom: 0.5rem;">Non-Taxable Components</h5>
+                                    <ul class="module-list">
+                                        <li>Housing Allowance: ₦60,000</li>
+                                        <li>Transport Allowance: ₦40,000</li>
+                                        <li>Meal Allowance: ₦20,000</li>
+                                        <li>Welfare Fund (Non-Taxable): ₦10,000</li>
+                                        <li><strong>Total Non-Taxable: ₦130,000</strong></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h4 style="color: var(--primary-green); margin: 1rem 0;">Tax Calculation</h4>
+                        <div class="access-flow">
+                            <div>1. Total Taxable Income: ₦195,000</div>
+                            <div>2. Annual Equivalent: ₦2,340,000</div>
+                            <div>3. PAYE Tax (Monthly): ₦27,000</div>
+                            <div>4. Other Deductions: ₦21,600</div>
+                            <div><strong>Total Deductions: ₦48,600</strong></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Additional Benefits</h3>
+                    <ul class="module-list">
+                        <li>Annual Leave Allowance: 1 month base salary</li>
+                        <li>13th Month Pay: Base salary</li>
+                        <li>Performance Bonus: Up to 20% of annual base</li>
+                        <li>Health Insurance Coverage</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <h3>Salary Progression</h3>
+                    <div class="access-flow">
+                        <div>Entry Level: ₦150,000</div>
+                        <div>Mid Range: ₦200,000</div>
+                        <div>Maximum: ₦250,000</div>
+                    </div>
+                    <p style="margin-top: 1rem; font-size: 0.9rem;">
+                        * Annual increment based on performance review and company policies
+                    </p>
+                </div>
+            </div>
+        </section>
+    </div>
+</body>
+</html>

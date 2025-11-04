@@ -27,12 +27,9 @@ import { useAuth } from "../../../../context/AuthContext";
 import {
   formatCurrency,
   formatNumberWithCommas,
-  parseFormattedNumber,
 } from "../../../../utils/formatters";
 import {
   createBudgetAllocation,
-  getBudgetAllocations,
-  getBudgetAllocationById,
   approveBudgetAllocation,
   rejectBudgetAllocation,
   getBudgetAllocationStats,
@@ -53,6 +50,13 @@ const BudgetAllocation = () => {
   const [projects, setProjects] = useState([]);
   const [filteredProjects, setFilteredProjects] = useState([]);
   const [stats, setStats] = useState({});
+  const [projectWallet, setProjectWallet] = useState({
+    available: 0,
+    allocated: 0,
+    reserved: 0,
+    used: 0,
+    lastAllocated: 0,
+  });
   const [activeTab, setActiveTab] = useState("projects");
   const [budgetHistory, setBudgetHistory] = useState([]);
 
@@ -75,7 +79,12 @@ const BudgetAllocation = () => {
     const loadAllData = async () => {
       setLoading(true);
       try {
-        await Promise.all([loadStats(), loadProjects(), loadBudgetHistory()]);
+        await Promise.all([
+          loadStats(),
+          loadProjects(),
+          loadBudgetHistory(),
+          loadProjectWallet(),
+        ]);
       } finally {
         setLoading(false);
       }
@@ -125,6 +134,33 @@ const BudgetAllocation = () => {
       }
     } catch (error) {
       console.error("Error loading stats:", error);
+    }
+  };
+
+  const loadProjectWallet = async () => {
+    try {
+      const res = await getELRAWallet();
+      if (res?.success) {
+        const cats = res.data?.financialSummary?.budgetCategories;
+        const recent = res.data?.recentTransactions || [];
+        const lastAlloc = recent.find(
+          (t) =>
+            t?.type === "allocation" &&
+            (t?.budgetCategory === "projects" ||
+              /project/i.test(t?.description || ""))
+        );
+        if (cats?.projects) {
+          setProjectWallet({
+            available: cats.projects.available || 0,
+            allocated: cats.projects.allocated || 0,
+            reserved: cats.projects.reserved || 0,
+            used: cats.projects.used || 0,
+            lastAllocated: lastAlloc?.amount || 0,
+          });
+        }
+      }
+    } catch (e) {
+      // ignore for now
     }
   };
 
@@ -655,9 +691,7 @@ const BudgetAllocation = () => {
                   <BuildingOfficeIcon className="w-5 h-5 text-white/70" />
                 </div>
                 <p className="text-2xl font-bold text-white mb-1">
-                  {formatCurrency(
-                    stats.walletBalance?.projects?.available || 0
-                  )}
+                  {formatCurrency(projectWallet.available || 0)}
                 </p>
                 <p className="text-xs text-white/70">Available for Projects</p>
               </div>
@@ -686,6 +720,45 @@ const BudgetAllocation = () => {
                   {formatCurrency(stats.totalAllocated || 0)}
                 </p>
                 <p className="text-xs text-white/70">Budget Distributed</p>
+              </div>
+            </div>
+            {/* Extra project category stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-white/90 uppercase tracking-wide">
+                    Used Project Budget
+                  </p>
+                  <ArrowTrendingDownIcon className="w-5 h-5 text-white/70" />
+                </div>
+                <p className="text-2xl font-bold text-white mb-1">
+                  {formatCurrency(projectWallet.used || 0)}
+                </p>
+                <p className="text-xs text-white/70">Processed</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-white/90 uppercase tracking-wide">
+                    Reserved Project Budget
+                  </p>
+                  <ClockIcon className="w-5 h-5 text-white/70" />
+                </div>
+                <p className="text-2xl font-bold text-white mb-1">
+                  {formatCurrency(projectWallet.reserved || 0)}
+                </p>
+                <p className="text-xs text-white/70">Awaiting Processing</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-white/90 uppercase tracking-wide">
+                    Last Allocated Amount
+                  </p>
+                  <BanknotesIcon className="w-5 h-5 text-white/70" />
+                </div>
+                <p className="text-2xl font-bold text-white mb-1">
+                  {formatCurrency(projectWallet.lastAllocated || 0)}
+                </p>
+                <p className="text-xs text-white/70">Most recent allocation</p>
               </div>
             </div>
           </div>
@@ -1288,9 +1361,7 @@ const BudgetAllocation = () => {
                           This will allocate the exact project items cost for
                           procurement. Current ELRA wallet balance:{" "}
                           <span className="font-bold">
-                            {formatCurrency(
-                              stats.walletBalance?.projects?.available || 0
-                            )}
+                            {formatCurrency(projectWallet.available || 0)}
                           </span>
                         </p>
                       </div>

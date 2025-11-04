@@ -35,6 +35,17 @@ const Welcome = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
+  const [passwordStrength, setPasswordStrength] = useState({
+    score: 0,
+    feedback: "",
+  });
+  const [passwordRequirements, setPasswordRequirements] = useState({
+    minLength: false,
+    hasLowercase: false,
+    hasUppercase: false,
+    hasNumber: false,
+  });
+  const [passwordMatch, setPasswordMatch] = useState(null);
 
   const invitationCode = searchParams.get("code");
 
@@ -82,6 +93,44 @@ const Welcome = () => {
     }
   };
 
+  const checkPasswordStrength = (password) => {
+    const requirements = {
+      minLength: password.length >= 6,
+      hasLowercase: /[a-z]/.test(password),
+      hasUppercase: /[A-Z]/.test(password),
+      hasNumber: /[0-9]/.test(password),
+    };
+
+    let score = 0;
+    if (requirements.minLength) score++;
+    if (requirements.hasLowercase) score++;
+    if (requirements.hasUppercase) score++;
+    if (requirements.hasNumber) score++;
+
+    let feedback = "";
+    if (score === 0) feedback = "Very Weak";
+    else if (score === 1) feedback = "Weak";
+    else if (score === 2) feedback = "Fair";
+    else if (score === 3) feedback = "Good";
+    else if (score === 4) feedback = "Strong";
+
+    setPasswordRequirements(requirements);
+    setPasswordStrength({ score, feedback });
+  };
+
+  // Check if passwords match
+  const checkPasswordMatch = (password, confirmPassword) => {
+    if (!confirmPassword) {
+      setPasswordMatch(null);
+      return;
+    }
+    if (password === confirmPassword) {
+      setPasswordMatch(true);
+    } else {
+      setPasswordMatch(false);
+    }
+  };
+
   const validateForm = () => {
     const newErrors = {};
 
@@ -95,8 +144,17 @@ const Welcome = () => {
 
     if (!formData.password) {
       newErrors.password = "Password is required";
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
+    } else {
+      if (!passwordRequirements.minLength) {
+        newErrors.password = "Password must be at least 6 characters";
+      } else if (
+        !passwordRequirements.hasLowercase ||
+        !passwordRequirements.hasUppercase ||
+        !passwordRequirements.hasNumber
+      ) {
+        newErrors.password =
+          "Password must contain at least one lowercase letter, one uppercase letter, and one number";
+      }
     }
 
     if (!formData.confirmPassword) {
@@ -175,6 +233,18 @@ const Welcome = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // Check password strength when password changes
+    if (name === "password") {
+      checkPasswordStrength(value);
+      checkPasswordMatch(value, formData.confirmPassword);
+    }
+
+    // Check password match when confirm password changes
+    if (name === "confirmPassword") {
+      checkPasswordMatch(formData.password, value);
+    }
+
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
@@ -198,12 +268,12 @@ const Welcome = () => {
             <p className="text-[var(--elra-text-secondary)] mb-6">
               No invitation code provided.
             </p>
-          <button
-            onClick={() => navigate("/login")}
+            <button
+              onClick={() => navigate("/login")}
               className="w-full bg-[var(--elra-primary)] hover:bg-[var(--elra-primary-dark)] text-white py-3 px-4 text-base rounded-lg font-semibold transition-all duration-300 shadow-lg"
-          >
-            Go to Login
-          </button>
+            >
+              Go to Login
+            </button>
           </div>
         </div>
       </div>
@@ -218,255 +288,383 @@ const Welcome = () => {
         <div className="flex justify-center mb-6">
           <div className="bg-white p-6 rounded-xl shadow-lg">
             <ELRALogo className="h-14 w-auto" />
-              </div>
-            </div>
+          </div>
+        </div>
 
         {/* Card Form */}
         <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-2xl p-6 md:p-8">
           <h2 className="text-xl font-bold text-center text-[var(--elra-primary)] mb-6">
-                {step === 1 && "Verifying Invitation"}
-                {step === 2 && "Complete Your Profile"}
-                {step === 3 && "Welcome to ELRA!"}
-              </h2>
+            {step === 1 && "Verifying Invitation"}
+            {step === 2 && "Complete Your Profile"}
+            {step === 3 && "Welcome to ELRA!"}
+          </h2>
 
           <p className="text-center text-[var(--elra-text-secondary)] mb-6">
-                {step === 1 && "Please wait while we verify your invitation..."}
-                {step === 2 && "Set up your account to get started"}
-                {step === 3 && "Your account has been created successfully!"}
-              </p>
+            {step === 1 && "Please wait while we verify your invitation..."}
+            {step === 2 && "Set up your account to get started"}
+            {step === 3 && "Your account has been created successfully!"}
+          </p>
 
-              {/* Step 1: Loading/Verification */}
-              {step === 1 && (
+          {/* Step 1: Loading/Verification */}
+          {step === 1 && (
             <div className="text-center">
-                  {loading ? (
-                    <div className="space-y-6">
-                      <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[var(--elra-primary)] mx-auto"></div>
-                      <p className="text-[var(--elra-text-secondary)]">
-                        Verifying your invitation...
-                      </p>
-                    </div>
-                  ) : error ? (
-                    <div className="space-y-6">
-                      <HiExclamation className="h-16 w-16 mx-auto text-red-500" />
-                      <p className="text-red-600 font-medium">{error}</p>
-                      <button
-                        onClick={() => navigate("/login")}
+              {loading ? (
+                <div className="space-y-6">
+                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[var(--elra-primary)] mx-auto"></div>
+                  <p className="text-[var(--elra-text-secondary)]">
+                    Verifying your invitation...
+                  </p>
+                </div>
+              ) : error ? (
+                <div className="space-y-6">
+                  <HiExclamation className="h-16 w-16 mx-auto text-red-500" />
+                  <p className="text-red-600 font-medium">{error}</p>
+                  <button
+                    onClick={() => navigate("/login")}
                     className="w-full bg-[var(--elra-primary)] text-white py-3 px-4 text-base rounded-lg font-semibold hover:bg-[var(--elra-primary-dark)] transition-colors"
-                      >
-                        Go to Login
-                      </button>
-                    </div>
-                  ) : null}
+                  >
+                    Go to Login
+                  </button>
+                </div>
+              ) : null}
             </div>
-              )}
+          )}
 
-              {/* Step 2: Registration Form */}
-              {step === 2 && invitationData && (
+          {/* Step 2: Registration Form */}
+          {step === 2 && invitationData && (
             <div>
-                  {/* Invitation Preview */}
-                  <div className="bg-white border-2 border-[var(--elra-primary)] rounded-lg p-4 mb-6">
-                    <div className="flex items-center space-x-3 mb-3">
-                      <HiCheckCircle className="h-5 w-5 text-[var(--elra-primary)]" />
-                      <h3 className="font-semibold text-[var(--elra-primary)]">
-                        Invitation Details
-                      </h3>
+              {/* Invitation Preview */}
+              <div className="bg-white border-2 border-[var(--elra-primary)] rounded-lg p-4 mb-6">
+                <div className="flex items-center space-x-3 mb-3">
+                  <HiCheckCircle className="h-5 w-5 text-[var(--elra-primary)]" />
+                  <h3 className="font-semibold text-[var(--elra-primary)]">
+                    Invitation Details
+                  </h3>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <HiMail className="h-4 w-4 text-[var(--elra-primary)]" />
+                    <span className="text-[var(--elra-primary)] font-medium">
+                      {invitationData.email}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <HiOfficeBuilding className="h-4 w-4 text-[var(--elra-primary)]" />
+                    <span className="text-[var(--elra-primary)]">
+                      {invitationData.department.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <HiUserGroup className="h-4 w-4 text-[var(--elra-primary)]" />
+                    <span className="text-[var(--elra-primary)]">
+                      {invitationData.role.name}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm text-center">
+                    {error}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-[var(--elra-text-primary)] mb-2">
+                      First Name
+                    </label>
+                    <div className="relative">
+                      <HiUser className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--elra-secondary-2)]" />
+                      <input
+                        type="text"
+                        name="firstName"
+                        value={formData.firstName}
+                        onChange={handleInputChange}
+                        className={`w-full pl-10 pr-4 py-3 text-base border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] ${
+                          errors.firstName
+                            ? "border-red-400 focus:ring-red-200"
+                            : "border-[var(--elra-border-primary)]"
+                        }`}
+                        placeholder="Enter your first name"
+                      />
                     </div>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center space-x-2">
-                        <HiMail className="h-4 w-4 text-[var(--elra-primary)]" />
-                        <span className="text-[var(--elra-primary)] font-medium">
-                          {invitationData.email}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <HiOfficeBuilding className="h-4 w-4 text-[var(--elra-primary)]" />
-                        <span className="text-[var(--elra-primary)]">
-                          {invitationData.department.name}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <HiUserGroup className="h-4 w-4 text-[var(--elra-primary)]" />
-                        <span className="text-[var(--elra-primary)]">
-                          {invitationData.role.name}
-                        </span>
-                      </div>
-                    </div>
+                    {errors.firstName && (
+                      <p className="mt-2 text-sm text-red-600">
+                        {errors.firstName}
+                      </p>
+                    )}
                   </div>
 
-                  <form onSubmit={handleSubmit} className="space-y-6">
-                    {error && (
-                      <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm text-center">
-                        {error}
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-semibold text-[var(--elra-text-primary)] mb-2">
-                          First Name
-                        </label>
-                        <div className="relative">
+                  <div>
+                    <label className="block text-sm font-semibold text-[var(--elra-text-primary)] mb-2">
+                      Last Name
+                    </label>
+                    <div className="relative">
                       <HiUser className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--elra-secondary-2)]" />
-                          <input
-                            type="text"
-                            name="firstName"
-                            value={formData.firstName}
-                            onChange={handleInputChange}
+                      <input
+                        type="text"
+                        name="lastName"
+                        value={formData.lastName}
+                        onChange={handleInputChange}
                         className={`w-full pl-10 pr-4 py-3 text-base border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] ${
-                              errors.firstName
+                          errors.lastName
                             ? "border-red-400 focus:ring-red-200"
-                                : "border-[var(--elra-border-primary)]"
-                            }`}
-                            placeholder="Enter your first name"
-                          />
-                        </div>
-                        {errors.firstName && (
-                      <p className="mt-2 text-sm text-red-600">
-                            {errors.firstName}
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-semibold text-[var(--elra-text-primary)] mb-2">
-                          Last Name
-                        </label>
-                        <div className="relative">
-                      <HiUser className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--elra-secondary-2)]" />
-                          <input
-                            type="text"
-                            name="lastName"
-                            value={formData.lastName}
-                            onChange={handleInputChange}
-                        className={`w-full pl-10 pr-4 py-3 text-base border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] ${
-                              errors.lastName
-                            ? "border-red-400 focus:ring-red-200"
-                                : "border-[var(--elra-border-primary)]"
-                            }`}
-                            placeholder="Enter your last name"
-                          />
-                        </div>
-                        {errors.lastName && (
-                      <p className="mt-2 text-sm text-red-600">
-                            {errors.lastName}
-                          </p>
-                        )}
-                      </div>
+                            : "border-[var(--elra-border-primary)]"
+                        }`}
+                        placeholder="Enter your last name"
+                      />
                     </div>
+                    {errors.lastName && (
+                      <p className="mt-2 text-sm text-red-600">
+                        {errors.lastName}
+                      </p>
+                    )}
+                  </div>
+                </div>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-[var(--elra-text-primary)] mb-2">
-                        Password
-                      </label>
-                      <div className="relative">
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--elra-text-primary)] mb-2">
+                    Password
+                  </label>
+                  <div className="relative">
                     <HiLockClosed className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--elra-secondary-2)]" />
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          name="password"
-                          value={formData.password}
-                          onChange={handleInputChange}
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      value={formData.password}
+                      onChange={handleInputChange}
                       className={`w-full pl-10 pr-10 py-3 text-base border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] ${
-                            errors.password
+                        errors.password
                           ? "border-red-400 focus:ring-red-200"
-                              : "border-[var(--elra-border-primary)]"
-                          }`}
-                          placeholder="Create a password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
+                          : formData.password && passwordStrength.score >= 3
+                          ? "border-green-400"
+                          : formData.password && passwordStrength.score < 3
+                          ? "border-yellow-400"
+                          : "border-[var(--elra-border-primary)]"
+                      }`}
+                      placeholder="Create a password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-[var(--elra-primary)]"
                     >
                       {showPassword ? <MdVisibilityOff /> : <MdVisibility />}
-                        </button>
-                      </div>
-                      {errors.password && (
-                    <p className="mt-2 text-sm text-red-600">
-                          {errors.password}
-                        </p>
-                      )}
-                    </div>
+                    </button>
+                  </div>
 
-                    <div>
-                      <label className="block text-sm font-semibold text-[var(--elra-text-primary)] mb-2">
-                        Confirm Password
-                      </label>
-                      <div className="relative">
-                    <HiLockClosed className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--elra-secondary-2)]" />
-                        <input
-                          type={showConfirmPassword ? "text" : "password"}
-                          name="confirmPassword"
-                          value={formData.confirmPassword}
-                          onChange={handleInputChange}
-                      className={`w-full pl-10 pr-10 py-3 text-base border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] ${
-                            errors.confirmPassword
-                          ? "border-red-400 focus:ring-red-200"
-                              : "border-[var(--elra-border-primary)]"
+                  {/* Password Strength Indicator */}
+                  {formData.password && (
+                    <div className="mt-2">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-300 ${
+                              passwordStrength.score === 0
+                                ? "w-0 bg-gray-400"
+                                : passwordStrength.score === 1
+                                ? "w-1/4 bg-red-500"
+                                : passwordStrength.score === 2
+                                ? "w-2/4 bg-yellow-500"
+                                : passwordStrength.score === 3
+                                ? "w-3/4 bg-blue-500"
+                                : "w-full bg-green-500"
+                            }`}
+                          ></div>
+                        </div>
+                        <span
+                          className={`text-xs font-medium ${
+                            passwordStrength.score === 0 ||
+                            passwordStrength.score === 1
+                              ? "text-red-600"
+                              : passwordStrength.score === 2
+                              ? "text-yellow-600"
+                              : passwordStrength.score === 3
+                              ? "text-blue-600"
+                              : "text-green-600"
                           }`}
-                          placeholder="Confirm your password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setShowConfirmPassword(!showConfirmPassword)
-                          }
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-[var(--elra-primary)]"
                         >
-                          {showConfirmPassword ? (
-                            <MdVisibilityOff />
-                          ) : (
-                            <MdVisibility />
-                          )}
-                        </button>
+                          {passwordStrength.feedback}
+                        </span>
                       </div>
-                      {errors.confirmPassword && (
-                    <p className="mt-2 text-sm text-red-600">
-                          {errors.confirmPassword}
-                        </p>
-                      )}
-                    </div>
 
+                      {/* Password Requirements */}
+                      <div className="space-y-1 text-xs">
+                        <div
+                          className={`flex items-center space-x-2 ${
+                            passwordRequirements.minLength
+                              ? "text-green-600"
+                              : "text-gray-500"
+                          }`}
+                        >
+                          {passwordRequirements.minLength ? (
+                            <HiCheckCircle className="h-4 w-4" />
+                          ) : (
+                            <HiExclamation className="h-4 w-4" />
+                          )}
+                          <span>At least 6 characters</span>
+                        </div>
+                        <div
+                          className={`flex items-center space-x-2 ${
+                            passwordRequirements.hasLowercase
+                              ? "text-green-600"
+                              : "text-gray-500"
+                          }`}
+                        >
+                          {passwordRequirements.hasLowercase ? (
+                            <HiCheckCircle className="h-4 w-4" />
+                          ) : (
+                            <HiExclamation className="h-4 w-4" />
+                          )}
+                          <span>One lowercase letter</span>
+                        </div>
+                        <div
+                          className={`flex items-center space-x-2 ${
+                            passwordRequirements.hasUppercase
+                              ? "text-green-600"
+                              : "text-gray-500"
+                          }`}
+                        >
+                          {passwordRequirements.hasUppercase ? (
+                            <HiCheckCircle className="h-4 w-4" />
+                          ) : (
+                            <HiExclamation className="h-4 w-4" />
+                          )}
+                          <span>One uppercase letter</span>
+                        </div>
+                        <div
+                          className={`flex items-center space-x-2 ${
+                            passwordRequirements.hasNumber
+                              ? "text-green-600"
+                              : "text-gray-500"
+                          }`}
+                        >
+                          {passwordRequirements.hasNumber ? (
+                            <HiCheckCircle className="h-4 w-4" />
+                          ) : (
+                            <HiExclamation className="h-4 w-4" />
+                          )}
+                          <span>One number</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {errors.password && (
+                    <p className="mt-2 text-sm text-red-600">
+                      {errors.password}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-[var(--elra-text-primary)] mb-2">
+                    Confirm Password
+                  </label>
+                  <div className="relative">
+                    <HiLockClosed className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--elra-secondary-2)]" />
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      name="confirmPassword"
+                      value={formData.confirmPassword}
+                      onChange={handleInputChange}
+                      className={`w-full pl-10 pr-10 py-3 text-base border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--elra-primary)] ${
+                        errors.confirmPassword
+                          ? "border-red-400 focus:ring-red-200"
+                          : passwordMatch === true
+                          ? "border-green-400"
+                          : passwordMatch === false
+                          ? "border-red-400"
+                          : "border-[var(--elra-border-primary)]"
+                      }`}
+                      placeholder="Confirm your password"
+                    />
                     <button
-                      type="submit"
-                      disabled={loading}
-                  className="w-full bg-[var(--elra-primary-dark)] hover:bg-[var(--elra-primary)] text-white py-3 px-4 text-base rounded-lg font-semibold transition-all duration-300 disabled:opacity-50 shadow-lg flex items-center justify-center space-x-2"
+                      type="button"
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-[var(--elra-primary)]"
                     >
-                      {loading ? (
+                      {showConfirmPassword ? (
+                        <MdVisibilityOff />
+                      ) : (
+                        <MdVisibility />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Password Match Indicator */}
+                  {formData.confirmPassword && passwordMatch !== null && (
+                    <div className="mt-2 flex items-center space-x-2">
+                      {passwordMatch ? (
                         <>
-                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          <span>Creating Account...</span>
+                          <HiCheckCircle className="h-4 w-4 text-green-600" />
+                          <span className="text-xs text-green-600">
+                            Passwords match
+                          </span>
                         </>
                       ) : (
                         <>
-                          <span>Complete Registration</span>
-                          <HiArrowRight className="h-5 w-5" />
+                          <HiExclamation className="h-4 w-4 text-red-600" />
+                          <span className="text-xs text-red-600">
+                            Passwords do not match
+                          </span>
                         </>
                       )}
-                    </button>
-                  </form>
-            </div>
-              )}
+                    </div>
+                  )}
 
-              {/* Step 3: Success */}
-              {step === 3 && (
-            <div className="text-center">
-                  <div className="space-y-6">
-                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                      <HiCheckCircle className="h-10 w-10 text-green-500" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-[var(--elra-text-primary)] mb-2">
-                        Account Created Successfully!
-                      </h3>
-                      <p className="text-[var(--elra-text-secondary)]">
-                        Welcome to ELRA! You'll be redirected to your dashboard
-                        shortly.
-                      </p>
-                    </div>
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--elra-primary)] mx-auto"></div>
-                  </div>
+                  {errors.confirmPassword && (
+                    <p className="mt-2 text-sm text-red-600">
+                      {errors.confirmPassword}
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-[var(--elra-primary-dark)] hover:bg-[var(--elra-primary)] text-white py-3 px-4 text-base rounded-lg font-semibold transition-all duration-300 disabled:opacity-50 shadow-lg flex items-center justify-center space-x-2"
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Creating Account...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Complete Registration</span>
+                      <HiArrowRight className="h-5 w-5" />
+                    </>
+                  )}
+                </button>
+              </form>
             </div>
-              )}
+          )}
+
+          {/* Step 3: Success */}
+          {step === 3 && (
+            <div className="text-center">
+              <div className="space-y-6">
+                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                  <HiCheckCircle className="h-10 w-10 text-green-500" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-[var(--elra-text-primary)] mb-2">
+                    Account Created Successfully!
+                  </h3>
+                  <p className="text-[var(--elra-text-secondary)]">
+                    Welcome to ELRA! You'll be redirected to your dashboard
+                    shortly.
+                  </p>
+                </div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--elra-primary)] mx-auto"></div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

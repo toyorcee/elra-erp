@@ -74,6 +74,13 @@ const PayrollApprovals = () => {
       if (response.success) {
         const budgetCategories =
           response.data?.financialSummary?.budgetCategories;
+        const recent = response.data?.recentTransactions || [];
+        const lastPayrollAllocation = recent.find(
+          (t) =>
+            t?.type === "allocation" &&
+            (t?.budgetCategory === "payroll" ||
+              /payroll/i.test(t?.description || ""))
+        );
 
         if (budgetCategories?.payroll) {
           return {
@@ -81,6 +88,7 @@ const PayrollApprovals = () => {
             availableBudget: budgetCategories.payroll.available || 0,
             usedBudget: budgetCategories.payroll.used || 0,
             reservedBudget: budgetCategories.payroll.reserved || 0,
+            lastAllocatedAmount: lastPayrollAllocation?.amount || 0,
             monthlyLimit: 0,
           };
         }
@@ -90,6 +98,7 @@ const PayrollApprovals = () => {
           availableBudget: response.data?.financialSummary?.availableFunds || 0,
           usedBudget: 0,
           reservedBudget: 0,
+          lastAllocatedAmount: 0,
           monthlyLimit: 0,
         };
       } else {
@@ -99,6 +108,7 @@ const PayrollApprovals = () => {
           availableBudget: 0,
           usedBudget: 0,
           reservedBudget: 0,
+          lastAllocatedAmount: 0,
           monthlyLimit: 0,
         };
       }
@@ -109,6 +119,7 @@ const PayrollApprovals = () => {
         availableBudget: 0,
         usedBudget: 0,
         reservedBudget: 0,
+        lastAllocatedAmount: 0,
         monthlyLimit: 0,
       };
     }
@@ -138,14 +149,21 @@ const PayrollApprovals = () => {
         0
       );
 
+    // Prefer live wallet numbers; if not present, derive from approvals
+    const walletAllocated =
+      (budgetData.usedBudget || 0) + (budgetData.reservedBudget || 0);
+    const derivedAllocated = allocatedAmount;
+
     setFinanceStats({
       totalBudget: budgetData.totalBudget || 0,
       allocatedAmount:
-        (budgetData.usedBudget || 0) + (budgetData.reservedBudget || 0),
+        walletAllocated > 0 || budgetData.reservedBudget !== undefined
+          ? walletAllocated
+          : derivedAllocated,
       remainingBudget: budgetData.availableBudget || 0,
-      pendingAllocations,
-      usedBudget: budgetData.usedBudget || 0,
+      pendingAllocations,      usedBudget: budgetData.usedBudget || 0,
       reservedBudget: budgetData.reservedBudget || 0,
+      lastAllocatedAmount: budgetData.lastAllocatedAmount || 0,
       monthlyLimit: budgetData.monthlyLimit || 0,
     });
   };
@@ -643,6 +661,45 @@ const PayrollApprovals = () => {
                   {formatCurrency(financeStats.pendingAllocations)}
                 </p>
                 <p className="text-xs text-white/70">Awaiting Approval</p>
+              </div>
+            </div>
+            {/* Additional Category Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-white/90 uppercase tracking-wide">
+                    Used Payroll Budget
+                  </p>
+                  <ArrowTrendingDownIcon className="w-5 h-5 text-white/70" />
+                </div>
+                <p className="text-2xl font-bold text-white mb-1">
+                  {formatCurrency(financeStats.usedBudget)}
+                </p>
+                <p className="text-xs text-white/70">Processed</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-white/90 uppercase tracking-wide">
+                    Reserved Payroll Budget
+                  </p>
+                  <ClockIcon className="w-5 h-5 text-white/70" />
+                </div>
+                <p className="text-2xl font-bold text-white mb-1">
+                  {formatCurrency(financeStats.reservedBudget)}
+                </p>
+                <p className="text-xs text-white/70">Awaiting Processing</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-white/90 uppercase tracking-wide">
+                    Last Allocated Amount
+                  </p>
+                  <BanknotesIcon className="w-5 h-5 text-white/70" />
+                </div>
+                <p className="text-2xl font-bold text-white mb-1">
+                  {formatCurrency(financeStats.lastAllocatedAmount || 0)}
+                </p>
+                <p className="text-xs text-white/70">Most recent allocation</p>
               </div>
             </div>
           </div>

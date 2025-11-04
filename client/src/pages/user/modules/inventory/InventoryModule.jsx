@@ -1,5 +1,5 @@
 import React from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "../../../../context/AuthContext";
 import { GradientSpinner } from "../../../../components/common";
@@ -8,12 +8,10 @@ import {
   FaList,
   FaChartLine,
   FaSearch,
-  FaClipboardList,
 } from "react-icons/fa";
 
 const InventoryModule = () => {
   const { user } = useAuth();
-  const { module } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = React.useState(false);
 
@@ -22,7 +20,6 @@ const InventoryModule = () => {
     const userDepartment = user?.department?.name;
     const isSuperAdmin = userLevel === 1000;
 
-    // Super Admin can access everything
     if (isSuperAdmin) {
       return true;
     }
@@ -47,16 +44,6 @@ const InventoryModule = () => {
 
   const inventoryFeatures = [
     {
-      title: "Project Workflows",
-      description: "Manage inventory for approved projects",
-      icon: FaClipboardList,
-      color: "bg-gradient-to-br from-blue-500 to-cyan-600",
-      path: "/dashboard/modules/inventory",
-      status: "Active",
-      badge: "Workflows",
-      required: { minLevel: 600 },
-    },
-    {
       title: "Inventory List",
       description: "View and manage all inventory items",
       icon: FaList,
@@ -64,14 +51,18 @@ const InventoryModule = () => {
       path: "/dashboard/modules/inventory/list",
       status: "Active",
       badge: "List",
-      required: { minLevel: 700, department: "Operations" },
+      required: { minLevel: 600, department: "Operations" },
       hidden: (user) => {
         const userDepartment = user?.department?.name;
         const isSuperAdmin = user?.role?.level === 1000;
         const isOperationsHOD =
           user?.role?.level === 700 && userDepartment === "Operations";
+        const isOperationsManager =
+          user?.role?.level >= 600 &&
+          user?.role?.level < 700 &&
+          userDepartment === "Operations";
 
-        return !(isSuperAdmin || isOperationsHOD);
+        return !(isSuperAdmin || isOperationsHOD || isOperationsManager);
       },
     },
     {
@@ -82,14 +73,18 @@ const InventoryModule = () => {
       path: "/dashboard/modules/inventory/tracking",
       status: "Active",
       badge: "Tracking",
-      required: { minLevel: 700, department: "Operations" },
+      required: { minLevel: 600, department: "Operations" },
       hidden: (user) => {
         const userDepartment = user?.department?.name;
         const isSuperAdmin = user?.role?.level === 1000;
         const isOperationsHOD =
           user?.role?.level === 700 && userDepartment === "Operations";
+        const isOperationsManager =
+          user?.role?.level >= 600 &&
+          user?.role?.level < 700 &&
+          userDepartment === "Operations";
 
-        return !(isSuperAdmin || isOperationsHOD);
+        return !(isSuperAdmin || isOperationsHOD || isOperationsManager);
       },
     },
     {
@@ -100,14 +95,18 @@ const InventoryModule = () => {
       path: "/dashboard/modules/inventory/reports",
       status: "Active",
       badge: "Reports",
-      required: { minLevel: 700, department: "Operations" },
+      required: { minLevel: 600, department: "Operations" },
       hidden: (user) => {
         const userDepartment = user?.department?.name;
         const isSuperAdmin = user?.role?.level === 1000;
         const isOperationsHOD =
           user?.role?.level === 700 && userDepartment === "Operations";
+        const isOperationsManager =
+          user?.role?.level >= 600 &&
+          user?.role?.level < 700 &&
+          userDepartment === "Operations";
 
-        return !(isSuperAdmin || isOperationsHOD);
+        return !(isSuperAdmin || isOperationsHOD || isOperationsManager);
       },
     },
   ].filter(hasAccess);
@@ -118,21 +117,57 @@ const InventoryModule = () => {
       icon: FaList,
       color: "bg-green-500",
       path: "/dashboard/modules/inventory/list",
-      required: { minLevel: 700, department: "Operations" },
+      required: { minLevel: 600, department: "Operations" },
+      hidden: (user) => {
+        const userDepartment = user?.department?.name;
+        const isSuperAdmin = user?.role?.level === 1000;
+        const isOperationsHOD =
+          user?.role?.level === 700 && userDepartment === "Operations";
+        const isOperationsManager =
+          user?.role?.level >= 600 &&
+          user?.role?.level < 700 &&
+          userDepartment === "Operations";
+
+        return !(isSuperAdmin || isOperationsHOD || isOperationsManager);
+      },
     },
     {
       title: "Inventory Tracking",
       icon: FaSearch,
       color: "bg-purple-500",
       path: "/dashboard/modules/inventory/tracking",
-      required: { minLevel: 700, department: "Operations" },
+      required: { minLevel: 600, department: "Operations" },
+      hidden: (user) => {
+        const userDepartment = user?.department?.name;
+        const isSuperAdmin = user?.role?.level === 1000;
+        const isOperationsHOD =
+          user?.role?.level === 700 && userDepartment === "Operations";
+        const isOperationsManager =
+          user?.role?.level >= 600 &&
+          user?.role?.level < 700 &&
+          userDepartment === "Operations";
+
+        return !(isSuperAdmin || isOperationsHOD || isOperationsManager);
+      },
     },
     {
       title: "Inventory Reports",
       icon: FaChartLine,
       color: "bg-orange-500",
       path: "/dashboard/modules/inventory/reports",
-      required: { minLevel: 700, department: "Operations" },
+      required: { minLevel: 600, department: "Operations" },
+      hidden: (user) => {
+        const userDepartment = user?.department?.name;
+        const isSuperAdmin = user?.role?.level === 1000;
+        const isOperationsHOD =
+          user?.role?.level === 700 && userDepartment === "Operations";
+        const isOperationsManager =
+          user?.role?.level >= 600 &&
+          user?.role?.level < 700 &&
+          userDepartment === "Operations";
+
+        return !(isSuperAdmin || isOperationsHOD || isOperationsManager);
+      },
     },
   ].filter(hasAccess);
 

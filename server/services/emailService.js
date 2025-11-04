@@ -7,18 +7,77 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Helper function to load certificate images
+// Helper function to load images for emails as data URIs (supports .png/.jpg/.svg)
 const loadEmailImage = (imageName) => {
   try {
     const imagePath = path.resolve(__dirname, "../assets/images", imageName);
     if (fs.existsSync(imagePath)) {
       const imageBuffer = fs.readFileSync(imagePath);
-      return `data:image/jpeg;base64,${imageBuffer.toString("base64")}`;
+      const ext = path.extname(imagePath).toLowerCase();
+      const mime =
+        ext === ".png"
+          ? "image/png"
+          : ext === ".svg"
+          ? "image/svg+xml"
+          : "image/jpeg";
+      return `data:${mime};base64,${imageBuffer.toString("base64")}`;
     }
   } catch (error) {
     console.warn(`⚠️ Could not load image ${imageName}:`, error.message);
   }
   return null;
+};
+
+// Optional CID/public URL support for a uniform logo across all emails
+const getLogoConfig = () => {
+  const filename = process.env.EMAIL_LOGO_FILENAME || "elra-logo.png";
+  const ext = path.extname(filename).toLowerCase();
+  const mime =
+    ext === ".png"
+      ? "image/png"
+      : ext === ".svg"
+      ? "image/svg+xml"
+      : "image/jpeg";
+  return { filename, mime };
+};
+
+const getEmailLogoSrc = () => {
+  const useCid = (process.env.EMAIL_USE_CID || "").toLowerCase() === "true";
+  const cid = process.env.EMAIL_LOGO_CID || "brandLogo";
+  if (useCid) return `cid:${cid}`;
+
+  if (process.env.EMAIL_LOGO_URL) return process.env.EMAIL_LOGO_URL;
+
+  const { filename, mime } = getLogoConfig();
+  try {
+    const imagePath = path.resolve(__dirname, "../assets/images", filename);
+    if (fs.existsSync(imagePath)) {
+      const imageBuffer = fs.readFileSync(imagePath);
+      return `data:${mime};base64,${imageBuffer.toString("base64")}`;
+    }
+  } catch (err) {
+    console.warn("⚠️ Could not resolve email logo src:", err.message);
+  }
+  return null;
+};
+
+const getEmailLogoAttachmentIfNeeded = () => {
+  const useCid = (process.env.EMAIL_USE_CID || "").toLowerCase() === "true";
+  if (!useCid) return null;
+  const { filename, mime } = getLogoConfig();
+  try {
+    const imagePath = path.resolve(__dirname, "../assets/images", filename);
+    if (!fs.existsSync(imagePath)) return null;
+    return {
+      filename,
+      path: imagePath,
+      cid: process.env.EMAIL_LOGO_CID || "brandLogo",
+      contentType: mime,
+    };
+  } catch (err) {
+    console.warn("⚠️ Could not prepare CID logo attachment:", err.message);
+    return null;
+  }
 };
 
 // Create transporter
@@ -99,13 +158,14 @@ const createEmailTemplate = (
       <meta charset="utf-8">
         <title>${title}</title>
         <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .header { background: linear-gradient(135deg, #0D6449 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-        .header h1 { margin: 0 0 5px 0; font-size: 32px; font-weight: bold; }
-        .tagline { margin: 0 0 15px 0; }
-        .tagline p { margin: 0; font-size: 16px; opacity: 0.9; font-weight: 300; letter-spacing: 1px; }
-        .header h2 { margin: 0; font-size: 20px; opacity: 0.9; }
-        .content { padding: 20px; }
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f5f5f5; margin: 0; padding: 20px; }
+        .email-wrapper { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .header { background: #ffffff; color: #1a1a1a; padding: 45px 30px 35px 30px; text-align: center; border-bottom: 3px solid #0D6449; }
+        .header h1 { margin: 12px 0 8px 0; font-size: 36px; font-weight: 700; color: #0D6449; letter-spacing: -0.5px; }
+        .tagline { margin: 0 0 20px 0; }
+        .tagline p { margin: 0; font-size: 17px; color: #059669; font-weight: 400; letter-spacing: 0.5px; }
+        .header h2 { margin: 0; font-size: 22px; color: #333; font-weight: 600; }
+        .content { padding: 30px; background: #ffffff; }
         .order-details { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; }
         .total-section { background: #e8f4fd; padding: 15px; border-radius: 8px; margin: 20px 0; }
         .contact-info { background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 20px 0; }
@@ -153,21 +213,21 @@ const createEmailTemplate = (
         </style>
     </head>
     <body>
+        <div class="email-wrapper">
             <div class="header">
-        <div style="text-align: center; margin-bottom: 8px;">
-          ${(() => {
-            const elraLogo = loadEmailImage("elra-logo.jpg");
-            if (elraLogo) {
-              return `<img src="${elraLogo}" alt="ELRA Logo" style="height: 40px; width: auto; max-width: 40px; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3)); margin-bottom: 8px;" />`;
-            }
-            return "";
-          })()}
-          <h1 style="margin: 0; font-size: 32px; font-weight: bold;">ELRA</h1>
-        </div>
-        <div class="tagline">
-          <p>You Lease, We Regulate</p>
+                <div style="text-align: center; margin-bottom: 12px;">
+                  ${(() => {
+                    const elraLogo = getEmailLogoSrc();
+                    if (elraLogo) {
+                      return `<img src="${elraLogo}" alt="ELRA Logo" style="height: 70px; width: auto; max-width: 200px; display: block; margin: 0 auto 12px auto;" />`;
+                    }
+                    return "";
+                  })()}
                 </div>
-        <h2>${title}</h2>
+                <div class="tagline">
+                  <p>You Lease, We Regulate</p>
+                </div>
+                <h2>${title}</h2>
             </div>
             
             <div class="content">
@@ -187,9 +247,10 @@ const createEmailTemplate = (
                     : ""
                 }
             
-            <div class="footer">
-          <p><strong>${footerText}</strong></p>
-          <p>© ${currentYear} ELRA. All rights reserved.</p>
+                <div class="footer">
+                  <p><strong>${footerText}</strong></p>
+                  <p>© ${currentYear} ELRA. All rights reserved.</p>
+                </div>
             </div>
         </div>
     </body>
@@ -223,6 +284,15 @@ export const sendPasswordResetEmail = async (email, resetToken, userName) => {
       subject: "ELRA - Password Reset Request",
       html: htmlContent,
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log(`✅ Password reset email sent to: ${email}`);
@@ -263,6 +333,15 @@ export const sendWelcomeEmail = async (email, userName) => {
       subject: "Welcome to ELRA - Your Account is Ready!",
       html: htmlContent,
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log("Welcome email sent:", result.messageId);
@@ -304,6 +383,15 @@ export const sendAccountActivationEmail = async (
       subject: "ELRA - Activate Your Account",
       html: htmlContent,
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log(`✅ ACTIVATION EMAIL SENT to ${email}:`, result.messageId);
@@ -339,6 +427,15 @@ export const sendPasswordChangeSuccessEmail = async (email, userName) => {
       subject: "ELRA - Password Changed Successfully",
       html: htmlContent,
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log(`✅ Password change success email sent to: ${email}`);
@@ -364,6 +461,15 @@ export const sendEmail = async (email, subject, htmlContent) => {
       subject: subject,
       html: htmlContent,
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log(`✅ Email sent to: ${email}`);
@@ -415,6 +521,15 @@ export const sendIndustryInstanceInvitation = async (
       subject: `Welcome to ${companyName} - ELRA Platform Access`,
       html: htmlContent,
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log(`✅ Industry instance invitation sent to: ${email}`);
@@ -481,6 +596,15 @@ export const sendInvitationEmail = async (
       subject: `You're Invited to Join ELRA Platform`,
       html: htmlContent,
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log(`✅ Employee invitation sent to: ${email}`);
@@ -537,6 +661,15 @@ export const sendSubscriptionEmail = async (
       subject: "🎉 Your ELRA Subscription is Now Active!",
       html: htmlContent,
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log(`✅ Subscription activation email sent to: ${email}`);
@@ -606,6 +739,15 @@ export const sendPlatformAdminNewSubscriptionEmail = async (
       }`,
       html: htmlContent,
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log(
@@ -672,6 +814,15 @@ export const sendPlatformAdminRenewalEmail = async (
       }`,
       html: htmlContent,
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log(
@@ -740,6 +891,15 @@ export const sendPlatformAdminCancellationEmail = async (
       }`,
       html: htmlContent,
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log(
@@ -811,6 +971,15 @@ export const sendPlatformAdminPaymentFailureEmail = async (
       }`,
       html: htmlContent,
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log(
@@ -863,6 +1032,15 @@ export const sendUserRenewalEmail = async (
       subject: "🔄 Your ELRA Subscription Has Been Renewed!",
       html: htmlContent,
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log(`✅ User renewal email sent to: ${userEmail}`);
@@ -918,6 +1096,15 @@ export const sendUserCancellationEmail = async (
       subject: "⚠️ Your ELRA Subscription Has Been Cancelled",
       html: htmlContent,
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log(`✅ User cancellation email sent to: ${userEmail}`);
@@ -976,6 +1163,15 @@ export const sendUserPaymentFailureEmail = async (
       subject: "❌ Payment Failed - Action Required - ELRA",
       html: htmlContent,
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log(`✅ User payment failure email sent to: ${userEmail}`);
@@ -1111,6 +1307,15 @@ export const sendInventoryCompletionEmail = async (
           ]
         : [],
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log(`✅ Inventory completion email sent to: ${email}`);
@@ -1151,61 +1356,62 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
           body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.6;
-            background: #f7f7fa;
+            background: #f5f5f5;
             min-height: 100vh;
             padding: 20px;
+            margin: 0;
           }
           
           .email-container {
             max-width: 600px;
             margin: 0 auto;
             background: #ffffff;
-            border-radius: 16px;
+            border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
-            border: 1px solid #e7ebea;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
           }
           
           .header {
-            background: linear-gradient(135deg, #0D6449 0%, #059669 50%, #10b981 100%);
-            padding: 40px 30px;
+            background: #ffffff;
+            color: #1a1a1a;
+            padding: 45px 30px 35px 30px;
             text-align: center;
-            color: white;
-            position: relative;
+            border-bottom: 3px solid #0D6449;
           }
           
           .logo {
-            margin-bottom: 16px;
+            margin-bottom: 12px;
             position: relative;
             z-index: 1;
           }
           
           .logo img {
-            height: 60px;
+            height: 70px;
             width: auto;
             max-width: 200px;
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+            display: block;
+            margin: 0 auto 12px auto;
           }
           
           .logo-text {
-            font-size: 32px;
+            font-size: 36px;
             font-weight: 700;
-            margin-bottom: 8px;
+            margin: 12px 0 8px 0;
             letter-spacing: -0.5px;
-            color: white;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            color: #0D6449;
           }
           
           .subtitle {
-            font-size: 16px;
-            opacity: 0.9;
+            font-size: 17px;
+            color: #059669;
             font-weight: 400;
-            margin-bottom: 8px;
+            margin: 0 0 20px 0;
+            letter-spacing: 0.5px;
           }
           
           .subtitle-secondary {
             font-size: 14px;
-            opacity: 0.8;
+            color: #059669;
             font-weight: 300;
             letter-spacing: 0.3px;
           }
@@ -1344,19 +1550,16 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
       <body>
         <div class="email-container">
           <div class="header">
-            <div class="logo-container">
-              <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 10px;">
-                ${(() => {
-                  const elraLogo = loadEmailImage("elra-logo.jpg");
-                  if (elraLogo) {
-                    return `<img src="${elraLogo}" alt="ELRA Logo" style="height: 60px; width: auto; max-width: 60px; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));" />`;
-                  }
-                  return "";
-                })()}
-            <div class="logo-text">ELRA</div>
-              </div>
+            <div class="logo">
+              ${(() => {
+                const elraLogo = getEmailLogoSrc();
+                if (elraLogo) {
+                  return `<img src="${elraLogo}" alt="ELRA Logo" style="height: 70px; width: auto; max-width: 200px; display: block; margin: 0 auto 12px auto;" />`;
+                }
+                return "";
+              })()}
             </div>
-            <div class="subtitle">You Lease, We Regulate...</div>
+            <div class="subtitle">You Lease, We Regulate</div>
           </div>
           
           <div class="content">
@@ -1408,6 +1611,15 @@ export const sendPendingRegistrationEmail = async (email, firstName) => {
       subject: "Registration Received - ELRA",
       html: htmlContent,
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log(`✅ PENDING REGISTRATION EMAIL SENT to ${email}`);
@@ -1447,10 +1659,11 @@ const sendPayslipEmail = async ({
           body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.6;
-            background: #ffffff;
+            background: #f5f5f5;
             min-height: 100vh;
             padding: 20px;
-            color: #000000;
+            margin: 0;
+            color: #333;
           }
           
           .email-container {
@@ -1459,47 +1672,43 @@ const sendPayslipEmail = async ({
             background: #ffffff;
             border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            border: 1px solid #e5e7eb;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
           }
           
           .header {
-            background: linear-gradient(135deg, #0d6449 0%, #059669 100%);
-            padding: 30px 20px;
+            background: #ffffff;
+            color: #1a1a1a;
+            padding: 45px 30px 35px 30px;
             text-align: center;
-            color: white;
+            border-bottom: 3px solid #0D6449;
           }
           
           .logo-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
           }
           
           .logo-image {
-            height: 60px;
+            height: 70px;
             width: auto;
             max-width: 200px;
+            display: block;
+            margin: 0 auto 12px auto;
           }
           
           .logo-text {
-            font-size: 48px;
-            font-weight: 800;
-            letter-spacing: -2px;
-            font-family: 'Poppins', sans-serif;
-            color: white;
-            margin: 0;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            font-size: 36px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: #0D6449;
+            margin: 12px 0 8px 0;
           }
           
           .subtitle {
-            font-size: 16px;
-            font-weight: 500;
-            color: white;
+            font-size: 17px;
+            font-weight: 400;
+            color: #059669;
             letter-spacing: 0.5px;
-            margin-top: 8px;
+            margin: 0;
           }
           
           .content {
@@ -1646,18 +1855,15 @@ const sendPayslipEmail = async ({
                  <div class="email-container">
            <div class="header">
              <div class="logo-container">
-               <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 10px;">
-                 ${(() => {
-                   const elraLogo = loadEmailImage("elra-logo.jpg");
-                   if (elraLogo) {
-                     return `<img src="${elraLogo}" alt="ELRA Logo" style="height: 60px; width: auto; max-width: 60px; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));" />`;
-                   }
-                   return "";
-                 })()}
-               <div class="logo-text">ELRA</div>
-               </div>
+               ${(() => {
+                 const elraLogo = getEmailLogoSrc();
+                 if (elraLogo) {
+                   return `<img src="${elraLogo}" alt="ELRA Logo" class="logo-image" />`;
+                 }
+                 return "";
+               })()}
              </div>
-             <div class="subtitle">You Lease, We Regulate...</div>
+             <div class="subtitle">You Lease, We Regulate</div>
            </div>
           
           <div class="content">
@@ -1720,6 +1926,15 @@ const sendPayslipEmail = async ({
         },
       ],
     };
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
+    }
 
     const result = await transporter.sendMail(mailOptions);
     console.log(
@@ -1926,6 +2141,15 @@ export const sendVendorNotificationEmail = async (
           contentType: "application/pdf",
         },
       ];
+    }
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
     }
 
     const result = await transporter.sendMail(mailOptions);
@@ -2228,6 +2452,15 @@ export const sendClientNotificationEmail = async (
           contentType: "application/pdf",
         },
       ];
+    }
+    {
+      const logoAttachment = getEmailLogoAttachmentIfNeeded();
+      if (logoAttachment) {
+        mailOptions.attachments = [
+          ...(mailOptions.attachments || []),
+          logoAttachment,
+        ];
+      }
     }
 
     const result = await transporter.sendMail(mailOptions);

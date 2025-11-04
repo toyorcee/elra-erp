@@ -56,6 +56,11 @@ const companyWalletSchema = new mongoose.Schema(
           default: 0,
           min: 0,
         },
+        reserved: {
+          type: Number,
+          default: 0,
+          min: 0,
+        },
       },
       projects: {
         allocated: {
@@ -496,11 +501,10 @@ companyWalletSchema.methods.reserveFromCategory = function (
     totalAvailableFunds: this.availableFunds,
   });
 
-  // Update category reservation
   this.budgetCategories[category].available -= amount;
-  this.budgetCategories[category].reserved += amount;
+  this.budgetCategories[category].reserved =
+    (this.budgetCategories[category].reserved || 0) + amount;
 
-  // Update overall wallet
   this.reservedFunds += amount;
 
   console.log(`💰 [WALLET METHOD] AFTER UPDATE:`, {

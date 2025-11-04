@@ -153,6 +153,8 @@ const notificationSchema = new mongoose.Schema(
         "complaint_reminder",
         "complaint_forwarded",
         "PROJECT_CERTIFICATE_READY",
+        "OFFBOARDING_REVERTED",
+        "ONBOARDING_COMPLETED",
       ],
       required: true,
     },

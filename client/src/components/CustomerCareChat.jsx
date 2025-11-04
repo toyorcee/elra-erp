@@ -79,6 +79,8 @@ const CustomerCareChat = () => {
       return;
     }
 
+    setIsTyping(true);
+
     try {
       const complaintsResponse = await complaintAPI.getComplaints({
         submittedByMe: true,
@@ -116,16 +118,19 @@ const CustomerCareChat = () => {
     } catch (error) {
       console.error("Error checking user history:", error);
       showDefaultGreeting();
+    } finally {
+      setIsTyping(false);
     }
   };
 
   const showSmartGreeting = (recentComplaints, activeComplaints) => {
     if (activeComplaints.length > 0) {
       const activeComplaint = activeComplaints[0];
+      sessionStorage.setItem("prefetchedComplaintId", activeComplaint._id);
       const smartMessage = {
         id: Date.now(),
         type: "bot",
-        message: `Welcome back! I see you have an active complaint (#${activeComplaint.complaintNumber}) about "${activeComplaint.title}". Would you like to continue discussing this issue or start a new complaint?`,
+        message: `Welcome back! I see you have an active complaint (#${activeComplaint.complaintNumber}) about "${activeComplaint.title}". Say "yes" to check the status, or "no" to submit a new complaint.`,
         timestamp: new Date().toISOString(),
       };
       setMessages([smartMessage]);
@@ -133,10 +138,12 @@ const CustomerCareChat = () => {
       setConversationState("waiting_for_choice");
     } else if (recentComplaints.length > 0) {
       const recentComplaint = recentComplaints[0];
+      // Store complaint ID for status check
+      sessionStorage.setItem("prefetchedComplaintId", recentComplaint._id);
       const smartMessage = {
         id: Date.now(),
         type: "bot",
-        message: `Hi! I see you submitted a complaint recently (#${recentComplaint.complaintNumber}) about "${recentComplaint.title}". Is this related to that issue or do you have a new concern?`,
+        message: `Hi! I see you submitted a complaint recently (#${recentComplaint.complaintNumber}) about "${recentComplaint.title}". Say "yes" to check the status, or "no" to submit a new complaint.`,
         timestamp: new Date().toISOString(),
       };
       setMessages([smartMessage]);
@@ -187,60 +194,6 @@ const CustomerCareChat = () => {
     setUserHistory(null);
     setShowHistoryOptions(false);
     setConversationState("idle");
-  };
-
-  useEffect(() => {
-    const prefetchedComplaintId = sessionStorage.getItem(
-      "prefetchedComplaintId"
-    );
-
-    if (prefetchedComplaintId) {
-      fetchComplaintDetails(prefetchedComplaintId);
-      sessionStorage.removeItem("prefetchedComplaintId");
-    }
-  }, []);
-
-  const fetchComplaintDetails = async (complaintId) => {
-    setIsTyping(true);
-
-    try {
-      const response = await complaintAPI.getComplaintById(complaintId);
-
-      if (response.success) {
-        const complaint = response.data;
-
-        const prefetchedMessage = {
-          id: Date.now(),
-          type: "bot",
-          message: `I see you want to continue discussing your complaint "${complaint.title}" (${complaint.complaintNumber}). Current status: ${complaint.status}. How can I help you with this issue?`,
-          timestamp: new Date().toISOString(),
-        };
-
-        setMessages((prev) => [...prev, prefetchedMessage]);
-      } else {
-        console.error("❌ API response not successful:", response);
-        const fallbackMessage = {
-          id: Date.now(),
-          type: "bot",
-          message:
-            "I see you want to continue discussing a complaint. How can I help you with this issue?",
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, fallbackMessage]);
-      }
-    } catch (error) {
-      console.error("❌ Error fetching complaint details:", error);
-      const fallbackMessage = {
-        id: Date.now(),
-        type: "bot",
-        message:
-          "I see you want to continue discussing a complaint. How can I help you with this issue?",
-        timestamp: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, fallbackMessage]);
-    } finally {
-      setIsTyping(false);
-    }
   };
 
   const isSpamOrAbuse = (message) => {
@@ -455,30 +408,51 @@ const CustomerCareChat = () => {
       setIsTyping(true);
 
       await new Promise((resolve) => setTimeout(resolve, 2000));
-
       const response = await complaintAPI.getComplaintById(complaintId);
+      console.log(
+        "🔍 [CUSTOMER CARE CHAT] Complaint status check response:",
+        response
+      );
 
-      if (response.success) {
+      if (response && response.success) {
         const complaint = response.data;
-        await complaintAPI.sendReminderNotification(complaintId);
+
+        let reminderSent = false;
+        try {
+          await complaintAPI.sendReminderNotification(complaintId);
+          reminderSent = true;
+        } catch (reminderError) {
+          console.error(
+            "❌ [CUSTOMER CARE CHAT] Error sending reminder notification:",
+            reminderError
+          );
+        }
 
         let botMessage = "";
 
         switch (complaint.status) {
           case "pending":
-            botMessage = `I've checked your complaint "${complaint.title}" (${complaint.complaintNumber}). Current status: 🟡 **PENDING** - I've sent a reminder to the Customer Care team. They should respond within 24-48 hours. Are there any other issues I can help you with?`;
+            botMessage = reminderSent
+              ? `I've checked your complaint "${complaint.title}" (${complaint.complaintNumber}). Current status: 🟡 **PENDING** - I've sent a reminder to the Customer Care team. They should respond within 24-48 hours. Are there any other issues I can help you with?`
+              : `I've checked your complaint "${complaint.title}" (${complaint.complaintNumber}). Current status: 🟡 **PENDING** - The Customer Care team is reviewing your complaint and should respond within 24-48 hours. Are there any other issues I can help you with?`;
             break;
           case "in_progress":
-            botMessage = `I've checked your complaint "${complaint.title}" (${complaint.complaintNumber}). Current status: 🔵 **IN PROGRESS** - I've sent a reminder to the assigned team member. They should provide an update soon. Are there any other issues I can help you with?`;
+            botMessage = reminderSent
+              ? `I've checked your complaint "${complaint.title}" (${complaint.complaintNumber}). Current status: 🔵 **IN PROGRESS** - I've sent a reminder to the assigned team member. They should provide an update soon. Are there any other issues I can help you with?`
+              : `I've checked your complaint "${complaint.title}" (${complaint.complaintNumber}). Current status: 🔵 **IN PROGRESS** - The assigned team member is working on your complaint and should provide an update soon. Are there any other issues I can help you with?`;
             break;
           case "resolved":
-            botMessage = `Great news! Your complaint "${complaint.title}" (${complaint.complaintNumber}) has been 🟢 **RESOLVED**! If you haven't received the resolution details, I'll send a reminder to the team to follow up with you directly. Are there any other issues I can help you with?`;
+            botMessage = reminderSent
+              ? `Great news! Your complaint "${complaint.title}" (${complaint.complaintNumber}) has been 🟢 **RESOLVED**! If you haven't received the resolution details, I'll send a reminder to the team to follow up with you directly. Are there any other issues I can help you with?`
+              : `Great news! Your complaint "${complaint.title}" (${complaint.complaintNumber}) has been 🟢 **RESOLVED**! If you haven't received the resolution details, please contact the Customer Care team. Are there any other issues I can help you with?`;
             break;
           case "closed":
             botMessage = `Your complaint "${complaint.title}" (${complaint.complaintNumber}) has been ⚫ **CLOSED**. If you have any questions about the resolution, I can help you get in touch with the Customer Care team. Are there any other issues I can help you with?`;
             break;
           default:
-            botMessage = `I've checked your complaint "${complaint.title}" (${complaint.complaintNumber}). I've sent a reminder notification to the Customer Care team about your concern. Are there any other issues I can help you with?`;
+            botMessage = reminderSent
+              ? `I've checked your complaint "${complaint.title}" (${complaint.complaintNumber}). I've sent a reminder notification to the Customer Care team about your concern. Are there any other issues I can help you with?`
+              : `I've checked your complaint "${complaint.title}" (${complaint.complaintNumber}). The Customer Care team is aware of your concern. Are there any other issues I can help you with?`;
         }
 
         const statusResponse = {
@@ -491,11 +465,26 @@ const CustomerCareChat = () => {
         setMessages((prev) => [...prev, statusResponse]);
         setIsTyping(false);
       } else {
+        // Try to send reminder even if we can't fetch the complaint details
+        let reminderSent = false;
+        if (complaintId) {
+          try {
+            await complaintAPI.sendReminderNotification(complaintId);
+            reminderSent = true;
+          } catch (reminderError) {
+            console.error(
+              "❌ [CUSTOMER CARE CHAT] Error sending reminder notification:",
+              reminderError
+            );
+          }
+        }
+
         const errorResponse = {
           id: Date.now(),
           type: "bot",
-          message:
-            "I'm having trouble checking your complaint status right now, but I've sent a reminder notification to the Customer Care team about your concern. They should get back to you soon.",
+          message: reminderSent
+            ? "I'm having trouble checking your complaint status right now, but I've sent a reminder notification to the Customer Care team about your concern. They should get back to you soon. Please try again later or contact support directly."
+            : "I'm having trouble checking your complaint status right now. Please try again later or contact support directly.",
           timestamp: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, errorResponse]);
@@ -506,15 +495,34 @@ const CustomerCareChat = () => {
         "❌ [CUSTOMER CARE CHAT] Error checking complaint status:",
         error
       );
+      console.error(
+        "❌ [CUSTOMER CARE CHAT] Error details:",
+        error.response?.data || error.message || error
+      );
+
+      // Try to send reminder even on error if we have the complaintId
+      let reminderSent = false;
+      if (complaintId) {
+        try {
+          await complaintAPI.sendReminderNotification(complaintId);
+          reminderSent = true;
+        } catch (reminderError) {
+          console.error(
+            "❌ [CUSTOMER CARE CHAT] Error sending reminder notification:",
+            reminderError
+          );
+        }
+      }
+
       const errorResponse = {
         id: Date.now(),
         type: "bot",
-        message:
-          "I'm having trouble checking your complaint status right now, but I've sent a reminder notification to the Customer Care team about your concern. They should get back to you soon.",
+        message: reminderSent
+          ? "I'm having trouble checking your complaint status right now, but I've sent a reminder notification to the Customer Care team about your concern. They should get back to you soon. Please try again later or contact support directly."
+          : "I'm having trouble checking your complaint status right now. Please try again later or contact support directly.",
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorResponse]);
-    } finally {
       setIsTyping(false);
     }
   };
@@ -561,33 +569,9 @@ const CustomerCareChat = () => {
       return;
     }
 
-    // 2. Handle complaint step-by-step collection
+    // 2. Handle complaint step-by-step collection (SIMPLIFIED: 4 steps only)
     if (isComplaintMode) {
-      if (complaintStep === "title") {
-        setComplaintTitle(messageText);
-
-        setTimeout(() => {
-          const botResponse = {
-            id: Date.now() + 1,
-            type: "bot",
-            message:
-              `Perfect! I've set the title as "${messageText}". 🎯 Now, how urgent is this issue? Please choose:` +
-              " 🟢 Low - Can wait a few days (e.g., general questions, minor issues)" +
-              " 🟡 Medium - Normal priority (e.g., standard requests, moderate issues)" +
-              " 🔴 High - Needs attention soon (e.g., urgent problems, blocking work)" +
-              " Just type: Low, Medium, or High",
-            timestamp: new Date().toISOString(),
-          };
-          setMessages((prev) => [...prev, botResponse]);
-          setComplaintStep("priority");
-          setShowPriorityButtons(true);
-          setIsTyping(false);
-        }, 1000);
-        return;
-      }
-
       if (complaintStep === "category") {
-        // Parse category from user response
         const categoryText = messageText.toLowerCase();
         let selectedCategory = "other";
 
@@ -636,7 +620,7 @@ const CustomerCareChat = () => {
 
         setComplaintCategory(selectedCategory);
 
-        // Ask for details next
+        // Ask for details next (Step 3)
         setTimeout(() => {
           const botResponse = {
             id: Date.now() + 1,
@@ -657,226 +641,101 @@ const CustomerCareChat = () => {
       }
 
       if (complaintStep === "details") {
-        // User provided the details
+        // User provided the details - ready to submit (Step 4)
         setFinalComplaintMessage(messageText);
+        setComplaintPriority("medium");
 
-        // Ask for title next
         setTimeout(() => {
           const botResponse = {
             id: Date.now() + 1,
             type: "bot",
             message:
-              "Thank you for the details! 📝 Now I need a clear title for your complaint." +
-              " Please give me a short, descriptive title (e.g., 'Salary Calculation Error', 'Computer Not Working', 'Leave Request Issue')." +
-              " This will help our team quickly understand what the complaint is about.",
-            timestamp: new Date().toISOString(),
-          };
-          setMessages((prev) => [...prev, botResponse]);
-          setComplaintStep("title");
-          setIsTyping(false);
-        }, 1000);
-        return;
-      }
-
-      if (complaintStep === "priority") {
-        // Parse priority from user response
-        const priorityText = messageText.toLowerCase();
-        let selectedPriority = "medium";
-
-        if (priorityText.includes("low")) selectedPriority = "low";
-        else if (priorityText.includes("medium")) selectedPriority = "medium";
-        else if (priorityText.includes("high")) selectedPriority = "high";
-
-        setComplaintPriority(selectedPriority);
-
-        // Ready to submit
-        setTimeout(() => {
-          const botResponse = {
-            id: Date.now() + 1,
-            type: "bot",
-            message:
-              `Perfect! I've set the priority as **${selectedPriority.toUpperCase()}**. 🎯` +
-              " Complaint Summary:" +
-              ` 📋 Title: ${complaintTitle}` +
-              ` 📝 Description: ${finalComplaintMessage}` +
-              ` 📂 Category: ${complaintCategory
-                .replace("_", " ")
-                .toUpperCase()}` +
-              ` ⚡ Priority: ${selectedPriority.toUpperCase()}` +
-              " Ready to submit! Type 'submit' to send this complaint to our Customer Care team. 🚀",
+              "Thank you for the details! 📝 Ready to submit. Type 'submit' to send this complaint to our Customer Care team. 🚀",
             timestamp: new Date().toISOString(),
           };
           setMessages((prev) => [...prev, botResponse]);
           setComplaintStep("submit");
-          setShowPriorityButtons(false);
           setIsTyping(false);
         }, 1000);
         return;
       }
     }
 
-    // 2. SECOND PRIORITY: Check for feedback-related keywords
-    const feedbackKeywords = [
-      "feedback",
-      "response",
-      "reply",
-      "answer",
-      "update",
-      "status",
-      "progress",
-      "heard",
-      "contacted",
-      "reached",
-      "called",
-      "emailed",
-      "messaged",
-      "notified",
-      "assigned",
-      "assigned to",
-      "handled",
-      "processed",
-      "reviewed",
-      "looked at",
-      "haven't",
-      "have not",
-      "didn't",
-      "did not",
-      "no response",
-      "no feedback",
-      "no update",
-      "no answer",
-      "no reply",
-      "silence",
-      "ignored",
-      "forgotten",
-    ];
+    // 3. Handle conversation choice (check status vs new complaint)
+    if (conversationState === "waiting_for_choice") {
+      const lowerMessage = messageText.toLowerCase().trim();
 
-    const isFeedbackRelated = feedbackKeywords.some((keyword) =>
-      messageText.toLowerCase().includes(keyword)
-    );
+      // Keywords for checking status (yes)
+      const checkStatusKeywords = [
+        "yes",
+        "yeah",
+        "yep",
+        "yup",
+        "sure",
+        "ok",
+        "okay",
+        "check",
+        "status",
+        "update",
+        "see",
+        "show",
+        "view",
+        "na",
+        "abi",
+        "sha",
+        "ehn", // Nigerian Pidgin confirmations
+        "correct",
+        "true",
+        "right",
+      ];
 
-    if (isFeedbackRelated) {
-      const prefetchedComplaintId = sessionStorage.getItem(
-        "prefetchedComplaintId"
+      // Keywords for starting new complaint (no)
+      const newComplaintKeywords = [
+        "no",
+        "nope",
+        "not",
+        "new",
+        "different",
+        "another",
+        "separate",
+        "new complaint",
+        "different complaint",
+        "another complaint",
+        "no be",
+        "e no be",
+        "abi no",
+        "e no be that", // Nigerian Pidgin
+      ];
+
+      const wantsToCheckStatus = checkStatusKeywords.some((keyword) =>
+        lowerMessage.includes(keyword)
       );
 
-      if (prefetchedComplaintId) {
-        handleFeedbackCheck(prefetchedComplaintId);
-        return;
-      } else {
-        handleFeedbackCheckForRecentComplaint();
-        return;
-      }
-    }
+      const wantsNewComplaint = newComplaintKeywords.some((keyword) =>
+        lowerMessage.includes(keyword)
+      );
 
-    // 2.5. Check for thank you keywords
-    const thankYouKeywords = [
-      "thank you",
-      "thanks",
-      "thank u",
-      "tanks",
-      "tnx",
-      "thx",
-      "appreciate",
-      "grateful",
-      "bless",
-      "blessed",
-      "appreciation",
-      "well done",
-      "good job",
-      "nice work",
-      "excellent",
-      "great help",
-      "helpful",
-      "useful",
-      "amazing",
-      "wonderful",
-      "fantastic",
-    ];
-
-    const isThankYou = thankYouKeywords.some((keyword) =>
-      messageText.toLowerCase().includes(keyword)
-    );
-
-    if (isThankYou) {
-      setTimeout(() => {
-        const thankYouResponse = {
-          id: Date.now(),
-          type: "bot",
-          message:
-            "You're very welcome! 😉 I'm here to help with any work-related issues or complaints. Is there anything else I can assist you with?",
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, thankYouResponse]);
-        setIsTyping(false);
-      }, 1000);
-      return;
-    }
-
-    // 3. THIRD PRIORITY: Handle conversation state choices
-    if (conversationState === "waiting_for_choice") {
-      if (
-        messageText.toLowerCase().includes("continue") ||
-        messageText.toLowerCase().includes("yes") ||
-        messageText.toLowerCase().includes("related") ||
-        messageText.toLowerCase().includes("na") ||
-        messageText.toLowerCase().includes("abi") ||
-        messageText.toLowerCase().includes("sha") ||
-        messageText.toLowerCase().includes("ehn") ||
-        messageText.toLowerCase().includes("okay") ||
-        messageText.toLowerCase().includes("sure") ||
-        messageText.toLowerCase().includes("correct") ||
-        messageText.toLowerCase().includes("true") ||
-        messageText.toLowerCase().includes("that one") ||
-        messageText.toLowerCase().includes("same thing") ||
-        messageText.toLowerCase().includes("same problem") ||
-        messageText.toLowerCase().includes("that issue") ||
-        messageText.toLowerCase().includes("that complaint")
-      ) {
-        setConversationState("complaint_mode");
-        setTimeout(() => {
-          const botResponse = {
-            id: Date.now() + 1,
-            type: "bot",
-            message:
-              "Perfect! I'll help you continue with your existing complaint. What would you like to know or discuss about it?",
-            timestamp: new Date().toISOString(),
-          };
-          setMessages((prev) => [...prev, botResponse]);
-          setIsTyping(false);
-        }, 1500);
+      if (wantsToCheckStatus && !wantsNewComplaint) {
+        // User wants to check status - fetch complaint status
+        const prefetchedComplaintId = sessionStorage.getItem(
+          "prefetchedComplaintId"
+        );
+        if (prefetchedComplaintId) {
+          await handleFeedbackCheck(prefetchedComplaintId);
+        } else {
+          handleFeedbackCheckForRecentComplaint();
+        }
+        setConversationState("idle");
         return;
       }
 
-      // User wants to start new complaint
-      if (
-        messageText.toLowerCase().includes("new") ||
-        messageText.toLowerCase().includes("different") ||
-        messageText.toLowerCase().includes("another") ||
-        messageText.toLowerCase().includes("separate") ||
-        messageText.toLowerCase().includes("no") ||
-        messageText.toLowerCase().includes("never") ||
-        messageText.toLowerCase().includes("not") ||
-        messageText.toLowerCase().includes("nothing") ||
-        messageText.toLowerCase().includes("no be") ||
-        messageText.toLowerCase().includes("no o") ||
-        messageText.toLowerCase().includes("abi no") ||
-        messageText.toLowerCase().includes("e no be") ||
-        messageText.toLowerCase().includes("different thing") ||
-        messageText.toLowerCase().includes("another thing") ||
-        messageText.toLowerCase().includes("new thing") ||
-        messageText.toLowerCase().includes("fresh") ||
-        messageText.toLowerCase().includes("another complaint") ||
-        messageText.toLowerCase().includes("different complaint") ||
-        messageText.toLowerCase().includes("new complaint") ||
-        messageText.toLowerCase().includes("separate issue") ||
-        messageText.toLowerCase().includes("another issue")
-      ) {
-        setConversationState("new_complaint");
+      if (wantsNewComplaint || (!wantsToCheckStatus && !wantsNewComplaint)) {
+        sessionStorage.removeItem("prefetchedComplaintId");
         setTimeout(() => {
           setIsComplaintMode(true);
           setComplaintStep("category");
           setShowCategoryButtons(true);
+          setConversationState("idle");
           const botResponse = {
             id: Date.now() + 1,
             type: "bot",
@@ -898,190 +757,17 @@ const CustomerCareChat = () => {
           };
           setMessages((prev) => [...prev, botResponse]);
           setIsTyping(false);
-        }, 1500);
+        }, 1000);
         return;
       }
     }
 
-    // 4. FOURTH PRIORITY: Check for general complaint keywords
-    const complaintKeywords = [
-      "complaint",
-      "issue",
-      "problem",
-      "concern",
-      "help",
-      "support",
-    ];
-    const isComplaint = complaintKeywords.some((keyword) =>
-      messageText.toLowerCase().includes(keyword)
-    );
-
-    if (isComplaint) {
-      setTimeout(() => {
-        const botResponse = {
-          id: Date.now() + 1,
-          type: "bot",
-          message:
-            "I understand you have a concern. Would you like me to help you submit a formal complaint? This will ensure it gets tracked and resolved properly.",
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, botResponse]);
-        setIsTyping(false);
-      }, 1500);
-      return;
-    }
-
-    // 5. FIFTH PRIORITY: Handle yes/no responses
-    if (
-      messageText.toLowerCase().includes("yes") ||
-      messageText.toLowerCase().includes("yeah") ||
-      messageText.toLowerCase().includes("ya") ||
-      messageText.toLowerCase().includes("sure") ||
-      messageText.toLowerCase().includes("ok") ||
-      messageText.toLowerCase().includes("okay") ||
-      messageText.toLowerCase().includes("yep") ||
-      messageText.toLowerCase().includes("yup") ||
-      messageText.toLowerCase().includes("na") ||
-      messageText.toLowerCase().includes("abi") ||
-      messageText.toLowerCase().includes("sha") ||
-      messageText.toLowerCase().includes("ehn") ||
-      messageText.toLowerCase().includes("correct") ||
-      messageText.toLowerCase().includes("true") ||
-      messageText.toLowerCase().includes("that one") ||
-      messageText.toLowerCase().includes("go ahead") ||
-      messageText.toLowerCase().includes("make we do am") ||
-      messageText.toLowerCase().includes("let's do it") ||
-      messageText.toLowerCase().includes("submit am")
-    ) {
-      setTimeout(() => {
-        setIsComplaintMode(true);
-        const botResponse = {
-          id: Date.now() + 1,
-          type: "bot",
-          message:
-            "Perfect! Please tell me more details about your complaint. What exactly is the issue you're experiencing?",
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, botResponse]);
-        setIsTyping(false);
-      }, 1500);
-      return;
-    }
-
-    if (
-      messageText.toLowerCase().includes("no") ||
-      messageText.toLowerCase().includes("nope") ||
-      messageText.toLowerCase().includes("hell no") ||
-      messageText.toLowerCase().includes("not really") ||
-      messageText.toLowerCase().includes("don't want") ||
-      messageText.toLowerCase().includes("dont want") ||
-      messageText.toLowerCase().includes("no thanks") ||
-      messageText.toLowerCase().includes("no thank you") ||
-      messageText.toLowerCase().includes("no be") ||
-      messageText.toLowerCase().includes("no o") ||
-      messageText.toLowerCase().includes("abi no") ||
-      messageText.toLowerCase().includes("e no be") ||
-      messageText.toLowerCase().includes("never") ||
-      messageText.toLowerCase().includes("not") ||
-      messageText.toLowerCase().includes("nothing") ||
-      messageText.toLowerCase().includes("no need") ||
-      messageText.toLowerCase().includes("no wahala") ||
-      messageText.toLowerCase().includes("no problem") ||
-      messageText.toLowerCase().includes("e no need") ||
-      messageText.toLowerCase().includes("e no necessary")
-    ) {
-      setTimeout(() => {
-        const botResponse = {
-          id: Date.now() + 1,
-          type: "bot",
-          message:
-            "No problem! If you change your mind or need help with anything else, just let me know. I'm here to assist you with any work-related issues or concerns.",
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, botResponse]);
-        setIsTyping(false);
-      }, 1500);
-      return;
-    }
-
-    // 6. DEFAULT: General response
-    setTimeout(() => {
-      const botResponse = {
-        id: Date.now() + 1,
-        type: "bot",
-        message:
-          "I'm here to help you with work-related issues and complaints. 🤝 If you have a specific problem or concern, please describe it and I'll help you submit a formal complaint. You can also ask me about the status of existing complaints.",
-        timestamp: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, botResponse]);
-      setIsTyping(false);
-    }, 1500);
-
-    if (
-      conversationState === "waiting_for_choice" &&
-      (messageText.toLowerCase().includes("continue") ||
-        messageText.toLowerCase().includes("yes") ||
-        messageText.toLowerCase().includes("related") ||
-        messageText.toLowerCase().includes("na") ||
-        messageText.toLowerCase().includes("abi") ||
-        messageText.toLowerCase().includes("sha") ||
-        messageText.toLowerCase().includes("ehn") ||
-        messageText.toLowerCase().includes("okay") ||
-        messageText.toLowerCase().includes("sure") ||
-        messageText.toLowerCase().includes("correct") ||
-        messageText.toLowerCase().includes("true") ||
-        messageText.toLowerCase().includes("that one") ||
-        messageText.toLowerCase().includes("same thing") ||
-        messageText.toLowerCase().includes("same problem") ||
-        messageText.toLowerCase().includes("that issue") ||
-        messageText.toLowerCase().includes("that complaint"))
-    ) {
-      setConversationState("complaint_mode");
-      setTimeout(() => {
-        const botResponse = {
-          id: Date.now() + 1,
-          type: "bot",
-          message:
-            "Perfect! I'll help you continue with your existing complaint. What would you like to know or discuss about it?",
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, botResponse]);
-        setIsTyping(false);
-      }, 1500);
-      return;
-    }
-
-    if (
-      conversationState === "waiting_for_choice" &&
-      (messageText.toLowerCase().includes("new") ||
-        messageText.toLowerCase().includes("different") ||
-        messageText.toLowerCase().includes("another") ||
-        messageText.toLowerCase().includes("separate") ||
-        messageText.toLowerCase().includes("no") ||
-        messageText.toLowerCase().includes("never") ||
-        messageText.toLowerCase().includes("not") ||
-        messageText.toLowerCase().includes("nothing") ||
-        messageText.toLowerCase().includes("no be") ||
-        messageText.toLowerCase().includes("no o") ||
-        messageText.toLowerCase().includes("abi no") ||
-        messageText.toLowerCase().includes("e no be") ||
-        messageText.toLowerCase().includes("e no be that") ||
-        messageText.toLowerCase().includes("different thing") ||
-        messageText.toLowerCase().includes("another thing") ||
-        messageText.toLowerCase().includes("new thing") ||
-        messageText.toLowerCase().includes("fresh") ||
-        messageText.toLowerCase().includes("another complaint") ||
-        messageText.toLowerCase().includes("different complaint") ||
-        messageText.toLowerCase().includes("new complaint") ||
-        messageText.toLowerCase().includes("separate issue") ||
-        messageText.toLowerCase().includes("another issue"))
-    ) {
-      setConversationState("new_complaint");
+    // 4. DEFAULT: If not in complaint mode, start complaint mode (Step 1)
+    if (!isComplaintMode) {
       setTimeout(() => {
         setIsComplaintMode(true);
         setComplaintStep("category");
         setShowCategoryButtons(true);
-        setShowPriorityButtons(false);
         const botResponse = {
           id: Date.now() + 1,
           type: "bot",
@@ -1103,151 +789,8 @@ const CustomerCareChat = () => {
         };
         setMessages((prev) => [...prev, botResponse]);
         setIsTyping(false);
-      }, 1500);
+      }, 1000);
       return;
-    }
-
-    if (isFeedbackRelated) {
-      const prefetchedComplaintId = sessionStorage.getItem(
-        "prefetchedComplaintId"
-      );
-
-      if (prefetchedComplaintId) {
-        handleFeedbackCheck(prefetchedComplaintId);
-      } else {
-        setTimeout(() => {
-          const botResponse = {
-            id: Date.now() + 1,
-            type: "bot",
-            message:
-              "I understand you haven't received feedback yet. Let me check the status of your complaint and see what's happening. I'll also notify the Customer Care team about your concern. Can you tell me more about what you were expecting to hear back about?",
-            timestamp: new Date().toISOString(),
-          };
-          setMessages((prev) => [...prev, botResponse]);
-          setIsTyping(false);
-        }, 1500);
-      }
-    } else if (isComplaint) {
-      setTimeout(() => {
-        const botResponse = {
-          id: Date.now() + 1,
-          type: "bot",
-          message:
-            "I understand you have a concern. Would you like me to help you submit a formal complaint? This will ensure it gets tracked and resolved properly.",
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, botResponse]);
-        setIsTyping(false);
-      }, 1500);
-    } else if (
-      messageText.toLowerCase().includes("yes") ||
-      messageText.toLowerCase().includes("yeah") ||
-      messageText.toLowerCase().includes("ya") ||
-      messageText.toLowerCase().includes("sure") ||
-      messageText.toLowerCase().includes("ok") ||
-      messageText.toLowerCase().includes("okay") ||
-      messageText.toLowerCase().includes("yep") ||
-      messageText.toLowerCase().includes("yup") ||
-      messageText.toLowerCase().includes("na") ||
-      messageText.toLowerCase().includes("abi") ||
-      messageText.toLowerCase().includes("sha") ||
-      messageText.toLowerCase().includes("ehn") ||
-      messageText.toLowerCase().includes("correct") ||
-      messageText.toLowerCase().includes("true") ||
-      messageText.toLowerCase().includes("that one") ||
-      messageText.toLowerCase().includes("go ahead") ||
-      messageText.toLowerCase().includes("make we do am") ||
-      messageText.toLowerCase().includes("let's do it") ||
-      messageText.toLowerCase().includes("submit am")
-    ) {
-      setTimeout(() => {
-        setIsComplaintMode(true);
-        setComplaintStep("category");
-        setShowCategoryButtons(true);
-        setShowPriorityButtons(false);
-        const botResponse = {
-          id: Date.now() + 1,
-          type: "bot",
-          message:
-            "Great! I'll help you submit your complaint. 🎯 What's your complaint about? Please choose one:" +
-            " 💰 Salary & Pay - Payroll issues, deductions, bonuses, allowances" +
-            " 🏖️ Leave & Time Off - Leave requests, attendance, time tracking" +
-            " 🖥️ Equipment & IT - Computer problems, equipment requests, technical issues" +
-            " 👥 HR & Policies - Employee relations, policies, recruitment" +
-            " 🛒 Procurement - Purchasing, vendor issues, purchase orders" +
-            " 📦 Inventory - Stock, supplies, equipment tracking" +
-            " 📊 Projects & Tasks - Project issues, task assignments" +
-            " 🎧 Customer Service - Service issues, support tickets" +
-            " 🔐 Access & Security - Login problems, permissions, security" +
-            " 📄 Documents & Files - File access, document requests" +
-            " ❓ Other - Anything else not listed above" +
-            " Just tell me what it's about (e.g., 'Salary' or 'Leave' or 'Equipment')",
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, botResponse]);
-        setIsTyping(false);
-      }, 1500);
-    } else if (
-      messageText.toLowerCase().includes("no") ||
-      messageText.toLowerCase().includes("nope") ||
-      messageText.toLowerCase().includes("hell no") ||
-      messageText.toLowerCase().includes("not really") ||
-      messageText.toLowerCase().includes("don't want") ||
-      messageText.toLowerCase().includes("dont want") ||
-      messageText.toLowerCase().includes("no thanks") ||
-      messageText.toLowerCase().includes("no thank you") ||
-      messageText.toLowerCase().includes("no be") ||
-      messageText.toLowerCase().includes("no o") ||
-      messageText.toLowerCase().includes("abi no") ||
-      messageText.toLowerCase().includes("e no be") ||
-      messageText.toLowerCase().includes("never") ||
-      messageText.toLowerCase().includes("not") ||
-      messageText.toLowerCase().includes("nothing") ||
-      messageText.toLowerCase().includes("no need") ||
-      messageText.toLowerCase().includes("no wahala") ||
-      messageText.toLowerCase().includes("no problem") ||
-      messageText.toLowerCase().includes("e no need") ||
-      messageText.toLowerCase().includes("e no necessary")
-    ) {
-      setTimeout(() => {
-        const botResponse = {
-          id: Date.now() + 1,
-          type: "bot",
-          message:
-            "No problem! I'm still here if you need any help or want to discuss anything else. Feel free to ask me anything!",
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, botResponse]);
-        setIsTyping(false);
-      }, 1500);
-    } else if (isComplaintMode) {
-      setFinalComplaintMessage(messageText);
-      setTimeout(() => {
-        const botResponse = {
-          id: Date.now() + 1,
-          type: "bot",
-          message:
-            "Thank you for the details! 📝 Now I need a clear title for your complaint." +
-            " Please give me a short, descriptive title (e.g., 'Salary Calculation Error', 'Computer Not Working', 'Leave Request Issue')." +
-            " This will help our team quickly understand what the complaint is about.",
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, botResponse]);
-        setComplaintStep("title");
-        setIsTyping(false);
-      }, 1500);
-    } else {
-      setTimeout(() => {
-        const botResponse = {
-          id: Date.now() + 1,
-          type: "bot",
-          message:
-            "Thank you for your message. I'm here to help! 😊 If you have a specific concern or complaint, please let me know and I can help you submit it formally.",
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, botResponse]);
-        setIsTyping(false);
-      }, 1500);
     }
   };
 
@@ -1256,19 +799,6 @@ const CustomerCareChat = () => {
       e.preventDefault();
       handleSendMessage();
     }
-  };
-
-  const handleContinueComplaint = (complaint) => {
-    sessionStorage.setItem("prefetchedComplaintId", complaint._id);
-
-    const continueMessage = {
-      id: Date.now(),
-      type: "bot",
-      message: `I'll help you continue discussing your complaint #${complaint.complaintNumber} about "${complaint.title}". What would you like to know or discuss?`,
-      timestamp: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, continueMessage]);
-    setShowHistoryOptions(false);
   };
 
   const handleStartNewComplaint = () => {
@@ -1300,19 +830,27 @@ const CustomerCareChat = () => {
     setShowHistoryOptions(false);
   };
 
-  const handleViewHistory = () => {
-    setIsOpen(false);
-    navigate("/dashboard/modules/customer-care/my-complaints");
-  };
-
   const handleSubmitComplaintFromSession = async () => {
     try {
       setIsSubmittingComplaint(true);
 
+      // Generate title from description (first 50 chars or first sentence)
+      const generateTitle = (desc) => {
+        if (!desc)
+          return `Customer Care Complaint - ${new Date().toLocaleDateString()}`;
+        const firstSentence = desc.split(/[.!?]/)[0].trim();
+        if (firstSentence.length > 50) {
+          return firstSentence.substring(0, 47) + "...";
+        }
+        return (
+          firstSentence ||
+          desc.substring(0, 50) ||
+          `Customer Care Complaint - ${new Date().toLocaleDateString()}`
+        );
+      };
+
       const title =
-        complaintTitle ||
-        finalComplaintMessage ||
-        chatSession.find((msg) => msg.type === "user")?.message ||
+        generateTitle(finalComplaintMessage) ||
         `Customer Care Complaint - ${new Date().toLocaleDateString()}`;
 
       const sessionText = chatSession
@@ -1405,53 +943,15 @@ ${sessionText}`;
         setComplaintStep("category");
         setShowCategoryButtons(false);
         setShowPriorityButtons(false);
+        setIsTyping(false);
       } else {
         toast.error("Failed to submit complaint. Please try again. 😔");
+        setIsTyping(false);
       }
     } catch (error) {
       console.error("Error submitting complaint:", error);
       toast.error("Failed to submit complaint. Please try again.");
-    } finally {
-      setIsSubmittingComplaint(false);
-    }
-  };
-
-  const handleSubmitComplaint = async (
-    title,
-    description,
-    category = "other",
-    priority = "medium"
-  ) => {
-    try {
-      setIsSubmittingComplaint(true);
-
-      const complaintData = {
-        title,
-        description,
-        category,
-        priority,
-      };
-
-      const response = await complaintAPI.createComplaint(complaintData);
-
-      if (response.success) {
-        toast.success("Complaint submitted successfully! 🎉");
-
-        const successMessage = {
-          id: Date.now(),
-          type: "bot",
-          message: `Great! I've submitted your complaint "${title}". You'll receive a confirmation email shortly with your complaint number: ${
-            response.data.complaintNumber || "CC-XXXXXX"
-          }.`,
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, successMessage]);
-      } else {
-        toast.error("Failed to submit complaint. Please try again. 😔");
-      }
-    } catch (error) {
-      console.error("Error submitting complaint:", error);
-      toast.error("Failed to submit complaint. Please try again.");
+      setIsTyping(false);
     } finally {
       setIsSubmittingComplaint(false);
     }
@@ -1462,7 +962,7 @@ ${sessionText}`;
       icon: HiTicket,
       label: "Submit Complaint",
       action: () => {
-        setNewMessage("I would like to submit a complaint about...");
+        handleStartNewComplaint();
       },
     },
     {
@@ -1476,9 +976,14 @@ ${sessionText}`;
       icon: HiClock,
       label: "Check Status",
       action: () => {
-        setNewMessage(
-          "Can you help me check the status of my previous complaint?"
+        const prefetchedComplaintId = sessionStorage.getItem(
+          "prefetchedComplaintId"
         );
+        if (prefetchedComplaintId) {
+          handleFeedbackCheck(prefetchedComplaintId);
+        } else {
+          handleFeedbackCheckForRecentComplaint();
+        }
       },
     },
   ];
@@ -1547,53 +1052,6 @@ ${sessionText}`;
                   </button>
                 </div>
               </div>
-
-              {/* Smart Actions - Single Section */}
-              {showHistoryOptions && userHistory && (
-                <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-green-50">
-                  <p className="text-sm text-gray-700 mb-3 font-medium">
-                    What would you like to do?
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {userHistory.hasActiveComplaints && (
-                      <button
-                        onClick={() =>
-                          handleContinueComplaint(
-                            userHistory.activeComplaints[0]
-                          )
-                        }
-                        className="flex items-center space-x-3 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg"
-                      >
-                        <HiClock className="w-5 h-5" />
-                        <span>Continue Active Complaint</span>
-                      </button>
-                    )}
-                    <button
-                      onClick={handleStartNewComplaint}
-                      className="flex items-center space-x-3 px-4 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg"
-                    >
-                      <HiTicket className="w-5 h-5" />
-                      <span>Start New Complaint</span>
-                    </button>
-                    <button
-                      onClick={handleViewHistory}
-                      className="flex items-center space-x-3 px-4 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-xl text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg"
-                    >
-                      <HiCheckCircle className="w-5 h-5" />
-                      <span>View My Complaints</span>
-                    </button>
-                    <button
-                      onClick={() =>
-                        setNewMessage("I need to report an issue with...")
-                      }
-                      className="flex items-center space-x-3 px-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg"
-                    >
-                      <HiExclamationTriangle className="w-5 h-5" />
-                      <span>Report Issue</span>
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">

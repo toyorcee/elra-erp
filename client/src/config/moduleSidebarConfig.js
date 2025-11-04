@@ -463,7 +463,7 @@ export const moduleSidebarConfig = {
             description: "View and manage all users across departments",
           },
           {
-            label: "Department Management",
+            label: "General Department Management",
             icon: "BuildingOfficeIcon",
             path: "/dashboard/modules/hr/departments",
             required: { minLevel: 700, department: "Human Resources" },

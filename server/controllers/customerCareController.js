@@ -2785,6 +2785,7 @@ export const sendReminderNotification = async (req, res) => {
       );
 
     const notifications = [];
+    let staffNotifications = []; // Initialize outside if block
 
     const hodNotifications = customerCareHODs.map((user) => ({
       recipient: user._id,
@@ -2822,7 +2823,7 @@ export const sendReminderNotification = async (req, res) => {
     }
 
     if (!complaint.assignedTo && customerCareStaff.length > 0) {
-      const staffNotifications = customerCareStaff.slice(0, 3).map((user) => ({
+      staffNotifications = customerCareStaff.slice(0, 3).map((user) => ({
         recipient: user._id,
         type: "complaint_reminder",
         title: "Complaint Needs Attention",
@@ -2839,6 +2840,12 @@ export const sendReminderNotification = async (req, res) => {
       }));
       notifications.push(...staffNotifications);
     }
+
+    // Instantiate notification service
+    const NotificationService = (
+      await import("../services/notificationService.js")
+    ).default;
+    const notificationService = new NotificationService();
 
     // Send notifications using proper service
     console.log(

@@ -2759,9 +2759,21 @@ export const sendReminderNotification = async (req, res) => {
       });
     }
 
+    const Department = (await import("../models/Department.js")).default;
+    const customerCareDept = await Department.findOne({
+      $or: [{ name: "Customer Service" }, { name: "Customer Care" }],
+    });
+
+    if (!customerCareDept) {
+      return res.status(404).json({
+        success: false,
+        message: "Customer Care department not found",
+      });
+    }
+
     const customerCareHODs = await User.find({
       isActive: true,
-      department: complaint.department._id,
+      department: customerCareDept._id,
     })
       .populate("role", "name level")
       .select("_id firstName lastName email role")
@@ -2774,7 +2786,7 @@ export const sendReminderNotification = async (req, res) => {
 
     const customerCareStaff = await User.find({
       isActive: true,
-      department: complaint.department._id,
+      department: customerCareDept._id,
     })
       .populate("role", "name level")
       .select("_id firstName lastName email role")
@@ -2841,6 +2853,26 @@ export const sendReminderNotification = async (req, res) => {
       notifications.push(...staffNotifications);
     }
 
+    // Notification for the submitter
+    const submitterNotification = {
+      recipient: complaint.submittedBy._id,
+      type: "complaint_reminder",
+      title: "Reminder Sent to Customer Care",
+      message: `We've sent a reminder to the Customer Care team about your complaint ${complaint.complaintNumber} ("${complaint.title}"). They should get back to you soon.`,
+      data: {
+        type: "complaint_reminder",
+        complaintId: complaint._id,
+        complaintNumber: complaint.complaintNumber,
+        title: complaint.title,
+        status: complaint.status,
+        priority: complaint.priority,
+        reminderSent: true,
+        actionUrl: "/dashboard/modules/customer-care/my-complaints",
+      },
+      isRead: false,
+    };
+    notifications.push(submitterNotification);
+
     // Instantiate notification service
     const NotificationService = (
       await import("../services/notificationService.js")
@@ -2884,6 +2916,19 @@ export const sendReminderNotification = async (req, res) => {
           );
         }
       }
+    }
+
+    // Send notification to submitter
+    try {
+      await notificationService.createNotification(submitterNotification);
+      console.log(
+        `✅ [CUSTOMER CARE] Reminder notification sent to submitter: ${complaint.submittedBy.firstName} ${complaint.submittedBy.lastName}`
+      );
+    } catch (error) {
+      console.error(
+        `❌ [CUSTOMER CARE] Failed to send reminder notification to submitter:`,
+        error
+      );
     }
 
     res.status(200).json({

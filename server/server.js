@@ -341,7 +341,7 @@ app.get("/api/test-cookies", (req, res) => {
 
 app.get("/api", (req, res) => {
   res.json({
-    message: "Welcome to EDMS API",
+    message: "Welcome to ELRA API",
     version: "1.0.0",
     status: "active",
     environment: process.env.NODE_ENV || "development",

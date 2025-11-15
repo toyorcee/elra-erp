@@ -382,6 +382,245 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
   });
 });
 
+// Mark all tasks as complete for a single employee
+const markAllTasksComplete = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const lifecycle = await EmployeeLifecycle.findById(id);
+  if (!lifecycle) {
+    return res.status(404).json({
+      success: false,
+      message: "Lifecycle not found",
+    });
+  }
+
+  // Check if there are any incomplete tasks
+  const incompleteTasks = lifecycle.tasks.filter(
+    (task) => task.status !== "Completed"
+  );
+
+  if (incompleteTasks.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "All tasks are already completed",
+    });
+  }
+
+  // Mark all incomplete tasks as completed
+  const now = new Date();
+  incompleteTasks.forEach((task) => {
+    const originalStatus = task.status;
+    task.status = "Completed";
+    task.completedBy = req.user._id;
+    task.completedAt = now;
+    if (originalStatus === "Pending" && !task.startedAt) {
+      task.startedAt = now;
+    }
+  });
+
+  lifecycle.markModified("tasks");
+  await lifecycle.save();
+
+  // Add timeline entry
+  await lifecycle.addTimelineEntry(
+    "All Tasks Completed",
+    `All ${incompleteTasks.length} remaining tasks marked as complete by HR`,
+    req.user._id
+  );
+
+  const updatedLifecycle = await EmployeeLifecycle.findById(id).populate([
+    { path: "employee", select: "firstName lastName email avatar fullName" },
+    { path: "department", select: "name" },
+    { path: "assignedHR", select: "firstName lastName email" },
+    { path: "initiatedBy", select: "firstName lastName email" },
+    { path: "tasks.assignedTo", select: "firstName lastName email" },
+    { path: "tasks.completedBy", select: "firstName lastName email" },
+  ]);
+
+  return res.status(200).json({
+    success: true,
+    data: updatedLifecycle,
+    message: `All ${incompleteTasks.length} tasks marked as complete successfully`,
+    progress: updatedLifecycle.getProgressPercentage(),
+  });
+});
+
+// Mark all tasks as complete for all employees with incomplete onboarding
+const markAllTasksCompleteForAll = asyncHandler(async (req, res) => {
+  const user = req.user;
+
+  // Only allow HR HOD and Super Admin
+  if (user.role.level < 700) {
+    return res.status(403).json({
+      success: false,
+      message:
+        "Access denied. Only HOD and Super Admin can perform this action.",
+    });
+  }
+
+  // Get all active onboarding lifecycles that are not completed
+  const activeOnboardings = await EmployeeLifecycle.find({
+    type: "Onboarding",
+    status: { $in: ["Initiated", "In Progress"] },
+  }).populate("employee", "firstName lastName email");
+
+  if (activeOnboardings.length === 0) {
+    return res.status(200).json({
+      success: true,
+      data: [],
+      message: "No active onboarding processes found",
+      updatedCount: 0,
+    });
+  }
+
+  const now = new Date();
+  const updatedLifecycles = [];
+  let totalTasksCompleted = 0;
+
+  for (const lifecycle of activeOnboardings) {
+    const incompleteTasks = lifecycle.tasks.filter(
+      (task) => task.status !== "Completed"
+    );
+
+    if (incompleteTasks.length > 0) {
+      // Mark all incomplete tasks as completed
+      incompleteTasks.forEach((task) => {
+        const originalStatus = task.status;
+        task.status = "Completed";
+        task.completedBy = user._id;
+        task.completedAt = now;
+        if (originalStatus === "Pending" && !task.startedAt) {
+          task.startedAt = now;
+        }
+      });
+
+      lifecycle.markModified("tasks");
+      await lifecycle.save();
+
+      // Add timeline entry
+      await lifecycle.addTimelineEntry(
+        "All Tasks Completed",
+        `All ${incompleteTasks.length} remaining tasks marked as complete by HR (Bulk Action)`,
+        user._id
+      );
+
+      totalTasksCompleted += incompleteTasks.length;
+
+      const updatedLifecycle = await EmployeeLifecycle.findById(
+        lifecycle._id
+      ).populate([
+        {
+          path: "employee",
+          select: "firstName lastName email avatar fullName",
+        },
+        { path: "department", select: "name" },
+        { path: "assignedHR", select: "firstName lastName email" },
+        { path: "initiatedBy", select: "firstName lastName email" },
+        { path: "tasks.assignedTo", select: "firstName lastName email" },
+        { path: "tasks.completedBy", select: "firstName lastName email" },
+      ]);
+
+      updatedLifecycles.push(updatedLifecycle);
+    }
+  }
+
+  return res.status(200).json({
+    success: true,
+    data: updatedLifecycles,
+    message: `Successfully marked all tasks complete for ${updatedLifecycles.length} employee(s). Total ${totalTasksCompleted} tasks completed.`,
+    updatedCount: updatedLifecycles.length,
+    totalTasksCompleted,
+  });
+});
+
+// Mark all tasks as complete for all employees with incomplete offboarding
+const markAllTasksCompleteForAllOffboarding = asyncHandler(async (req, res) => {
+  const user = req.user;
+
+  // Only allow HR HOD and Super Admin
+  if (user.role.level < 700) {
+    return res.status(403).json({
+      success: false,
+      message:
+        "Access denied. Only HOD and Super Admin can perform this action.",
+    });
+  }
+
+  // Get all active offboarding lifecycles that are not completed
+  const activeOffboardings = await EmployeeLifecycle.find({
+    type: "Offboarding",
+    status: { $in: ["Initiated", "In Progress"] },
+  }).populate("employee", "firstName lastName email");
+
+  if (activeOffboardings.length === 0) {
+    return res.status(200).json({
+      success: true,
+      data: [],
+      message: "No active offboarding processes found",
+      updatedCount: 0,
+    });
+  }
+
+  const now = new Date();
+  const updatedLifecycles = [];
+  let totalTasksCompleted = 0;
+
+  for (const lifecycle of activeOffboardings) {
+    const incompleteTasks = lifecycle.tasks.filter(
+      (task) => task.status !== "Completed"
+    );
+
+    if (incompleteTasks.length > 0) {
+      // Mark all incomplete tasks as completed
+      incompleteTasks.forEach((task) => {
+        const originalStatus = task.status;
+        task.status = "Completed";
+        task.completedBy = user._id;
+        task.completedAt = now;
+        if (originalStatus === "Pending" && !task.startedAt) {
+          task.startedAt = now;
+        }
+      });
+
+      lifecycle.markModified("tasks");
+      await lifecycle.save();
+
+      // Add timeline entry
+      await lifecycle.addTimelineEntry(
+        "All Tasks Completed",
+        `All ${incompleteTasks.length} remaining tasks marked as complete by HR (Bulk Action)`,
+        user._id
+      );
+
+      totalTasksCompleted += incompleteTasks.length;
+
+      const updatedLifecycle = await EmployeeLifecycle.findById(
+        lifecycle._id
+      ).populate([
+        {
+          path: "employee",
+          select: "firstName lastName email avatar fullName",
+        },
+        { path: "department", select: "name" },
+        { path: "assignedHR", select: "firstName lastName email" },
+        { path: "initiatedBy", select: "firstName lastName email" },
+        { path: "tasks.assignedTo", select: "firstName lastName email" },
+        { path: "tasks.completedBy", select: "firstName lastName email" },
+      ]);
+
+      updatedLifecycles.push(updatedLifecycle);
+    }
+  }
+
+  return res.status(200).json({
+    success: true,
+    data: updatedLifecycles,
+    message: `Successfully marked all tasks complete for ${updatedLifecycles.length} employee(s). Total ${totalTasksCompleted} tasks completed.`,
+    updatedCount: updatedLifecycles.length,
+    totalTasksCompleted,
+  });
+});
+
 const getActiveLifecycles = asyncHandler(async (req, res) => {
   const lifecycles = await EmployeeLifecycle.findActive();
 
@@ -1006,6 +1245,9 @@ export {
   updateLifecycleStatus,
   completeChecklistItem,
   updateTaskStatus,
+  markAllTasksComplete,
+  markAllTasksCompleteForAll,
+  markAllTasksCompleteForAllOffboarding,
   getActiveLifecycles,
   getOverdueLifecycles,
   getLifecycleStats,

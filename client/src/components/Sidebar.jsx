@@ -393,7 +393,12 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             isItemActive
               ? "bg-emerald-50 text-emerald-700"
               : "text-gray-800 hover:bg-gray-50"
-          }`}
+          } ${hasChildren ? "cursor-pointer" : ""}`}
+          onClick={(e) => {
+            if (hasChildren) {
+              toggleItemExpand(item.path, e);
+            }
+          }}
         >
           <IconComponent
             className={`h-5 w-5 ${
@@ -402,9 +407,15 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
           />
           <Link
             to={item.path}
-            onClick={() => {
-              if (item.path.includes("/modules/") && !isItemActive) {
-                startModuleLoading();
+            onClick={(e) => {
+              if (hasChildren) {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleItemExpand(item.path, e);
+              } else {
+                if (item.path.includes("/modules/") && !isItemActive) {
+                  startModuleLoading();
+                }
               }
             }}
             className="ml-3 flex-1"
@@ -412,16 +423,13 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             {item.label}
           </Link>
           {hasChildren && (
-            <button
-              onClick={(e) => toggleItemExpand(item.path, e)}
-              className="p-1 hover:bg-gray-200 rounded transition-colors ml-2"
-            >
+            <div className="ml-2">
               {isExpanded ? (
                 <ChevronDownIcon className="h-4 w-4 text-gray-600" />
               ) : (
                 <ChevronRightIcon className="h-4 w-4 text-gray-600" />
               )}
-            </button>
+            </div>
           )}
         </div>
         {hasChildren && isExpanded && (
@@ -480,7 +488,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
       {/* Sidebar Container */}
       <div
         className={`fixed top-0 left-0 h-full z-50 transition-all duration-300 ease-in-out ${
-          shouldShowExpanded ? "w-80" : "w-16"
+          shouldShowExpanded ? "w-72" : "w-16"
         } ${
           isMobile
             ? isOpen
@@ -524,7 +532,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             </div>
 
             {/* Navigation Icons */}
-            <div className="flex flex-col items-center space-y-3 flex-1 px-2">
+            <div className="flex flex-col items-center space-y-3 flex-1 px-2 pb-3">
               {navigation.map((item) => {
                 const IconComponent = getIconComponent(item.icon);
                 const isItemActive = isActive(item.path);
@@ -554,13 +562,25 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
                 );
               })}
             </div>
+
+            {/* Sign Out Button - Collapsed */}
+            <div className="w-full flex justify-center pb-4 border-t border-gray-200 pt-3">
+              <button
+                onClick={logout}
+                className="flex items-center justify-center h-11 w-11 rounded-lg text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all duration-300"
+                title="Sign Out"
+                aria-label="Sign Out"
+              >
+                <ArrowRightOnRectangleIcon className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         )}
 
         {/* Expanded Panel - Only shown when expanded */}
         {shouldShowExpanded && (
           <div
-            className="bg-white w-80 h-full flex flex-col border-r border-gray-200 relative"
+            className="bg-white w-72 h-full flex flex-col border-r border-gray-200 relative"
             style={{
               minHeight: "100vh",
               height: "100vh",
@@ -593,7 +613,7 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
             <div
               className="px-2 py-4 space-y-1 sidebar-scroll flex-1"
               style={{
-                maxHeight: "calc(100vh - 80px)",
+                maxHeight: "calc(100vh - 140px)",
                 overflowY: "auto",
               }}
             >
@@ -618,6 +638,19 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
 
                 {sections.system.map(renderNavItemExpanded)}
               </div>
+            </div>
+
+            {/* Sign Out Button - Expanded */}
+            <div className="border-t border-gray-200 px-2 py-3 mt-auto">
+              <button
+                onClick={logout}
+                className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition-all duration-200 group"
+                title="Sign Out"
+                aria-label="Sign Out"
+              >
+                <ArrowRightOnRectangleIcon className="h-5 w-5 text-gray-600 group-hover:text-red-600" />
+                <span className="ml-3">Sign Out</span>
+              </button>
             </div>
           </div>
         )}

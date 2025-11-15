@@ -85,13 +85,14 @@ class PayrollApprovalService {
         }
 
         // Check payroll budget availability and reserve funds
+        // Finance HOD approves based on GROSS PAY, so we reserve gross pay amount
         const ELRAWallet = await import("../models/ELRAWallet.js");
         const elraWallet = await ELRAWallet.default.getOrCreateWallet(
           "ELRA_MAIN",
           approvedBy
         );
 
-        const payrollAmount = approval.financialSummary.totalNetPay;
+        const payrollAmount = approval.financialSummary.totalGrossPay;
         const payrollBudget = elraWallet.budgetCategories?.payroll;
 
         if (!payrollBudget) {
@@ -106,10 +107,13 @@ class PayrollApprovalService {
         }
 
         // Reserve funds from payroll budget (within transaction)
+        // Reserve GROSS PAY amount since Finance HOD approves based on gross pay
         await elraWallet.reserveFromCategory(
           "payroll",
           payrollAmount,
-          `Payroll allocation for ${approval.period.monthName} ${approval.period.year}`,
+          `Payroll allocation for ${approval.period.monthName} ${
+            approval.period.year
+          } (Gross Pay: ₦${payrollAmount.toLocaleString()})`,
           approval.approvalId,
           approval._id,
           "payroll",
@@ -118,7 +122,7 @@ class PayrollApprovalService {
         );
 
         console.log(
-          `💳 [ELRA WALLET] Reserved ₦${payrollAmount.toLocaleString()} from payroll budget`
+          `💳 [ELRA WALLET] Reserved ₦${payrollAmount.toLocaleString()} (GROSS PAY) from payroll budget for approval ${approvalId}`
         );
 
         // Update finance approval (within transaction)
@@ -562,12 +566,27 @@ class PayrollApprovalService {
       return await PayrollApproval.findOne({ approvalId })
         .populate({
           path: "requestedBy",
-          select: "firstName lastName email employeeId department avatar",
-          populate: { path: "department", select: "name" },
+          select: "firstName lastName email employeeId department avatar role",
+          populate: [
+            { path: "department", select: "name" },
+            { path: "role", select: "name level" },
+          ],
         })
-        .populate("financeApproval.approvedBy", "firstName lastName email")
-        .populate("hrApproval.approvedBy", "firstName lastName email")
-        .populate("processedBy", "firstName lastName email");
+        .populate({
+          path: "financeApproval.approvedBy",
+          select: "firstName lastName email role",
+          populate: { path: "role", select: "name level" },
+        })
+        .populate({
+          path: "hrApproval.approvedBy",
+          select: "firstName lastName email role",
+          populate: { path: "role", select: "name level" },
+        })
+        .populate({
+          path: "processedBy",
+          select: "firstName lastName email role",
+          populate: { path: "role", select: "name level" },
+        });
     } catch (error) {
       console.error("Error getting approval details:", error);
       throw error;
@@ -610,11 +629,12 @@ class PayrollApprovalService {
             approval.period.monthName
           } ${
             approval.period.year
-          }. Total: ₦${approval.financialSummary.totalNetPay.toLocaleString()}`,
+          }. Gross Pay: ₦${approval.financialSummary.totalGrossPay.toLocaleString()}`,
           priority: "high",
           data: {
             approvalId: approval.approvalId,
             period: approval.period,
+            totalGrossPay: approval.financialSummary.totalGrossPay,
             totalNetPay: approval.financialSummary.totalNetPay,
             totalEmployees: approval.financialSummary.totalEmployees,
             actionUrl: `/dashboard/approvals/payroll/${approval.approvalId}`,
@@ -793,7 +813,10 @@ class PayrollApprovalService {
    * Get user role for approval workflow
    */
   getUserRole(user) {
-    if (user.email === "superadmin@elra.com") return "superadmin";
+    // Super Admin (role level >= 1000) can act as Finance HOD for approvals
+    if (user.role?.level >= 1000) {
+      return "superadmin";
+    }
     if (
       user.department?.name === "Finance & Accounting" &&
       user.role?.name === "HOD"

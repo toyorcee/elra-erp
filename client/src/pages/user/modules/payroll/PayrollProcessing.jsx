@@ -1001,7 +1001,13 @@ const PayrollProcessing = () => {
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => {
-                                  setSelectedPreviewData(preview.payrollData);
+                                  // Include approvalStatus in the preview data
+                                  setSelectedPreviewData({
+                                    ...preview.payrollData,
+                                    approvalStatus: preview.approvalStatus,
+                                    _id: preview._id,
+                                    approvalId: preview.approvalId,
+                                  });
                                   setShowPreviewDetailModal(true);
                                 }}
                                 className="text-purple-600 hover:text-purple-900 p-2 rounded-lg hover:bg-purple-50 transition-colors cursor-pointer"
@@ -1273,7 +1279,7 @@ const PayrollProcessing = () => {
       {/* Payroll Details Modal */}
       {isDetailModalOpen && selectedPayroll && (
         <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-hidden">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div>
@@ -2155,7 +2161,12 @@ const PayrollProcessing = () => {
                         <div className="flex items-center gap-2 ml-4">
                           <button
                             onClick={() => {
-                              setSelectedPreviewData(preview.payrollData);
+                              setSelectedPreviewData({
+                                ...preview.payrollData,
+                                approvalStatus: preview.approvalStatus,
+                                _id: preview._id,
+                                approvalId: preview.approvalId,
+                              });
                               setShowPreviewDetailModal(true);
                             }}
                             className="px-4 py-2 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center gap-2"
@@ -2406,25 +2417,38 @@ const PayrollProcessing = () => {
                                   <HiEye className="w-3 h-3" />
                                   View Details
                                 </button>
-                                <button
-                                  onClick={() => {
-                                    const employeeId =
-                                      payroll.employee?.id ||
-                                      payroll.employee?._id;
-                                    if (employeeId) {
-                                      const payrollId = selectedPayroll._id;
-                                      const payslipUrl = `/api/payroll/payslips/${payrollId}/view/${employeeId}`;
-                                      const fullUrl = `${
-                                        window.location.origin
-                                      }${payslipUrl}?t=${Date.now()}`;
-                                      window.open(fullUrl, "_blank");
-                                    }
-                                  }}
-                                  className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-600 hover:text-white transition-colors flex items-center gap-1"
-                                >
-                                  <HiEye className="w-3 h-3" />
-                                  Payslip
-                                </button>
+                                {/* Only show Payslip button when payroll is processed (payslips generated) */}
+                                {selectedPreviewData?.approvalStatus ===
+                                  "processed" && (
+                                  <button
+                                    onClick={() => {
+                                      const employeeId =
+                                        payroll.employee?.id ||
+                                        payroll.employee?._id;
+                                      if (employeeId) {
+                                        // Use the approval ID from selectedPreviewData if available, otherwise fallback
+                                        const payrollId =
+                                          selectedPreviewData?._id ||
+                                          selectedPayroll?._id;
+                                        if (payrollId) {
+                                          const payslipUrl = `/api/payroll/payslips/${payrollId}/view/${employeeId}`;
+                                          const fullUrl = `${
+                                            window.location.origin
+                                          }${payslipUrl}?t=${Date.now()}`;
+                                          window.open(fullUrl, "_blank");
+                                        } else {
+                                          toast.error("Payroll ID not found");
+                                        }
+                                      } else {
+                                        toast.error("Employee ID not found");
+                                      }
+                                    }}
+                                    className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-600 hover:text-white transition-colors flex items-center gap-1"
+                                  >
+                                    <HiEye className="w-3 h-3" />
+                                    Payslip
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>

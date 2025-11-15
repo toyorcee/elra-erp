@@ -720,6 +720,48 @@ export const userModulesAPI = {
         throw error;
       }
     },
+    markAllTasksComplete: async (id) => {
+      try {
+        const response = await api.patch(
+          `/employee-lifecycle/${id}/mark-all-tasks-complete`
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [employeeLifecycleAPI] Error marking all tasks complete:",
+          error
+        );
+        throw error;
+      }
+    },
+    markAllTasksCompleteForAll: async () => {
+      try {
+        const response = await api.patch(
+          `/employee-lifecycle/mark-all-tasks-complete-all`
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [employeeLifecycleAPI] Error marking all tasks complete for all employees:",
+          error
+        );
+        throw error;
+      }
+    },
+    markAllTasksCompleteForAllOffboarding: async () => {
+      try {
+        const response = await api.patch(
+          `/employee-lifecycle/mark-all-tasks-complete-all-offboarding`
+        );
+        return response.data;
+      } catch (error) {
+        console.error(
+          "❌ [employeeLifecycleAPI] Error marking all tasks complete for all offboarding employees:",
+          error
+        );
+        throw error;
+      }
+    },
     getActive: async () => {
       try {
         const response = await api.get("/employee-lifecycle/active");

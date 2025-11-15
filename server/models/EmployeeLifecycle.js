@@ -656,7 +656,7 @@ employeeLifecycleSchema.pre("save", async function (next) {
             recipient: employee._id,
             type: "ONBOARDING_COMPLETED",
             title: "🎉 Onboarding Completed Successfully!",
-            message: `Congratulations! Your onboarding process has been completed successfully. You are now fully onboarded to ELRA and eligible for payroll. Welcome to the team!`,
+            message: `Congratulations! Your onboarding process has been completed successfully. You are now fully onboarded to ELRA. Welcome to the team!`,
             priority: "high",
             category: "ONBOARDING",
             actionUrl: "/dashboard",

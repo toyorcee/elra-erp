@@ -7,6 +7,9 @@ import {
   updateLifecycleStatus,
   completeChecklistItem,
   updateTaskStatus,
+  markAllTasksComplete,
+  markAllTasksCompleteForAll,
+  markAllTasksCompleteForAllOffboarding,
   getActiveLifecycles,
   getOverdueLifecycles,
   getLifecycleStats,
@@ -37,6 +40,12 @@ router.get("/:id", getLifecycleById);
 router.patch("/:id/status", updateLifecycleStatus);
 router.patch("/:id/checklist", completeChecklistItem);
 router.patch("/:id/task", updateTaskStatus);
+router.patch("/:id/mark-all-tasks-complete", markAllTasksComplete);
+router.patch("/mark-all-tasks-complete-all", markAllTasksCompleteForAll);
+router.patch(
+  "/mark-all-tasks-complete-all-offboarding",
+  markAllTasksCompleteForAllOffboarding
+);
 router.patch("/:id/revert-offboarding", revertOffboarding);
 
 export default router;

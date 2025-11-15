@@ -360,14 +360,15 @@ const submitForApproval = async (req, res) => {
           title: "New Payroll Approval Request",
           message: `New payroll approval request for ${
             payrollData.period?.monthName
-          } ${payrollData.period?.year}. Total amount: ₦${
-            payrollData.totalNetPay?.toLocaleString() || 0
+          } ${payrollData.period?.year}. Gross Pay: ₦${
+            payrollData.totalGrossPay?.toLocaleString() || 0
           }`,
           priority: "high",
           data: {
             approvalId: approvalRequest.approvalId,
             period: payrollData.period,
             scope: payrollData.scope,
+            totalGrossPay: payrollData.totalGrossPay,
             totalNetPay: payrollData.totalNetPay,
             totalEmployees: payrollData.totalEmployees,
           },
@@ -1042,7 +1043,8 @@ const approvePayroll = async (req, res) => {
 
     const userRole = PayrollApprovalService.getUserRole(req.user);
 
-    if (userRole === "finance_hod") {
+    // Super Admin can approve as Finance HOD
+    if (userRole === "superadmin" || userRole === "finance_hod") {
       const approval = await PayrollApprovalService.approveByFinance(
         approvalId,
         req.user._id,
@@ -1051,7 +1053,10 @@ const approvePayroll = async (req, res) => {
 
       res.status(200).json({
         success: true,
-        message: "Payroll approved by Finance HOD",
+        message:
+          userRole === "superadmin"
+            ? "Payroll approved by Super Admin"
+            : "Payroll approved by Finance HOD",
         data: approval,
       });
     } else if (userRole === "hr_hod") {
@@ -1108,12 +1113,17 @@ const rejectPayroll = async (req, res) => {
     // Determine user role
     const userRole = PayrollApprovalService.getUserRole(req.user);
 
-    if (userRole === "finance_hod" || userRole === "hr_hod") {
+    // Super Admin can reject as Finance HOD
+    if (
+      userRole === "superadmin" ||
+      userRole === "finance_hod" ||
+      userRole === "hr_hod"
+    ) {
       const approval = await PayrollApprovalService.rejectApproval(
         approvalId,
         req.user._id,
         reason,
-        userRole
+        userRole === "superadmin" ? "finance_hod" : userRole
       );
 
       res.status(200).json({

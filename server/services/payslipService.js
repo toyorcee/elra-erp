@@ -430,7 +430,7 @@ class PayslipService {
   }
 
   /**
-   * Generate payslip header with improved layout
+   * Generate payslip header with compact layout
    */
   generateHeader(doc, employeeData, period) {
     const elraGreen = [13, 100, 73];
@@ -439,58 +439,58 @@ class PayslipService {
     const elraLogo = loadPayslipImage("elra-logo.jpg");
     if (elraLogo) {
       try {
-        // Position logo centered at top
-        doc.addImage(elraLogo, "JPEG", 95, 10, 20, 20);
+        // Position logo centered at top with reduced size
+        doc.addImage(elraLogo, "JPEG", 95, 8, 18, 18);
         doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
-        doc.setFontSize(28);
+        doc.setFontSize(24);
         doc.setFont("helvetica", "bold");
-        doc.text("ELRA", 105, 35, { align: "center" });
+        doc.text("ELRA", 105, 32, { align: "center" });
       } catch (error) {
         console.warn(
           "⚠️ Could not add ELRA logo to payslip, falling back to text:",
           error.message
         );
         doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
-        doc.setFontSize(28);
+        doc.setFontSize(24);
         doc.setFont("helvetica", "bold");
-        doc.text("ELRA", 105, 25, { align: "center" });
+        doc.text("ELRA", 105, 22, { align: "center" });
       }
     } else {
       // Fallback to text-only
       doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
-      doc.setFontSize(28);
+      doc.setFontSize(24);
       doc.setFont("helvetica", "bold");
-      doc.text("ELRA", 105, 25, { align: "center" });
+      doc.text("ELRA", 105, 22, { align: "center" });
     }
 
-    // Add tagline with proper spacing
+    // Add tagline with compact spacing
     doc.setTextColor(elraGreen[0], elraGreen[1], elraGreen[2]);
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text("You Lease, We Regulate...", 105, 42, { align: "center" });
+    doc.text("You Lease, We Regulate...", 105, 38, { align: "center" });
 
-    // Payslip title with better spacing
+    // Payslip title with compact spacing
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(18);
+    doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text(`Payslip for ${period.monthName} ${period.year}`, 105, 52, {
+    doc.text(`Payslip for ${period.monthName} ${period.year}`, 105, 50, {
       align: "center",
     });
 
     // Add a subtle line separator
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.5);
-    doc.line(20, 58, 190, 58);
+    doc.line(20, 56, 190, 56);
   }
 
   /**
-   * Generate employee information section with improved spacing
+   * Generate employee information section with compact spacing
    */
   generateEmployeeInfo(doc, employeeData, payroll) {
-    const startY = 65; // Increased spacing from header
+    const startY = 62; // Reduced spacing from header
 
-    // Employee Details
-    doc.setFontSize(10);
+    // Employee Details - More compact layout
+    doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
     const employeeName =
       employeeData.firstName && employeeData.lastName
@@ -501,7 +501,7 @@ class PayslipService {
     doc.text(
       `Employee ID: ${employeeData.employeeId || employeeData._id || "N/A"}`,
       20,
-      startY + 7
+      startY + 5
     );
 
     let departmentName = "N/A";
@@ -515,7 +515,7 @@ class PayslipService {
         departmentName = employeeData.department;
       }
     }
-    doc.text(`Department: ${departmentName}`, 20, startY + 14);
+    doc.text(`Department: ${departmentName}`, 20, startY + 10);
 
     let position = "N/A";
     if (
@@ -531,27 +531,27 @@ class PayslipService {
     } else if (employeeData.role) {
       position = employeeData.role;
     }
-    doc.text(`Position: ${position}`, 20, startY + 21);
+    doc.text(`Position: ${position}`, 20, startY + 15);
 
     doc.text(
       `Period: ${payroll.period?.monthName || "N/A"} ${
         payroll.period?.year || "N/A"
       }`,
       20,
-      startY + 28
+      startY + 20
     );
     doc.text(
       `Payment Date: ${new Date().toLocaleDateString()}`,
       20,
-      startY + 35
+      startY + 25
     );
   }
 
   /**
-   * Generate earnings section
+   * Generate earnings section with compact layout
    */
   generateEarningsSection(doc, payroll) {
-    const startY = 140;
+    const startY = 95; // Reduced spacing
 
     // Use ELRA green color
     const elraGreen = [13, 100, 73];
@@ -598,41 +598,39 @@ class PayslipService {
       theme: "grid",
       headStyles: {
         fillColor: elraGreen,
-        fontSize: 10,
+        fontSize: 9,
         fontStyle: "bold",
         textColor: [255, 255, 255],
-        cellPadding: 5,
+        cellPadding: 3,
       },
       styles: {
-        fontSize: 9,
-        cellPadding: 5,
+        fontSize: 8,
+        cellPadding: 3,
         lineWidth: 0.1,
       },
       columnStyles: {
-        0: { fontStyle: "bold", cellWidth: "auto", cellPadding: 5 },
-        1: { halign: "right", cellWidth: "auto", cellPadding: 5 },
+        0: { fontStyle: "bold", cellWidth: "auto", cellPadding: 3 },
+        1: { halign: "right", cellWidth: "auto", cellPadding: 3 },
       },
       alternateRowStyles: {
         fillColor: [245, 245, 245],
       },
       margin: { left: 20, right: 20 },
       tableWidth: "auto",
+      pageBreak: "avoid",
     });
   }
 
   /**
-   * Generate deductions section
+   * Generate deductions section with compact layout
    */
   generateDeductionsSection(doc, payroll) {
-    const startY = doc.lastAutoTable.finalY + 10;
+    const startY = doc.lastAutoTable.finalY + 5; 
 
-    // Use ELRA green color
     const elraGreen = [13, 100, 73];
 
-    // Deductions Table
     const deductionsData = [];
 
-    // Statutory Deductions - get from deductions object
     const paye = payroll.deductions?.paye || payroll.paye || 0;
     const pension = payroll.deductions?.pension || payroll.pension || 0;
     const nhis = payroll.deductions?.nhis || payroll.nhis || 0;
@@ -685,33 +683,34 @@ class PayslipService {
       theme: "grid",
       headStyles: {
         fillColor: elraGreen,
-        fontSize: 10,
+        fontSize: 9,
         fontStyle: "bold",
         textColor: [255, 255, 255],
-        cellPadding: 5,
+        cellPadding: 3,
       },
       styles: {
-        fontSize: 9,
-        cellPadding: 5,
+        fontSize: 8,
+        cellPadding: 3,
         lineWidth: 0.1,
       },
       columnStyles: {
-        0: { fontStyle: "bold", cellWidth: "auto", cellPadding: 5 },
-        1: { halign: "right", cellWidth: "auto", cellPadding: 5 },
+        0: { fontStyle: "bold", cellWidth: "auto", cellPadding: 3 },
+        1: { halign: "right", cellWidth: "auto", cellPadding: 3 },
       },
       alternateRowStyles: {
         fillColor: [245, 245, 245],
       },
       margin: { left: 20, right: 20 },
       tableWidth: "auto",
+      pageBreak: "avoid",
     });
   }
 
   /**
-   * Generate summary section
+   * Generate summary section with compact layout
    */
   generateSummarySection(doc, payroll) {
-    const startY = doc.lastAutoTable.finalY + 10;
+    const startY = doc.lastAutoTable.finalY + 5; // Reduced spacing
 
     // Use ELRA green color
     const elraGreen = [13, 100, 73];
@@ -733,37 +732,38 @@ class PayslipService {
       startY: startY,
       theme: "grid",
       styles: {
-        fontSize: 10,
+        fontSize: 9,
         fontStyle: "bold",
         textColor: elraGreen,
-        cellPadding: 5,
+        cellPadding: 4,
         lineWidth: 0.1,
       },
       columnStyles: {
-        0: { fontStyle: "bold", cellWidth: "auto", cellPadding: 5 },
-        1: { halign: "right", cellWidth: "auto", cellPadding: 5 },
+        0: { fontStyle: "bold", cellWidth: "auto", cellPadding: 4 },
+        1: { halign: "right", cellWidth: "auto", cellPadding: 4 },
       },
       margin: { left: 20, right: 20 },
       tableWidth: "auto",
+      pageBreak: "avoid",
     });
   }
 
   /**
-   * Generate footer
+   * Generate footer with compact spacing
    */
   generateFooter(doc) {
-    const footerY = doc.lastAutoTable.finalY + 15;
-    doc.setFontSize(8);
+    const footerY = doc.lastAutoTable.finalY + 8; // Reduced spacing
+    doc.setFontSize(7);
     doc.setTextColor(130, 130, 130);
     doc.text("Generated on: " + new Date().toLocaleString(), 20, footerY);
-    doc.setFontSize(7);
-    doc.text("This is a computer generated document", 20, footerY + 5);
+    doc.setFontSize(6);
+    doc.text("This is a computer generated document", 20, footerY + 4);
     doc.text(
       "© " +
         new Date().getFullYear() +
         " ELRA Enterprise Resource Management System",
       20,
-      footerY + 10
+      footerY + 8
     );
   }
 

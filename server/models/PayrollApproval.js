@@ -274,11 +274,22 @@ payrollApprovalSchema.statics.getPendingApprovals = async function (
   return await this.find(query)
     .populate({
       path: "requestedBy",
-      select: "firstName lastName email employeeId department avatar",
-      populate: { path: "department", select: "name" },
+      select: "firstName lastName email employeeId department avatar role",
+      populate: [
+        { path: "department", select: "name" },
+        { path: "role", select: "name level" },
+      ],
     })
-    .populate("financeApproval.approvedBy", "firstName lastName email")
-    .populate("hrApproval.approvedBy", "firstName lastName email")
+    .populate({
+      path: "financeApproval.approvedBy",
+      select: "firstName lastName email role",
+      populate: { path: "role", select: "name level" },
+    })
+    .populate({
+      path: "hrApproval.approvedBy",
+      select: "firstName lastName email role",
+      populate: { path: "role", select: "name level" },
+    })
     .sort({ createdAt: -1 });
 };
 

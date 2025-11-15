@@ -33,6 +33,8 @@ const OnboardingManagement = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [searchTimeout, setSearchTimeout] = useState(null);
   const [updatingTasks, setUpdatingTasks] = useState({});
+  const [markingAllTasks, setMarkingAllTasks] = useState(false);
+  const [markingAllTasksForAll, setMarkingAllTasksForAll] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -362,6 +364,107 @@ const OnboardingManagement = () => {
     }
   };
 
+  const handleMarkAllTasksComplete = async (lifecycleId) => {
+    try {
+      setMarkingAllTasks(true);
+
+      const response =
+        await userModulesAPI.employeeLifecycle.markAllTasksComplete(
+          lifecycleId
+        );
+
+      if (response.success) {
+        toast.success(
+          response.message || "All tasks marked as complete successfully"
+        );
+
+        if (response.data) {
+          const updatedLifecycle = response.data;
+
+          // Update grouped users immediately
+          const updatedGroupedUsers = groupedUsers.map((userData) => {
+            if (
+              userData.lifecycles.Onboarding?._id?.toString() ===
+              lifecycleId.toString()
+            ) {
+              return {
+                ...userData,
+                lifecycles: {
+                  ...userData.lifecycles,
+                  Onboarding: updatedLifecycle,
+                },
+              };
+            }
+            return userData;
+          });
+
+          setGroupedUsers(updatedGroupedUsers);
+
+          if (selectedUser) {
+            const updatedSelectedUser = {
+              ...selectedUser,
+              lifecycles: {
+                ...selectedUser.lifecycles,
+                Onboarding: updatedLifecycle,
+              },
+            };
+            setSelectedUser(updatedSelectedUser);
+          }
+        }
+
+        setTimeout(() => {
+          fetchData();
+        }, 500);
+      } else {
+        toast.error(response.message || "Failed to mark all tasks as complete");
+      }
+    } catch (error) {
+      console.error("Error marking all tasks complete:", error);
+      toast.error("Failed to mark all tasks as complete");
+    } finally {
+      setMarkingAllTasks(false);
+    }
+  };
+
+  const handleMarkAllTasksCompleteForAll = async () => {
+    // Confirm action
+    const confirmed = window.confirm(
+      "Are you sure you want to mark all incomplete tasks as complete for ALL employees? This action cannot be undone."
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setMarkingAllTasksForAll(true);
+
+      const response =
+        await userModulesAPI.employeeLifecycle.markAllTasksCompleteForAll();
+
+      if (response.success) {
+        toast.success(
+          response.message ||
+            `Successfully marked all tasks complete for ${
+              response.updatedCount || 0
+            } employee(s)`
+        );
+
+        // Refresh data to show updated status
+        setTimeout(() => {
+          fetchData();
+        }, 500);
+      } else {
+        toast.error(response.message || "Failed to mark all tasks as complete");
+      }
+    } catch (error) {
+      console.error("Error marking all tasks complete for all:", error);
+      toast.error("Failed to mark all tasks as complete for all employees");
+    } finally {
+      setMarkingAllTasksForAll(false);
+    }
+  };
+
   const getDefaultAvatar = () => {
     return defaultAvatar;
   };
@@ -426,13 +529,42 @@ const OnboardingManagement = () => {
                 </p>
               </div>
             </div>
-            <button
-              onClick={fetchData}
-              className="inline-flex items-center px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors font-medium cursor-pointer"
-            >
-              <ArrowPathIcon className="h-5 w-5 mr-2" />
-              Refresh
-            </button>
+            <div className="flex items-center space-x-3">
+              {groupedUsers.some((user) => {
+                const onboarding = getLifecycleStatus(user, "Onboarding");
+                return (
+                  onboarding &&
+                  onboarding.status !== "Completed" &&
+                  onboarding.status !== "Cancelled" &&
+                  onboarding.tasks?.some((task) => task.status !== "Completed")
+                );
+              }) && (
+                <button
+                  onClick={handleMarkAllTasksCompleteForAll}
+                  disabled={markingAllTasksForAll}
+                  className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {markingAllTasksForAll ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      <span>Marking All...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircleIcon className="h-5 w-5 mr-2" />
+                      <span>Mark All Tasks (All Employees)</span>
+                    </>
+                  )}
+                </button>
+              )}
+              <button
+                onClick={fetchData}
+                className="inline-flex items-center px-4 py-2 bg-[var(--elra-primary)] text-white rounded-lg hover:bg-[var(--elra-primary-dark)] transition-colors font-medium cursor-pointer"
+              >
+                <ArrowPathIcon className="h-5 w-5 mr-2" />
+                Refresh
+              </button>
+            </div>
           </div>
         </div>
 
@@ -913,16 +1045,45 @@ const OnboardingManagement = () => {
 
                   {/* 5-Task System */}
                   <div className="mb-6">
-                    <div className="flex items-center space-x-2 mb-4">
-                      <ClipboardDocumentCheckIcon className="w-5 h-5 text-[var(--elra-primary)]" />
-                      <h4 className="text-md font-semibold text-gray-900">
-                        Onboarding Tasks (
-                        {selectedUser.lifecycles.Onboarding.tasks?.filter(
-                          (task) => task.status === "Completed"
-                        ).length || 0}
-                        /{selectedUser.lifecycles.Onboarding.tasks?.length || 0}
-                        )
-                      </h4>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-2">
+                        <ClipboardDocumentCheckIcon className="w-5 h-5 text-[var(--elra-primary)]" />
+                        <h4 className="text-md font-semibold text-gray-900">
+                          Onboarding Tasks (
+                          {selectedUser.lifecycles.Onboarding.tasks?.filter(
+                            (task) => task.status === "Completed"
+                          ).length || 0}
+                          /
+                          {selectedUser.lifecycles.Onboarding.tasks?.length ||
+                            0}
+                          )
+                        </h4>
+                      </div>
+                      {selectedUser.lifecycles.Onboarding.tasks?.some(
+                        (task) => task.status !== "Completed"
+                      ) && (
+                        <button
+                          onClick={() =>
+                            handleMarkAllTasksComplete(
+                              selectedUser.lifecycles.Onboarding._id
+                            )
+                          }
+                          disabled={markingAllTasks}
+                          className="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                        >
+                          {markingAllTasks ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              <span>Marking All...</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircleIcon className="w-4 h-4" />
+                              <span>Mark All Tasks</span>
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
 
                     <div className="space-y-3">

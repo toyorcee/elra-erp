@@ -129,7 +129,7 @@ const PayrollApprovals = () => {
   const calculateFinanceStats = async (approvalsData) => {
     const budgetData = await fetchELRABudget();
 
-    // Calculate amounts from approval data
+    // Calculate amounts from approval data - using GROSS PAY for Finance HOD approval
     const allocatedAmount = approvalsData
       .filter(
         (approval) =>
@@ -138,14 +138,16 @@ const PayrollApprovals = () => {
           approval.approvalStatus === "processed"
       )
       .reduce(
-        (sum, approval) => sum + (approval.financialSummary?.totalNetPay || 0),
+        (sum, approval) =>
+          sum + (approval.financialSummary?.totalGrossPay || 0),
         0
       );
 
     const pendingAllocations = approvalsData
       .filter((approval) => approval.approvalStatus === "pending_finance")
       .reduce(
-        (sum, approval) => sum + (approval.financialSummary?.totalNetPay || 0),
+        (sum, approval) =>
+          sum + (approval.financialSummary?.totalGrossPay || 0),
         0
       );
 
@@ -161,7 +163,8 @@ const PayrollApprovals = () => {
           ? walletAllocated
           : derivedAllocated,
       remainingBudget: budgetData.availableBudget || 0,
-      pendingAllocations,      usedBudget: budgetData.usedBudget || 0,
+      pendingAllocations,
+      usedBudget: budgetData.usedBudget || 0,
       reservedBudget: budgetData.reservedBudget || 0,
       lastAllocatedAmount: budgetData.lastAllocatedAmount || 0,
       monthlyLimit: budgetData.monthlyLimit || 0,
@@ -255,7 +258,11 @@ const PayrollApprovals = () => {
   };
 
   // Get status badge
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, approval = null) => {
+    // Check if approved by Super Admin
+    const isSuperAdminApproval =
+      approval?.financeApproval?.approvedBy?.role?.level >= 1000;
+
     const statusConfig = {
       pending_finance: {
         color: "bg-amber-100 text-amber-800 border-amber-200",
@@ -265,7 +272,9 @@ const PayrollApprovals = () => {
       approved_finance: {
         color: "bg-blue-100 text-blue-800 border-blue-200",
         icon: CheckCircleIcon,
-        text: "Finance Approved - Pending HR",
+        text: isSuperAdminApproval
+          ? "Super Admin Approved - Pending HR"
+          : "Finance Approved - Pending HR",
       },
       approved_hr: {
         color: "bg-green-100 text-green-800 border-green-200",
@@ -382,14 +391,14 @@ const PayrollApprovals = () => {
     {
       header: "Status",
       accessor: "approvalStatus",
-      renderer: (approval) => getStatusBadge(approval.approvalStatus),
+      renderer: (approval) => getStatusBadge(approval.approvalStatus, approval),
     },
     {
-      header: "Total Net Pay",
-      accessor: "financialSummary.totalNetPay",
+      header: "Total Gross Pay",
+      accessor: "financialSummary.totalGrossPay",
       renderer: (approval) => (
         <div className="text-sm font-medium text-green-600">
-          {formatCurrency(approval.financialSummary?.totalNetPay || 0)}
+          {formatCurrency(approval.financialSummary?.totalGrossPay || 0)}
         </div>
       ),
     },
@@ -405,16 +414,31 @@ const PayrollApprovals = () => {
     {
       header: "Requested By",
       accessor: "requestedBy",
-      renderer: (approval) => (
-        <div>
-          <div className="text-sm font-medium text-gray-900">
-            {approval.requestedBy?.firstName} {approval.requestedBy?.lastName}
+      renderer: (approval) => {
+        const isSuperAdmin = approval.requestedBy?.role?.level >= 1000;
+        return (
+          <div>
+            <div className="text-sm font-medium text-gray-900">
+              {isSuperAdmin ? (
+                <>
+                  Super Admin
+                  <span className="text-gray-500 ml-1">
+                    ({approval.requestedBy?.firstName}{" "}
+                    {approval.requestedBy?.lastName})
+                  </span>
+                </>
+              ) : (
+                `${approval.requestedBy?.firstName} ${approval.requestedBy?.lastName}`
+              )}
+            </div>
+            <div className="text-sm text-gray-500">
+              {isSuperAdmin
+                ? "System Administration"
+                : approval.requestedBy?.department?.name}
+            </div>
           </div>
-          <div className="text-sm text-gray-500">
-            {approval.requestedBy?.department?.name}
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       header: "Request Date",
@@ -647,7 +671,9 @@ const PayrollApprovals = () => {
                 <p className="text-2xl font-bold text-white mb-1">
                   {formatCurrency(financeStats.allocatedAmount)}
                 </p>
-                <p className="text-xs text-white/70">Processed & Reserved</p>
+                <p className="text-xs text-white/70">
+                  Gross Pay (Processed & Reserved)
+                </p>
               </div>
 
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
@@ -660,7 +686,9 @@ const PayrollApprovals = () => {
                 <p className="text-2xl font-bold text-white mb-1">
                   {formatCurrency(financeStats.pendingAllocations)}
                 </p>
-                <p className="text-xs text-white/70">Awaiting Approval</p>
+                <p className="text-xs text-white/70">
+                  Gross Pay (Awaiting Approval)
+                </p>
               </div>
             </div>
             {/* Additional Category Stats */}
@@ -675,7 +703,7 @@ const PayrollApprovals = () => {
                 <p className="text-2xl font-bold text-white mb-1">
                   {formatCurrency(financeStats.usedBudget)}
                 </p>
-                <p className="text-xs text-white/70">Processed</p>
+                <p className="text-xs text-white/70">Gross Pay (Processed)</p>
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
                 <div className="flex items-center justify-between mb-3">
@@ -687,7 +715,9 @@ const PayrollApprovals = () => {
                 <p className="text-2xl font-bold text-white mb-1">
                   {formatCurrency(financeStats.reservedBudget)}
                 </p>
-                <p className="text-xs text-white/70">Awaiting Processing</p>
+                <p className="text-xs text-white/70">
+                  Gross Pay (Awaiting Processing)
+                </p>
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
                 <div className="flex items-center justify-between mb-3">
@@ -958,7 +988,10 @@ const PayrollApprovals = () => {
                       Approval Status
                     </h3>
                     <div className="flex items-center gap-3">
-                      {getStatusBadge(selectedApproval.approvalStatus)}
+                      {getStatusBadge(
+                        selectedApproval.approvalStatus,
+                        selectedApproval
+                      )}
                     </div>
                   </div>
 
@@ -987,11 +1020,22 @@ const PayrollApprovals = () => {
                       </div>
                       <div>
                         <div className="text-sm font-medium text-gray-900">
-                          {selectedApproval.requestedBy?.firstName}{" "}
-                          {selectedApproval.requestedBy?.lastName}
+                          {selectedApproval.requestedBy?.role?.level >= 1000 ? (
+                            <>
+                              Super Admin
+                              <span className="text-gray-500 ml-1">
+                                ({selectedApproval.requestedBy?.firstName}{" "}
+                                {selectedApproval.requestedBy?.lastName})
+                              </span>
+                            </>
+                          ) : (
+                            `${selectedApproval.requestedBy?.firstName} ${selectedApproval.requestedBy?.lastName}`
+                          )}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {selectedApproval.requestedBy?.department?.name}
+                          {selectedApproval.requestedBy?.role?.level >= 1000
+                            ? "System Administration"
+                            : selectedApproval.requestedBy?.department?.name}
                         </div>
                       </div>
                     </div>
@@ -1699,14 +1743,34 @@ const PayrollApprovals = () => {
                 {selectedApproval.financeApproval?.status === "approved" && (
                   <div className="bg-blue-50 rounded-lg p-4 mb-4">
                     <h4 className="font-semibold text-blue-900 mb-2">
-                      Finance Approval
+                      {selectedApproval.financeApproval.approvedBy?.role
+                        ?.level >= 1000
+                        ? "Super Admin Approval"
+                        : "Finance Approval"}
                     </h4>
                     <div className="flex items-center gap-2">
                       <CheckCircleIcon className="w-5 h-5 text-green-600" />
                       <span className="text-blue-900">
                         Approved by{" "}
-                        {selectedApproval.financeApproval.approvedBy?.firstName}{" "}
-                        {selectedApproval.financeApproval.approvedBy?.lastName}
+                        {selectedApproval.financeApproval.approvedBy?.role
+                          ?.level >= 1000
+                          ? "Super Admin"
+                          : `${selectedApproval.financeApproval.approvedBy?.firstName} ${selectedApproval.financeApproval.approvedBy?.lastName}`}
+                        {selectedApproval.financeApproval.approvedBy?.role
+                          ?.level >= 1000 && (
+                          <span className="text-blue-600 ml-1">
+                            (
+                            {
+                              selectedApproval.financeApproval.approvedBy
+                                ?.firstName
+                            }{" "}
+                            {
+                              selectedApproval.financeApproval.approvedBy
+                                ?.lastName
+                            }
+                            )
+                          </span>
+                        )}
                       </span>
                       <span className="text-blue-600">
                         on{" "}
@@ -1726,14 +1790,26 @@ const PayrollApprovals = () => {
                 {selectedApproval.hrApproval?.status === "approved" && (
                   <div className="bg-green-50 rounded-lg p-4 mb-4">
                     <h4 className="font-semibold text-green-900 mb-2">
-                      HR Approval
+                      {selectedApproval.hrApproval.approvedBy?.role?.level >=
+                      1000
+                        ? "Super Admin Approval"
+                        : "HR Approval"}
                     </h4>
                     <div className="flex items-center gap-2">
                       <CheckCircleIcon className="w-5 h-5 text-green-600" />
                       <span className="text-green-900">
                         Approved by{" "}
-                        {selectedApproval.hrApproval.approvedBy?.firstName}{" "}
-                        {selectedApproval.hrApproval.approvedBy?.lastName}
+                        {selectedApproval.hrApproval.approvedBy?.role?.level >=
+                        1000
+                          ? "Super Admin"
+                          : `${selectedApproval.hrApproval.approvedBy?.firstName} ${selectedApproval.hrApproval.approvedBy?.lastName}`}
+                        {selectedApproval.hrApproval.approvedBy?.role?.level >=
+                          1000 && (
+                          <span className="text-green-600 ml-1">
+                            ({selectedApproval.hrApproval.approvedBy?.firstName}{" "}
+                            {selectedApproval.hrApproval.approvedBy?.lastName})
+                          </span>
+                        )}
                       </span>
                       <span className="text-green-600">
                         on {formatDate(selectedApproval.hrApproval.approvedAt)}

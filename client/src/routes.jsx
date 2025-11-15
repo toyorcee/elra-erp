@@ -33,6 +33,7 @@ import {
   ComplaintManagement,
   CustomerCareReports,
 } from "./pages/user/modules/customer-care";
+import CustomerCareModule from "./pages/user/modules/customer-care/CustomerCareModule";
 import SubmitComplaint from "./pages/user/modules/customer-care/SubmitComplaint";
 import MyAssignments from "./pages/user/modules/customer-care/MyAssignments";
 import AssignComplaints from "./pages/user/modules/customer-care/AssignComplaints";
@@ -281,10 +282,7 @@ const AppRoutes = () => {
         />
 
         {/* Customer Care Module Routes */}
-        <Route
-          path="modules/customer-care"
-          element={<CustomerCareDashboard />}
-        />
+        <Route path="modules/customer-care" element={<CustomerCareModule />} />
         <Route
           path="modules/customer-care/overview"
           element={<CustomerCareDashboard />}
@@ -369,10 +367,6 @@ const AppRoutes = () => {
           element={<DepartmentProjects />}
         />
 
-        <Route
-          path="modules/customer-care"
-          element={<CustomerCareDashboard />}
-        />
         <Route path="modules/communication" element={<Communication />} />
         <Route
           path="modules/communication/messages"

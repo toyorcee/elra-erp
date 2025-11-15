@@ -2,95 +2,70 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../../context/AuthContext";
 import {
-  FaChartLine,
-  FaUsers,
-  FaClipboardCheck,
+  FaHeadset,
+  FaTicketAlt,
+  FaChartBar,
   FaFileAlt,
-  FaHandshake,
+  FaPlus,
 } from "react-icons/fa";
 
-const ProjectManagement = () => {
+const CustomerCareModule = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const hasAccess = (item) => {
-    const userLevel = user?.role?.level || 0;
-    const userDepartment = user?.department?.name;
+  const isCustomerCareUser =
+    user?.department?.name === "Customer Service" ||
+    user?.department?.name === "Customer Care";
 
-    if (userLevel >= 1000) {
-      return true;
-    }
-
-    if (item.required?.minLevel && userLevel < item.required.minLevel) {
-      return false;
-    }
-
-    if (
-      item.required?.department &&
-      userDepartment !== item.required.department
-    ) {
-      return false;
-    }
-
-    if (item.hidden && typeof item.hidden === "function") {
-      return !item.hidden(user);
-    }
-
-    return true;
-  };
-
-  const projectFeatures = [
+  const customerCareFeatures = [
     {
-      title: "Project Dashboard",
-      description:
-        "Project Management HOD dashboard - comprehensive overview of project performance and financial management",
-      icon: FaChartLine,
-      path: "/dashboard/modules/projects/analytics",
-      badge: "Dashboard",
-      required: { minLevel: 700, department: "Project Management" },
+      title: "Overview",
+      description: "Customer care overview and key metrics",
+      icon: FaChartBar,
+      path: "/dashboard/modules/customer-care/overview",
+      badge: "Overview",
     },
     {
-      title: "Approval Management",
-      description: "Review and approve project requests",
-      icon: FaClipboardCheck,
-      path: "/dashboard/modules/projects/approvals",
-      badge: "Approvals",
-      required: { minLevel: 700 },
+      title: "All Complaints",
+      description: "View and manage all staff complaints",
+      icon: FaTicketAlt,
+      path: "/dashboard/modules/customer-care/complaints",
+      badge: "Complaints",
+      hidden: !isCustomerCareUser,
     },
     {
-      title: "Manage External Projects",
-      description:
-        "Create and manage external projects - Project Management HOD only",
-      icon: FaHandshake,
-      path: "/dashboard/modules/projects/external",
-      badge: "External",
-      required: { minLevel: 700, department: "Project Management" },
+      title: "Complaint Management",
+      description: "Manage and assign complaints to team members",
+      icon: FaHeadset,
+      path: "/dashboard/modules/customer-care/management",
+      badge: "Management",
+      hidden: !isCustomerCareUser,
     },
     {
-      title: "Project Teams",
-      description: "Manage project teams and assignments",
-      icon: FaUsers,
-      path: "/dashboard/modules/projects/teams",
-      badge: "Teams",
-      required: { minLevel: 700, department: "Project Management" },
+      title: "Submit Complaint",
+      description: "Submit a new complaint or service request",
+      icon: FaPlus,
+      path: "/dashboard/modules/customer-care/submit-complaint",
+      badge: "Submit",
+      hidden: isCustomerCareUser,
     },
     {
-      title: "Project Reports",
-      description: "Monthly project approval reports and analytics",
+      title: "My Complaints",
+      description: "View your submitted complaints and their status",
+      icon: FaTicketAlt,
+      path: "/dashboard/modules/customer-care/my-complaints",
+      badge: "My Tickets",
+      hidden: isCustomerCareUser,
+    },
+    {
+      title: "Reports",
+      description: "View customer care reports and analytics",
       icon: FaFileAlt,
-      path: "/dashboard/modules/projects/reports",
+      path: "/dashboard/modules/customer-care/reports",
       badge: "Reports",
-      required: { minLevel: 700 },
+      hidden: !isCustomerCareUser,
     },
-    {
-      title: "Approval History",
-      description: "Your cross-departmental approval history",
-      icon: FaFileAlt,
-      path: "/dashboard/modules/projects/approvals",
-      badge: "History",
-      required: { minLevel: 700 },
-    },
-  ].filter(hasAccess);
+  ].filter((feature) => !feature.hidden);
 
   return (
     <div className="min-h-screen bg-white">
@@ -98,13 +73,15 @@ const ProjectManagement = () => {
       <div className="bg-white px-6 py-12">
         <div className="text-center">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-emerald-600 rounded-lg mb-6">
-            <FaChartLine className="h-10 w-10 text-white" />
+            <FaHeadset className="h-10 w-10 text-white" />
           </div>
           <h1 className="text-5xl font-bold text-gray-900 mb-4">
-            Project Management
+            Customer Care
           </h1>
           <p className="text-lg text-gray-600">
-            Comprehensive project planning, tracking and management tools
+            {isCustomerCareUser
+              ? "Manage customer support, tickets, and service requests"
+              : "Submit complaints and get help from our Customer Care team"}
           </p>
         </div>
       </div>
@@ -112,7 +89,7 @@ const ProjectManagement = () => {
       {/* Features Section */}
       <div className="px-6 pb-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projectFeatures.map((feature) => {
+          {customerCareFeatures.map((feature) => {
             const IconComponent = feature.icon;
             return (
               <div
@@ -159,4 +136,4 @@ const ProjectManagement = () => {
   );
 };
 
-export default ProjectManagement;
+export default CustomerCareModule;

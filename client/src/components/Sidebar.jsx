@@ -75,27 +75,23 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isHovered, setIsHovered] = useState(false);
-  const [collapsedSections, setCollapsedSections] = useState({});
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [expandedItems, setExpandedItems] = useState({});
 
   const scrollbarStyles = `
     .sidebar-scroll::-webkit-scrollbar {
       width: 4px;
     }
     .sidebar-scroll::-webkit-scrollbar-track {
-      background: var(--elra-secondary-3);
+      background: #f3f4f6;
       border-radius: 2px;
     }
     .sidebar-scroll::-webkit-scrollbar-thumb {
-      background: var(--elra-primary);
+      background: #9ca3af;
       border-radius: 2px;
       min-height: 30px;
     }
     .sidebar-scroll::-webkit-scrollbar-thumb:hover {
-      background: var(--elra-primary-dark);
-    }
-    .sidebar-scroll::-webkit-scrollbar-thumb:active {
-      background: var(--elra-primary-dark);
+      background: #6b7280;
     }
   `;
 
@@ -230,114 +226,39 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
   const userRoleLevel = user?.role?.level || user?.roleLevel || 300;
   const roleInfo = getRoleInfo(userRoleLevel);
 
-  const handleMouseEnter = () => {
-    if (!isMobile && !isOpen) {
-      setIsHovered(true);
+  const shouldShowExpanded = isOpen;
+
+  const handleToggle = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
     }
-  };
-
-  const handleMouseLeave = () => {
-    if (!isMobile && !isOpen) {
-      setIsHovered(false);
-    }
-  };
-
-  const shouldShowExpanded = isOpen || isHovered;
-
-  const handleToggle = () => {
-    setIsTransitioning(true);
     onToggle();
-
-    if (isOpen) {
-      const allSections = {};
-      Object.keys(sections).forEach((section) => {
-        allSections[section] = true;
-      });
-      setCollapsedSections(allSections);
-    }
-
-    setTimeout(() => {
-      setIsTransitioning(false);
-    }, 300);
   };
 
-  const toggleSectionCollapse = (sectionTitle, event) => {
+  const toggleItemExpand = (itemPath, event) => {
     if (event) {
       event.preventDefault();
       event.stopPropagation();
     }
-
-    setTimeout(() => {
-      setCollapsedSections((prev) => ({
-        ...prev,
-        [sectionTitle]: !prev[sectionTitle],
-      }));
-    }, 50);
-  };
-
-  const isSectionCollapsed = (sectionTitle, _defaultExpanded = false) => {
-    if (collapsedSections.hasOwnProperty(sectionTitle)) {
-      return collapsedSections[sectionTitle];
-    }
-    return !shouldShowExpanded;
-  };
-
-  React.useEffect(() => {
-    if (isModuleView && currentModule) {
-      setCollapsedSections({});
-    }
-  }, [currentModule, isModuleView]);
-
-  useEffect(() => {
-    if (!shouldShowExpanded) {
-      const allSections = {};
-      Object.keys(sections).forEach((section) => {
-        allSections[section] = true;
-      });
-      setCollapsedSections(allSections);
-    }
-  }, [shouldShowExpanded]);
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate("/login");
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
+    setExpandedItems((prev) => ({
+      ...prev,
+      [itemPath]: !prev[itemPath],
+    }));
   };
 
   const isActive = (path) => {
     const currentPath = location.pathname;
 
-    // Dashboard should only be active when on the main dashboard page
     if (path === "/dashboard") {
       return currentPath === "/dashboard";
     }
 
-    // For module paths, check if current path starts with the module path
     if (path.startsWith("/dashboard/modules/")) {
       return currentPath.startsWith(path);
     }
 
     return currentPath === path;
-  };
-
-  const getMostSpecificActiveItem = () => {
-    const currentPath = location.pathname;
-
-    if (currentPath === "/dashboard") return "/dashboard";
-
-    if (currentPath.startsWith("/dashboard/modules/")) {
-      const modulePath = currentPath.split("/").slice(0, 4).join("/");
-      return modulePath;
-    }
-
-    if (currentPath.startsWith("/dashboard/")) {
-      return currentPath;
-    }
-
-    return currentPath;
   };
 
   const getIconComponent = (iconName) => {
@@ -413,170 +334,123 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
     return iconMap[iconName] || HomeIcon;
   };
 
-  const renderNavItem = (item) => {
+  // Get children for a module item
+  const getItemChildren = (item) => {
+    if (!item.path.includes("/modules/")) return [];
+
+    const moduleKey = item.path.split("/modules/")[1];
+
+    if (
+      isModuleView &&
+      currentModule === moduleKey &&
+      moduleSidebarItems.length > 0
+    ) {
+      return moduleSidebarItems.flatMap((section) => section.items || []);
+    }
+
+    return [];
+  };
+
+  // Check if item has children
+  const itemHasChildren = (item) => {
+    if (!item.path.includes("/modules/")) return false;
+    const moduleKey = item.path.split("/modules/")[1];
+    return (
+      isModuleView &&
+      currentModule === moduleKey &&
+      moduleSidebarItems.length > 0
+    );
+  };
+
+  // Auto-expand parent if any child is active
+  React.useEffect(() => {
+    if (isModuleView && currentModule && moduleSidebarItems.length > 0) {
+      const modulePath = `/dashboard/modules/${currentModule}`;
+      const hasActiveChild = moduleSidebarItems.some((section) =>
+        section.items?.some((item) => isActive(item.path))
+      );
+
+      if (hasActiveChild && !expandedItems[modulePath]) {
+        setExpandedItems((prev) => ({
+          ...prev,
+          [modulePath]: true,
+        }));
+      }
+    }
+  }, [isModuleView, currentModule, moduleSidebarItems, location.pathname]);
+
+  const renderNavItemExpanded = (item) => {
     const IconComponent = getIconComponent(item.icon);
     const isItemActive = isActive(item.path);
-    const isMostSpecific = getMostSpecificActiveItem() === item.path;
-
-    const handleClick = () => {
-      if (item.path.includes("/modules/") && !isItemActive) {
-        startModuleLoading();
-      }
-    };
+    const hasChildren = itemHasChildren(item);
+    const children = hasChildren ? getItemChildren(item) : [];
+    const isExpanded = expandedItems[item.path] || false;
 
     return (
       <div key={item.path} className="relative">
-        <Link
-          to={item.path}
-          onClick={handleClick}
-          className={`group flex items-center px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium rounded-xl transition-all duration-300 relative cursor-pointer touch-target ${
+        <div
+          className={`group flex items-center px-3 py-2 text-sm font-medium transition-all duration-200 ${
             isItemActive
-              ? "bg-[var(--elra-primary)] text-white font-semibold shadow-lg shadow-emerald-500/20"
-              : "text-gray-800 hover:bg-emerald-50 hover:text-emerald-700"
-          } ${!shouldShowExpanded && "justify-center"}`}
+              ? "bg-emerald-50 text-emerald-700"
+              : "text-gray-800 hover:bg-gray-50"
+          }`}
         >
-          <div className="relative">
-            <IconComponent
-              className={`h-5 w-5 ${
-                isItemActive
-                  ? "text-white"
-                  : "text-gray-600 group-hover:text-emerald-600"
-              } ${
-                !shouldShowExpanded && "mx-auto"
-              } transition-all duration-300 group-hover:scale-110`}
-            />
-          </div>
-          {shouldShowExpanded && (
-            <>
-              <span
-                className={`ml-3 flex-1 ${
-                  isItemActive
-                    ? "text-white"
-                    : "text-gray-800 group-hover:text-emerald-700"
-                }`}
-              >
-                {item.label}
-              </span>
-              <div className="flex items-center space-x-2">
-                {isMostSpecific && (
-                  <span className="px-2 py-1 text-xs font-bold text-white bg-white/20 rounded-full">
-                    Active
-                  </span>
-                )}
-              </div>
-            </>
-          )}
-        </Link>
-      </div>
-    );
-  };
-
-  const renderSection = (sectionKey, sectionTitle, items) => {
-    if (!items || items.length === 0) return null;
-    if (!hasSectionAccess(userRoleLevel, sectionKey)) return null;
-
-    const isCollapsed = isSectionCollapsed(sectionTitle, false);
-    const extraMarginTop = sectionKey === "erp" ? "mt-8" : "";
-
-    return (
-      <div key={sectionKey} className={`mb-8 ${extraMarginTop}`}>
-        {shouldShowExpanded && (
-          <button
-            onClick={(e) => toggleSectionCollapse(sectionTitle, e)}
-            className={`w-full px-4 text-sm font-bold uppercase tracking-wider mb-3 py-3 flex items-center justify-between transition-all duration-200 text-[var(--elra-primary)] cursor-pointer hover:bg-gray-100`}
+          <IconComponent
+            className={`h-5 w-5 ${
+              isItemActive ? "text-emerald-600" : "text-gray-600"
+            }`}
+          />
+          <Link
+            to={item.path}
+            onClick={() => {
+              if (item.path.includes("/modules/") && !isItemActive) {
+                startModuleLoading();
+              }
+            }}
+            className="ml-3 flex-1"
           >
-            <div className="flex items-center">
-              <span>{sectionTitle.toUpperCase()}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              {isCollapsed ? (
-                <ChevronRightIcon className="h-4 w-4 transition-transform duration-200" />
-              ) : (
-                <ChevronDownIcon className="h-4 w-4 transition-transform duration-200" />
-              )}
-            </div>
-          </button>
-        )}
-        {!isCollapsed && (
-          <div className="space-y-2">{items.map(renderNavItem)}</div>
-        )}
-      </div>
-    );
-  };
-
-  // Loading skeletons for ERP modules while fetching from backend
-  const renderERPLoading = () => {
-    if (!shouldShowExpanded) {
-      return (
-        <div className="mb-8 mt-8 px-2">
-          <div className="grid grid-cols-2 gap-2">
-            {Array.from({ length: 8 }).map((_, idx) => (
-              <div
-                key={idx}
-                className="flex flex-col items-center p-2 rounded-full min-h-[60px] justify-center animate-pulse bg-gray-100"
-                style={{ height: "60px" }}
-              >
-                <div className="h-5 w-5 mb-1 rounded-full bg-gray-300" />
-                <div className="h-3 w-12 rounded bg-gray-300" />
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="mb-8 mt-8">
-        <div className="w-full px-4 text-sm font-bold uppercase tracking-wider mb-3 py-3 flex items-center justify-between text-[var(--elra-primary)]">
-          <div className="flex items-center">
-            <span>ERP MODULES</span>
-          </div>
-        </div>
-        <div className="space-y-2 px-4">
-          {Array.from({ length: 8 }).map((_, idx) => (
-            <div
-              key={idx}
-              className="flex items-center px-3 py-2 rounded-full animate-pulse bg-gray-100"
+            {item.label}
+          </Link>
+          {hasChildren && (
+            <button
+              onClick={(e) => toggleItemExpand(item.path, e)}
+              className="p-1 hover:bg-gray-200 rounded transition-colors ml-2"
             >
-              <div className="h-5 w-5 rounded-full bg-gray-300" />
-              <div className="ml-3 h-3 w-40 rounded bg-gray-300" />
-            </div>
-          ))}
+              {isExpanded ? (
+                <ChevronDownIcon className="h-4 w-4 text-gray-600" />
+              ) : (
+                <ChevronRightIcon className="h-4 w-4 text-gray-600" />
+              )}
+            </button>
+          )}
         </div>
-      </div>
-    );
-  };
+        {hasChildren && isExpanded && (
+          <div className="ml-8 mt-1 space-y-1">
+            {children.map((child, childIndex) => {
+              const ChildIconComponent = getIconComponent(child.icon);
+              const isChildActive = isActive(child.path);
 
-  const renderCollapsedERPModules = () => {
-    if (shouldShowExpanded || sections.erp.length === 0) return null;
-
-    return (
-      <div className="mb-8 mt-8">
-        <div className="flex flex-col items-center gap-4 px-2">
-          {sections.erp.map((item) => {
-            const IconComponent = getIconComponent(item.icon);
-            const isItemActive = isActive(item.path);
-
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`relative flex items-center justify-center h-11 w-11 rounded-full transition-all duration-300 cursor-pointer focus:outline-none ${
-                  isItemActive
-                    ? "bg-[var(--elra-primary)] text-white ring-2 ring-emerald-300 shadow-lg shadow-emerald-500/20"
-                    : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                }`}
-                title={item.label}
-              >
-                <IconComponent
-                  className={`h-5 w-5 ${
-                    isItemActive ? "text-white" : "text-emerald-700"
+              return (
+                <Link
+                  key={childIndex}
+                  to={child.path}
+                  className={`group flex items-center px-3 py-2 text-sm font-medium transition-all duration-200 ${
+                    isChildActive
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "text-gray-700 hover:bg-gray-50"
                   }`}
-                />
-              </Link>
-            );
-          })}
-        </div>
+                >
+                  <ChildIconComponent
+                    className={`h-4 w-4 ${
+                      isChildActive ? "text-emerald-600" : "text-gray-600"
+                    }`}
+                  />
+                  <span className="ml-3 flex-1">{child.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   };
@@ -603,247 +477,150 @@ const Sidebar = ({ isOpen, onToggle, isMobile }) => {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar Container */}
       <div
-        className={`fixed top-0 left-0 h-full bg-white backdrop-blur-xl border-r border-gray-200 z-50 transition-all duration-300 ease-in-out ${
-          shouldShowExpanded ? "w-64" : "w-16"
+        className={`fixed top-0 left-0 h-full z-50 transition-all duration-300 ease-in-out ${
+          shouldShowExpanded ? "w-80" : "w-16"
         } ${
           isMobile
             ? isOpen
               ? "transform translate-x-0"
               : "-translate-x-full"
             : ""
-        } ${
-          !isOpen && !isMobile ? "lg:translate-x-0" : ""
-        } shadow-2xl shadow-gray-200/20`}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        } ${!isOpen && !isMobile ? "lg:translate-x-0" : ""}`}
         style={{
           minHeight: "100vh",
           height: "100vh",
-          overflowY: "auto",
         }}
         role="navigation"
         aria-label="Main navigation"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between h-14 sm:h-16 px-3 sm:px-4 border-b border-gray-200 bg-white sticky top-0 z-10">
-          {shouldShowExpanded && (
-            <div className="flex items-center min-w-0">
-              <span className="font-bold text-[var(--elra-primary)] text-base sm:text-lg truncate">
-                {isModuleView && currentModule
-                  ? getCurrentModuleInfo()?.label || currentModule
-                  : "Dashboard"}
-              </span>
-            </div>
-          )}
-
-          <div className="flex items-center space-x-1 flex-shrink-0">
-            {shouldShowExpanded ? (
+        {/* Collapsed Panel - Only shown when NOT expanded */}
+        {!shouldShowExpanded && (
+          <div
+            className="bg-white w-16 h-full flex flex-col items-center border-r border-gray-200 relative"
+            style={{
+              minHeight: "100vh",
+              height: "100vh",
+              overflowY: "auto",
+            }}
+          >
+            {/* Top Section - Arrow and Logo */}
+            <div className="w-full flex flex-col items-center pt-3 pb-4">
+              {/* Expand Arrow Button - Top right */}
               <button
                 onClick={handleToggle}
-                className="p-2 text-gray-500 hover:text-[var(--elra-primary)] hover:bg-gray-100 transition-all duration-200 cursor-pointer touch-target hidden lg:block"
-                title="Collapse sidebar"
-                aria-label="Collapse sidebar"
-              >
-                <ChevronDownIcon className="h-5 w-5 transform rotate-90" />
-              </button>
-            ) : (
-              <button
-                onClick={handleToggle}
-                className="p-2 text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 cursor-pointer touch-target hidden lg:block"
+                className="w-6 h-6 bg-white border border-gray-300 shadow-lg flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors z-20 rounded-sm mb-3"
                 title="Expand sidebar"
                 aria-label="Expand sidebar"
               >
-                <Bars3Icon className="h-5 w-5" />
+                <ChevronRightIcon className="h-4 w-4 text-gray-800" />
               </button>
-            )}
 
-            {/* Mobile toggle button */}
-            <button
-              onClick={handleToggle}
-              className="p-2 rounded-xl text-[var(--elra-primary)] hover:text-[var(--elra-primary-dark)] transition-all duration-200 hover:scale-110 cursor-pointer touch-target lg:hidden"
-              aria-label={isOpen ? "Close sidebar" : "Open sidebar"}
-            >
-              {isOpen ? (
-                <XMarkIcon className="h-5 w-5 sm:h-6 sm:w-6" />
-              ) : (
-                <Bars3Icon className="h-5 w-5 sm:h-6 sm:w-6" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* User Profile */}
-        <div className="px-3 sm:px-4 py-3 sm:py-4 border-b border-gray-200 bg-white">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center min-w-0 flex-1">
-              <div
-                className={`${
-                  shouldShowExpanded ? "w-10 h-10 sm:w-12 sm:h-12" : "w-10 h-10"
-                } rounded-full flex items-center justify-center shadow-lg overflow-hidden border-2 border-[var(--elra-primary)] flex-shrink-0 ${
-                  !shouldShowExpanded ? "mx-auto" : "mr-3 sm:mr-4"
-                }`}
-              >
-                {user?.avatar ? (
-                  <img
-                    src={getImageUrl(user.avatar)}
-                    alt={`${user?.firstName} ${user?.lastName}`}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.style.display = "none";
-                      e.target.nextSibling.style.display = "flex";
-                    }}
-                  />
-                ) : null}
-                <div
-                  className={`${
-                    user?.avatar ? "hidden" : "flex"
-                  } w-full h-full bg-gradient-to-br from-[var(--elra-primary)] to-[var(--elra-primary-dark)] items-center justify-center`}
-                >
-                  <span
-                    className={`text-white font-bold ${
-                      shouldShowExpanded ? "text-lg" : "text-base"
-                    }`}
-                  >
-                    {user?.firstName?.charAt(0) || user?.name?.charAt(0) || "U"}
-                  </span>
-                </div>
+              {/* Logo/Icon - Green square with E */}
+              <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-lg">E</span>
               </div>
-              {shouldShowExpanded && (
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs sm:text-sm font-semibold text-gray-800 truncate">
-                    {user?.firstName} {user?.lastName}
-                  </p>
-                  <p className="text-xs sm:text-sm text-gray-600 font-semibold truncate">
-                    {user?.department?.name || "Department"}
-                  </p>
-                  <p className="text-[10px] sm:text-xs text-gray-500 font-medium truncate">
-                    {typeof roleInfo?.title === "string"
-                      ? roleInfo.title
-                      : "Staff"}
-                  </p>
-                </div>
-              )}
+            </div>
+
+            {/* Navigation Icons */}
+            <div className="flex flex-col items-center space-y-3 flex-1 px-2">
+              {navigation.map((item) => {
+                const IconComponent = getIconComponent(item.icon);
+                const isItemActive = isActive(item.path);
+
+                return (
+                  <div
+                    key={item.path}
+                    className="relative w-full flex justify-center"
+                  >
+                    <Link
+                      to={item.path}
+                      onClick={() => {
+                        if (item.path.includes("/modules/") && !isItemActive) {
+                          startModuleLoading();
+                        }
+                      }}
+                      className={`relative flex items-center justify-center h-11 w-11 rounded-lg transition-all duration-300 ${
+                        isItemActive
+                          ? "bg-emerald-50 text-emerald-600"
+                          : "text-gray-600 hover:bg-gray-100"
+                      }`}
+                      title={item.label}
+                    >
+                      <IconComponent className="h-5 w-5" />
+                    </Link>
+                  </div>
+                );
+              })}
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Navigation */}
-        <div
-          className="px-2 sm:px-4 py-4 sm:py-6 space-y-1 sidebar-scroll"
-          style={{
-            maxHeight: "calc(100vh - 180px)",
-            overflowY: "auto",
-          }}
-        >
-          <div className="space-y-1">
-            {shouldShowExpanded && sections.main.map(renderNavItem)}
+        {/* Expanded Panel - Only shown when expanded */}
+        {shouldShowExpanded && (
+          <div
+            className="bg-white w-80 h-full flex flex-col border-r border-gray-200 relative"
+            style={{
+              minHeight: "100vh",
+              height: "100vh",
+              overflowY: "auto",
+            }}
+          >
+            {/* Collapse Arrow Button - Right edge, protruding */}
+            <button
+              onClick={handleToggle}
+              className="absolute top-2 right-2 w-6 h-6 bg-white border border-gray-300 shadow-lg flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors z-20 rounded-sm"
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
+            >
+              <ChevronRightIcon className="h-4 w-4 text-gray-800 transform rotate-180" />
+            </button>
 
-            {shouldShowExpanded
-              ? loadingModules
-                ? renderERPLoading()
-                : renderSection("erp", "ERP Modules", sections.erp)
-              : loadingModules
-              ? renderERPLoading()
-              : renderCollapsedERPModules()}
+            {/* AdminHub Header Section */}
+            <div className="px-4 py-3 border-b border-gray-200 bg-white">
+              <div className="flex items-center">
+                <div className="w-8 h-8 bg-emerald-600 rounded flex items-center justify-center mr-3">
+                  <span className="text-white text-xs font-bold">ERP</span>
+                </div>
+                <span className="text-sm font-semibold text-gray-800">
+                  AdminHub
+                </span>
+              </div>
+            </div>
 
-            {shouldShowExpanded && (
-              <>
-                {isModuleView && currentModule && (
-                  <>
-                    <div className="mb-6 mt-4">
-                      <button
-                        onClick={(e) =>
-                          toggleSectionCollapse("Module Features", e)
-                        }
-                        className="w-full px-4 text-sm font-bold text-[var(--elra-primary)] uppercase tracking-wider mb-3 py-3 rounded-full flex items-center justify-between transition-all duration-200 cursor-pointer hover:bg-gray-100"
+            {/* Navigation Items */}
+            <div
+              className="px-2 py-4 space-y-1 sidebar-scroll flex-1"
+              style={{
+                maxHeight: "calc(100vh - 80px)",
+                overflowY: "auto",
+              }}
+            >
+              <div className="space-y-1">
+                {sections.main.map(renderNavItemExpanded)}
+
+                {loadingModules ? (
+                  <div className="space-y-1">
+                    {Array.from({ length: 5 }).map((_, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center px-3 py-2 rounded-lg animate-pulse bg-gray-100"
                       >
-                        <span>Module Features</span>
-                        <div className="flex items-center space-x-2">
-                          {isSectionCollapsed("Module Features", false) ? (
-                            <ChevronRightIcon className="h-4 w-4 transition-transform duration-200" />
-                          ) : (
-                            <ChevronDownIcon className="h-4 w-4 transition-transform duration-200" />
-                          )}
-                        </div>
-                      </button>
-                    </div>
-
-                    {!isSectionCollapsed("Module Features", false) && (
-                      <div className="space-y-4">
-                        {moduleSidebarItems.map((section, sectionIndex) => (
-                          <div key={sectionIndex} className="mb-4">
-                            <button
-                              onClick={(e) =>
-                                toggleSectionCollapse(section.title, e)
-                              }
-                              className="w-full px-4 text-xs font-semibold text-[var(--elra-primary)] uppercase tracking-wider mb-2 py-2 rounded-lg flex items-center justify-between transition-all duration-200 cursor-pointer hover:bg-gray-100"
-                            >
-                              <span>{section.title}</span>
-                              {section.collapsible && (
-                                <div className="flex items-center space-x-2">
-                                  {isSectionCollapsed(
-                                    section.title,
-                                    section.defaultExpanded
-                                  ) ? (
-                                    <ChevronRightIcon className="h-4 w-4 transition-transform duration-200" />
-                                  ) : (
-                                    <ChevronDownIcon className="h-4 w-4 transition-transform duration-200" />
-                                  )}
-                                </div>
-                              )}
-                            </button>
-                            {(!section.collapsible ||
-                              !isSectionCollapsed(
-                                section.title,
-                                section.defaultExpanded
-                              )) && (
-                              <div className="space-y-1 ml-4">
-                                {section.items.map((item, itemIndex) => {
-                                  const IconComponent = getIconComponent(
-                                    item.icon
-                                  );
-                                  const isItemActive = isActive(item.path);
-
-                                  return (
-                                    <div key={itemIndex} className="relative">
-                                      <Link
-                                        to={item.path}
-                                        className={`group flex items-center px-4 py-2 text-xs font-medium rounded-xl transition-all duration-300 cursor-pointer ${
-                                          isItemActive
-                                            ? "bg-[var(--elra-primary)] text-white font-semibold shadow-lg shadow-emerald-500/20"
-                                            : "text-gray-800 hover:bg-emerald-50 hover:text-emerald-700"
-                                        }`}
-                                      >
-                                        <IconComponent
-                                          className={`h-4 w-4 ${
-                                            isItemActive
-                                              ? "text-white"
-                                              : "text-gray-600 group-hover:text-emerald-600"
-                                          } transition-all duration-300 group-hover:scale-110`}
-                                        />
-                                        <span className="ml-3 flex-1">
-                                          {item.label}
-                                        </span>
-                                      </Link>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                        <div className="h-5 w-5 rounded bg-gray-300" />
+                        <div className="ml-3 h-4 w-32 rounded bg-gray-300" />
                       </div>
-                    )}
-                  </>
+                    ))}
+                  </div>
+                ) : (
+                  sections.erp.map(renderNavItemExpanded)
                 )}
 
-                {renderSection("system", "System", sections.system)}
-              </>
-            )}
+                {sections.system.map(renderNavItemExpanded)}
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </>
   );
